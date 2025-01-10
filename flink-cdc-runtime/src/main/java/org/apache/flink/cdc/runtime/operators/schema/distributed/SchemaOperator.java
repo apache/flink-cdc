@@ -150,6 +150,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
             // Then, notify this information to the coordinator
             requestSchemaChange(
+                    tableId,
                     new SchemaChangeRequest(sourcePartition, subTaskId, schemaChangeEvent));
             schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(1);
         } else if (event instanceof DataChangeEvent) {
@@ -188,9 +189,15 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private void requestSchemaChange(SchemaChangeRequest schemaChangeRequest) {
+    private void requestSchemaChange(
+            TableId sourceTableId, SchemaChangeRequest schemaChangeRequest) {
         LOG.info("{}> Sent FlushEvent to downstream...", subTaskId);
-        output.collect(new StreamRecord<>(new FlushEvent(subTaskId)));
+        output.collect(
+                new StreamRecord<>(
+                        new FlushEvent(
+                                subTaskId,
+                                tableIdRouter.route(sourceTableId),
+                                schemaChangeRequest.getSchemaChangeEvent().getType())));
 
         LOG.info("{}> Sending evolve request...", subTaskId);
         SchemaChangeResponse response = sendRequestToCoordinator(schemaChangeRequest);
