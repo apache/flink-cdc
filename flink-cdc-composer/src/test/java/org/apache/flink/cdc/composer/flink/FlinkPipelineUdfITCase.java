@@ -40,6 +40,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -58,7 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Integration test for UDFs. */
-public class FlinkPipelineUdfITCase {
+class FlinkPipelineUdfITCase {
     private static final int MAX_PARALLELISM = 4;
 
     // Always use parent-first classloader for CDC classes.
@@ -839,6 +840,8 @@ public class FlinkPipelineUdfITCase {
 
     @ParameterizedTest
     @MethodSource("testParams")
+    @Disabled(
+            "This test is meant to be run locally since it relies on a valid connection to OpenAI server.")
     void testTransformWithModel(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 

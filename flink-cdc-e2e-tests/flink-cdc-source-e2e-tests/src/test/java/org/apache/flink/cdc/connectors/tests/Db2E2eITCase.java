@@ -22,12 +22,13 @@ import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
+import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
@@ -48,7 +49,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -58,11 +58,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** End-to-end tests for db2 cdc connector uber jar. */
-public class Db2E2eITCase extends FlinkContainerTestEnvironment {
+class Db2E2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2E2eITCase.class);
     private static final String INTER_CONTAINER_DB2_ALIAS = "db2";
@@ -78,21 +77,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
     private static Db2Container db2Container;
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    @Parameterized.Parameter(1)
-    public boolean parallelismSnapshot;
-
-    @Parameterized.Parameters(name = "flinkVersion: {0}, parallelismSnapshot: {1}")
-    public static List<Object[]> parameters() {
-        final List<String> flinkVersions = getFlinkVersion();
-        List<Object[]> params = new ArrayList<>();
-        for (String flinkVersion : flinkVersions) {
-            params.add(new Object[] {flinkVersion, true});
-            params.add(new Object[] {flinkVersion, false});
-        }
-        return params;
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         debeziumDockerImageName =
                 DockerImageName.parse(
@@ -102,7 +87,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
                         .asCompatibleSubstituteFor(DB2_IMAGE);
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         super.before();
         LOG.info("Starting db2 containers...");
@@ -139,7 +124,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         LOG.info("Db2 asn agent are started.");
     }
 
-    @After
+    @AfterEach
     public void after() {
         if (db2Container != null) {
             db2Container.close();
@@ -148,8 +133,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         super.after();
     }
 
-    @Test
-    public void testDb2CDC() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testDb2CDC(boolean parallelismSnapshot) throws Exception {
         initializeDb2Table("inventory", "PRODUCTS");
         List<String> sqlLines =
                 Arrays.asList(
@@ -256,7 +242,9 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
         Path path = null;
         try {
             URL filePath = Db2E2eITCase.class.getClassLoader().getResource(resourceFilePath);
-            assertNotNull("Cannot locate " + resourceFilePath, filePath);
+            Assertions.assertThat(filePath)
+                    .withFailMessage("Cannot locate " + resourceFilePath)
+                    .isNotNull();
             path = Paths.get(filePath.toURI());
         } catch (URISyntaxException e) {
             LOG.error("Cannot get path from URI.", e);
@@ -322,7 +310,7 @@ public class Db2E2eITCase extends FlinkContainerTestEnvironment {
     protected void initializeDb2Table(String sqlFile, String tableName) {
         final String ddlFile = String.format("docker/db2/%s.sql", sqlFile);
         final URL ddlTestFile = Db2TestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getDb2Connection();
                 Statement statement = connection.createStatement()) {
             String tableExistSql =

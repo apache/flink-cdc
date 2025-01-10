@@ -34,13 +34,12 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +48,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -57,64 +57,62 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** IT tests for {@link SqlServerSourceBuilder.SqlServerIncrementalSource}. */
-public class SqlServerSourceITCase extends SqlServerSourceTestBase {
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
+class SqlServerSourceITCase extends SqlServerSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerSourceITCase.class);
-
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
 
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
     @Test
-    public void testReadSingleTableWithSingleParallelism() throws Exception {
+    void testReadSingleTableWithSingleParallelism() throws Exception {
         testSqlServerParallelSource(
                 1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"dbo.customers"});
     }
 
     @Test
-    public void testReadSingleTableWithMultipleParallelism() throws Exception {
+    void testReadSingleTableWithMultipleParallelism() throws Exception {
         testSqlServerParallelSource(
                 4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"dbo.customers"});
     }
 
     // Failover tests
     @Test
-    public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
+    void testTaskManagerFailoverInSnapshotPhase() throws Exception {
         testSqlServerParallelSource(
                 FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"dbo.customers"});
     }
 
     @Test
-    public void testTaskManagerFailoverInBinlogPhase() throws Exception {
+    void testTaskManagerFailoverInBinlogPhase() throws Exception {
         testSqlServerParallelSource(
                 FailoverType.TM, FailoverPhase.STREAM, new String[] {"dbo.customers"});
     }
 
     @Test
-    public void testJobManagerFailoverInSnapshotPhase() throws Exception {
+    void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testSqlServerParallelSource(
                 FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"dbo.customers"});
     }
 
     @Test
-    public void testJobManagerFailoverInBinlogPhase() throws Exception {
+    void testJobManagerFailoverInBinlogPhase() throws Exception {
         testSqlServerParallelSource(
                 FailoverType.JM, FailoverPhase.STREAM, new String[] {"dbo.customers"});
     }
 
     @Test
-    public void testJobManagerFailoverSingleParallelism() throws Exception {
+    void testJobManagerFailoverSingleParallelism() throws Exception {
         testSqlServerParallelSource(
                 1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"dbo.customers"});
     }
 
     @Test
-    public void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
         testSqlServerParallelSource(
                 DEFAULT_PARALLELISM,
                 FailoverType.TM,
@@ -126,7 +124,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
+    void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(false, 25, USE_PRE_HIGHWATERMARK_HOOK);
 
@@ -165,7 +163,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
+    void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(false, 25, USE_POST_LOWWATERMARK_HOOK);
 
@@ -204,7 +202,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+    void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(true, 25, USE_PRE_HIGHWATERMARK_HOOK);
 
@@ -241,7 +239,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
+    void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(true, 25, USE_POST_LOWWATERMARK_HOOK);
 
@@ -279,7 +277,7 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testTableWithChunkColumnOfNoPrimaryKey() {
+    void testTableWithChunkColumnOfNoPrimaryKey() {
         String chunkColumn = "name";
         try {
             testSqlServerParallelSource(
@@ -291,13 +289,11 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
                     RestartStrategies.noRestart(),
                     chunkColumn);
         } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                            chunkColumn, "id", "customer.dbo.customers"))
-                            .isPresent());
+            Assertions.assertThat(e)
+                    .hasStackTraceContaining(
+                            String.format(
+                                    "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                                    chunkColumn, "id", "customer.dbo.customers"));
         }
     }
 
@@ -488,7 +484,10 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == FailoverPhase.SNAPSHOT && iterator.hasNext()) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(100));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(100));
         }
 
         LOG.info("snapshot data start");
@@ -501,7 +500,10 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
         }
         if (failoverPhase == FailoverPhase.STREAM) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(200));
         }
         for (String tableId : captureCustomerTables) {
             makeSecondPartBinlogEvents(databaseName + "." + tableId);

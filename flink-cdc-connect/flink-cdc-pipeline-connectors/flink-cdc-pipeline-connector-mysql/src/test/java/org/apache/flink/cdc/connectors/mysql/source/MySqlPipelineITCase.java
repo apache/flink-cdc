@@ -55,10 +55,10 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -83,7 +83,7 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link MySqlDataSource}. */
-public class MySqlPipelineITCase extends MySqlSourceTestBase {
+class MySqlPipelineITCase extends MySqlSourceTestBase {
 
     protected static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0);
@@ -94,21 +94,21 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void stopContainers() {
         LOG.info("Stopping containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Containers are stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
@@ -117,7 +117,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testInitialStartupMode() throws Exception {
+    void testInitialStartupMode() throws Exception {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -265,7 +265,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testInitialStartupModeWithOpTs() throws Exception {
+    void testInitialStartupModeWithOpTs() throws Exception {
         inventoryDatabase.createAndInitialize();
         Configuration sourceConfiguration = new Configuration();
         sourceConfiguration.set(MySqlDataSourceOptions.HOSTNAME, MYSQL8_CONTAINER.getHost());
@@ -427,7 +427,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testParseAlterStatement() throws Exception {
+    void testParseAlterStatement() throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
@@ -562,7 +562,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testSchemaChangeEvents() throws Exception {
+    void testSchemaChangeEvents() throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
@@ -860,7 +860,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testDanglingDropTableEventInBinlog() throws Exception {
+    void testDanglingDropTableEventInBinlog() throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
 

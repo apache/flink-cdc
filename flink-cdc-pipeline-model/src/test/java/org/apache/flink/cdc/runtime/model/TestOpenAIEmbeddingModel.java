@@ -21,14 +21,17 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /** A test for {@link OpenAIEmbeddingModel}. */
-public class TestOpenAIEmbeddingModel {
+class TestOpenAIEmbeddingModel {
 
     @Test
-    public void testEval() {
+    @Disabled(
+            "This test is meant to be run locally since it relies on a valid connection to OpenAI server.")
+    void testEval() {
         OpenAIEmbeddingModel openAIEmbeddingModel = new OpenAIEmbeddingModel();
         Configuration configuration = new Configuration();
         configuration.set(ModelOptions.OPENAI_HOST, "http://langchain4j.dev/demo/openai/v1");
@@ -38,6 +41,6 @@ public class TestOpenAIEmbeddingModel {
         openAIEmbeddingModel.open(userDefinedFunctionContext);
         ArrayData arrayData =
                 openAIEmbeddingModel.eval("Flink CDC is a streaming data integration tool");
-        Assertions.assertNotNull(arrayData);
+        Assertions.assertThat(arrayData).isNotNull();
     }
 }

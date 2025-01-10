@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** A test for the {@link AlterColumnTypeEventSerializer}. */
-public class AlterColumnTypeEventSerializerTest extends SerializerTestBase<AlterColumnTypeEvent> {
+class AlterColumnTypeEventSerializerTest extends SerializerTestBase<AlterColumnTypeEvent> {
     @Override
     protected TypeSerializer<AlterColumnTypeEvent> createSerializer() {
         return AlterColumnTypeEventSerializer.INSTANCE;
