@@ -389,17 +389,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             if (!transform.getSelectors().isMatch(tableId)) {
                 continue;
             }
-            if (!transform.getProjection().isPresent()) {
-                processProjectionTransform(tableId, tableSchema, referencedColumnsSet, null);
-                hasMatchTransform = true;
-            } else {
-                TransformProjection transformProjection = transform.getProjection().get();
-                if (transformProjection.isValid()) {
-                    processProjectionTransform(
-                            tableId, tableSchema, referencedColumnsSet, transform);
-                    hasMatchTransform = true;
-                }
-            }
+            processProjectionTransform(tableId, tableSchema, referencedColumnsSet, transform);
+            hasMatchTransform = true;
         }
         if (!hasMatchTransform) {
             processProjectionTransform(tableId, tableSchema, referencedColumnsSet, null);
