@@ -22,10 +22,10 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The processor of pre-transform projection in {@link PreTransformOperator}.
@@ -39,7 +39,7 @@ import java.util.List;
  * </ul>
  */
 public class PreTransformProcessor {
-    private PreTransformChangeInfo tableChangeInfo;
+    private final PreTransformChangeInfo tableChangeInfo;
 
     public PreTransformProcessor(PreTransformChangeInfo tableChangeInfo) {
         this.tableChangeInfo = tableChangeInfo;
@@ -62,30 +62,18 @@ public class PreTransformProcessor {
     public BinaryRecordData processFillDataField(BinaryRecordData data) {
         List<Object> valueList = new ArrayList<>();
         List<Column> columns = tableChangeInfo.getPreTransformedSchema().getColumns();
-        for (int i = 0; i < columns.size(); i++) {
-            valueList.add(
-                    getValueFromBinaryRecordData(
-                            columns.get(i).getName(),
-                            data,
-                            tableChangeInfo.getSourceSchema().getColumns(),
-                            tableChangeInfo.getSourceFieldGetters()));
+        Map<String, RecordData.FieldGetter> sourceFieldGetters =
+                tableChangeInfo.getSourceFieldGetters();
+        for (Column column : columns) {
+            RecordData.FieldGetter fieldGetter = sourceFieldGetters.get(column.getName());
+            if (fieldGetter != null) {
+                valueList.add(fieldGetter.getFieldOrNull(data));
+            } else {
+                valueList.add(null);
+            }
         }
         return tableChangeInfo
                 .getPreTransformedRecordDataGenerator()
                 .generate(valueList.toArray(new Object[0]));
-    }
-
-    private Object getValueFromBinaryRecordData(
-            String columnName,
-            BinaryRecordData binaryRecordData,
-            List<Column> columns,
-            RecordData.FieldGetter[] fieldGetters) {
-        for (int i = 0; i < columns.size(); i++) {
-            if (columnName.equals(columns.get(i).getName())) {
-                return DataTypeConverter.convert(
-                        fieldGetters[i].getFieldOrNull(binaryRecordData), columns.get(i).getType());
-            }
-        }
-        return null;
     }
 }
