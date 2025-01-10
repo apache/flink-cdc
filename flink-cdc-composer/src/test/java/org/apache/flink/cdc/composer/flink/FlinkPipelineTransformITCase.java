@@ -489,7 +489,7 @@ class FlinkPipelineTransformITCase {
         runGenericTransformTest(
                 sinkApi,
                 Arrays.asList(
-                        // nullProjection、emptyProjection、asteriskProjection has the same meaning
+                        // Setting projection as null, '', or * should be equivalent
                         nullProjection,
                         emptyProjection,
                         asteriskProjection,
