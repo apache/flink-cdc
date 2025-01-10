@@ -156,5 +156,20 @@ public class MySqlSchemaUtils {
                 tableId.getSchemaName(), null, tableId.getTableName());
     }
 
+    /**
+     * In debezium, when COLUMN_INCLUDE_LIST and COLUMN_EXCLUDE_LIST exist at the same time, the
+     * optimization level of COLUMN_INCLUDE_LIST is greater than that of COLUMN_EXCLUDE_LIST.
+     * https://github.com/debezium/debezium/blob/9744e869c303f902e025c3a09cf5d775971ae78e/debezium-core/src/main/java/io/debezium/relational/RelationalDatabaseConnectorConfig.java#L610
+     */
+    public static boolean matchesColumn(
+            String fullColumnName, List<String> columnIncludeList, List<String> columnExcludeList) {
+        if (columnIncludeList != null && !columnIncludeList.isEmpty()) {
+            return columnIncludeList.stream().anyMatch(fullColumnName::matches);
+        } else if (columnExcludeList != null && !columnExcludeList.isEmpty()) {
+            return columnExcludeList.stream().noneMatch(fullColumnName::matches);
+        }
+        return true;
+    }
+
     private MySqlSchemaUtils() {}
 }

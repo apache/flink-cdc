@@ -19,8 +19,11 @@ package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
@@ -42,13 +45,16 @@ import org.apache.kafka.connect.source.SourceRecord;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
+import static org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils.matchesColumn;
 
 /** Event deserializer for {@link MySqlDataSource}. */
 @Internal
@@ -62,6 +68,8 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean includeSchemaChanges;
+    private final List<String> columnIncludeList;
+    private final List<String> columnExcludeList;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
@@ -69,17 +77,29 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private List<MySqlReadableMetadata> readableMetadataList;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
-        this(changelogMode, includeSchemaChanges, new ArrayList<>());
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            List<String> columnIncludeList,
+            List<String> columnExcludeList) {
+        this(
+                changelogMode,
+                includeSchemaChanges,
+                new ArrayList<>(),
+                columnIncludeList,
+                columnExcludeList);
     }
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
-            List<MySqlReadableMetadata> readableMetadataList) {
+            List<MySqlReadableMetadata> readableMetadataList,
+            List<String> columnIncludeList,
+            List<String> columnExcludeList) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
+        this.columnIncludeList = columnIncludeList;
+        this.columnExcludeList = columnExcludeList;
     }
 
     @Override
@@ -99,12 +119,60 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                         historyRecord.document().getString(HistoryRecord.Fields.DDL_STATEMENTS);
                 customParser.setCurrentDatabase(databaseName);
                 customParser.parse(ddl, tables);
-                return customParser.getAndClearParsedEvents();
+                List<SchemaChangeEvent> andClearParsedEvents =
+                        customParser.getAndClearParsedEvents();
+                if (columnIncludeList == null && columnExcludeList == null) {
+                    return andClearParsedEvents;
+                } else {
+                    return andClearParsedEvents.stream()
+                            .filter(this::filterColumnChangeEvent)
+                            .collect(Collectors.toList());
+                }
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to parse the schema change : " + record, e);
             }
         }
         return Collections.emptyList();
+    }
+
+    public final boolean filterColumnChangeEvent(SchemaChangeEvent event) {
+        return Boolean.TRUE.equals(
+                SchemaChangeEventVisitor.visit(
+                        event,
+                        addColumnEvent ->
+                                filterColumnNames(
+                                        addColumnEvent.tableId(),
+                                        addColumnEvent.getAddedColumns().stream()
+                                                .map(
+                                                        AddColumnEvent.ColumnWithPosition
+                                                                ::getAddColumn)
+                                                .map(Column::getName)
+                                                .collect(Collectors.toList())),
+                        alterColumnTypeEvent ->
+                                filterColumnNames(
+                                        alterColumnTypeEvent.tableId(),
+                                        alterColumnTypeEvent.getTypeMapping().keySet()),
+                        createTableEvent -> true,
+                        dropColumnEvent ->
+                                filterColumnNames(
+                                        dropColumnEvent.tableId(),
+                                        dropColumnEvent.getDroppedColumnNames()),
+                        dropTableEvent -> true,
+                        renameColumnEvent ->
+                                filterColumnNames(
+                                        renameColumnEvent.tableId(),
+                                        renameColumnEvent.getNameMapping().keySet()),
+                        truncateTableEvent -> true));
+    }
+
+    private boolean filterColumnNames(TableId tableId, Collection<String> eventColumnNames) {
+        return eventColumnNames.stream()
+                .anyMatch(
+                        name ->
+                                matchesColumn(
+                                        tableId + "." + name,
+                                        columnIncludeList,
+                                        columnExcludeList));
     }
 
     @Override
