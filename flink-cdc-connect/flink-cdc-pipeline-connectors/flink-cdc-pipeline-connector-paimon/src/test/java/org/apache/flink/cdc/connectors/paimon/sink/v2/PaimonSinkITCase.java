@@ -276,7 +276,8 @@ public class PaimonSinkITCase {
         // Each commit will generate one sequence number(equal to checkpointId).
         List<Row> expected =
                 enableDeleteVector
-                        ? Collections.singletonList(Row.ofKind(RowKind.INSERT, 3L))
+                        ? Arrays.asList(
+                                Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 3L))
                         : Arrays.asList(
                                 Row.ofKind(RowKind.INSERT, 1L),
                                 Row.ofKind(RowKind.INSERT, 2L),
