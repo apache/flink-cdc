@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.core.testutils.FlinkAssertions.anyCauseMatches;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** A test for {@link OpenAIChatModel}. */
@@ -39,10 +38,11 @@ public class TestOpenAIChatModel {
         UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
         openAIChatModel.open(userDefinedFunctionContext);
         assertThatThrownBy(
-                () -> {
-                    String response = openAIChatModel.eval("Who invented the electric light?");
-                    Assertions.assertFalse(response.isEmpty());
-                })
+                        () -> {
+                            String response =
+                                    openAIChatModel.eval("Who invented the electric light?");
+                            Assertions.assertFalse(response.isEmpty());
+                        })
                 .satisfies(anyCauseMatches("quota"));
     }
 }

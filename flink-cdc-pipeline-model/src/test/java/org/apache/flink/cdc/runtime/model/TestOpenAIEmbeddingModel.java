@@ -40,11 +40,12 @@ public class TestOpenAIEmbeddingModel {
         UserDefinedFunctionContext userDefinedFunctionContext = () -> configuration;
         openAIEmbeddingModel.open(userDefinedFunctionContext);
         assertThatThrownBy(
-                () -> {
-                    ArrayData arrayData =
-                            openAIEmbeddingModel.eval("Flink CDC is a streaming data integration tool");
-                    Assertions.assertNotNull(arrayData);
-                })
+                        () -> {
+                            ArrayData arrayData =
+                                    openAIEmbeddingModel.eval(
+                                            "Flink CDC is a streaming data integration tool");
+                            Assertions.assertNotNull(arrayData);
+                        })
                 .satisfies(anyCauseMatches("quota"));
     }
 }
