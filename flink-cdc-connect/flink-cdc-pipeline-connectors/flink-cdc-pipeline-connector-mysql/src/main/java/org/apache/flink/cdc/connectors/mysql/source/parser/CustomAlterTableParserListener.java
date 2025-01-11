@@ -60,6 +60,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private final MySqlAntlrDdlParser parser;
     private final List<ParseTreeListener> listeners;
     private final LinkedList<SchemaChangeEvent> changes;
+    private final boolean tinyInt1isBit;
     private org.apache.flink.cdc.common.event.TableId currentTable;
     private List<ColumnEditor> columnEditors;
     private CustomColumnDefinitionParserListener columnDefinitionListener;
@@ -70,10 +71,12 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     public CustomAlterTableParserListener(
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners,
-            LinkedList<SchemaChangeEvent> changes) {
+            LinkedList<SchemaChangeEvent> changes,
+            boolean tinyInt1isBit) {
         this.parser = parser;
         this.listeners = listeners;
         this.changes = changes;
+        this.tinyInt1isBit = tinyInt1isBit;
     }
 
     @Override
@@ -315,7 +318,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     String newColumnName = parser.parseName(ctx.newColumn);
 
                     Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
 
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
@@ -366,7 +369,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
                     listeners.remove(columnDefinitionListener);
                 },
@@ -413,7 +416,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
                 dbzColumn.name(),
-                fromDbzColumn(dbzColumn),
+                fromDbzColumn(dbzColumn, tinyInt1isBit),
                 dbzColumn.comment(),
                 dbzColumn.defaultValueExpression().orElse(null));
     }

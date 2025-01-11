@@ -576,7 +576,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
         RowType splitKeyType =
                 ChunkUtils.getChunkKeyColumnType(
-                        Column.editor().name("id").type("INT").jdbcType(4).create());
+                        Column.editor().name("id").type("INT").jdbcType(4).create(), true);
         List<MySqlSchemalessSnapshotSplit> remainingSplits =
                 Arrays.asList(
                         new MySqlSchemalessSnapshotSplit(

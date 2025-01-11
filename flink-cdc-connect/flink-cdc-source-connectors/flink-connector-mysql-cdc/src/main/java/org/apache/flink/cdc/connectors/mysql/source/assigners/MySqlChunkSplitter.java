@@ -32,6 +32,7 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
@@ -148,7 +149,12 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             splitColumn =
                     ChunkUtils.getChunkKeyColumn(
                             currentSplittingTable, sourceConfig.getChunkKeyColumns());
-            splitType = ChunkUtils.getChunkKeyColumnType(splitColumn);
+            boolean tinyInt1isBit =
+                    Boolean.parseBoolean(
+                            sourceConfig
+                                    .getJdbcProperties()
+                                    .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
+            splitType = ChunkUtils.getChunkKeyColumnType(splitColumn, tinyInt1isBit);
             minMaxOfSplitColumn =
                     StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
@@ -385,7 +391,12 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             Object max,
             int chunkSize,
             long approximateRowCnt) {
-        if (!isEvenlySplitColumn(splitColumn)) {
+        boolean tinyInt1isBit =
+                Boolean.parseBoolean(
+                        sourceConfig
+                                .getJdbcProperties()
+                                .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
+        if (!isEvenlySplitColumn(splitColumn, tinyInt1isBit)) {
             return -1;
         }
         final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
@@ -410,8 +421,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
     }
 
     /** Checks whether split column is evenly distributed across its range. */
-    private static boolean isEvenlySplitColumn(Column splitColumn) {
-        DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
+    private static boolean isEvenlySplitColumn(Column splitColumn, boolean tinyInt1isBit) {
+        DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn, tinyInt1isBit);
         LogicalTypeRoot typeRoot = flinkType.getLogicalType().getTypeRoot();
 
         // currently, we only support the optimization that split column with type BIGINT, INT,

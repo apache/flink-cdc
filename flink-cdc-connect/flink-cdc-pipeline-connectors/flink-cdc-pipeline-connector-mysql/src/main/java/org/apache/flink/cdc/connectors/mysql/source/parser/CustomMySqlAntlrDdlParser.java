@@ -34,10 +34,12 @@ import java.util.List;
 public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     private final LinkedList<SchemaChangeEvent> parsedEvents;
+    private final boolean tinyInt1isBit;
 
-    public CustomMySqlAntlrDdlParser() {
+    public CustomMySqlAntlrDdlParser(boolean tinyInt1isBit) {
         super();
         this.parsedEvents = new LinkedList<>();
+        this.tinyInt1isBit = tinyInt1isBit;
     }
 
     // Overriding this method because the BIT type requires default length dimension of 1.
@@ -277,7 +279,7 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     @Override
     protected AntlrDdlParserListener createParseTreeWalkerListener() {
-        return new CustomMySqlAntlrDdlParserListener(this, parsedEvents);
+        return new CustomMySqlAntlrDdlParserListener(this, parsedEvents, tinyInt1isBit);
     }
 
     public List<SchemaChangeEvent> getAndClearParsedEvents() {
