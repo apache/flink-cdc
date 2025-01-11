@@ -28,7 +28,6 @@ limitations under the License.
 
     <properties>
         <doris.connector.version>24.0.1</doris.connector.version>
-        <testcontainers.version>1.18.3</testcontainers.version>
         <mysql.connector.version>8.0.26</mysql.connector.version>
     </properties>
 

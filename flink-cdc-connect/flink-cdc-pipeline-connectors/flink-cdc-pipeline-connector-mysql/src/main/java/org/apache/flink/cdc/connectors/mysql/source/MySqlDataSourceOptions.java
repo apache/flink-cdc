@@ -281,7 +281,7 @@ public class MySqlDataSourceOptions {
                     .withDescription(
                             "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
                                     + "Available readable metadata are: op_ts.");
-  
+
     @Experimental
     public static final ConfigOption<Boolean> INCLUDE_COMMENTS_ENABLED =
             ConfigOptions.key("include-comments.enabled")
