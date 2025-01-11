@@ -120,6 +120,13 @@ pipeline:
        <td> Whether to write through FE redirection and directly connect to BE to write </td>
      </tr>
      <tr>
+       <td>charset-encoding</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">false</td>
+       <td>Boolean</td>
+       <td> Charset encoding for doris http client, default UTF-8 </td>
+     </tr>
+     <tr>
        <td>sink.enable.batch-mode</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">true</td>

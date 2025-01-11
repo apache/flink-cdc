@@ -281,4 +281,13 @@ public class MySqlDataSourceOptions {
                     .withDescription(
                             "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
                                     + "Available readable metadata are: op_ts.");
+  
+    @Experimental
+    public static final ConfigOption<Boolean> INCLUDE_COMMENTS_ENABLED =
+            ConfigOptions.key("include-comments.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether enable include table and column comments, by default is false, if set to true, table and column comments will be sent. "
+                                    + "Note: Enable this option will bring the implications on memory usage.");
 }
