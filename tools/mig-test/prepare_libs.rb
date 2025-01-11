@@ -21,50 +21,26 @@ throw 'Unspecified `CDC_SOURCE_HOME` environment variable.' if CDC_SOURCE_HOME.n
 
 Dir.chdir(__dir__)
 
-RELEASED_VERSIONS = {
-  '3.0.0': {
-    tar: 'https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.0/flink-cdc-3.0.0-bin.tar.gz',
-    connectors: %w[
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.0/flink-cdc-pipeline-connector-doris-3.0.0.jar
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.0/flink-cdc-pipeline-connector-mysql-3.0.0.jar
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.0/flink-cdc-pipeline-connector-starrocks-3.0.0.jar
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-values/3.0.0/flink-cdc-pipeline-connector-values-3.0.0.jar
-    ]
-  },
-  '3.0.1': {
-    tar: 'https://github.com/ververica/flink-cdc-connectors/releases/download/release-3.0.1/flink-cdc-3.0.1-bin.tar.gz',
-    connectors: %w[
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-doris/3.0.1/flink-cdc-pipeline-connector-doris-3.0.1.jar
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-mysql/3.0.1/flink-cdc-pipeline-connector-mysql-3.0.1.jar
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-starrocks/3.0.1/flink-cdc-pipeline-connector-starrocks-3.0.1.jar
-      https://repo1.maven.org/maven2/com/ververica/flink-cdc-pipeline-connector-values/3.0.1/flink-cdc-pipeline-connector-values-3.0.1.jar
-    ]
-  },
-  '3.1.0': {
-    tar: 'https://dlcdn.apache.org/flink/flink-cdc-3.1.0/flink-cdc-3.1.0-bin.tar.gz',
-    connectors: %w[
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/3.1.0/flink-cdc-pipeline-connector-doris-3.1.0.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-starrocks/3.1.0/flink-cdc-pipeline-connector-starrocks-3.1.0.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/3.1.0/flink-cdc-pipeline-connector-kafka-3.1.0.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.1.0/flink-cdc-pipeline-connector-paimon-3.1.0.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-values/3.1.0/flink-cdc-pipeline-connector-values-3.1.0.jar
-    ]
-  },
-  '3.1.1': {
-    tar: 'https://dlcdn.apache.org/flink/flink-cdc-3.1.1/flink-cdc-3.1.1-bin.tar.gz',
-    connectors: %w[
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.1/flink-cdc-pipeline-connector-mysql-3.1.1.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/3.1.1/flink-cdc-pipeline-connector-doris-3.1.1.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-starrocks/3.1.1/flink-cdc-pipeline-connector-starrocks-3.1.1.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/3.1.1/flink-cdc-pipeline-connector-kafka-3.1.1.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/3.1.1/flink-cdc-pipeline-connector-paimon-3.1.1.jar
-      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-values/3.1.1/flink-cdc-pipeline-connector-values-3.1.1.jar
+def gen_version(tag)
+  {
+    tar: "https://dlcdn.apache.org/flink/flink-cdc-#{tag}/flink-cdc-#{tag}-bin.tar.gz",
+    connectors: %W[
+      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/#{tag}/flink-cdc-pipeline-connector-mysql-#{tag}.jar
+      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/#{tag}/flink-cdc-pipeline-connector-doris-#{tag}.jar
+      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-starrocks/#{tag}/flink-cdc-pipeline-connector-starrocks-#{tag}.jar
+      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-kafka/#{tag}/flink-cdc-pipeline-connector-kafka-#{tag}.jar
+      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-paimon/#{tag}/flink-cdc-pipeline-connector-paimon-#{tag}.jar
+      https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-values/#{tag}/flink-cdc-pipeline-connector-values-#{tag}.jar
     ]
   }
+end
+
+RELEASED_VERSIONS = {
+  '3.2.0': gen_version('3.2.0'),
+  '3.2.1': gen_version('3.2.1'),
 }.freeze
 
-HEAD_VERSION = '3.2-SNAPSHOT'
+HEAD_VERSION = '3.3-SNAPSHOT'
 
 def download_or_get(link)
   `mkdir -p cache`

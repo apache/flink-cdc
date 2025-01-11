@@ -21,6 +21,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
@@ -40,9 +41,9 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
 
-    private final Options catalogOptions;
+    protected final Options catalogOptions;
 
-    private final String commitUser;
+    protected final String commitUser;
 
     private final PaimonRecordSerializer<InputT> serializer;
 
@@ -61,7 +62,11 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
 
     @Override
     public PaimonWriter<InputT> createWriter(InitContext context) {
-        return new PaimonWriter<>(catalogOptions, context.metricGroup(), commitUser, serializer);
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+        return new PaimonWriter<>(
+                catalogOptions, context.metricGroup(), commitUser, serializer, lastCheckpointId);
     }
 
     @Override

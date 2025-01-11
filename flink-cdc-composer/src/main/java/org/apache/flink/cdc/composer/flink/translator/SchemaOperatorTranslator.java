@@ -19,13 +19,14 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.composer.definition.RouteDef;
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperatorFactory;
+import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
+import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperatorFactory;
+import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -39,36 +40,49 @@ import java.util.List;
 public class SchemaOperatorTranslator {
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final String schemaOperatorUid;
-
     private final Duration rpcTimeOut;
+    private final String timezone;
 
     public SchemaOperatorTranslator(
             SchemaChangeBehavior schemaChangeBehavior,
             String schemaOperatorUid,
-            Duration rpcTimeOut) {
+            Duration rpcTimeOut,
+            String timezone) {
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.schemaOperatorUid = schemaOperatorUid;
         this.rpcTimeOut = rpcTimeOut;
+        this.timezone = timezone;
     }
 
-    public DataStream<Event> translate(
+    public DataStream<Event> translateRegular(
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        return addSchemaOperator(input, parallelism, metadataApplier, routes, schemaChangeBehavior);
+        return addRegularSchemaOperator(
+                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
+    }
+
+    public DataStream<Event> translateDistributed(
+            DataStream<PartitioningEvent> input,
+            int parallelism,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes) {
+        return addDistributedSchemaOperator(
+                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
     }
 
     public String getSchemaOperatorUid() {
         return schemaOperatorUid;
     }
 
-    private DataStream<Event> addSchemaOperator(
+    private DataStream<Event> addRegularSchemaOperator(
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
-            SchemaChangeBehavior schemaChangeBehavior) {
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -82,27 +96,52 @@ public class SchemaOperatorTranslator {
                         "SchemaOperator",
                         new EventTypeInfo(),
                         new SchemaOperatorFactory(
-                                metadataApplier, routingRules, rpcTimeOut, schemaChangeBehavior));
+                                metadataApplier,
+                                routingRules,
+                                rpcTimeOut,
+                                schemaChangeBehavior,
+                                timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }
 
-    private DataStream<Event> dropSchemaChangeEvent(DataStream<Event> input, int parallelism) {
-        return input.filter(event -> !(event instanceof SchemaChangeEvent))
-                .setParallelism(parallelism);
-    }
-
-    private DataStream<Event> exceptionOnSchemaChange(DataStream<Event> input, int parallelism) {
-        return input.map(
-                        event -> {
-                            if (event instanceof SchemaChangeEvent) {
-                                throw new RuntimeException(
-                                        String.format(
-                                                "Aborting execution as the pipeline encountered a schema change event: %s",
-                                                event));
-                            }
-                            return event;
-                        })
+    private DataStream<Event> addDistributedSchemaOperator(
+            DataStream<PartitioningEvent> input,
+            int parallelism,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes,
+            SchemaChangeBehavior schemaChangeBehavior,
+            String timezone) {
+        Preconditions.checkArgument(
+                schemaChangeBehavior == SchemaChangeBehavior.LENIENT
+                        || schemaChangeBehavior == SchemaChangeBehavior.IGNORE
+                        || schemaChangeBehavior == SchemaChangeBehavior.EXCEPTION,
+                "Schema change behavior %s is not supported because you're trying to compose a "
+                        + "pipeline with distributed topology, where data records from different partitions needs to "
+                        + "be combined together.\n"
+                        + "Use `LENIENT` mode to evolve downstream schema while keep all upstream data fields intact.\n"
+                        + "Use `IGNORE` to get a static schema view and ignore any upstream schema changes.\n"
+                        + "Use `EXCEPTION` to report error immediately as upstream schema changes are unacceptable.",
+                schemaChangeBehavior);
+        List<RouteRule> routingRules = new ArrayList<>();
+        for (RouteDef route : routes) {
+            routingRules.add(
+                    new RouteRule(
+                            route.getSourceTable(),
+                            route.getSinkTable(),
+                            route.getReplaceSymbol().orElse(null)));
+        }
+        return input.transform(
+                        "SchemaMapper",
+                        new EventTypeInfo(),
+                        new org.apache.flink.cdc.runtime.operators.schema.distributed
+                                .SchemaOperatorFactory(
+                                metadataApplier,
+                                routingRules,
+                                rpcTimeOut,
+                                schemaChangeBehavior,
+                                timezone))
+                .uid(schemaOperatorUid)
                 .setParallelism(parallelism);
     }
 }

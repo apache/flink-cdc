@@ -56,4 +56,9 @@ public class MultiTableCommittableChannelComputer
             return Math.floorMod(Objects.hash(committableMessage), numChannels);
         }
     }
+
+    @Override
+    public String toString() {
+        return "shuffle by table";
+    }
 }

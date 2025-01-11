@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-JOB_VERSIONS = %w[2.4.2 3.0.0 3.0.1 3.1.0 3.1.1 3.2-SNAPSHOT]
+JOB_VERSIONS = %w[3.2.0 3.2.1 3.3-SNAPSHOT]
 
 JOB_VERSIONS.each do |version|
   puts "Compiling DataStream job for CDC #{version}"

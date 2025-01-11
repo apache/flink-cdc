@@ -33,6 +33,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -41,8 +42,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit.generateSplitId;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Tests for {@link
@@ -99,6 +103,22 @@ public class PendingSplitsStateSerializerTest {
         final byte[] ser3 = state.serializedFormCache;
         assertSame(ser1, ser2);
         assertSame(ser1, ser3);
+    }
+
+    @Test
+    public void testOutputIsFinallyCleared() throws Exception {
+        final PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+
+        final byte[] ser1 = serializer.serialize(state);
+        state.serializedFormCache = null;
+
+        PendingSplitsState unsupportedState = new UnsupportedPendingSplitsState();
+
+        assertThrows(IOException.class, () -> serializer.serialize(unsupportedState));
+
+        final byte[] ser2 = serializer.serialize(state);
+        assertArrayEquals(ser1, ser2);
     }
 
     static PendingSplitsState serializeAndDeserializeSourceEnumState(PendingSplitsState state)
@@ -190,7 +210,7 @@ public class PendingSplitsStateSerializerTest {
             TableId tableId, int splitNo) {
         return new MySqlSchemalessSnapshotSplit(
                 tableId,
-                tableId.toString() + "-" + splitNo,
+                generateSplitId(tableId, splitNo),
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 new Object[] {100L + splitNo * 1000L},
@@ -269,4 +289,7 @@ public class PendingSplitsStateSerializerTest {
             throw new UnsupportedOperationException("Not implemented.");
         }
     }
+
+    /** An implementation for {@link PendingSplitsState} which will cause a serialization error. */
+    static class UnsupportedPendingSplitsState extends PendingSplitsState {}
 }

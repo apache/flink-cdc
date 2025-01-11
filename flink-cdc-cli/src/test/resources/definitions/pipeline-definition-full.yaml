@@ -47,6 +47,7 @@ transform:
     partition-keys: product_name
     table-options: comment=app order
     description: project fields from source table
+    converter-after-transform: SOFT_DELETE
   - source-table: mydb.web_order_.*
     projection: CONCAT(id, order_id) as uniq_id, *
     filter: uniq_id > 10
@@ -57,3 +58,9 @@ pipeline:
   parallelism: 4
   schema.change.behavior: evolve
   schema-operator.rpc-timeout: 1 h
+  model:
+    model-name: GET_EMBEDDING
+    class-name: OpenAIEmbeddingModel
+    openai.model: text-embedding-3-small
+    openai.host: https://xxxx
+    openai.apikey: abcd1234

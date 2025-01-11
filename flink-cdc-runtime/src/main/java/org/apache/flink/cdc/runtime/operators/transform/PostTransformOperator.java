@@ -18,31 +18,46 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
+import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.runtime.jobgraph.OperatorID;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
+import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverters;
+import org.apache.flink.cdc.runtime.parser.TransformParser;
+import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
+import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
+import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -62,10 +77,16 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     /** keep the relationship of TableId and table information. */
     private final Map<TableId, PostTransformChangeInfo> postTransformChangeInfoMap;
 
-    private transient Map<Tuple2<TableId, TransformProjection>, TransformProjectionProcessor>
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
+    private List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private transient Map<String, Object> udfFunctionInstances;
+
+    private transient Map<Tuple2<TableId, String>, TransformProjectionProcessor>
             transformProjectionProcessorMap;
     private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
             transformFilterProcessorMap;
+    private final Map<TableId, Boolean> hasAsteriskMap;
+    private final Map<TableId, List<String>> projectedColumnsMap;
 
     public static PostTransformOperator.Builder newBuilder() {
         return new PostTransformOperator.Builder();
@@ -74,8 +95,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     /** Builder of {@link PostTransformOperator}. */
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
-        private OperatorID schemaOperatorID;
         private String timezone;
+        private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
+                new ArrayList<>();
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions,
@@ -83,7 +105,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOptions) {
+                String tableOptions,
+                String postTransformConverter,
+                SupportedMetadataColumn[] supportedMetadataColumns) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -91,18 +115,24 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOptions));
+                            tableOptions,
+                            postTransformConverter,
+                            supportedMetadataColumns));
             return this;
         }
 
         public PostTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
-            return this;
-        }
-
-        public PostTransformOperator.Builder addSchemaOperatorID(OperatorID schemaOperatorID) {
-            this.schemaOperatorID = schemaOperatorID;
+            transformRules.add(
+                    new TransformRule(
+                            tableInclusions,
+                            projection,
+                            filter,
+                            "",
+                            "",
+                            "",
+                            null,
+                            new SupportedMetadataColumn[0]));
             return this;
         }
 
@@ -115,17 +145,42 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
+        public PostTransformOperator.Builder addUdfFunctions(
+                List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
+            this.udfFunctions.addAll(udfFunctions);
+            return this;
+        }
+
         public PostTransformOperator build() {
-            return new PostTransformOperator(transformRules, timezone);
+            return new PostTransformOperator(transformRules, timezone, udfFunctions);
         }
     }
 
-    private PostTransformOperator(List<TransformRule> transformRules, String timezone) {
+    private PostTransformOperator(
+            List<TransformRule> transformRules,
+            String timezone,
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
         this.transformRules = transformRules;
         this.timezone = timezone;
         this.postTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.transformFilterProcessorMap = new ConcurrentHashMap<>();
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
+        this.udfFunctions = udfFunctions;
+        this.udfFunctionInstances = new ConcurrentHashMap<>();
+        this.hasAsteriskMap = new HashMap<>();
+        this.projectedColumnsMap = new HashMap<>();
+    }
+
+    @Override
+    public void setup(
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<StreamRecord<Event>> output) {
+        super.setup(containingTask, config, output);
+        udfDescriptors =
+                udfFunctions.stream()
+                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1, udf.f2))
+                        .collect(Collectors.toList());
     }
 
     @Override
@@ -134,10 +189,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         transforms =
                 transformRules.stream()
                         .map(
-                                tuple3 -> {
-                                    String tableInclusions = tuple3.getTableInclusions();
-                                    String projection = tuple3.getProjection();
-                                    String filterExpression = tuple3.getFilter();
+                                transformRule -> {
+                                    String tableInclusions = transformRule.getTableInclusions();
+                                    String projection = transformRule.getProjection();
+                                    String filterExpression = transformRule.getFilter();
 
                                     Selectors selectors =
                                             new Selectors.SelectorsBuilder()
@@ -146,11 +201,28 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                                     return new PostTransformer(
                                             selectors,
                                             TransformProjection.of(projection).orElse(null),
-                                            TransformFilter.of(filterExpression).orElse(null));
+                                            TransformFilter.of(filterExpression, udfDescriptors)
+                                                    .orElse(null),
+                                            PostTransformConverters.of(
+                                                    transformRule.getPostTransformConverter()),
+                                            transformRule.getSupportedMetadataColumns());
                                 })
                         .collect(Collectors.toList());
         this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
         this.transformFilterProcessorMap = new ConcurrentHashMap<>();
+        this.udfFunctionInstances = new ConcurrentHashMap<>();
+        udfDescriptors.forEach(
+                udf -> {
+                    try {
+                        Class<?> clazz = Class.forName(udf.getClasspath());
+                        udfFunctionInstances.put(udf.getName(), clazz.newInstance());
+                    } catch (ClassNotFoundException
+                            | InstantiationException
+                            | IllegalAccessException e) {
+                        throw new RuntimeException("Failed to instantiate UDF function " + udf);
+                    }
+                });
+        initializeUdf();
     }
 
     @Override
@@ -163,6 +235,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     public void close() throws Exception {
         super.close();
         clearOperator();
+
+        // Clean up UDF instances
+        destroyUdf();
+        udfFunctionInstances.clear();
     }
 
     @Override
@@ -173,8 +249,10 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             transformProjectionProcessorMap
                     .keySet()
                     .removeIf(e -> Objects.equals(e.f0, schemaChangeEvent.tableId()));
-            event = cacheSchema(schemaChangeEvent);
-            output.collect(new StreamRecord<>(event));
+            transformFilterProcessorMap
+                    .keySet()
+                    .removeIf(e -> Objects.equals(e.f0, schemaChangeEvent.tableId()));
+            cacheSchema(schemaChangeEvent).ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {
             Optional<DataChangeEvent> dataChangeEventOptional =
                     processDataChangeEvent(((DataChangeEvent) event));
@@ -184,8 +262,60 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private SchemaChangeEvent cacheSchema(SchemaChangeEvent event) throws Exception {
+    private Optional<SchemaChangeEvent> cacheSchema(SchemaChangeEvent event) throws Exception {
         TableId tableId = event.tableId();
+        List<String> columnNamesBeforeChange = Collections.emptyList();
+
+        if (event instanceof CreateTableEvent) {
+            CreateTableEvent createTableEvent = (CreateTableEvent) event;
+            Set<String> projectedColumnsSet =
+                    transforms.stream()
+                            .filter(t -> t.getSelectors().isMatch(tableId))
+                            .flatMap(
+                                    rule ->
+                                            TransformParser.generateProjectionColumns(
+                                                    rule.getProjection()
+                                                            .map(TransformProjection::getProjection)
+                                                            .orElse(null),
+                                                    createTableEvent.getSchema().getColumns(),
+                                                    udfDescriptors,
+                                                    rule.getSupportedMetadataColumns())
+                                                    .stream())
+                            .map(ProjectionColumn::getColumnName)
+                            .collect(Collectors.toSet());
+
+            boolean notTransformed =
+                    transforms.stream().noneMatch(t -> t.getSelectors().isMatch(tableId));
+
+            if (notTransformed) {
+                // If this TableId isn't presented in any transform block, it should behave like a
+                // "*" projection and should be regarded as asterisk-ful.
+                hasAsteriskMap.put(tableId, true);
+            } else {
+                boolean hasAsterisk =
+                        transforms.stream()
+                                .filter(t -> t.getSelectors().isMatch(tableId))
+                                .anyMatch(
+                                        t ->
+                                                TransformParser.hasAsterisk(
+                                                        t.getProjection()
+                                                                .map(
+                                                                        TransformProjection
+                                                                                ::getProjection)
+                                                                .orElse(null)));
+
+                hasAsteriskMap.put(tableId, hasAsterisk);
+            }
+            projectedColumnsMap.put(
+                    tableId,
+                    createTableEvent.getSchema().getColumnNames().stream()
+                            .filter(projectedColumnsSet::contains)
+                            .collect(Collectors.toList()));
+        } else {
+            columnNamesBeforeChange =
+                    getPostTransformChangeInfo(tableId).getPreTransformedSchema().getColumnNames();
+        }
+
         Schema schema;
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
@@ -201,9 +331,14 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 tableId, PostTransformChangeInfo.of(tableId, projectedSchema, schema));
 
         if (event instanceof CreateTableEvent) {
-            return new CreateTableEvent(event.tableId(), projectedSchema);
+            return Optional.of(new CreateTableEvent(tableId, projectedSchema));
+        } else if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // See comments in PreTransformOperator#cacheChangeSchema method.
+            return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event);
+        } else {
+            return SchemaUtils.transformSchemaChangeEvent(
+                    false, projectedColumnsMap.get(tableId), event);
         }
-        return event;
     }
 
     private PostTransformChangeInfo getPostTransformChangeInfo(TableId tableId) {
@@ -215,24 +350,33 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         return tableInfo;
     }
 
-    private Schema transformSchema(TableId tableId, Schema schema) throws Exception {
+    private Schema transformSchema(TableId tableId, Schema schema) {
         List<Schema> newSchemas = new ArrayList<>();
         for (PostTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();
             if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
-                TransformProjection transformProjection = transform.getProjection().get();
+                TransformProjection transformProjection =
+                        TransformProjection.of(transform.getProjection().get().getProjection())
+                                .get();
                 if (transformProjection.isValid()) {
                     if (!transformProjectionProcessorMap.containsKey(
-                            Tuple2.of(tableId, transformProjection))) {
+                            Tuple2.of(tableId, transformProjection.getProjection()))) {
                         transformProjectionProcessorMap.put(
-                                Tuple2.of(tableId, transformProjection),
-                                TransformProjectionProcessor.of(transformProjection, timezone));
+                                Tuple2.of(tableId, transformProjection.getProjection()),
+                                TransformProjectionProcessor.of(
+                                        transformProjection,
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
                     }
                     TransformProjectionProcessor postTransformProcessor =
                             transformProjectionProcessorMap.get(
-                                    Tuple2.of(tableId, transformProjection));
+                                    Tuple2.of(tableId, transformProjection.getProjection()));
                     // update the columns of projection and add the column of projection into Schema
-                    newSchemas.add(postTransformProcessor.processSchemaChangeEvent(schema));
+                    newSchemas.add(
+                            postTransformProcessor.processSchema(
+                                    schema, transform.getSupportedMetadataColumns()));
                 }
             }
         }
@@ -240,7 +384,13 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             return schema;
         }
 
-        return SchemaUtils.inferWiderSchema(newSchemas);
+        return SchemaMergingUtils.getCommonSchema(newSchemas);
+    }
+
+    private List<Object> getUdfFunctionInstances() {
+        return udfDescriptors.stream()
+                .map(e -> udfFunctionInstances.get(e.getName()))
+                .collect(Collectors.toList());
     }
 
     private Optional<DataChangeEvent> processDataChangeEvent(DataChangeEvent dataChangeEvent)
@@ -265,7 +415,13 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                             Tuple2.of(tableId, transformFilter))) {
                         transformFilterProcessorMap.put(
                                 Tuple2.of(tableId, transformFilter),
-                                TransformFilterProcessor.of(tableInfo, transformFilter, timezone));
+                                TransformFilterProcessor.of(
+                                        tableInfo,
+                                        transformFilter,
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
                     }
                     TransformFilterProcessor transformFilterProcessor =
                             transformFilterProcessorMap.get(Tuple2.of(tableId, transformFilter));
@@ -280,23 +436,48 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                         && transformProjectionOptional.get().isValid()) {
                     TransformProjection transformProjection = transformProjectionOptional.get();
                     if (!transformProjectionProcessorMap.containsKey(
-                                    Tuple2.of(tableId, transformProjection))
-                            || !transformProjectionProcessorMap
-                                    .get(Tuple2.of(tableId, transformProjection))
-                                    .hasTableInfo()) {
+                            Tuple2.of(tableId, transformProjection.getProjection()))) {
                         transformProjectionProcessorMap.put(
-                                Tuple2.of(tableId, transformProjection),
+                                Tuple2.of(tableId, transformProjection.getProjection()),
                                 TransformProjectionProcessor.of(
-                                        tableInfo, transformProjection, timezone));
+                                        tableInfo,
+                                        transformProjection,
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
+                    } else if (!transformProjectionProcessorMap
+                            .get(Tuple2.of(tableId, transformProjection.getProjection()))
+                            .hasTableInfo()) {
+                        TransformProjectionProcessor transformProjectionProcessorWithoutTableInfo =
+                                transformProjectionProcessorMap.get(
+                                        Tuple2.of(tableId, transformProjection.getProjection()));
+                        transformProjectionProcessorMap.put(
+                                Tuple2.of(tableId, transformProjection.getProjection()),
+                                TransformProjectionProcessor.of(
+                                        tableInfo,
+                                        transformProjectionProcessorWithoutTableInfo
+                                                .getTransformProjection(),
+                                        timezone,
+                                        udfDescriptors,
+                                        getUdfFunctionInstances(),
+                                        transform.getSupportedMetadataColumns()));
                     }
                     TransformProjectionProcessor postTransformProcessor =
                             transformProjectionProcessorMap.get(
-                                    Tuple2.of(tableId, transformProjection));
+                                    Tuple2.of(tableId, transformProjection.getProjection()));
                     dataChangeEventOptional =
                             processProjection(
                                     postTransformProcessor,
                                     dataChangeEventOptional.get(),
                                     epochTime);
+                }
+                if (dataChangeEventOptional.isPresent()
+                        && transform.getPostTransformConverter().isPresent()) {
+                    dataChangeEventOptional =
+                            convertDataChangeEvent(
+                                    dataChangeEventOptional.get(),
+                                    transform.getPostTransformConverter().get());
                 }
                 transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
             }
@@ -315,6 +496,11 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         }
     }
 
+    private Optional<DataChangeEvent> convertDataChangeEvent(
+            DataChangeEvent dataChangeEvent, PostTransformConverter postTransformConverter) {
+        return postTransformConverter.convert(dataChangeEvent);
+    }
+
     private Optional<DataChangeEvent> processFilter(
             TransformFilterProcessor transformFilterProcessor,
             DataChangeEvent dataChangeEvent,
@@ -322,15 +508,18 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             throws Exception {
         BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+        Map<String, String> meta = dataChangeEvent.meta();
         // insert and update event only process afterData, delete only process beforeData
         if (after != null) {
-            if (transformFilterProcessor.process(after, epochTime)) {
+            if (transformFilterProcessor.process(
+                    after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'), meta)) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
             }
         } else if (before != null) {
-            if (transformFilterProcessor.process(before, epochTime)) {
+            if (transformFilterProcessor.process(
+                    before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'), meta)) {
                 return Optional.of(dataChangeEvent);
             } else {
                 return Optional.empty();
@@ -347,11 +536,20 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
         if (before != null) {
             BinaryRecordData projectedBefore =
-                    postTransformProcessor.processData(before, epochTime);
+                    postTransformProcessor.processData(
+                            before,
+                            epochTime,
+                            opTypeToRowKind(dataChangeEvent.op(), '-'),
+                            dataChangeEvent.meta());
             dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
         }
         if (after != null) {
-            BinaryRecordData projectedAfter = postTransformProcessor.processData(after, epochTime);
+            BinaryRecordData projectedAfter =
+                    postTransformProcessor.processData(
+                            after,
+                            epochTime,
+                            opTypeToRowKind(dataChangeEvent.op(), '+'),
+                            dataChangeEvent.meta());
             dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
         }
         return Optional.of(dataChangeEvent);
@@ -391,5 +589,56 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         this.transformProjectionProcessorMap = null;
         this.transformFilterProcessorMap = null;
         TransformExpressionCompiler.cleanUp();
+    }
+
+    private void initializeUdf() {
+        udfDescriptors.forEach(
+                udf -> {
+                    try {
+                        if (udf.isCdcPipelineUdf()) {
+                            // We use reflection to invoke UDF methods since we may add more methods
+                            // into UserDefinedFunction interface, thus the provided UDF classes
+                            // might not be compatible with the interface definition in CDC common.
+                            Object udfInstance = udfFunctionInstances.get(udf.getName());
+                            UserDefinedFunctionContext userDefinedFunctionContext =
+                                    () -> Configuration.fromMap(udf.getParameters());
+                            udfInstance
+                                    .getClass()
+                                    .getMethod("open", UserDefinedFunctionContext.class)
+                                    .invoke(udfInstance, userDefinedFunctionContext);
+                        } else {
+                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
+                        }
+                    } catch (InvocationTargetException
+                            | NoSuchMethodException
+                            | IllegalAccessException ex) {
+                        throw new RuntimeException("Failed to initialize UDF " + udf, ex);
+                    }
+                });
+    }
+
+    private void destroyUdf() {
+        udfDescriptors.forEach(
+                udf -> {
+                    try {
+                        if (udf.isCdcPipelineUdf()) {
+                            // We use reflection to invoke UDF methods since we may add more methods
+                            // into UserDefinedFunction interface, thus the provided UDF classes
+                            // might not be compatible with the interface definition in CDC common.
+                            Object udfInstance = udfFunctionInstances.get(udf.getName());
+                            udfInstance.getClass().getMethod("close").invoke(udfInstance);
+                        } else {
+                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
+                        }
+                    } catch (InvocationTargetException
+                            | NoSuchMethodException
+                            | IllegalAccessException ex) {
+                        throw new RuntimeException("Failed to destroy UDF " + udf, ex);
+                    }
+                });
+    }
+
+    private String opTypeToRowKind(OperationType opType, char beforeOrAfter) {
+        return String.format("%c%c", beforeOrAfter, opType.name().charAt(0));
     }
 }

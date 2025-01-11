@@ -127,7 +127,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             }
             jsonSerializers.put(
                     schemaChangeEvent.tableId(),
-                    new TableSchemaInfo(schema, jsonSerializer, zoneId));
+                    new TableSchemaInfo(
+                            schemaChangeEvent.tableId(), schema, jsonSerializer, zoneId));
             return null;
         }
 
@@ -153,7 +154,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                     new RowData[] {
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
-                                                .getRowDataFromRecordData((dataChangeEvent.after()))
+                                                .getRowDataFromRecordData(
+                                                        dataChangeEvent.after(), false)
                                     }));
                     reuseGenericRowData.setField(2, OP_INSERT);
                     return jsonSerializers
@@ -161,16 +163,16 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                             .getSerializationSchema()
                             .serialize(reuseGenericRowData);
                 case DELETE:
+                    reuseGenericRowData.setField(0, null);
                     reuseGenericRowData.setField(
-                            0,
+                            1,
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
                                                 .getRowDataFromRecordData(
-                                                        (dataChangeEvent.before()))
+                                                        dataChangeEvent.before(), false)
                                     }));
-                    reuseGenericRowData.setField(1, null);
                     reuseGenericRowData.setField(2, OP_DELETE);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
@@ -185,7 +187,7 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
                                                 .getRowDataFromRecordData(
-                                                        (dataChangeEvent.before()))
+                                                        dataChangeEvent.before(), false)
                                     }));
                     reuseGenericRowData.setField(
                             1,
@@ -193,7 +195,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                     new RowData[] {
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
-                                                .getRowDataFromRecordData((dataChangeEvent.after()))
+                                                .getRowDataFromRecordData(
+                                                        dataChangeEvent.after(), false)
                                     }));
                     reuseGenericRowData.setField(2, OP_UPDATE);
                     return jsonSerializers

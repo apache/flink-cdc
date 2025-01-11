@@ -50,6 +50,7 @@ public class ValuesDataSourceHelper {
      */
     public enum EventSetId {
         SINGLE_SPLIT_SINGLE_TABLE,
+        SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE,
         SINGLE_SPLIT_MULTI_TABLES,
         MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS,
@@ -93,6 +94,11 @@ public class ValuesDataSourceHelper {
             case SINGLE_SPLIT_SINGLE_TABLE:
                 {
                     sourceEvents = singleSplitSingleTable();
+                    break;
+                }
+            case SINGLE_SPLIT_SINGLE_TABLE_WITH_DEFAULT_VALUE:
+                {
+                    sourceEvents = singleSplitSingleTableWithDefaultValue();
                     break;
                 }
             case SINGLE_SPLIT_MULTI_TABLES:
@@ -211,6 +217,30 @@ public class ValuesDataSourceHelper {
 
         eventOfSplits.add(split1);
         return eventOfSplits;
+    }
+
+    public static List<List<Event>> singleSplitSingleTableWithDefaultValue() {
+        List<List<Event>> eventOfSplits = singleSplitSingleTable();
+        // add column with default value
+        eventOfSplits.get(0).add(addColumnWithDefaultValue(TABLE_1));
+        // rename column with default value
+        eventOfSplits.get(0).add(renameColumnWithDefaultValue(TABLE_1));
+
+        return eventOfSplits;
+    }
+
+    private static AddColumnEvent addColumnWithDefaultValue(TableId tableId) {
+        AddColumnEvent.ColumnWithPosition columnWithPositionWithDefault =
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("colWithDefault", DataTypes.STRING(), null, "flink"));
+        return new AddColumnEvent(
+                tableId, Collections.singletonList(columnWithPositionWithDefault));
+    }
+
+    private static RenameColumnEvent renameColumnWithDefaultValue(TableId tableId) {
+        Map<String, String> nameMapping = new HashMap<>();
+        nameMapping.put("colWithDefault", "newColWithDefault");
+        return new RenameColumnEvent(tableId, nameMapping);
     }
 
     public static List<List<Event>> singleSplitMultiTables() {
@@ -520,7 +550,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
-                                }));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "1");
+                            }
+                        });
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
@@ -529,7 +564,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("2")
-                                }));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "2");
+                            }
+                        });
         split1.add(insertEvent2);
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
@@ -538,7 +578,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("3")
-                                }));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "3");
+                            }
+                        });
         split1.add(insertEvent3);
 
         // add column
@@ -569,7 +614,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
-                                })));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "4");
+                            }
+                        }));
 
         // update
         split1.add(
@@ -584,7 +634,12 @@ public class ValuesDataSourceHelper {
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("x")
-                                })));
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("op_ts", "5");
+                            }
+                        }));
 
         eventOfSplits.add(split1);
         return eventOfSplits;

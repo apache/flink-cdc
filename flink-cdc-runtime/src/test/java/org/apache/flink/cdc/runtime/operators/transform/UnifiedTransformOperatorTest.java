@@ -27,7 +27,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -72,8 +72,10 @@ public class UnifiedTransformOperatorTest {
         private final BinaryRecordDataGenerator preTransformedRecordGenerator;
         private final BinaryRecordDataGenerator postTransformedRecordGenerator;
 
-        private EventOperatorTestHarness<PreTransformOperator, Event> preTransformOperatorHarness;
-        private EventOperatorTestHarness<PostTransformOperator, Event> postTransformOperatorHarness;
+        private RegularEventOperatorTestHarness<PreTransformOperator, Event>
+                preTransformOperatorHarness;
+        private RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                postTransformOperatorHarness;
 
         public static UnifiedTransformTestCase of(
                 TableId tableId,
@@ -241,7 +243,8 @@ public class UnifiedTransformOperatorTest {
                             .addTransform(
                                     tableId.identifier(), projectionExpression, filterExpression)
                             .build();
-            preTransformOperatorHarness = new EventOperatorTestHarness<>(preTransformOperator, 1);
+            preTransformOperatorHarness =
+                    RegularEventOperatorTestHarness.with(preTransformOperator, 1);
             preTransformOperatorHarness.open();
 
             postTransformOperator =
@@ -249,7 +252,8 @@ public class UnifiedTransformOperatorTest {
                             .addTransform(
                                     tableId.identifier(), projectionExpression, filterExpression)
                             .build();
-            postTransformOperatorHarness = new EventOperatorTestHarness<>(postTransformOperator, 1);
+            postTransformOperatorHarness =
+                    RegularEventOperatorTestHarness.with(postTransformOperator, 1);
             postTransformOperatorHarness.open();
             return this;
         }
@@ -346,7 +350,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -392,7 +396,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING().notNull())
                                 .physicalColumn("age", DataTypes.INT().notNull())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -511,7 +515,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -558,7 +562,7 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -607,7 +611,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
@@ -661,7 +665,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("identifier_name", DataTypes.STRING())
@@ -710,7 +714,7 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("identifier_name", DataTypes.STRING())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -761,7 +765,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("identifier_name", DataTypes.STRING())
@@ -851,7 +855,7 @@ public class UnifiedTransformOperatorTest {
                                 .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
                                 .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
                                 .physicalColumn("__table_name__", DataTypes.STRING().notNull())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -918,6 +922,59 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
+    public void testMetadataTransformIncludeMetaColumnString() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "id, name, age, id + age as computed, __namespace_name__ as metaColNameSpaceName,  __schema_name__ as metaColSchemaName, __table_name__ as metaColNameTableName, "
+                                + "UPPER(__schema_name__) as metaColSchemaNameUpper, '__table_name__' as metaColStr1, '__namespace__name__schema__name__table__name__' as metaColStr2",
+                        "id > 100",
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING().notNull())
+                                .physicalColumn("age", DataTypes.INT().notNull())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .physicalColumn(
+                                        "metaColNameSpaceName", DataTypes.STRING().notNull())
+                                .physicalColumn("metaColSchemaName", DataTypes.STRING().notNull())
+                                .physicalColumn(
+                                        "metaColNameTableName", DataTypes.STRING().notNull())
+                                .physicalColumn("metaColSchemaNameUpper", DataTypes.STRING())
+                                .physicalColumn("metaColStr1", DataTypes.STRING())
+                                .physicalColumn("metaColStr2", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .insertSource(1000, "Alice", 17)
+                .insertPreTransformed(1000, "Alice", 17)
+                .insertPostTransformed(
+                        1000,
+                        "Alice",
+                        17,
+                        1017,
+                        "my_company",
+                        "my_branch",
+                        "schema_nullability",
+                        "MY_BRANCH",
+                        "__table_name__",
+                        "__namespace__name__schema__name__table__name__")
+                .runTests()
+                .destroyHarness();
+    }
+
+    @Test
     public void testTransformWithCast() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "transform_with_cast");
         UnifiedTransformTestCase.of(
@@ -979,6 +1036,131 @@ public class UnifiedTransformOperatorTest {
                 .deleteSource("1001", "Alice", 17, "Reference001", 2021)
                 .deletePreTransformed("1001", 17, 2021)
                 .deletePostTransformed("1001", 18, 1018L, "17")
+                .runTests()
+                .destroyHarness();
+    }
+
+    @Test
+    public void testTransformWithCommentsAndExpressions() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "*, id + age as computed",
+                        "id > 100",
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .physicalColumn("computed", DataTypes.INT())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .insertSource(1001, "Alice", 17)
+                .insertPreTransformed(1001, "Alice", 17)
+                .insertPostTransformed(1001, "Alice", 17, 1018)
+                .runTests()
+                .destroyHarness();
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "id, age, id + age as computed",
+                        "id > 100",
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .physicalColumn("computed", DataTypes.INT())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .insertSource(1001, "Alice", 17)
+                .insertPreTransformed(1001, 17)
+                .insertPostTransformed(1001, 17, 1018)
+                .runTests()
+                .destroyHarness();
+
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "'extras' AS extras, age + 1 AS new_age_incremented, age AS new_age, name AS new_name, age, name, id",
+                        "id > 100",
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .physicalColumn(
+                                        "description",
+                                        DataTypes.STRING(),
+                                        "description column",
+                                        "nothing really important")
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("extras", DataTypes.STRING())
+                                .physicalColumn("new_age_incremented", DataTypes.INT())
+                                .physicalColumn("new_age", DataTypes.INT(), "age column", "17")
+                                .physicalColumn(
+                                        "new_name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn("age", DataTypes.INT(), "age column", "17")
+                                .physicalColumn(
+                                        "name", DataTypes.STRING(), "name column", "John Smith")
+                                .physicalColumn(
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .insertSource(1001, "Alice", 17, "Whatever")
+                .insertPreTransformed(1001, "Alice", 17)
+                .insertPostTransformed("extras", 18, 17, "Alice", 17, "Alice", 1001)
                 .runTests()
                 .destroyHarness();
     }

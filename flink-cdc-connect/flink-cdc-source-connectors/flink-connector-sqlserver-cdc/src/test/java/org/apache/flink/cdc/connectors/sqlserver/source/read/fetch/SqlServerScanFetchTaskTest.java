@@ -17,11 +17,14 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.source.read.fetch;
 
+import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
-import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.SnapshotSplitAssigner;
+import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
@@ -30,11 +33,14 @@ import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfig;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
+import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnFactory;
 import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask;
 import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.RecordsFormatter;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -44,12 +50,13 @@ import org.junit.Test;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
@@ -190,6 +197,29 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     @Test
+    public void testDateTimePrimaryKey() throws Exception {
+        String databaseName = "pk";
+        String tableName = "dbo.dt_pk";
+
+        initializeSqlServerTable(databaseName);
+
+        SqlServerSourceConfigFactory sourceConfigFactory =
+                getConfigFactory(databaseName, new String[] {tableName}, 8096);
+        SqlServerSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        SqlServerDialect sqlServerDialect = new SqlServerDialect(sourceConfig);
+
+        List<SnapshotSplit> snapshotSplits = getSnapshotSplits(sourceConfig, sqlServerDialect);
+        assertFalse(snapshotSplits.isEmpty());
+
+        RowType expectedType =
+                (RowType)
+                        DataTypes.ROW(DataTypes.FIELD("dt", DataTypes.TIMESTAMP(3).notNull()))
+                                .getLogicalType();
+
+        snapshotSplits.forEach(s -> assertEquals(expectedType, s.getSplitKeyType()));
+    }
+
+    @Test
     public void testDeleteDataInSnapshotScan() throws Exception {
         String databaseName = "customer";
         String tableName = "dbo.customers";
@@ -292,19 +322,29 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
     }
 
     private List<SnapshotSplit> getSnapshotSplits(
-            SqlServerSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect) {
-        String databaseName = sourceConfig.getDatabaseList().get(0);
-        List<TableId> tableIdList =
-                sourceConfig.getTableList().stream()
-                        .map(tableId -> TableId.parse(databaseName + "." + tableId))
-                        .collect(Collectors.toList());
-        final ChunkSplitter chunkSplitter = sourceDialect.createChunkSplitter(sourceConfig);
-
+            SqlServerSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect)
+            throws Exception {
+        List<TableId> discoverTables = sourceDialect.discoverDataCollections(sourceConfig);
+        OffsetFactory offsetFactory = new LsnFactory();
+        final SnapshotSplitAssigner snapshotSplitAssigner =
+                new SnapshotSplitAssigner<JdbcSourceConfig>(
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        discoverTables,
+                        sourceDialect.isDataCollectionIdCaseSensitive(sourceConfig),
+                        sourceDialect,
+                        offsetFactory);
+        snapshotSplitAssigner.initEnumeratorMetrics(
+                new SourceEnumeratorMetrics(
+                        UnregisteredMetricsGroup.createSplitEnumeratorMetricGroup()));
+        snapshotSplitAssigner.open();
         List<SnapshotSplit> snapshotSplitList = new ArrayList<>();
-        for (TableId table : tableIdList) {
-            Collection<SnapshotSplit> snapshotSplits = chunkSplitter.generateSplits(table);
-            snapshotSplitList.addAll(snapshotSplits);
+        Optional<SourceSplitBase> split = snapshotSplitAssigner.getNext();
+        while (split.isPresent()) {
+            snapshotSplitList.add(split.get().asSnapshotSplit());
+            split = snapshotSplitAssigner.getNext();
         }
+        snapshotSplitAssigner.close();
         return snapshotSplitList;
     }
 

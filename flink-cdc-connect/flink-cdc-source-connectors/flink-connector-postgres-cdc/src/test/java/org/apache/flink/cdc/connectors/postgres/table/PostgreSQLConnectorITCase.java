@@ -193,7 +193,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -266,7 +266,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();
@@ -454,7 +454,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "+I(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
                         "-D(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
                         "+I(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEquals(expected, actual);
 
         result.getJobClient().get().cancel().get();
@@ -592,7 +592,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "-D("
                                 + databaseName
                                 + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.170)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         Collections.sort(actual);
         Collections.sort(expected);
         assertEquals(expected, actual);
@@ -707,7 +707,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "spare tire,22.200"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         result.getJobClient().get().cancel().get();

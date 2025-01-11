@@ -69,6 +69,8 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
                     }
                 });
         Options options = Options.fromMap(catalogOptions);
+        // Avoid using previous table schema.
+        options.setString("cache-enabled", "false");
         try (Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(options)) {
             Preconditions.checkNotNull(
                     catalog.listDatabases(), "catalog option of Paimon is invalid.");
@@ -104,7 +106,17 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
             }
         }
         PaimonRecordSerializer<Event> serializer = new PaimonRecordEventSerializer(zoneId);
-        return new PaimonDataSink(options, tableOptions, commitUser, partitionMaps, serializer);
+        String schemaOperatorUid =
+                context.getPipelineConfiguration()
+                        .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
+        return new PaimonDataSink(
+                options,
+                tableOptions,
+                commitUser,
+                partitionMaps,
+                serializer,
+                zoneId,
+                schemaOperatorUid);
     }
 
     @Override

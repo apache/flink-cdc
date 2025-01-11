@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -50,7 +51,6 @@ import io.debezium.schema.TopicSelector;
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -151,7 +151,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Override
     public ChunkSplitter createChunkSplitter(JdbcSourceConfig sourceConfig) {
-        return new PostgresChunkSplitter(sourceConfig, this);
+        return new PostgresChunkSplitter(
+                sourceConfig, this, ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+    }
+
+    @Override
+    public ChunkSplitter createChunkSplitter(
+            JdbcSourceConfig sourceConfig, ChunkSplitterState chunkSplitterState) {
+        return new PostgresChunkSplitter(sourceConfig, this, chunkSplitterState);
     }
 
     @Override
@@ -171,11 +178,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             // fetch table schemas
-            Map<TableId, TableChange> tableSchemas = new HashMap<>();
-            for (TableId tableId : capturedTableIds) {
-                TableChange tableSchema = queryTableSchema(jdbc, tableId);
-                tableSchemas.put(tableId, tableSchema);
-            }
+            Map<TableId, TableChange> tableSchemas = queryTableSchema(jdbc, capturedTableIds);
             return tableSchemas;
         } catch (Exception e) {
             throw new FlinkRuntimeException(
@@ -194,6 +197,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
             schema = new CustomPostgresSchema((PostgresConnection) jdbc, sourceConfig);
         }
         return schema.getTableSchema(tableId);
+    }
+
+    private Map<TableId, TableChange> queryTableSchema(
+            JdbcConnection jdbc, List<TableId> tableIds) {
+        if (schema == null) {
+            schema = new CustomPostgresSchema((PostgresConnection) jdbc, sourceConfig);
+        }
+        return schema.getTableSchema(tableIds);
     }
 
     @Override

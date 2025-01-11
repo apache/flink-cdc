@@ -79,10 +79,10 @@ org.apache.flink.kubernetes.KubernetesClusterDescriptor      [] - Please note th
 org.apache.flink.kubernetes.KubernetesClusterDescriptor      [] - Create flink session cluster my-first-flink-cluster successfully, JobManager Web Interface: http://my-first-flink-cluster-rest.default:8081
 ```
 
-{{< hint info >}}
+{{< hint info >}}  
 please refer to [Flink documentation](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/resource-providers/native_kubernetes/#accessing-flinks-web-ui) to expose Flink’s Web UI and REST endpoint.   
-You should ensure that REST endpoint can be accessed by the node of your submission.
-{{< /hint >}}
+You should ensure that REST endpoint can be accessed by the node of your submission.  
+{{< /hint >}}  
 Then, you need to add these two config to your flink-conf.yaml:
 
 ```yaml
@@ -152,8 +152,148 @@ Job ID: ae30f4580f1918bebf16752d4963dc54
 Job Description: Sync MySQL Database to Doris
 ```
 
-Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.  
+Then you can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.
 
-{{< hint info >}}
-Please note that submitting with **native application mode** and **Flink Kubernetes operator** are not supported for now.
+## Kubernetes Operator Mode
+The doc assumes a [Flink Kubernetes Operator](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/) has been deployed on your K8s cluster, then you only need to build a Docker image of Flink CDC.
+
+### Build a custom Docker image
+1. Download the tar file of Flink CDC and needed connectors from [release page](https://github.com/apache/flink-cdc/releases), then move them to the docker image build directory.  
+   Assume that your docker image build directory is `/opt/docker/flink-cdc`, The structure of this directory is as follow：
+    ```text
+    /opt/docker/flink-cdc
+        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
+        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
+        ├── mysql-connector-java-8.0.27.jar
+        └── ...
+    ```
+2. Create a Dockerfile to build a custom image from the `flink` official image and add Flink CDC dependencies.
+    ```shell script
+    FROM flink:1.18.0-java8
+    ADD *.jar $FLINK_HOME/lib/
+    ADD flink-cdc*.tar.gz $FLINK_HOME/
+    RUN mv $FLINK_HOME/flink-cdc-{{< param Version >}}/lib/flink-cdc-dist-{{< param Version >}}.jar $FLINK_HOME/lib/
+    ```
+   Finally, The structure is as follow：
+    ```text
+    /opt/docker/flink-cdc
+        ├── Dockerfile
+        ├── flink-cdc-{{< param Version >}}-bin.tar.gz
+        ├── flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar
+        ├── flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar
+        ├── mysql-connector-java-8.0.27.jar
+        └── ...
+    ```
+3. Build the custom Docker image then push.
+    ```bash
+   docker build -t flink-cdc-pipeline:{{< param Version >}} .
+   
+   docker push flink-cdc-pipeline:{{< param Version >}}
+   ```
+
+### Create a ConfigMap for mounting Flink CDC configuration files
+Here is an example file, please change the connection parameters into your actual values:
+```yaml
+---
+apiVersion: v1
+data:
+  flink-cdc.yaml: |-
+      parallelism: 4
+      schema.change.behavior: EVOLVE
+  mysql-to-doris.yaml: |-
+    source:
+      type: mysql
+      hostname: localhost
+      port: 3306
+      username: root
+      password: 123456
+      tables: app_db.\.*
+      server-id: 5400-5404
+      server-time-zone: UTC
+    
+    sink:
+      type: doris
+      fenodes: 127.0.0.1:8030
+      username: root
+      password: ""
+    
+    pipeline:
+      name: Sync MySQL Database to Doris
+      parallelism: 2
+kind: ConfigMap
+metadata:
+  name: flink-cdc-pipeline-configmap
+```
+
+### Create a FlinkDeployment YAML
+Here is an example file `flink-cdc-pipeline-job.yaml`：
+```yaml
+---
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: flink-cdc-pipeline-job
+spec:
+  flinkConfiguration:
+    classloader.resolve-order: parent-first
+    state.checkpoints.dir: 'file:///tmp/checkpoints'
+    state.savepoints.dir: 'file:///tmp/savepoints'
+  flinkVersion: v1_18
+  image: 'flink-cdc-pipeline:{{< param Version >}}'
+  imagePullPolicy: Always
+  job:
+    args:
+      - '--use-mini-cluster'
+      - /opt/flink/flink-cdc-{{< param Version >}}/conf/mysql-to-doris.yaml
+    entryClass: org.apache.flink.cdc.cli.CliFrontend
+    jarURI: 'local:///opt/flink/lib/flink-cdc-dist-{{< param Version >}}.jar'
+    parallelism: 1
+    state: running
+    upgradeMode: savepoint
+  jobManager:
+    replicas: 1
+    resource:
+      cpu: 1
+      memory: 1024m
+  podTemplate:
+    apiVersion: v1
+    kind: Pod
+    spec:
+      containers:
+        # don't modify this name
+        - name: flink-main-container
+          volumeMounts:
+            - mountPath: /opt/flink/flink-cdc-{{< param Version >}}/conf
+              name: flink-cdc-pipeline-config
+      volumes:
+        - configMap:
+            name: flink-cdc-pipeline-configmap
+          name: flink-cdc-pipeline-config
+  restartNonce: 0
+  serviceAccount: flink
+  taskManager:
+    resource:
+      cpu: 1
+      memory: 1024m
+```
+{{< hint info >}}  
+1. Due to Flink's class loader, the parameter of `classloader.resolve-order` must be `parent-first`.
+2. Flink CDC submits a job to a remote Flink cluster by default, you should start a Standalone Flink cluster in the pod by `--use-mini-cluster` in Operator mode.  
+{{< /hint >}}
+
+### Submit a Flink CDC Job
+After the ConfigMap and FlinkDeployment YAML are created, you can submit the Flink CDC job to the Operator through kubectl like：
+```bash
+kubectl apply -f flink-cdc-pipeline-job.yaml
+```
+
+After successful submission, the return information is as follows：
+```shell
+flinkdeployment.flink.apache.org/flink-cdc-pipeline-job created
+```
+If you want to trace the logs or expose the Flink Web UI, please refer to: [Flink Kubernetes Operator documentation](https://nightlies.apache.org/flink/flink-kubernetes-operator-docs-main/docs/concepts/overview/)。
+
+{{< hint info >}}  
+Please note that submitting with **native application mode** is not supported for now.  
 {{< /hint >}}

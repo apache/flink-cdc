@@ -18,6 +18,8 @@
 package org.apache.flink.cdc.connectors.oceanbase.table;
 
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestBase;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseOracleCdcMetadata;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -26,20 +28,14 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 /** Integration tests for OceanBase Oracle mode table source. */
 @Ignore("Test ignored before oceanbase-xe docker image is available")
-@RunWith(Parameterized.class)
 public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
 
     private final StreamExecutionEnvironment env =
@@ -48,61 +44,25 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private final String schema;
-    private final String configUrl;
-
-    public OceanBaseOracleModeITCase(
-            String username,
-            String password,
-            String hostname,
-            int port,
-            String logProxyHost,
-            int logProxyPort,
-            String tenant,
-            String schema,
-            String configUrl) {
-        super("oracle", username, password, hostname, port, logProxyHost, logProxyPort, tenant);
-        this.schema = schema;
-        this.configUrl = configUrl;
-    }
-
-    @Parameterized.Parameters
-    public static List<Object[]> parameters() {
-        return Collections.singletonList(
-                new Object[] {
-                    "SYS@test",
-                    "123456",
-                    "127.0.0.1",
-                    2881,
-                    "127.0.0.1",
-                    2983,
-                    "test",
-                    "SYS",
-                    "http://127.0.0.1:8080/services?Action=ObRootServiceInfo&ObCluster=obcluster"
-                });
-    }
+    private static final OceanBaseCdcMetadata METADATA = new OceanBaseOracleCdcMetadata();
 
     @Override
-    protected String commonOptionsString() {
-        return super.commonOptionsString() + " , " + " 'jdbc.driver' = 'com.oceanbase.jdbc.Driver'";
+    protected OceanBaseCdcMetadata metadata() {
+        return METADATA;
     }
 
     @Override
     protected String logProxyOptionsString() {
         return super.logProxyOptionsString()
                 + " , "
-                + String.format(" 'config-url' = '%s'", configUrl);
-    }
-
-    @Override
-    protected Connection getJdbcConnection() throws SQLException {
-        return DriverManager.getConnection(
-                "jdbc:oceanbase://" + hostname + ":" + port + "/" + schema, username, password);
+                + String.format(" 'config-url' = '%s'", METADATA.getConfigUrl());
     }
 
     @Test
     public void testAllDataTypes() throws Exception {
         initializeTable("column_type_test");
+
+        String schema = metadata().getDatabase();
         String sourceDDL =
                 String.format(
                         "CREATE TABLE full_types ("
@@ -260,7 +220,7 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
                         "+I(1,vc2,vc2,nvc2,c  ,nc ,1.1,2.22,3.33,8.888,4.444400,5.555,6.66,1234.567891,1234.567891,77.323,1,22,333,4444,5555,true,99,9999,999999999,999999999999999999,90,9900,999999990,999999999999999900,99999999999999999999999999999999999900,2022-10-30T00:00,2022-10-30T12:34:56.007890,2022-10-30T12:34:56.130,2022-10-30T12:34:56.125500,2022-10-30T12:34:56.125457,col_clob,col_blob)",
                         "+U(1,vc2,vc2,nvc2,c  ,nc ,1.1,2.22,3.33,8.888,4.444400,5.555,6.66,1234.567891,1234.567891,77.323,1,22,333,4444,5555,true,99,9999,999999999,999999999999999999,90,9900,999999990,999999999999999900,99999999999999999999999999999999999900,2022-10-30T00:00,2022-10-30T12:34:56.125450,2022-10-30T12:34:56.130,2022-10-30T12:34:56.125500,2022-10-30T12:34:56.125457,col_clob,col_blob)");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }

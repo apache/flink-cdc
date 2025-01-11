@@ -24,6 +24,8 @@ import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.flink.sink.StoreMultiCommitter;
 import org.apache.paimon.manifest.WrappedManifestCommittable;
 import org.apache.paimon.options.Options;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -34,6 +36,8 @@ import java.util.stream.Collectors;
 /** A {@link Committer} to commit write results for multiple tables. */
 public class PaimonCommitter implements Committer<MultiTableCommittable> {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(PaimonCommitter.class);
+
     private final StoreMultiCommitter storeMultiCommitter;
 
     public PaimonCommitter(Options catalogOptions, String commitUser) {
@@ -41,24 +45,41 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
         storeMultiCommitter =
                 new StoreMultiCommitter(
                         () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
-                        commitUser,
-                        null);
+                        org.apache.paimon.flink.sink.Committer.createContext(
+                                commitUser, null, true, false, null));
     }
 
     @Override
     public void commit(Collection<CommitRequest<MultiTableCommittable>> commitRequests)
-            throws IOException, InterruptedException {
+            throws IOException {
         if (commitRequests.isEmpty()) {
             return;
         }
+
         List<MultiTableCommittable> committables =
                 commitRequests.stream()
                         .map(CommitRequest::getCommittable)
                         .collect(Collectors.toList());
+        // All CommitRequest shared the same checkpointId.
         long checkpointId = committables.get(0).checkpointId();
         WrappedManifestCommittable wrappedManifestCommittable =
                 storeMultiCommitter.combine(checkpointId, 1L, committables);
-        storeMultiCommitter.commit(Collections.singletonList(wrappedManifestCommittable));
+        try {
+            storeMultiCommitter.filterAndCommit(
+                    Collections.singletonList(wrappedManifestCommittable));
+            commitRequests.forEach(CommitRequest::signalAlreadyCommitted);
+            LOGGER.info(
+                    "Commit succeeded for {} with {} committable",
+                    checkpointId,
+                    committables.size());
+        } catch (Exception e) {
+            commitRequests.forEach(CommitRequest::retryLater);
+            LOGGER.warn(
+                    "Commit failed for {} with {} committable",
+                    checkpointId,
+                    committables.size(),
+                    e);
+        }
     }
 
     @Override

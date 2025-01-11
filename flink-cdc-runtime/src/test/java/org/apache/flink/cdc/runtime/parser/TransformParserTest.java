@@ -20,8 +20,10 @@ package org.apache.flink.cdc.runtime.parser;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
+import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 
@@ -35,11 +37,10 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
 import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
-import org.apache.calcite.sql.util.SqlOperatorTables;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.sql2rel.RelDecorrelator;
@@ -50,6 +51,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,10 +101,9 @@ public class TransformParserTest {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
-        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        transformSqlOperatorTable,
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -142,10 +143,9 @@ public class TransformParserTest {
                         factory,
                         new CalciteConnectionConfigImpl(new Properties()));
         TransformSqlOperatorTable transformSqlOperatorTable = TransformSqlOperatorTable.instance();
-        SqlStdOperatorTable sqlStdOperatorTable = SqlStdOperatorTable.instance();
         SqlValidator validator =
                 SqlValidatorUtil.newValidator(
-                        SqlOperatorTables.chain(sqlStdOperatorTable, transformSqlOperatorTable),
+                        transformSqlOperatorTable,
                         calciteCatalogReader,
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
@@ -184,7 +184,8 @@ public class TransformParserTest {
     @Test
     public void testParseComputedColumnNames() {
         List<String> computedColumnNames =
-                TransformParser.parseComputedColumnNames("CONCAT(id, order_id) as uniq_id, *");
+                TransformParser.parseComputedColumnNames(
+                        "CONCAT(id, order_id) as uniq_id, *", new SupportedMetadataColumn[0]);
 
         Assertions.assertThat(computedColumnNames.toArray()).isEqualTo(new String[] {"uniq_id"});
     }
@@ -324,38 +325,51 @@ public class TransformParserTest {
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
                         "id, upper(name) as name, age + 1 as newage, weight / (height * height) as bmi",
-                        testColumns);
+                        testColumns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
 
         List<String> expected =
                 Arrays.asList(
-                        "ProjectionColumn{column=`id` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
                         "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(name)', originalColumnNames=[name], transformExpressionKey=null}",
                         "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='age + 1', originalColumnNames=[age], transformExpressionKey=null}",
                         "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='weight / height * height', originalColumnNames=[weight, height, height], transformExpressionKey=null}");
-        Assertions.assertThat(result.toString()).isEqualTo("[" + String.join(", ", expected) + "]");
+        Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(
-                        "*, __namespace_name__, __schema_name__, __table_name__", testColumns);
+                        "*, __namespace_name__, __schema_name__, __table_name__",
+                        testColumns,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0]);
 
         List<String> metadataExpected =
                 Arrays.asList(
-                        "ProjectionColumn{column=`id` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
-                        "ProjectionColumn{column=`name` STRING, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
-                        "ProjectionColumn{column=`age` INT, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
-                        "ProjectionColumn{column=`address` STRING, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
-                        "ProjectionColumn{column=`weight` DOUBLE, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
-                        "ProjectionColumn{column=`height` DOUBLE, expression='null', scriptExpression='null', originalColumnNames=null, transformExpressionKey=null}",
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='id', originalColumnNames=[id], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`name` STRING 'string', expression='name', scriptExpression='name', originalColumnNames=[name], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`age` INT 'age', expression='age', scriptExpression='age', originalColumnNames=[age], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`address` STRING 'address', expression='address', scriptExpression='address', originalColumnNames=[address], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='weight', originalColumnNames=[weight], transformExpressionKey=null}",
+                        "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='height', originalColumnNames=[height], transformExpressionKey=null}",
                         "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='__namespace_name__', originalColumnNames=[__namespace_name__], transformExpressionKey=null}",
                         "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='__schema_name__', originalColumnNames=[__schema_name__], transformExpressionKey=null}",
                         "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='__table_name__', originalColumnNames=[__table_name__], transformExpressionKey=null}");
-        Assertions.assertThat(metadataResult.toString())
-                .isEqualTo("[" + String.join(", ", metadataExpected) + "]");
+        Assertions.assertThat(metadataResult)
+                .map(ProjectionColumn::toString)
+                .containsExactlyElementsOf(metadataExpected);
 
         // calculated columns must use AS to provide an alias name
         Assertions.assertThatThrownBy(
-                        () -> TransformParser.generateProjectionColumns("id, 1 + 1", testColumns))
-                .isExactlyInstanceOf(ParseException.class);
+                        () ->
+                                TransformParser.generateProjectionColumns(
+                                        "id, 1 + 1",
+                                        testColumns,
+                                        Collections.emptyList(),
+                                        new SupportedMetadataColumn[0]))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "Unrecognized projection expression: 1 + 1. Should be <EXPR> AS <IDENTIFIER>");
     }
 
     @Test
@@ -413,9 +427,97 @@ public class TransformParserTest {
                         "`concat`(1 - `x`, `concat`(1 - `y`, `concat`(1 - `z`, `x`), `y`), `z`) <> 10");
     }
 
+    @Test
+    public void testTranslateUdfFilterToJaninoExpression() {
+        testFilterExpressionWithUdf(
+                "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
+        testFilterExpressionWithUdf(
+                "format(lower(id))", "__instanceOfFormatFunctionClass.eval(lower(id))");
+        testFilterExpressionWithUdf(
+                "format(concat(a,b))", "__instanceOfFormatFunctionClass.eval(concat(a, b))");
+        testFilterExpressionWithUdf(
+                "format(SUBSTR(a,1))", "__instanceOfFormatFunctionClass.eval(substr(a, 1))");
+        testFilterExpressionWithUdf(
+                "typeof(id like '^[a-zA-Z]')",
+                "__instanceOfTypeOfFunctionClass.eval(like(id, \"^[a-zA-Z]\"))");
+        testFilterExpressionWithUdf(
+                "typeof(id not like '^[a-zA-Z]')",
+                "__instanceOfTypeOfFunctionClass.eval(notLike(id, \"^[a-zA-Z]\"))");
+        testFilterExpressionWithUdf(
+                "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
+        testFilterExpressionWithUdf(
+                "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
+        testFilterExpressionWithUdf(
+                "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
+        testFilterExpressionWithUdf(
+                "typeof(round(2,2))", "__instanceOfTypeOfFunctionClass.eval(round(2, 2))");
+        testFilterExpressionWithUdf(
+                "typeof(id + 2)", "__instanceOfTypeOfFunctionClass.eval(id + 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id - 2)", "__instanceOfTypeOfFunctionClass.eval(id - 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id * 2)", "__instanceOfTypeOfFunctionClass.eval(id * 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id / 2)", "__instanceOfTypeOfFunctionClass.eval(id / 2)");
+        testFilterExpressionWithUdf(
+                "typeof(id % 2)", "__instanceOfTypeOfFunctionClass.eval(id % 2)");
+        testFilterExpressionWithUdf(
+                "addone(addone(id)) > 4 OR typeof(id) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
+                "__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)) > 4 || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+        testFilterExpressionWithUdf(
+                "ADDONE(ADDONE(id)) > 4 OR TYPEOF(id) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
+                "__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(id)) > 4 || !valueEquals(__instanceOfTypeOfFunctionClass.eval(id), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")");
+    }
+
+    @Test
+    void testLargeNumericalLiterals() {
+        // For literals within [-2147483648, 2147483647] range, plain Integers are OK
+        testFilterExpression("id > 2147483647", "id > 2147483647");
+        testFilterExpression("id < -2147483648", "id < -2147483648");
+
+        // For out-of-range literals, an extra `L` suffix is required
+        testFilterExpression("id > 2147483648", "id > 2147483648L");
+        testFilterExpression("id > -2147483649", "id > -2147483649L");
+        testFilterExpression("id < 9223372036854775807", "id < 9223372036854775807L");
+        testFilterExpression("id > -9223372036854775808", "id > -9223372036854775808L");
+
+        // But there's still a limit
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "id > 9223372036854775808", Collections.emptyList()))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Numeric literal '9223372036854775808' out of range");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TransformParser.translateFilterExpressionToJaninoExpression(
+                                        "id < -9223372036854775809", Collections.emptyList()))
+                .isExactlyInstanceOf(CalciteContextException.class)
+                .hasMessageContaining("Numeric literal '-9223372036854775809' out of range");
+    }
+
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =
-                TransformParser.translateFilterExpressionToJaninoExpression(expression);
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression, Collections.emptyList());
+        Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
+    }
+
+    private void testFilterExpressionWithUdf(String expression, String expressionExpect) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        Arrays.asList(
+                                new UserDefinedFunctionDescriptor(
+                                        "format",
+                                        "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass"),
+                                new UserDefinedFunctionDescriptor(
+                                        "addone",
+                                        "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                                new UserDefinedFunctionDescriptor(
+                                        "typeof",
+                                        "org.apache.flink.cdc.udf.examples.java.TypeOfFunctionClass")));
         Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
     }
 }

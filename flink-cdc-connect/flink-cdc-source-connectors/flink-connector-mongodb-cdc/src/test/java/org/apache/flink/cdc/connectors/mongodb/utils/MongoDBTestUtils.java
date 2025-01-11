@@ -56,7 +56,8 @@ public class MongoDBTestUtils {
                 fail(
                         "Wait for sink size timeout, raw results: \n"
                                 + String.join(
-                                        "\n", TestValuesTableFactory.getRawResults(sinkName)));
+                                        "\n",
+                                        TestValuesTableFactory.getRawResultsAsStrings(sinkName)));
             }
             Thread.sleep(100);
         }
@@ -65,7 +66,7 @@ public class MongoDBTestUtils {
     public static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

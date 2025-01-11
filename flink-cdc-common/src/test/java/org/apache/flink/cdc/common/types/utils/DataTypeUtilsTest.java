@@ -17,14 +17,12 @@
 
 package org.apache.flink.cdc.common.types.utils;
 
-import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -88,46 +86,67 @@ class DataTypeUtilsTest {
                 DataTypes.ROW(DataTypes.SMALLINT(), DataTypes.STRING())
             };
 
+    private static final org.apache.flink.table.types.DataType[] FLINK_TYPES =
+            new org.apache.flink.table.types.DataType[] {
+                BOOLEAN(),
+                BYTES(),
+                BINARY(10),
+                VARBINARY(10),
+                CHAR(10),
+                VARCHAR(10),
+                STRING(),
+                INT(),
+                TINYINT(),
+                SMALLINT(),
+                BIGINT(),
+                DOUBLE(),
+                FLOAT(),
+                DECIMAL(6, 3),
+                DATE(),
+                TIME(),
+                TIME(6),
+                TIMESTAMP(),
+                TIMESTAMP(6),
+                TIMESTAMP_LTZ(),
+                TIMESTAMP_LTZ(6),
+                TIMESTAMP_WITH_TIME_ZONE(),
+                TIMESTAMP_WITH_TIME_ZONE(6),
+                ARRAY(BIGINT()),
+                MAP(SMALLINT(), STRING()),
+                ROW(FIELD("f1", STRING()), FIELD("f2", STRING(), "desc")),
+                ROW(SMALLINT(), STRING())
+            };
+
     @Test
     void testToFlinkDataType() {
-        List<DataField> list =
-                IntStream.range(0, ALL_TYPES.length)
-                        .mapToObj(i -> DataTypes.FIELD("f" + i, ALL_TYPES[i]))
-                        .collect(Collectors.toList());
+        DataType cdcNullableDataType =
+                new RowType(
+                        IntStream.range(0, ALL_TYPES.length)
+                                .mapToObj(i -> DataTypes.FIELD("f" + i, ALL_TYPES[i]))
+                                .collect(Collectors.toList()));
+        DataType cdcNotNullDataType =
+                new RowType(
+                        IntStream.range(0, ALL_TYPES.length)
+                                .mapToObj(i -> DataTypes.FIELD("f" + i, ALL_TYPES[i].notNull()))
+                                .collect(Collectors.toList()));
 
-        org.apache.flink.table.types.DataType dataType =
-                DataTypeUtils.toFlinkDataType(new RowType(list));
+        org.apache.flink.table.types.DataType nullableDataType =
+                DataTypeUtils.toFlinkDataType(cdcNullableDataType);
+        org.apache.flink.table.types.DataType notNullDataType =
+                DataTypeUtils.toFlinkDataType(cdcNotNullDataType);
 
-        org.apache.flink.table.types.DataType expectedDataType =
+        org.apache.flink.table.types.DataType expectedNullableDataType =
                 ROW(
-                        FIELD("f0", BOOLEAN()),
-                        FIELD("f1", BYTES()),
-                        FIELD("f2", BINARY(10)),
-                        FIELD("f3", VARBINARY(10)),
-                        FIELD("f4", CHAR(10)),
-                        FIELD("f5", VARCHAR(10)),
-                        FIELD("f6", STRING()),
-                        FIELD("f7", INT()),
-                        FIELD("f8", TINYINT()),
-                        FIELD("f9", SMALLINT()),
-                        FIELD("f10", BIGINT()),
-                        FIELD("f11", DOUBLE()),
-                        FIELD("f12", FLOAT()),
-                        FIELD("f13", DECIMAL(6, 3)),
-                        FIELD("f14", DATE()),
-                        FIELD("f15", TIME()),
-                        FIELD("f16", TIME(6)),
-                        FIELD("f17", TIMESTAMP()),
-                        FIELD("f18", TIMESTAMP(6)),
-                        FIELD("f19", TIMESTAMP_LTZ()),
-                        FIELD("f20", TIMESTAMP_LTZ(6)),
-                        FIELD("f21", TIMESTAMP_WITH_TIME_ZONE()),
-                        FIELD("f22", TIMESTAMP_WITH_TIME_ZONE(6)),
-                        FIELD("f23", ARRAY(BIGINT())),
-                        FIELD("f24", MAP(SMALLINT(), STRING())),
-                        FIELD("f25", ROW(FIELD("f1", STRING()), FIELD("f2", STRING(), "desc"))),
-                        FIELD("f26", ROW(SMALLINT(), STRING())));
+                        IntStream.range(0, FLINK_TYPES.length)
+                                .mapToObj(i -> FIELD("f" + i, FLINK_TYPES[i]))
+                                .collect(Collectors.toList()));
+        org.apache.flink.table.types.DataType expectedNotNullDataType =
+                ROW(
+                        IntStream.range(0, FLINK_TYPES.length)
+                                .mapToObj(i -> FIELD("f" + i, FLINK_TYPES[i].notNull()))
+                                .collect(Collectors.toList()));
 
-        assertThat(dataType).isEqualTo(expectedDataType);
+        assertThat(nullableDataType).isEqualTo(expectedNullableDataType);
+        assertThat(notNullDataType).isEqualTo(expectedNotNullDataType);
     }
 }

@@ -39,7 +39,7 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
    <groupId>org.apache.flink</groupId>
    <artifactId>flink-connector-mongodb-cdc</artifactId>
    <!--  请使用已发布的版本依赖，snapshot 版本的依赖需要本地自行编译。 -->
-   <version>3.2-SNAPSHOT</version>
+   <version>3.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -47,7 +47,7 @@ MongoDB CDC 连接器允许从 MongoDB 读取快照数据和增量数据。 本�
 
 ```下载链接仅适用于稳定版本。```
 
-下载 [flink-sql-connector-mongodb-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/3.1.0/flink-sql-connector-mongodb-cdc-3.1.0.jar)， 把它放在 `<FLINK_HOME>/lib/`.
+下载 [flink-sql-connector-mongodb-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/{{< param Version >}}/flink-sql-connector-mongodb-cdc-{{< param Version >}}.jar)， 把它放在 `<FLINK_HOME>/lib/`.
 
 **注意:** 参考 [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc)， 当前已发布的版本将在 Maven 中央仓库中提供。
 
@@ -147,7 +147,7 @@ SELECT * FROM products;
 **请注意**
 
 MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能将其转换为 Flink 的 UPSERT 更改日志流。
-upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为主键。
+因为 upsert 流需要唯一键，所以我们必须声明 `_id` 作为主键。
 我们不能将其他列声明为主键, 因为删除操作不包含除 `_id` 和 `sharding key` 之外的键和值。
 
 连接器选项
@@ -367,7 +367,7 @@ MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据
 
 ### 启动模式<a name="启动模式" id="002" ></a>
 
-配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
+配置选项```scan.startup.mode```指定 MongoDB CDC 消费者的启动模式。有效枚举包括：
 
 - `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 oplog。
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 oplog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。

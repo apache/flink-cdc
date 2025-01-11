@@ -17,15 +17,21 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Translator used to build {@link PreTransformOperator} and {@link PostTransformOperator} for event
@@ -33,8 +39,17 @@ import java.util.List;
  */
 public class TransformTranslator {
 
+    /** Package of built-in model. */
+    public static final String PREFIX_CLASSPATH_BUILT_IN_MODEL =
+            "org.apache.flink.cdc.runtime.model.";
+
     public DataStream<Event> translatePreTransform(
-            DataStream<Event> input, List<TransformDef> transforms) {
+            DataStream<Event> input,
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            boolean canContainDistributedTables) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -42,16 +57,26 @@ public class TransformTranslator {
         PreTransformOperator.Builder preTransformFunctionBuilder =
                 PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
-            if (transform.isValidProjection()) {
-                preTransformFunctionBuilder.addTransform(
-                        transform.getSourceTable(),
-                        transform.getProjection().orElse(null),
-                        transform.getFilter().orElse(null),
-                        transform.getPrimaryKeys(),
-                        transform.getPartitionKeys(),
-                        transform.getTableOptions());
-            }
+            preTransformFunctionBuilder.addTransform(
+                    transform.getSourceTable(),
+                    transform.getProjection().orElse(null),
+                    transform.getFilter().orElse(null),
+                    transform.getPrimaryKeys(),
+                    transform.getPartitionKeys(),
+                    transform.getTableOptions(),
+                    transform.getPostTransformConverter(),
+                    supportedMetadataColumns);
         }
+
+        preTransformFunctionBuilder
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addUdfFunctions(
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
+                .canContainDistributedTables(canContainDistributedTables);
+
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }
@@ -59,8 +84,10 @@ public class TransformTranslator {
     public DataStream<Event> translatePostTransform(
             DataStream<Event> input,
             List<TransformDef> transforms,
-            OperatorID schemaOperatorID,
-            String timezone) {
+            String timezone,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -75,12 +102,28 @@ public class TransformTranslator {
                         transform.isValidFilter() ? transform.getFilter().get() : null,
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
-                        transform.getTableOptions());
+                        transform.getTableOptions(),
+                        transform.getPostTransformConverter(),
+                        supportedMetadataColumns);
             }
         }
-        postTransformFunctionBuilder.addSchemaOperatorID(schemaOperatorID);
         postTransformFunctionBuilder.addTimezone(timezone);
+        postTransformFunctionBuilder.addUdfFunctions(
+                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
+        postTransformFunctionBuilder.addUdfFunctions(
+                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
         return input.transform(
                 "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
+    }
+
+    private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {
+        return Tuple3.of(
+                model.getModelName(),
+                PREFIX_CLASSPATH_BUILT_IN_MODEL + model.getClassName(),
+                model.getParameters());
+    }
+
+    private Tuple3<String, String, Map<String, String>> udfDefToUDFTuple(UdfDef udf) {
+        return Tuple3.of(udf.getName(), udf.getClasspath(), new HashMap<>());
     }
 }

@@ -18,14 +18,18 @@
 package org.apache.flink.cdc.cli.parser;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.definition.UdfDef;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import org.junit.jupiter.api.Test;
@@ -33,9 +37,19 @@ import org.junit.jupiter.api.Test;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Set;
 
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
@@ -145,7 +159,7 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
-    void testInvalidTimeZone() throws Exception {
+    void testInvalidTimeZone() {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         assertThatThrownBy(
@@ -173,6 +187,107 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDefWithRouteRepSym);
+    }
+
+    @Test
+    void testUdfDefinition() throws Exception {
+        URL resource = Resources.getResource("definitions/pipeline-definition-with-udf.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithUdf);
+    }
+
+    @Test
+    void testSchemaEvolutionTypesConfiguration() throws Exception {
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                null,
+                null,
+                ImmutableSet.of(
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        DROP_TABLE,
+                        RENAME_COLUMN,
+                        TRUNCATE_TABLE));
+        testSchemaEvolutionTypesParsing(
+                "try_evolve",
+                null,
+                null,
+                ImmutableSet.of(
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        DROP_TABLE,
+                        RENAME_COLUMN,
+                        TRUNCATE_TABLE));
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[column, table]",
+                "[drop]",
+                ImmutableSet.of(
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        RENAME_COLUMN,
+                        TRUNCATE_TABLE));
+        testSchemaEvolutionTypesParsing(
+                "lenient",
+                null,
+                null,
+                ImmutableSet.of(
+                        ADD_COLUMN, ALTER_COLUMN_TYPE, CREATE_TABLE, DROP_COLUMN, RENAME_COLUMN));
+        testSchemaEvolutionTypesParsing(
+                "lenient",
+                null,
+                "[]",
+                ImmutableSet.of(
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        DROP_TABLE,
+                        RENAME_COLUMN,
+                        TRUNCATE_TABLE));
+    }
+
+    private void testSchemaEvolutionTypesParsing(
+            String behavior, String included, String excluded, Set<SchemaChangeEventType> expected)
+            throws Exception {
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef =
+                parser.parse(
+                        "source:\n"
+                                + "  type: foo\n"
+                                + "sink:\n"
+                                + "  type: bar\n"
+                                + (included != null
+                                        ? String.format("  include.schema.changes: %s\n", included)
+                                        : "")
+                                + (excluded != null
+                                        ? String.format("  exclude.schema.changes: %s\n", excluded)
+                                        : "")
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: "
+                                + behavior
+                                + "\n"
+                                + "  parallelism: 1\n",
+                        new Configuration());
+        assertThat(pipelineDef)
+                .isEqualTo(
+                        new PipelineDef(
+                                new SourceDef("foo", null, new Configuration()),
+                                new SinkDef("bar", null, new Configuration(), expected),
+                                Collections.emptyList(),
+                                Collections.emptyList(),
+                                Collections.emptyList(),
+                                Configuration.fromMap(
+                                        ImmutableMap.<String, String>builder()
+                                                .put("schema.change.behavior", behavior)
+                                                .put("parallelism", "1")
+                                                .build())));
     }
 
     private final PipelineDef fullDef =
@@ -221,7 +336,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -229,7 +345,21 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new ModelDef(
+                                    "GET_EMBEDDING",
+                                    "OpenAIEmbeddingModel",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("model-name", "GET_EMBEDDING")
+                                                    .put("class-name", "OpenAIEmbeddingModel")
+                                                    .put("openai.model", "text-embedding-3-small")
+                                                    .put("openai.host", "https://xxxx")
+                                                    .put("openai.apikey", "abcd1234")
+                                                    .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -274,6 +404,7 @@ class YamlPipelineDefinitionParserTest {
                         + "    partition-keys: product_name\n"
                         + "    table-options: comment=app order\n"
                         + "    description: project fields from source table\n"
+                        + "    converter-after-transform: SOFT_DELETE\n"
                         + "  - source-table: mydb.web_order_.*\n"
                         + "    projection: CONCAT(id, order_id) as uniq_id, *\n"
                         + "    filter: uniq_id > 10\n"
@@ -283,7 +414,13 @@ class YamlPipelineDefinitionParserTest {
                         + "  name: source-database-sync-pipe\n"
                         + "  parallelism: 4\n"
                         + "  schema.change.behavior: evolve\n"
-                        + "  schema-operator.rpc-timeout: 1 h";
+                        + "  schema-operator.rpc-timeout: 1 h\n"
+                        + "  model:\n"
+                        + "    - model-name: GET_EMBEDDING\n"
+                        + "      class-name: OpenAIEmbeddingModel\n"
+                        + "      openai.model: text-embedding-3-small\n"
+                        + "      openai.host: https://xxxx\n"
+                        + "      openai.apikey: abcd1234";
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(pipelineDefText, new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDef);
@@ -335,7 +472,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -343,7 +481,21 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new ModelDef(
+                                    "GET_EMBEDDING",
+                                    "OpenAIEmbeddingModel",
+                                    new LinkedHashMap<>(
+                                            ImmutableMap.<String, String>builder()
+                                                    .put("model-name", "GET_EMBEDDING")
+                                                    .put("class-name", "OpenAIEmbeddingModel")
+                                                    .put("openai.model", "text-embedding-3-small")
+                                                    .put("openai.host", "https://xxxx")
+                                                    .put("openai.apikey", "abcd1234")
+                                                    .build()))),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
@@ -373,13 +525,20 @@ class YamlPipelineDefinitionParserTest {
                             Configuration.fromMap(
                                     ImmutableMap.<String, String>builder()
                                             .put("bootstrap-servers", "localhost:9092")
-                                            .build())),
+                                            .build()),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
                     Collections.singletonList(
                             new RouteDef(
                                     "mydb.default.app_order_.*",
                                     "odsdb.default.app_order",
                                     null,
                                     null)),
+                    Collections.emptyList(),
                     Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
@@ -389,10 +548,22 @@ class YamlPipelineDefinitionParserTest {
     private final PipelineDef minimizedDef =
             new PipelineDef(
                     new SourceDef("mysql", null, new Configuration()),
-                    new SinkDef("kafka", null, new Configuration()),
+                    new SinkDef(
+                            "kafka",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
                     Collections.emptyList(),
                     Collections.emptyList(),
-                    Configuration.fromMap(Collections.singletonMap("parallelism", "1")));
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            Collections.singletonMap(
+                                    "local-time-zone", ZoneId.systemDefault().toString())));
 
     private final PipelineDef fullDefWithRouteRepSym =
             new PipelineDef(
@@ -440,7 +611,8 @@ class YamlPipelineDefinitionParserTest {
                                     "id",
                                     "product_name",
                                     "comment=app order",
-                                    "project fields from source table"),
+                                    "project fields from source table",
+                                    "SOFT_DELETE"),
                             new TransformDef(
                                     "mydb.web_order_.*",
                                     "CONCAT(id, order_id) as uniq_id, *",
@@ -448,12 +620,50 @@ class YamlPipelineDefinitionParserTest {
                                     null,
                                     null,
                                     null,
-                                    "add new uniq_id for each row")),
+                                    "add new uniq_id for each row",
+                                    null)),
+                    Collections.emptyList(),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithUdf =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef(
+                            "values",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id",
+                                    "inc(id) < 100",
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null)),
+                    Arrays.asList(
+                            new UdfDef(
+                                    "inc",
+                                    "org.apache.flink.cdc.udf.examples.java.AddOneFunctionClass"),
+                            new UdfDef(
+                                    "format",
+                                    "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass")),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
                                     .build()));
 }

@@ -21,7 +21,9 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
+import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
@@ -30,12 +32,12 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Map;
 
-import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_NAMESPACE_NAME;
-import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_SCHEMA_NAME;
-import static org.apache.flink.cdc.runtime.parser.TransformParser.DEFAULT_TABLE_NAME;
+import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
 /** The processor of the transform filter. It processes the data change event of matched table. */
 public class TransformFilterProcessor {
@@ -44,25 +46,54 @@ public class TransformFilterProcessor {
     private TransformFilter transformFilter;
     private String timezone;
     private TransformExpressionKey transformExpressionKey;
+    private final transient List<Object> udfFunctionInstances;
+    private transient ExpressionEvaluator expressionEvaluator;
+    private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
 
     public TransformFilterProcessor(
-            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
+            PostTransformChangeInfo tableInfo,
+            TransformFilter transformFilter,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances,
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
         this.tableInfo = tableInfo;
         this.transformFilter = transformFilter;
         this.timezone = timezone;
-        transformExpressionKey = generateTransformExpressionKey();
+        this.supportedMetadataColumns = supportedMetadataColumns;
+        this.transformExpressionKey = generateTransformExpressionKey();
+        this.udfFunctionInstances = udfFunctionInstances;
+        this.expressionEvaluator =
+                TransformExpressionCompiler.compileExpression(
+                        transformExpressionKey, udfDescriptors);
     }
 
     public static TransformFilterProcessor of(
-            PostTransformChangeInfo tableInfo, TransformFilter transformFilter, String timezone) {
-        return new TransformFilterProcessor(tableInfo, transformFilter, timezone);
+            PostTransformChangeInfo tableInfo,
+            TransformFilter transformFilter,
+            String timezone,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap = new HashMap<>();
+        for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
+            supportedMetadataColumnsMap.put(
+                    supportedMetadataColumn.getName(), supportedMetadataColumn);
+        }
+        return new TransformFilterProcessor(
+                tableInfo,
+                transformFilter,
+                timezone,
+                udfDescriptors,
+                udfFunctionInstances,
+                supportedMetadataColumnsMap);
     }
 
-    public boolean process(BinaryRecordData after, long epochTime) {
-        ExpressionEvaluator expressionEvaluator =
-                TransformExpressionCompiler.compileExpression(transformExpressionKey);
+    public boolean process(
+            BinaryRecordData record, long epochTime, String opType, Map<String, String> meta) {
         try {
-            return (Boolean) expressionEvaluator.evaluate(generateParams(after, epochTime));
+            return (Boolean)
+                    expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
             LOG.error(
                     "Table:{} filter:{} execute failed. {}",
@@ -78,60 +109,84 @@ public class TransformFilterProcessor {
         List<Class<?>> argTypes = new ArrayList<>();
         String scriptExpression = transformFilter.getScriptExpression();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
-        List<String> columnNames = transformFilter.getColumnNames();
+        LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
         for (String columnName : columnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
-                    if (!argNames.contains(columnName)) {
-                        argNames.add(columnName);
-                        argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
-                    }
+                    argNames.add(columnName);
+                    argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     break;
                 }
             }
         }
-        Stream.of(DEFAULT_NAMESPACE_NAME, DEFAULT_SCHEMA_NAME, DEFAULT_TABLE_NAME)
+
+        METADATA_COLUMNS.stream()
                 .forEach(
-                        metadataColumn -> {
-                            if (scriptExpression.contains(metadataColumn)
-                                    && !argNames.contains(metadataColumn)) {
-                                argNames.add(metadataColumn);
-                                argTypes.add(String.class);
+                        col -> {
+                            if (scriptExpression.contains(col.f0) && !argNames.contains(col.f0)) {
+                                argNames.add(col.f0);
+                                argTypes.add(col.f2);
+                            }
+                        });
+
+        supportedMetadataColumns
+                .keySet()
+                .forEach(
+                        colName -> {
+                            if (scriptExpression.contains(colName) && !argNames.contains(colName)) {
+                                argNames.add(colName);
+                                argTypes.add(supportedMetadataColumns.get(colName).getJavaClass());
                             }
                         });
         return Tuple2.of(argNames, argTypes);
     }
 
-    private Object[] generateParams(BinaryRecordData after, long epochTime) {
+    private Object[] generateParams(
+            BinaryRecordData record, long epochTime, String opType, Map<String, String> meta) {
         List<Object> params = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
+        // 1 - Add referenced columns
         Tuple2<List<String>, List<Class<?>>> args = generateArguments();
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String columnName : args.f0) {
             switch (columnName) {
-                case DEFAULT_NAMESPACE_NAME:
+                case MetadataColumns.DEFAULT_NAMESPACE_NAME:
                     params.add(tableInfo.getNamespace());
                     continue;
-                case DEFAULT_SCHEMA_NAME:
+                case MetadataColumns.DEFAULT_SCHEMA_NAME:
                     params.add(tableInfo.getSchemaName());
                     continue;
-                case DEFAULT_TABLE_NAME:
+                case MetadataColumns.DEFAULT_TABLE_NAME:
                     params.add(tableInfo.getTableName());
                     continue;
+                case MetadataColumns.DEFAULT_DATA_EVENT_TYPE:
+                    params.add(opType);
+                    continue;
             }
+
+            if (supportedMetadataColumns.containsKey(columnName)) {
+                params.add(supportedMetadataColumns.get(columnName).read(meta));
+                continue;
+            }
+
             for (int i = 0; i < columns.size(); i++) {
                 Column column = columns.get(i);
                 if (column.getName().equals(columnName)) {
                     params.add(
                             DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(after), column.getType()));
+                                    fieldGetters[i].getFieldOrNull(record), column.getType()));
                     break;
                 }
             }
         }
+
+        // 2 - Add time-sensitive function arguments
         params.add(timezone);
         params.add(epochTime);
+
+        // 3 - Add UDF function instances
+        params.addAll(udfFunctionInstances);
         return params.toArray();
     }
 

@@ -20,13 +20,14 @@ package org.apache.flink.cdc.connectors.base.source.assigner.splitter;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.utils.JdbcChunkUtils;
 import org.apache.flink.cdc.connectors.base.utils.ObjectUtils;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.util.FlinkRuntimeException;
+import org.apache.flink.util.Preconditions;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
@@ -47,9 +48,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.math.BigDecimal.ROUND_CEILING;
-import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
@@ -60,55 +61,101 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     protected final JdbcSourceConfig sourceConfig;
     protected final JdbcDataSourceDialect dialect;
 
-    public JdbcSourceChunkSplitter(JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dialect) {
+    private final Object lock = new Object();
+    @Nullable private TableId currentSplittingTableId;
+    @Nullable private ChunkSplitterState.ChunkBound nextChunkStart;
+    @Nullable private Integer nextChunkId;
+
+    private JdbcConnection jdbcConnection;
+    private Table currentSplittingTable;
+    private TableChanges.TableChange currentSchema;
+    private Column splitColumn;
+    private RowType splitType;
+    private Object[] minMaxOfSplitColumn;
+    private long approximateRowCnt;
+
+    public JdbcSourceChunkSplitter(
+            JdbcSourceConfig sourceConfig,
+            JdbcDataSourceDialect dialect,
+            ChunkSplitterState chunkSplitterState) {
+        this(
+                sourceConfig,
+                dialect,
+                chunkSplitterState.getCurrentSplittingTableId(),
+                chunkSplitterState.getNextChunkStart(),
+                chunkSplitterState.getNextChunkId());
+    }
+
+    public JdbcSourceChunkSplitter(
+            JdbcSourceConfig sourceConfig,
+            JdbcDataSourceDialect dialect,
+            @Nullable TableId currentSplittingTableId,
+            @Nullable ChunkSplitterState.ChunkBound nextChunkStart,
+            @Nullable Integer nextChunkId) {
         this.sourceConfig = sourceConfig;
         this.dialect = dialect;
+        this.currentSplittingTableId = currentSplittingTableId;
+        this.nextChunkStart = nextChunkStart;
+        this.nextChunkId = nextChunkId;
+    }
+
+    @Override
+    public void open() {
+        this.jdbcConnection = dialect.openJdbcConnection(sourceConfig);
     }
 
     /** Generates all snapshot splits (chunks) for the give table path. */
     @Override
-    public Collection<SnapshotSplit> generateSplits(TableId tableId) {
-        try (JdbcConnection jdbc = dialect.openJdbcConnection(sourceConfig)) {
-
-            LOG.info("Start splitting table {} into chunks...", tableId);
-            long start = System.currentTimeMillis();
-
-            Table table =
-                    Objects.requireNonNull(dialect.queryTableSchema(jdbc, tableId)).getTable();
-            Column splitColumn = getSplitColumn(table, sourceConfig.getChunkKeyColumn());
-            final List<ChunkRange> chunks;
-            try {
-                chunks = splitTableIntoChunks(jdbc, tableId, splitColumn);
-            } catch (SQLException e) {
-                throw new FlinkRuntimeException("Failed to split chunks for table " + tableId, e);
+    public Collection<SnapshotSplit> generateSplits(TableId tableId) throws Exception {
+        if (!hasNextChunk()) {
+            // split a new table.
+            analyzeTable(tableId);
+            Optional<List<SnapshotSplit>> evenlySplitChunks = trySplitAllEvenlySizedChunks(tableId);
+            if (evenlySplitChunks.isPresent()) {
+                return evenlySplitChunks.get();
+            } else {
+                synchronized (lock) {
+                    this.currentSplittingTableId = tableId;
+                    this.nextChunkStart = ChunkSplitterState.ChunkBound.START_BOUND;
+                    this.nextChunkId = 0;
+                    return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+                }
             }
-
-            // convert chunks into splits
-            List<SnapshotSplit> splits = new ArrayList<>();
-            RowType splitType = getSplitType(splitColumn);
-            for (int i = 0; i < chunks.size(); i++) {
-                ChunkRange chunk = chunks.get(i);
-                SnapshotSplit split =
-                        createSnapshotSplit(
-                                jdbc,
-                                tableId,
-                                i,
-                                splitType,
-                                chunk.getChunkStart(),
-                                chunk.getChunkEnd());
-                splits.add(split);
+        } else {
+            Preconditions.checkState(
+                    currentSplittingTableId.equals(tableId),
+                    "Can not split a new table before the previous table splitting finish.");
+            if (currentSplittingTable == null) {
+                analyzeTable(currentSplittingTableId);
             }
+            synchronized (lock) {
+                return Collections.singletonList(splitOneUnevenlySizedChunk(tableId));
+            }
+        }
+    }
 
-            long end = System.currentTimeMillis();
-            LOG.info(
-                    "Split table {} into {} chunks, time cost: {}ms.",
-                    tableId,
-                    splits.size(),
-                    end - start);
-            return splits;
-        } catch (Exception e) {
-            throw new FlinkRuntimeException(
-                    String.format("Generate Splits for table %s error", tableId), e);
+    @Override
+    public boolean hasNextChunk() {
+        return currentSplittingTableId != null;
+    }
+
+    @Override
+    public ChunkSplitterState snapshotState(long checkpointId) {
+        // don't chunk new spilt when snapshot state.
+        synchronized (lock) {
+            return new ChunkSplitterState(currentSplittingTableId, nextChunkStart, nextChunkId);
+        }
+    }
+
+    @Override
+    public TableId getCurrentSplittingTableId() {
+        return currentSplittingTableId;
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (jdbcConnection != null) {
+            jdbcConnection.close();
         }
     }
 
@@ -256,8 +303,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
             throws SQLException {
         return JdbcChunkUtils.queryMin(
                 jdbc,
-                jdbc.quotedColumnIdString(splitColumn.name()),
                 jdbc.quotedTableIdString(tableId),
+                jdbc.quotedColumnIdString(splitColumn.name()),
                 excludedLowerBound);
     }
 
@@ -273,44 +320,118 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
     }
 
     /**
-     * We can use evenly-sized chunks or unevenly-sized chunks when split table into chunks, using
-     * evenly-sized chunks which is much efficient, using unevenly-sized chunks which will request
-     * many queries and is not efficient.
+     * Try to split all chunks for evenly-sized table, or else return empty.
+     *
+     * <p>We can use evenly-sized chunks or unevenly-sized chunks when split table into chunks,
+     * using evenly-sized chunks which is much efficient, using unevenly-sized chunks which will
+     * request many queries and is not efficient.
      */
-    private List<ChunkRange> splitTableIntoChunks(
-            JdbcConnection jdbc, TableId tableId, Column splitColumn) throws SQLException {
-        final Object[] minMax = queryMinMax(jdbc, tableId, splitColumn);
-        final Object min = minMax[0];
-        final Object max = minMax[1];
+    private Optional<List<SnapshotSplit>> trySplitAllEvenlySizedChunks(TableId tableId) {
+        LOG.debug("Try evenly splitting table {} into chunks", tableId);
+        final Object min = minMaxOfSplitColumn[0];
+        final Object max = minMaxOfSplitColumn[1];
         if (min == null || max == null || min.equals(max)) {
             // empty table, or only one row, return full table scan as a chunk
-            return Collections.singletonList(ChunkRange.all());
+            return Optional.of(
+                    createSnapshotSplit(tableId, Collections.singletonList(ChunkRange.all())));
         }
 
         final int chunkSize = sourceConfig.getSplitSize();
+        final int dynamicChunkSize =
+                getDynamicChunkSize(tableId, splitColumn, min, max, chunkSize, approximateRowCnt);
+        if (dynamicChunkSize != -1) {
+            LOG.debug("finish evenly splitting table {} into chunks", tableId);
+            List<ChunkRange> chunks =
+                    splitEvenlySizedChunks(
+                            tableId, min, max, approximateRowCnt, chunkSize, dynamicChunkSize);
+            return Optional.of(createSnapshotSplit(tableId, chunks));
+        } else {
+            LOG.debug("beginning unevenly splitting table {} into chunks", tableId);
+            return Optional.empty();
+        }
+    }
+
+    /** Analyze the meta information for given table. */
+    private void analyzeTable(TableId tableId) {
+        try {
+            currentSchema = dialect.queryTableSchema(jdbcConnection, tableId);
+            currentSplittingTable = Objects.requireNonNull(currentSchema).getTable();
+            splitColumn = getSplitColumn(currentSplittingTable, sourceConfig.getChunkKeyColumn());
+            splitType = getSplitType(splitColumn);
+            minMaxOfSplitColumn = queryMinMax(jdbcConnection, tableId, splitColumn);
+            approximateRowCnt = queryApproximateRowCnt(jdbcConnection, tableId);
+        } catch (Exception e) {
+            throw new RuntimeException("Fail to analyze table in chunk splitter.", e);
+        }
+    }
+
+    /** Generates one snapshot split (chunk) for the give table path. */
+    private SnapshotSplit splitOneUnevenlySizedChunk(TableId tableId) throws SQLException {
+        final int chunkSize = sourceConfig.getSplitSize();
+        final Object chunkStartVal = nextChunkStart.getValue();
+        LOG.info(
+                "Use unevenly-sized chunks for table {}, the chunk size is {} from {}",
+                tableId,
+                chunkSize,
+                nextChunkStart == ChunkSplitterState.ChunkBound.START_BOUND
+                        ? "null"
+                        : chunkStartVal.toString());
+        // we start from [null, min + chunk_size) and avoid [null, min)
+        Object chunkEnd =
+                nextChunkEnd(
+                        jdbcConnection,
+                        nextChunkStart == ChunkSplitterState.ChunkBound.START_BOUND
+                                ? minMaxOfSplitColumn[0]
+                                : chunkStartVal,
+                        tableId,
+                        splitColumn,
+                        minMaxOfSplitColumn[1],
+                        chunkSize);
+        // may sleep a while to avoid DDOS on MySQL server
+        maySleep(nextChunkId, tableId);
+        if (chunkEnd != null && isChunkEndLeMax(chunkEnd, minMaxOfSplitColumn[1], splitColumn)) {
+            nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
+            return createSnapshotSplit(tableId, nextChunkId++, splitType, chunkStartVal, chunkEnd);
+        } else {
+            currentSplittingTableId = null;
+            nextChunkStart = ChunkSplitterState.ChunkBound.END_BOUND;
+            return createSnapshotSplit(tableId, nextChunkId++, splitType, chunkStartVal, null);
+        }
+    }
+
+    /**
+     * Checks whether split column is evenly distributed across its range and return the
+     * dynamicChunkSize. If the split column is not evenly distributed, return -1.
+     */
+    private int getDynamicChunkSize(
+            TableId tableId,
+            Column splitColumn,
+            Object min,
+            Object max,
+            int chunkSize,
+            long approximateRowCnt) {
+        if (!isEvenlySplitColumn(splitColumn)) {
+            return -1;
+        }
         final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
         final double distributionFactorLower = sourceConfig.getDistributionFactorLower();
-
-        if (isEvenlySplitColumn(splitColumn)) {
-            long approximateRowCnt = queryApproximateRowCnt(jdbc, tableId);
-            double distributionFactor =
-                    calculateDistributionFactor(tableId, min, max, approximateRowCnt);
-
-            boolean dataIsEvenlyDistributed =
-                    doubleCompare(distributionFactor, distributionFactorLower) >= 0
-                            && doubleCompare(distributionFactor, distributionFactorUpper) <= 0;
-
-            if (dataIsEvenlyDistributed) {
-                // the minimum dynamic chunk size is at least 1
-                final int dynamicChunkSize = Math.max((int) (distributionFactor * chunkSize), 1);
-                return splitEvenlySizedChunks(
-                        tableId, min, max, approximateRowCnt, chunkSize, dynamicChunkSize);
-            } else {
-                return splitUnevenlySizedChunks(jdbc, tableId, splitColumn, min, max, chunkSize);
-            }
-        } else {
-            return splitUnevenlySizedChunks(jdbc, tableId, splitColumn, min, max, chunkSize);
+        double distributionFactor =
+                calculateDistributionFactor(tableId, min, max, approximateRowCnt);
+        boolean dataIsEvenlyDistributed =
+                ObjectUtils.doubleCompare(distributionFactor, distributionFactorLower) >= 0
+                        && ObjectUtils.doubleCompare(distributionFactor, distributionFactorUpper)
+                                <= 0;
+        LOG.info(
+                "The actual distribution factor for table {} is {}, the lower bound of evenly distribution factor is {}, the upper bound of evenly distribution factor is {}",
+                tableId,
+                distributionFactor,
+                distributionFactorLower,
+                distributionFactorUpper);
+        if (dataIsEvenlyDistributed) {
+            // the minimum dynamic chunk size is at least 1
+            return Math.max((int) (distributionFactor * chunkSize), 1);
         }
+        return -1;
     }
 
     /**
@@ -404,8 +525,21 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         }
     }
 
+    /** Generates all snapshot splits (chunks) from chunk ranges. */
+    private List<SnapshotSplit> createSnapshotSplit(TableId tableId, List<ChunkRange> chunks) {
+        // convert chunks into splits
+        List<SnapshotSplit> splits = new ArrayList<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            ChunkRange chunk = chunks.get(i);
+            SnapshotSplit split =
+                    createSnapshotSplit(
+                            tableId, i, splitType, chunk.getChunkStart(), chunk.getChunkEnd());
+            splits.add(split);
+        }
+        return splits;
+    }
+
     private SnapshotSplit createSnapshotSplit(
-            JdbcConnection jdbc,
             TableId tableId,
             int chunkId,
             RowType splitKeyType,
@@ -415,19 +549,9 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         Object[] splitStart = chunkStart == null ? null : new Object[] {chunkStart};
         Object[] splitEnd = chunkEnd == null ? null : new Object[] {chunkEnd};
         Map<TableId, TableChanges.TableChange> schema = new HashMap<>();
-        schema.put(tableId, dialect.queryTableSchema(jdbc, tableId));
+        schema.put(tableId, currentSchema);
         return new SnapshotSplit(
-                tableId,
-                splitId(tableId, chunkId),
-                splitKeyType,
-                splitStart,
-                splitEnd,
-                null,
-                schema);
-    }
-
-    private String splitId(TableId tableId, int chunkId) {
-        return tableId.toString() + ":" + chunkId;
+                tableId, chunkId, splitKeyType, splitStart, splitEnd, null, schema);
     }
 
     private void maySleep(int count, TableId tableId) {

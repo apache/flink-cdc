@@ -50,10 +50,13 @@ import static org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplit
  *
  * <p>2. Add streamSplitTaskId(int) to HybridPendingSplitsState, which represents the task ID
  * assigned to the stream split.
+ *
+ * <p>The modification of 8th version: add ChunkSplitterState to SnapshotPendingSplitsState, which
+ * contains the asynchronously splitting chunk info.
  */
 public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<PendingSplitsState> {
 
-    private static final int VERSION = 6;
+    private static final int VERSION = 8;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -80,28 +83,32 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         }
         final DataOutputSerializer out = SERIALIZER_CACHE.get();
 
-        out.writeInt(splitSerializer.getVersion());
-        if (state instanceof SnapshotPendingSplitsState) {
-            out.writeInt(SNAPSHOT_PENDING_SPLITS_STATE_FLAG);
-            serializeSnapshotPendingSplitsState((SnapshotPendingSplitsState) state, out);
-        } else if (state instanceof StreamPendingSplitsState) {
-            out.writeInt(STREAM_PENDING_SPLITS_STATE_FLAG);
-            serializeStreamPendingSplitsState((StreamPendingSplitsState) state, out);
-        } else if (state instanceof HybridPendingSplitsState) {
-            out.writeInt(HYBRID_PENDING_SPLITS_STATE_FLAG);
-            serializeHybridPendingSplitsState((HybridPendingSplitsState) state, out);
-        } else {
-            throw new IOException(
-                    "Unsupported to serialize PendingSplitsState class: "
-                            + state.getClass().getName());
-        }
+        try {
+            out.writeInt(splitSerializer.getVersion());
+            if (state instanceof SnapshotPendingSplitsState) {
+                out.writeInt(SNAPSHOT_PENDING_SPLITS_STATE_FLAG);
+                serializeSnapshotPendingSplitsState((SnapshotPendingSplitsState) state, out);
+            } else if (state instanceof StreamPendingSplitsState) {
+                out.writeInt(STREAM_PENDING_SPLITS_STATE_FLAG);
+                serializeStreamPendingSplitsState((StreamPendingSplitsState) state, out);
+            } else if (state instanceof HybridPendingSplitsState) {
+                out.writeInt(HYBRID_PENDING_SPLITS_STATE_FLAG);
+                serializeHybridPendingSplitsState((HybridPendingSplitsState) state, out);
+            } else {
+                throw new IOException(
+                        "Unsupported to serialize PendingSplitsState class: "
+                                + state.getClass().getName());
+            }
 
-        final byte[] result = out.getCopyOfBuffer();
-        // optimization: cache the serialized from, so we avoid the byte work during repeated
-        // serialization
-        state.serializedFormCache = result;
-        out.clear();
-        return result;
+            final byte[] result = out.getCopyOfBuffer();
+            // optimization: cache the serialized from, so we avoid the byte work during repeated
+            // serialization
+            state.serializedFormCache = result;
+
+            return result;
+        } finally {
+            out.clear();
+        }
     }
 
     @Override
@@ -114,6 +121,8 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             case 4:
             case 5:
             case 6:
+            case 7:
+            case 8:
                 return deserializePendingSplitsState(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -168,6 +177,22 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeTableIds(state.getRemainingTables(), out);
         out.writeBoolean(state.isTableIdCaseSensitive());
         writeTableSchemas(state.getTableSchemas(), out);
+
+        writeSplitFinishedCheckpointIds(state.getSplitFinishedCheckpointIds(), out);
+
+        // The modification of 8th version: add ChunkSplitterState to SnapshotPendingSplitsState,
+        // which contains the asynchronously splitting chunk info.
+        boolean hasTableIsSplitting =
+                state.getChunkSplitterState().getCurrentSplittingTableId() != null;
+        out.writeBoolean(hasTableIsSplitting);
+        if (hasTableIsSplitting) {
+            ChunkSplitterState chunkSplitterState = state.getChunkSplitterState();
+            out.writeUTF(chunkSplitterState.getCurrentSplittingTableId().toString());
+            out.writeUTF(
+                    SerializerUtils.rowToSerializedString(
+                            new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
+            out.writeInt(chunkSplitterState.getNextChunkId());
+        }
     }
 
     private void serializeHybridPendingSplitsState(
@@ -226,7 +251,9 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 new ArrayList<>(),
                 false,
-                false);
+                false,
+                new HashMap<>(),
+                ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
     }
 
     private HybridPendingSplitsState deserializeLegacyHybridPendingSplitsState(
@@ -277,6 +304,27 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         if (version >= 4) {
             tableSchemas.putAll(readTableSchemas(splitVersion, in));
         }
+        Map<String, Long> splitFinishedCheckpointIds = new HashMap<>();
+        if (version >= 7) {
+            splitFinishedCheckpointIds = readSplitFinishedCheckpointIds(in);
+        }
+
+        // The modification of 8th version: add ChunkSplitterState to SnapshotPendingSplitsState,
+        // which contains the asynchronously splitting chunk info.
+        ChunkSplitterState chunkSplitterState = ChunkSplitterState.NO_SPLITTING_TABLE_STATE;
+        if (version >= 8) {
+            boolean hasTableIsSplitting = in.readBoolean();
+            if (hasTableIsSplitting) {
+                TableId splittingTableId = TableId.parse(in.readUTF());
+                Object nextChunkStart = SerializerUtils.serializedStringToRow(in.readUTF())[0];
+                Integer nextChunkId = in.readInt();
+                chunkSplitterState =
+                        new ChunkSplitterState(
+                                splittingTableId,
+                                ChunkSplitterState.ChunkBound.middleOf(nextChunkStart),
+                                nextChunkId);
+            }
+        }
         return new SnapshotPendingSplitsState(
                 alreadyProcessedTables,
                 remainingSchemalessSplits,
@@ -286,7 +334,9 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 assignerStatus,
                 remainingTableIds,
                 isTableIdCaseSensitive,
-                true);
+                true,
+                splitFinishedCheckpointIds,
+                chunkSplitterState);
     }
 
     private HybridPendingSplitsState deserializeHybridPendingSplitsState(
@@ -305,6 +355,30 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
     // ------------------------------------------------------------------------------------------
     // Utilities
     // ------------------------------------------------------------------------------------------
+
+    private void writeSplitFinishedCheckpointIds(
+            Map<String, Long> splitFinishedCheckpointIds, DataOutputSerializer out)
+            throws IOException {
+        final int size = splitFinishedCheckpointIds.size();
+        out.writeInt(size);
+        for (Map.Entry<String, Long> splitFinishedCheckpointId :
+                splitFinishedCheckpointIds.entrySet()) {
+            out.writeUTF(splitFinishedCheckpointId.getKey());
+            out.writeLong(splitFinishedCheckpointId.getValue());
+        }
+    }
+
+    private Map<String, Long> readSplitFinishedCheckpointIds(DataInputDeserializer in)
+            throws IOException {
+        Map<String, Long> splitFinishedCheckpointIds = new HashMap<>();
+        final int size = in.readInt();
+        for (int i = 0; i < size; i++) {
+            String splitId = in.readUTF();
+            Long checkpointId = in.readLong();
+            splitFinishedCheckpointIds.put(splitId, checkpointId);
+        }
+        return splitFinishedCheckpointIds;
+    }
 
     private void writeFinishedOffsets(Map<String, Offset> splitsInfo, DataOutputSerializer out)
             throws IOException {

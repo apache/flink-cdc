@@ -44,7 +44,10 @@ import java.util.regex.Pattern;
 import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToDate;
 import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToTime;
 
-/** System function utils to support the call of flink cdc pipeline transform. */
+/**
+ * System function utils to support the call of flink cdc pipeline transform. <br>
+ * {@code castToXxx}-series function returns `null` when conversion is not viable.
+ */
 public class SystemFunctionUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
@@ -361,11 +364,64 @@ public class SystemFunctionUtils {
     }
 
     public static String substr(String str, int beginIndex) {
-        return str.substring(beginIndex);
+        return substring(str, beginIndex);
     }
 
     public static String substr(String str, int beginIndex, int length) {
-        return str.substring(beginIndex, beginIndex + length);
+        return substring(str, beginIndex, length);
+    }
+
+    public static String substring(String str, int beginIndex) {
+        return substring(str, beginIndex, Integer.MAX_VALUE);
+    }
+
+    public static String substring(String str, int beginIndex, int length) {
+        if (length < 0) {
+            LOG.error(
+                    "length of 'substring(str, beginIndex, length)' must be >= 0 and Int type, but length = {}",
+                    length);
+            throw new RuntimeException(
+                    "length of 'substring(str, beginIndex, length)' must be >= 0 and Int type, but length = "
+                            + length);
+        }
+        if (length > Integer.MAX_VALUE || beginIndex > Integer.MAX_VALUE) {
+            LOG.error(
+                    "length or start of 'substring(str, beginIndex, length)' must be Int type, but length = {}, beginIndex = {}",
+                    beginIndex,
+                    length);
+            throw new RuntimeException(
+                    "length or start of 'substring(str, beginIndex, length)' must be Int type, but length = "
+                            + beginIndex
+                            + ", beginIndex = "
+                            + length);
+        }
+        if (str.isEmpty()) {
+            return "";
+        }
+
+        int startPos;
+        int endPos;
+
+        if (beginIndex > 0) {
+            startPos = beginIndex - 1;
+            if (startPos >= str.length()) {
+                return "";
+            }
+        } else if (beginIndex < 0) {
+            startPos = str.length() + beginIndex;
+            if (startPos < 0) {
+                return "";
+            }
+        } else {
+            startPos = 0;
+        }
+
+        if ((str.length() - startPos) < length) {
+            endPos = str.length();
+        } else {
+            endPos = startPos + length;
+        }
+        return str.substring(startPos, endPos);
     }
 
     public static String upper(String str) {
@@ -553,71 +609,216 @@ public class SystemFunctionUtils {
         return object.toString();
     }
 
+    public static Boolean castToBoolean(Object object) {
+        if (object == null) {
+            return null;
+        } else if (object instanceof Boolean) {
+            return (Boolean) object;
+        } else if (object instanceof Byte) {
+            return !object.equals((byte) 0);
+        } else if (object instanceof Short) {
+            return !object.equals((short) 0);
+        } else if (object instanceof Integer) {
+            return !object.equals(0);
+        } else if (object instanceof Long) {
+            return !object.equals(0L);
+        } else if (object instanceof Float) {
+            return !object.equals(0f);
+        } else if (object instanceof Double) {
+            return !object.equals(0d);
+        } else if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).compareTo(BigDecimal.ZERO) != 0;
+        }
+        return Boolean.valueOf(castToString(object));
+    }
+
     public static Byte castToByte(Object object) {
         if (object == null) {
             return null;
         }
-        return Byte.valueOf(castObjectIntoString(object));
-    }
-
-    public static Boolean castToBoolean(Object object) {
-        if (object == null) {
+        if (object instanceof Boolean) {
+            return (byte) ((Boolean) object ? 1 : 0);
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).byteValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).byteValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).byteValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Byte.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Byte#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).byteValue();
+        } catch (NumberFormatException ignored) {
             return null;
         }
-        if (object instanceof Byte
-                || object instanceof Short
-                || object instanceof Integer
-                || object instanceof Long
-                || object instanceof Float
-                || object instanceof Double
-                || object instanceof BigDecimal) {
-            return !object.equals(0);
-        }
-        return Boolean.valueOf(castToString(object));
     }
 
     public static Short castToShort(Object object) {
         if (object == null) {
             return null;
         }
-        return Short.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (short) ((Boolean) object ? 1 : 0);
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).shortValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).shortValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).shortValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Short.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Short#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).shortValue();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Integer castToInteger(Object object) {
         if (object == null) {
             return null;
         }
-        return Integer.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1 : 0;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).intValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).intValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).intValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Integer.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Integer#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).intValue();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Long castToLong(Object object) {
         if (object == null) {
             return null;
         }
-        return Long.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1L : 0L;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).longValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).longValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).longValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Long.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Long#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).longValue();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Float castToFloat(Object object) {
         if (object == null) {
             return null;
         }
-        return Float.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1f : 0f;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).floatValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).floatValue();
+        }
+        if (object instanceof Float) {
+            return (Float) object;
+        }
+        try {
+            return Float.valueOf(castObjectIntoString(object));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Double castToDouble(Object object) {
         if (object == null) {
             return null;
         }
-        return Double.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1d : 0d;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).doubleValue();
+        }
+        if (object instanceof Double) {
+            return (Double) object;
+        }
+        if (object instanceof Float) {
+            return ((Float) object).doubleValue();
+        }
+        try {
+            return Double.valueOf(castObjectIntoString(object));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static BigDecimal castToBigDecimal(Object object, int precision, int scale) {
         if (object == null) {
             return null;
         }
-        BigDecimal bigDecimal =
-                new BigDecimal(castObjectIntoString(object), new MathContext(precision));
-        bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
+        if (object instanceof Boolean) {
+            object = (Boolean) object ? 1 : 0;
+        }
+
+        BigDecimal bigDecimal;
+        try {
+            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
+        // non-serializable object into the pipeline that breaks downstream.
+        if (bigDecimal.precision() > precision) {
+            return null;
+        }
         return bigDecimal;
     }
 

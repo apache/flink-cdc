@@ -17,24 +17,24 @@
 
 package org.apache.flink.cdc.connectors.oceanbase;
 
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
+import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
-import org.apache.flink.util.TestLogger;
+import org.apache.flink.test.util.AbstractTestBase;
 
 import org.junit.ClassRule;
-import org.junit.Rule;
 
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -43,51 +43,15 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing OceanBase source. */
-public abstract class OceanBaseTestBase extends TestLogger {
+public abstract class OceanBaseTestBase extends AbstractTestBase {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    protected static final int DEFAULT_PARALLELISM = 4;
-
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
-
     @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
 
-    protected final String compatibleMode;
-    protected final String username;
-    protected final String password;
-    protected final String hostname;
-    protected final int port;
-    protected final String logProxyHost;
-    protected final int logProxyPort;
-    protected final String tenant;
+    public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(60);
 
-    public OceanBaseTestBase(
-            String compatibleMode,
-            String username,
-            String password,
-            String hostname,
-            int port,
-            String logProxyHost,
-            int logProxyPort,
-            String tenant) {
-        this.compatibleMode = compatibleMode;
-        this.username = username;
-        this.password = password;
-        this.hostname = hostname;
-        this.port = port;
-        this.logProxyHost = logProxyHost;
-        this.logProxyPort = logProxyPort;
-        this.tenant = tenant;
-    }
+    protected abstract OceanBaseCdcMetadata metadata();
 
     protected String commonOptionsString() {
         return String.format(
@@ -96,8 +60,14 @@ public abstract class OceanBaseTestBase extends TestLogger {
                         + " 'password' = '%s', "
                         + " 'hostname' = '%s', "
                         + " 'port' = '%s', "
-                        + " 'compatible-mode' = '%s'",
-                username, password, hostname, port, compatibleMode);
+                        + " 'compatible-mode' = '%s', "
+                        + " 'jdbc.driver' = '%s'",
+                metadata().getUsername(),
+                metadata().getPassword(),
+                metadata().getHostname(),
+                metadata().getPort(),
+                metadata().getCompatibleMode(),
+                metadata().getDriverClass());
     }
 
     protected String logProxyOptionsString() {
@@ -106,7 +76,9 @@ public abstract class OceanBaseTestBase extends TestLogger {
                         + " 'tenant-name' = '%s',"
                         + " 'logproxy.host' = '%s',"
                         + " 'logproxy.port' = '%s'",
-                tenant, logProxyHost, logProxyPort);
+                metadata().getTenantName(),
+                metadata().getLogProxyHost(),
+                metadata().getLogProxyPort());
     }
 
     protected String initialOptionsString() {
@@ -120,7 +92,10 @@ public abstract class OceanBaseTestBase extends TestLogger {
         return " 'scan.startup.mode' = 'snapshot', " + commonOptionsString();
     }
 
-    protected abstract Connection getJdbcConnection() throws SQLException;
+    protected Connection getJdbcConnection() throws SQLException {
+        return DriverManager.getConnection(
+                metadata().getJdbcUrl(), metadata().getUsername(), metadata().getPassword());
+    }
 
     protected void setGlobalTimeZone(String serverTimeZone) throws SQLException {
         try (Connection connection = getJdbcConnection();
@@ -130,7 +105,8 @@ public abstract class OceanBaseTestBase extends TestLogger {
     }
 
     protected void initializeTable(String sqlFile) {
-        final String ddlFile = String.format("ddl/%s/%s.sql", compatibleMode, sqlFile);
+        final String ddlFile =
+                String.format("ddl/%s/%s.sql", metadata().getCompatibleMode(), sqlFile);
         final URL ddlTestFile = getClass().getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try (Connection connection = getJdbcConnection();
@@ -158,16 +134,25 @@ public abstract class OceanBaseTestBase extends TestLogger {
     }
 
     public static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
+            throws InterruptedException, TimeoutException {
+        long deadlineTimestamp = System.currentTimeMillis() + FETCH_TIMEOUT.toMillis();
+        while (System.currentTimeMillis() < deadlineTimestamp) {
+            if (sinkSize(sinkName) < expectedSize) {
+                Thread.sleep(100);
+            } else {
+                return;
+            }
         }
+        throw new TimeoutException(
+                String.format(
+                        "Failed to fetch enough records in sink.\nExpected size: %d\nActual values: %s",
+                        expectedSize, TestValuesTableFactory.getRawResults(sinkName)));
     }
 
     public static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.base.source.assigner;
 
+import org.apache.flink.api.connector.source.SourceSplit;
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.HybridPendingSplitsState;
@@ -27,6 +29,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 
 import io.debezium.relational.TableId;
 import org.slf4j.Logger;
@@ -61,13 +64,17 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     private final OffsetFactory offsetFactory;
 
+    private final SplitEnumeratorContext<? extends SourceSplit> enumeratorContext;
+    private SourceEnumeratorMetrics enumeratorMetrics;
+
     public HybridSplitAssigner(
             C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             DataSourceDialect<C> dialect,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this(
                 sourceConfig,
                 new SnapshotSplitAssigner<>(
@@ -79,7 +86,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         offsetFactory),
                 false,
                 sourceConfig.getSplitMetaGroupSize(),
-                offsetFactory);
+                offsetFactory,
+                enumeratorContext);
     }
 
     public HybridSplitAssigner(
@@ -87,7 +95,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             int currentParallelism,
             HybridPendingSplitsState checkpoint,
             DataSourceDialect<C> dialect,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this(
                 sourceConfig,
                 new SnapshotSplitAssigner<>(
@@ -98,7 +107,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         offsetFactory),
                 checkpoint.isStreamSplitAssigned(),
                 sourceConfig.getSplitMetaGroupSize(),
-                offsetFactory);
+                offsetFactory,
+                enumeratorContext);
     }
 
     private HybridSplitAssigner(
@@ -106,17 +116,29 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             SnapshotSplitAssigner<C> snapshotSplitAssigner,
             boolean isStreamSplitAssigned,
             int splitMetaGroupSize,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.offsetFactory = offsetFactory;
+        this.enumeratorContext = enumeratorContext;
     }
 
     @Override
     public void open() {
+        this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
+
+        if (isStreamSplitAssigned) {
+            enumeratorMetrics.enterStreamReading();
+        } else {
+            enumeratorMetrics.exitStreamReading();
+        }
+
         snapshotSplitAssigner.open();
+        // init enumerator metrics
+        snapshotSplitAssigner.initEnumeratorMetrics(enumeratorMetrics);
     }
 
     @Override
@@ -126,6 +148,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             return Optional.empty();
         }
         if (snapshotSplitAssigner.noMoreSplits()) {
+            enumeratorMetrics.exitSnapshotPhase();
             // stream split assigning
             if (isStreamSplitAssigned) {
                 // no more splits for the assigner
@@ -137,6 +160,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
                 isStreamSplitAssigned = true;
+                enumeratorMetrics.enterStreamReading();
                 StreamSplit streamSplit = createStreamSplit();
                 LOG.trace(
                         "SnapshotSplitAssigner is finished: creating a new stream split {}",
@@ -145,6 +169,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // do not need to create stream split, but send event to wake up the binlog reader
                 isStreamSplitAssigned = true;
+                enumeratorMetrics.enterStreamReading();
                 return Optional.empty();
             } else {
                 // stream split is not ready by now
@@ -183,6 +208,9 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 // we don't store the split, but will re-create stream split later
                 isStreamSplitAssigned = false;
             }
+        }
+        if (!snapshotSplits.isEmpty()) {
+            enumeratorMetrics.exitStreamReading();
         }
         snapshotSplitAssigner.addSplits(snapshotSplits);
     }

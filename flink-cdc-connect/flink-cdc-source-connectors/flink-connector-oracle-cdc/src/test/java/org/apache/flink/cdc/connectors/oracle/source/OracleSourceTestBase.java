@@ -29,6 +29,7 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.OracleContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
@@ -69,11 +70,21 @@ public class OracleSourceTestBase extends TestLogger {
     public static final String CONNECTOR_PWD = "dbz";
     public static final String TEST_USER = "debezium";
     public static final String TEST_PWD = "dbz";
+    public static final String TOP_USER = "sys as sysdba";
     public static final String TOP_SECRET = "top_secret";
 
     public static final OracleContainer ORACLE_CONTAINER =
             new OracleContainer(
-                            DockerImageName.parse("goodboy008/oracle-19.3.0-ee").withTag("non-cdb"))
+                            DockerImageName.parse("goodboy008/oracle-19.3.0-ee")
+                                    .withTag(
+                                            DockerClientFactory.instance()
+                                                            .client()
+                                                            .versionCmd()
+                                                            .exec()
+                                                            .getArch()
+                                                            .equals("amd64")
+                                                    ? "non-cdb"
+                                                    : "arm-non-cdb"))
                     .withUsername(CONNECTOR_USER)
                     .withPassword(CONNECTOR_PWD)
                     .withDatabaseName(ORACLE_DATABASE)
@@ -124,8 +135,7 @@ public class OracleSourceTestBase extends TestLogger {
     }
 
     public static Connection getJdbcConnectionAsDBA() throws SQLException {
-        return DriverManager.getConnection(
-                ORACLE_CONTAINER.getJdbcUrl(), "sys as sysdba", TOP_SECRET);
+        return DriverManager.getConnection(ORACLE_CONTAINER.getJdbcUrl(), TOP_USER, TOP_SECRET);
     }
 
     public static void createAndInitialize(String sqlFile) throws Exception {

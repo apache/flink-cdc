@@ -179,7 +179,7 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
                     "+I[112, jacket, new water resistent white wind breaker, 0.500]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         jobClient.cancel().get();
