@@ -276,6 +276,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         testParseAlterStatement(false);
     }
 
+    @Test
     public void testInitialStartupModeWithOpTs() throws Exception {
         inventoryDatabase.createAndInitialize();
         Configuration sourceConfiguration = new Configuration();
@@ -437,12 +438,12 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         }
     }
 
-    public void testParseAlterStatement(boolean tinyint1IsBit) throws Exception {
+    public void testParseAlterStatement(boolean tinyInt1isBit) throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
 
         Properties jdbcProperties = new Properties();
-        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyint1IsBit));
+        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyInt1isBit));
 
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -567,7 +568,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
                                                     "cols10",
-                                                    tinyint1IsBit
+                                                    tinyInt1isBit
                                                             ? DataTypes.BOOLEAN()
                                                             : DataTypes.TINYINT())))));
 
@@ -592,7 +593,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testSchemaChangeEventsTinyint1IsBit() throws Exception {
+    public void testSchemaChangeEventstinyInt1isBit() throws Exception {
         testSchemaChangeEvents(true);
     }
 
@@ -601,12 +602,12 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         testSchemaChangeEvents(false);
     }
 
-    public void testSchemaChangeEvents(boolean tinyint1IsBit) throws Exception {
+    public void testSchemaChangeEvents(boolean tinyInt1isBit) throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
 
         Properties jdbcProperties = new Properties();
-        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyint1IsBit));
+        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyInt1isBit));
 
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -663,7 +664,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
                                                     "new_tinyint1_col1",
-                                                    tinyint1IsBit
+                                                    tinyInt1isBit
                                                             ? DataTypes.BOOLEAN()
                                                             : DataTypes.TINYINT())))));
 
@@ -855,7 +856,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn("bit3_c", DataTypes.BINARY(1))
                                     .physicalColumn(
                                             "tiny1_c",
-                                            tinyint1IsBit
+                                            tinyInt1isBit
                                                     ? DataTypes.BOOLEAN()
                                                     : DataTypes.TINYINT())
                                     .physicalColumn("boolean_c", DataTypes.BOOLEAN())

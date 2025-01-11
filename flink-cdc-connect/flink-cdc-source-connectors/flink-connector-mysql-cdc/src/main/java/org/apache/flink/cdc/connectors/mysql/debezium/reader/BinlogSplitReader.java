@@ -36,6 +36,7 @@ import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadF
 
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
@@ -223,11 +224,18 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
+                boolean tinyInt1isBit =
+                        Boolean.parseBoolean(
+                                statefulTaskContext
+                                        .getSourceConfig()
+                                        .getJdbcProperties()
+                                        .getProperty(
+                                                PropertyKey.tinyInt1isBit.getKeyName(), "true"));
                 RowType splitKeyType =
                         ChunkUtils.getChunkKeyColumnType(
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
                                 statefulTaskContext.getSourceConfig().getChunkKeyColumns(),
-                                statefulTaskContext.getSourceConfig().getJdbcProperties());
+                                tinyInt1isBit);
 
                 Struct target = RecordUtils.getStructContainsChunkKey(sourceRecord);
                 Object[] chunkKey =

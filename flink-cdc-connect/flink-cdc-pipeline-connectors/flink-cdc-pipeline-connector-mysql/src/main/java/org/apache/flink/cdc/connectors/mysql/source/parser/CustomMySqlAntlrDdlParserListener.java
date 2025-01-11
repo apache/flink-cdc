@@ -47,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -77,14 +76,13 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
     public CustomMySqlAntlrDdlParserListener(
             MySqlAntlrDdlParser parser,
             LinkedList<SchemaChangeEvent> parsedEvents,
-            Properties jdbcProperties) {
+            boolean tinyInt1isBit) {
         // initialize listeners
         listeners.add(new CreateAndAlterDatabaseParserListener(parser));
         listeners.add(new DropDatabaseParserListener(parser));
         listeners.add(new CreateTableParserListener(parser, listeners));
         listeners.add(
-                new CustomAlterTableParserListener(
-                        parser, listeners, parsedEvents, jdbcProperties));
+                new CustomAlterTableParserListener(parser, listeners, parsedEvents, tinyInt1isBit));
         listeners.add(new DropTableParserListener(parser));
         listeners.add(new RenameTableParserListener(parser));
         listeners.add(new TruncateTableParserListener(parser));

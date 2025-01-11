@@ -33,6 +33,7 @@ import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
@@ -201,8 +202,12 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             Column column = columns.get(i);
 
             String colName = column.name();
-            DataType dataType =
-                    MySqlTypeUtils.fromDbzColumn(column, sourceConfig.getJdbcProperties());
+            boolean tinyInt1isBit =
+                    Boolean.parseBoolean(
+                            sourceConfig
+                                    .getJdbcProperties()
+                                    .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
+            DataType dataType = MySqlTypeUtils.fromDbzColumn(column, tinyInt1isBit);
             if (!column.isOptional()) {
                 dataType = dataType.notNull();
             }

@@ -104,22 +104,22 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57AccessCommonTypesSchemaTinyintIsBit() {
+    public void testMysql57AccessCommonTypesSchemaTinyInt1isBit() {
         testAccessCommonTypesSchema(fullTypesMySql57Database, true);
     }
 
     @Test
-    public void testMysql57AccessCommonTypesSchemaTinyintIsNotBit() {
+    public void testMysql57AccessCommonTypesSchemaTinyInt1isNotBit() {
         testAccessCommonTypesSchema(fullTypesMySql57Database, false);
     }
 
     @Test
-    public void testMysql8AccessCommonTypesSchemaTinyintIsBit() {
+    public void testMysql8AccessCommonTypesSchemaTinyInt1isBit() {
         testAccessCommonTypesSchema(fullTypesMySql8Database, true);
     }
 
     @Test
-    public void testMysql8AccessCommonTypesSchemaTinyintIsNotBit() {
+    public void testMysql8AccessCommonTypesSchemaTinyInt1isNotBit() {
         testAccessCommonTypesSchema(fullTypesMySql8Database, false);
     }
 
@@ -225,7 +225,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
         String[] tables = new String[] {"precision_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
@@ -300,7 +300,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
         String[] tables = new String[] {"precision_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database);
+                getMetadataAccessor(tables, fullTypesMySql8Database, false);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(

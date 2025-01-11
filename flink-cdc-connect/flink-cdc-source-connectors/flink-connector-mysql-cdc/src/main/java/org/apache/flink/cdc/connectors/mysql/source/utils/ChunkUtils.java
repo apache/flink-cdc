@@ -34,7 +34,6 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.table.api.DataTypes.FIELD;
@@ -46,15 +45,15 @@ public class ChunkUtils {
     private ChunkUtils() {}
 
     public static RowType getChunkKeyColumnType(
-            Table table, Map<ObjectPath, String> chunkKeyColumns, Properties jdbcProperties) {
-        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumns), jdbcProperties);
+            Table table, Map<ObjectPath, String> chunkKeyColumns, boolean tinyInt1isBit) {
+        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumns), tinyInt1isBit);
     }
 
-    public static RowType getChunkKeyColumnType(Column chunkKeyColumn, Properties jdbcProperties) {
+    public static RowType getChunkKeyColumnType(Column chunkKeyColumn, boolean tinyInt1isBit) {
         return (RowType)
                 ROW(FIELD(
                                 chunkKeyColumn.name(),
-                                MySqlTypeUtils.fromDbzColumn(chunkKeyColumn, jdbcProperties)))
+                                MySqlTypeUtils.fromDbzColumn(chunkKeyColumn, tinyInt1isBit)))
                         .getLogicalType();
     }
 

@@ -47,7 +47,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 
@@ -63,7 +62,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean includeSchemaChanges;
-    private final Properties jdbcProperties;
+    private final boolean tinyInt1isBit;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
@@ -71,28 +70,26 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private List<MySqlReadableMetadata> readableMetadataList;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode,
-            boolean includeSchemaChanges,
-            Properties jdbcProperties) {
-        this(changelogMode, includeSchemaChanges, new ArrayList<>(), jdbcProperties);
+            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
+        this(changelogMode, includeSchemaChanges, new ArrayList<>(), true);
     }
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
             List<MySqlReadableMetadata> readableMetadataList,
-            Properties jdbcProperties) {
+            boolean tinyInt1isBit) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
-        this.jdbcProperties = jdbcProperties;
+        this.tinyInt1isBit = tinyInt1isBit;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser(jdbcProperties);
+                customParser = new CustomMySqlAntlrDdlParser(tinyInt1isBit);
                 tables = new Tables();
             }
 

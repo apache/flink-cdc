@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlSchema;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
@@ -37,7 +38,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
@@ -130,14 +130,19 @@ public class MySqlSchemaUtils {
                 new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
             TableChanges.TableChange tableSchema =
                     mySqlSchema.getTableSchema(partition, jdbc, toDbzTableId(tableId));
-            return toSchema(tableSchema.getTable(), sourceConfig.getJdbcProperties());
+            boolean tinyInt1isBit =
+                    Boolean.parseBoolean(
+                            sourceConfig
+                                    .getJdbcProperties()
+                                    .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
+            return toSchema(tableSchema.getTable(), tinyInt1isBit);
         }
     }
 
-    public static Schema toSchema(Table table, Properties jdbcProperties) {
+    public static Schema toSchema(Table table, boolean tinyInt1isBit) {
         List<Column> columns =
                 table.columns().stream()
-                        .map(column -> toColumn(column, jdbcProperties))
+                        .map(column -> toColumn(column, tinyInt1isBit))
                         .collect(Collectors.toList());
 
         return Schema.newBuilder()
@@ -147,10 +152,10 @@ public class MySqlSchemaUtils {
                 .build();
     }
 
-    public static Column toColumn(io.debezium.relational.Column column, Properties jdbcProperties) {
+    public static Column toColumn(io.debezium.relational.Column column, boolean tinyInt1isBit) {
         return Column.physicalColumn(
                 column.name(),
-                MySqlTypeUtils.fromDbzColumn(column, jdbcProperties),
+                MySqlTypeUtils.fromDbzColumn(column, tinyInt1isBit),
                 column.comment());
     }
 
