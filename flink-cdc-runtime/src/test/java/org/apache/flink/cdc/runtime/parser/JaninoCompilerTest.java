@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.parser;
 
+import org.apache.flink.api.java.tuple.Tuple2;
+
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -34,6 +36,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for the {@link JaninoCompiler}. */
 public class JaninoCompilerTest {
@@ -119,5 +124,82 @@ public class JaninoCompilerTest {
                         Double.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
         Assert.assertEquals(3.0, evaluate);
+    }
+
+    @Test
+    public void testLargeNumericLiterals() {
+        // Test parsing integer literals
+        Stream.of(
+                        Tuple2.of("0", 0),
+                        Tuple2.of("1", 1),
+                        Tuple2.of("1", 1),
+                        Tuple2.of("2147483647", 2147483647),
+                        Tuple2.of("-2147483648", -2147483648))
+                .forEach(
+                        t -> {
+                            String expression = t.f0;
+                            List<String> columnNames = new ArrayList<>();
+                            List<Class<?>> paramTypes = new ArrayList<>();
+                            ExpressionEvaluator expressionEvaluator =
+                                    JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(expression),
+                                            columnNames,
+                                            paramTypes,
+                                            Integer.class);
+                            try {
+                                assertThat(expressionEvaluator.evaluate()).isEqualTo(t.f1);
+                            } catch (InvocationTargetException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+
+        // Test parsing double literals
+        Stream.of(
+                        Tuple2.of("3.1415926", 3.1415926),
+                        Tuple2.of("0.0", 0.0),
+                        Tuple2.of("17.0", 17.0),
+                        Tuple2.of("123456789.123456789", 123456789.123456789),
+                        Tuple2.of("-987654321.987654321", -987654321.987654321))
+                .forEach(
+                        t -> {
+                            String expression = t.f0;
+                            List<String> columnNames = new ArrayList<>();
+                            List<Class<?>> paramTypes = new ArrayList<>();
+                            ExpressionEvaluator expressionEvaluator =
+                                    JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(expression),
+                                            columnNames,
+                                            paramTypes,
+                                            Double.class);
+                            try {
+                                assertThat(expressionEvaluator.evaluate()).isEqualTo(t.f1);
+                            } catch (InvocationTargetException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+
+        // Test parsing long literals
+        Stream.of(
+                        Tuple2.of("2147483648L", 2147483648L),
+                        Tuple2.of("-2147483649L", -2147483649L),
+                        Tuple2.of("9223372036854775807L", 9223372036854775807L),
+                        Tuple2.of("-9223372036854775808L", -9223372036854775808L))
+                .forEach(
+                        t -> {
+                            String expression = t.f0;
+                            List<String> columnNames = new ArrayList<>();
+                            List<Class<?>> paramTypes = new ArrayList<>();
+                            ExpressionEvaluator expressionEvaluator =
+                                    JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(expression),
+                                            columnNames,
+                                            paramTypes,
+                                            Long.class);
+                            try {
+                                assertThat(expressionEvaluator.evaluate()).isEqualTo(t.f1);
+                            } catch (InvocationTargetException e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
     }
 }

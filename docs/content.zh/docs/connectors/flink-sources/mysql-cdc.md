@@ -54,7 +54,7 @@ MySQL CDC 连接器允许从 MySQL 数据库读取快照数据和增量数据。
 
 ```下载链接仅在已发布版本可用，请在文档网站左下角选择浏览已发布的版本。```
 
-下载 [flink-sql-connector-mysql-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/3.1.0/flink-sql-connector-mysql-cdc-3.1.0.jar) 到 `<FLINK_HOME>/lib/` 目录下。
+下载 [flink-sql-connector-mysql-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mysql-cdc/{{< param Version >}}/flink-sql-connector-mysql-cdc-{{< param Version >}}.jar) 到 `<FLINK_HOME>/lib/` 目录下。
 
 **注意:** 参考 [flink-sql-connector-mysql-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mysql-cdc) 当前已发布的所有版本都可以在 Maven 中央仓库获取。
 
@@ -581,7 +581,7 @@ MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认
  [100, +∞)
 ```
 
-对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' limit 25)` 来获得每个区块的低值和高值，
+对于其他主键列类型， MySQL CDC Source 将以下形式执行语句： `SELECT MAX(STR_ID) AS chunk_high FROM (SELECT * FROM TestTable WHERE STR_ID > 'uuid-001' ORDER BY STR_ID ASC LIMIT 25)` 来获得每个区块的低值和高值，
 分割块集如下所示：
 
  ```

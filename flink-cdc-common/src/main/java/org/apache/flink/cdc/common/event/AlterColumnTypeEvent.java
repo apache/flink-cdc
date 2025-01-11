@@ -146,4 +146,9 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
     public SchemaChangeEventType getType() {
         return SchemaChangeEventType.ALTER_COLUMN_TYPE;
     }
+
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new AlterColumnTypeEvent(newTableId, typeMapping, oldTypeMapping);
+    }
 }

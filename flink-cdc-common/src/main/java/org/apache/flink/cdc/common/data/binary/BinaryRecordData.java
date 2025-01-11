@@ -200,12 +200,14 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
 
     @Override
     public ArrayData getArray(int pos) {
-        throw new UnsupportedOperationException("Not support ArrayData");
+        assertIndexIsValid(pos);
+        return BinarySegmentUtils.readArrayData(segments, offset, getLong(pos));
     }
 
     @Override
     public MapData getMap(int pos) {
-        throw new UnsupportedOperationException("Not support MapData.");
+        assertIndexIsValid(pos);
+        return BinarySegmentUtils.readMapData(segments, offset, getLong(pos));
     }
 
     @Override

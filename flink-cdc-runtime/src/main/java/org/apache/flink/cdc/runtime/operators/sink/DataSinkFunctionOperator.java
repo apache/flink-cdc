@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -112,8 +113,22 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     // ----------------------------- Helper functions -------------------------------
     private void handleFlushEvent(FlushEvent event) throws Exception {
         userFunction.finish();
+        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
+            event.getTableIds().stream()
+                    .filter(tableId -> !processedTableIds.contains(tableId))
+                    .forEach(
+                            tableId -> {
+                                LOG.info("Table {} has not been processed", tableId);
+                                try {
+                                    emitLatestSchema(tableId);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                                processedTableIds.add(tableId);
+                            });
+        }
         schemaEvolutionClient.notifyFlushSuccess(
-                getRuntimeContext().getIndexOfThisSubtask(), event.getTableId());
+                getRuntimeContext().getIndexOfThisSubtask(), event.getSourceSubTaskId());
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {

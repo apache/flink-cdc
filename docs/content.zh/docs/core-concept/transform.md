@@ -39,9 +39,25 @@ To describe a transform rule, the following parameters can be used:
 | primary-keys | Sink table primary keys, separated by commas       | optional          |
 | partition-keys | Sink table partition keys, separated by commas       | optional          |
 | table-options | used to the configure table creation statement when automatically creating tables | optional          |
+| converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
 | description  | Transform rule description | optional          |
 
 Multiple rules can be declared in one single pipeline YAML file.
+
+## converter-after-transform
+
+`converter-after-transform` is used to change the DataChangeEvent after other transform. The available values of this options are as follows.
+
+- SOFT_DELETE: The delete event will be converted as an insert event. This converter should be used together with the metadata `__data_event_type__`. Then you can implement the soft delete.
+
+For example, the following transform will not delete data when the delete event happens. Instead it will update the column `op_type` to -D in sink and transform it to an insert record.
+
+```yaml
+transform:
+  - source-table: \.*.\.*
+    projection: \*, __data_event_type__ AS op_type
+    converter-after-transform: SOFT_DELETE
+```
 
 # Metadata Fields
 ## Fields definition
@@ -247,6 +263,8 @@ transform:
     description: reassign composite primary keys example
 ```
 
+Notice that primary key columns will be attributed as NOT NULL in the downstream table, so you should ensure that no NULL value will be assigned to these columns.
+
 ## Reassign partition key
 We can reassign the partition key in transform rules. For example, given a table web_order in the database mydb, we may define a transform rule as follows:
 
@@ -355,6 +373,77 @@ transform:
     projection: "*, inc(inc(inc(id))) as inc_id, format(id, 'id -> %d') as formatted_id"
     filter: inc(id) < 100
 ```
+
+## Embedding AI Model
+
+Embedding AI Model can be used in transform rules.
+To use Embedding AI Model, you need to download the jar of build-in model, and then add `--jar {$BUILT_IN_MODEL_PATH}` to your flink-cdc.sh command.
+
+How to define a Embedding AI Model:
+
+```yaml
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
+```
+Note:
+* `model-name` is a common required parameter for all support models, which represent the function name called in `projection` or `filter`.
+* `class-name` is a common required parameter for all support models, available values can be found in [All Support models](#all-support-models).
+* `openai.model`, `openai.host`, `openai.apiKey` and `openai.chat.prompt` is option parameters that defined in specific model.
+
+How to use a Embedding AI Model:
+
+```yaml
+transform:
+  - source-table: db.\.*
+    projection: "*, inc(inc(inc(id))) as inc_id, GET_EMBEDDING(page) as emb, CHAT(page) as summary"
+    filter: inc(id) < 100
+pipeline:
+  model:
+    - model-name: CHAT
+      class-name: OpenAIChatModel
+      openai.model: gpt-4o-mini
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+      openai.chat.prompt: please summary this
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: http://langchain4j.dev/demo/openai/v1
+      openai.apikey: demo
+```
+Here, GET_EMBEDDING is defined though `model-name` in `pipeline`.
+
+### All Support models
+
+The following built-in models are provided:
+
+#### OpenAIChatModel
+
+| parameter          | type   | optional/required | meaning                                                                                                                              |
+|--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | required          | Name of model to be called, for example: "gpt-4o-mini", Available options are "gpt-4o-mini", "gpt-4o", "gpt-4-32k", "gpt-3.5-turbo". |
+| openai.host        | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                      |
+| openai.apikey      | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                   |
+| openai.chat.prompt | STRING | optional          | Prompt for chatting with OpenAI, for example: "Please summary this ".                                                                |
+
+#### OpenAIEmbeddingModel
+
+| parameter     | type   | optional/required | meaning                                                                                                                                                                |
+|---------------|--------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
+| openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
+| openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
 
 # Known limitations
 * Currently, transform doesn't work with route rules. It will be supported in future versions.

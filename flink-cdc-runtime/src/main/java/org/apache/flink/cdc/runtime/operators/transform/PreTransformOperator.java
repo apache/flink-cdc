@@ -21,6 +21,7 @@ import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -32,6 +33,8 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -49,10 +52,10 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -69,11 +72,11 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private transient ListState<byte[]> state;
-    private final List<Tuple2<String, String>> udfFunctions;
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
     private Map<TableId, Boolean> hasAsteriskMap;
-    private Map<TableId, List<String>> referencedColumnsMap;
+    private final boolean canContainDistributedTables;
 
     public static PreTransformOperator.Builder newBuilder() {
         return new PreTransformOperator.Builder();
@@ -82,12 +85,23 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     /** Builder of {@link PreTransformOperator}. */
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
+        private boolean canContainDistributedTables;
 
-        private final List<Tuple2<String, String>> udfFunctions = new ArrayList<>();
+        private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
+                new ArrayList<>();
 
         public PreTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(new TransformRule(tableInclusions, projection, filter, "", "", ""));
+            transformRules.add(
+                    new TransformRule(
+                            tableInclusions,
+                            projection,
+                            filter,
+                            "",
+                            "",
+                            "",
+                            null,
+                            new SupportedMetadataColumn[0]));
             return this;
         }
 
@@ -97,7 +111,9 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                 @Nullable String filter,
                 String primaryKey,
                 String partitionKey,
-                String tableOption) {
+                String tableOption,
+                @Nullable String postTransformConverter,
+                SupportedMetadataColumn[] supportedMetadataColumns) {
             transformRules.add(
                     new TransformRule(
                             tableInclusions,
@@ -105,29 +121,42 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                             filter,
                             primaryKey,
                             partitionKey,
-                            tableOption));
+                            tableOption,
+                            postTransformConverter,
+                            supportedMetadataColumns));
             return this;
         }
 
         public PreTransformOperator.Builder addUdfFunctions(
-                List<Tuple2<String, String>> udfFunctions) {
+                List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
             this.udfFunctions.addAll(udfFunctions);
             return this;
         }
 
+        public PreTransformOperator.Builder canContainDistributedTables(
+                boolean canContainDistributedTables) {
+            this.canContainDistributedTables = canContainDistributedTables;
+            return this;
+        }
+
         public PreTransformOperator build() {
-            return new PreTransformOperator(transformRules, udfFunctions);
+            return new PreTransformOperator(
+                    transformRules, udfFunctions, canContainDistributedTables);
         }
     }
 
     private PreTransformOperator(
-            List<TransformRule> transformRules, List<Tuple2<String, String>> udfFunctions) {
-        this.transformRules = transformRules;
+            List<TransformRule> transformRules,
+            List<Tuple3<String, String, Map<String, String>>> udfFunctions,
+            boolean canContainDistributedTables) {
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
+
+        this.transformRules = transformRules;
         this.udfFunctions = udfFunctions;
+        this.canContainDistributedTables = canContainDistributedTables;
     }
 
     @Override
@@ -138,7 +167,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         super.setup(containingTask, config, output);
         this.udfDescriptors =
                 this.udfFunctions.stream()
-                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1))
+                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1, udf.f2))
                         .collect(Collectors.toList());
 
         // Initialize data fields in advance because they might be accessed in
@@ -165,12 +194,17 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         }
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.hasAsteriskMap = new ConcurrentHashMap<>();
-        this.referencedColumnsMap = new ConcurrentHashMap<>();
     }
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
+        if (canContainDistributedTables) {
+            // In distributed mode, we don't have a globally consistent schema for each partition.
+            // It's not meaningful to persist them to state. Instead, we rely on each source
+            // partition to send fresh CreateTableEvent to instantiate each event flow.
+            return;
+        }
         OperatorStateStore stateStore = context.getOperatorStateStore();
         ListStateDescriptor<byte[]> descriptor =
                 new ListStateDescriptor<>("originalSchemaState", byte[].class);
@@ -188,8 +222,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                         new CreateTableEvent(
                                 stateTableChangeInfo.getTableId(),
                                 stateTableChangeInfo.getPreTransformedSchema());
-                // hasAsteriskMap and referencedColumnsMap needs to be recalculated after restoring
-                // from a checkpoint.
+                // hasAsteriskMap needs to be recalculated after restoring from a checkpoint.
                 cacheTransformRuleInfo(restoredCreateTableEvent);
 
                 // Since PostTransformOperator doesn't preserve state, pre-transformed schema
@@ -202,6 +235,10 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
+        if (canContainDistributedTables) {
+            // Same reason in this#initializeState.
+            return;
+        }
         state.update(
                 new ArrayList<>(
                         preTransformChangeInfoMap.values().stream()
@@ -268,14 +305,33 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
-        Optional<SchemaChangeEvent> schemaChangeEvent =
-                SchemaUtils.transformSchemaChangeEvent(
-                        hasAsteriskMap.get(tableId), referencedColumnsMap.get(tableId), event);
+
+        Optional<SchemaChangeEvent> schemaChangeEvent;
+        if (hasAsteriskMap.getOrDefault(tableId, true)) {
+            // If this TableId is asterisk-ful, we should use the latest upstream schema as
+            // referenced columns to perform schema evolution, not of the original ones generated
+            // when creating tables. If hasAsteriskMap has no entry for this TableId, it means that
+            // this TableId has not been referenced by any transform rules, and should be regarded
+            // as asterisk-ful by default.
+            schemaChangeEvent =
+                    SchemaUtils.transformSchemaChangeEvent(
+                            true, tableChangeInfo.getSourceSchema().getColumnNames(), event);
+        } else {
+            // Otherwise, we will use the pre-transformed columns to determine if the given schema
+            // change event should be passed to downstream, only when it is presented in the
+            // pre-transformed schema.
+            schemaChangeEvent =
+                    SchemaUtils.transformSchemaChangeEvent(
+                            false,
+                            tableChangeInfo.getPreTransformedSchema().getColumnNames(),
+                            event);
+        }
         if (schemaChangeEvent.isPresent()) {
             preTransformedSchema =
                     SchemaUtils.applySchemaChangeEvent(
                             tableChangeInfo.getPreTransformedSchema(), schemaChangeEvent.get());
         }
+        cachePreTransformProcessor(tableId, originalSchema);
         preTransformChangeInfoMap.put(
                 tableId, PreTransformChangeInfo.of(tableId, originalSchema, preTransformedSchema));
         return schemaChangeEvent;
@@ -283,26 +339,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private void cacheTransformRuleInfo(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        Set<String> referencedColumnsSet =
-                transforms.stream()
-                        .filter(t -> t.getSelectors().isMatch(tableId))
-                        .flatMap(
-                                rule ->
-                                        TransformParser.generateReferencedColumns(
-                                                rule.getProjection()
-                                                        .map(TransformProjection::getProjection)
-                                                        .orElse(null),
-                                                rule.getFilter()
-                                                        .map(TransformFilter::getExpression)
-                                                        .orElse(null),
-                                                createTableEvent.getSchema().getColumns())
-                                                .stream())
-                        .map(Column::getName)
-                        .collect(Collectors.toSet());
-
         boolean notTransformed =
                 transforms.stream().noneMatch(t -> t.getSelectors().isMatch(tableId));
-
         if (notTransformed) {
             // If this TableId isn't presented in any transform block, it should behave like a "*"
             // projection and should be regarded as asterisk-ful.
@@ -320,17 +358,10 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
             hasAsteriskMap.put(createTableEvent.tableId(), hasAsterisk);
         }
-        referencedColumnsMap.put(
-                createTableEvent.tableId(),
-                createTableEvent.getSchema().getColumnNames().stream()
-                        .filter(referencedColumnsSet::contains)
-                        .collect(Collectors.toList()));
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
-        cacheTransformRuleInfo(createTableEvent);
         for (Tuple2<Selectors, SchemaMetadataTransform> transform : schemaMetadataTransformers) {
             Selectors selectors = transform.f0;
             if (selectors.isMatch(tableId)) {
@@ -342,27 +373,74 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             }
         }
 
+        cachePreTransformProcessor(tableId, createTableEvent.getSchema());
+        if (preTransformProcessorMap.containsKey(tableId)) {
+            return preTransformProcessorMap
+                    .get(tableId)
+                    .preTransformCreateTableEvent(createTableEvent);
+        }
+        return createTableEvent;
+    }
+
+    private void cachePreTransformProcessor(TableId tableId, Schema tableSchema) {
+        LinkedHashSet<Column> referencedColumnsSet = new LinkedHashSet<>();
+        boolean hasMatchTransform = false;
         for (PreTransformer transform : transforms) {
-            Selectors selectors = transform.getSelectors();
-            if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
+            if (!transform.getSelectors().isMatch(tableId)) {
+                continue;
+            }
+            if (!transform.getProjection().isPresent()) {
+                processProjectionTransform(tableId, tableSchema, referencedColumnsSet, null);
+                hasMatchTransform = true;
+            } else {
                 TransformProjection transformProjection = transform.getProjection().get();
-                TransformFilter transformFilter = transform.getFilter().orElse(null);
                 if (transformProjection.isValid()) {
-                    if (!preTransformProcessorMap.containsKey(tableId)) {
-                        preTransformProcessorMap.put(
-                                tableId,
-                                new PreTransformProcessor(
-                                        tableChangeInfo, transformProjection, transformFilter));
-                    }
-                    PreTransformProcessor preTransformProcessor =
-                            preTransformProcessorMap.get(tableId);
-                    // TODO: Currently this code wrongly filters out rows that weren't referenced in
-                    // the first matching transform rule but in the following transform rules.
-                    return preTransformProcessor.preTransformCreateTableEvent(createTableEvent);
+                    processProjectionTransform(
+                            tableId, tableSchema, referencedColumnsSet, transform);
+                    hasMatchTransform = true;
                 }
             }
         }
-        return createTableEvent;
+        if (!hasMatchTransform) {
+            processProjectionTransform(tableId, tableSchema, referencedColumnsSet, null);
+        }
+    }
+
+    public void processProjectionTransform(
+            TableId tableId,
+            Schema tableSchema,
+            LinkedHashSet<Column> referencedColumnsSet,
+            @Nullable PreTransformer transform) {
+        // If this TableId isn't presented in any transform block, it should behave like a "*"
+        // projection and should be regarded as asterisk-ful.
+        if (transform == null) {
+            referencedColumnsSet.addAll(tableSchema.getColumns());
+            hasAsteriskMap.put(tableId, true);
+        } else {
+            TransformProjection transformProjection = transform.getProjection().get();
+            boolean hasAsterisk = TransformParser.hasAsterisk(transformProjection.getProjection());
+            if (hasAsterisk) {
+                referencedColumnsSet.addAll(tableSchema.getColumns());
+                hasAsteriskMap.put(tableId, true);
+            } else {
+                TransformFilter transformFilter = transform.getFilter().orElse(null);
+                List<Column> referencedColumns =
+                        TransformParser.generateReferencedColumns(
+                                transformProjection.getProjection(),
+                                transformFilter != null ? transformFilter.getExpression() : null,
+                                tableSchema.getColumns());
+                // update referenced columns of other projections of the same tableId, if any
+                referencedColumnsSet.addAll(referencedColumns);
+                hasAsteriskMap.putIfAbsent(tableId, false);
+            }
+        }
+
+        PreTransformChangeInfo tableChangeInfo =
+                PreTransformChangeInfo.of(
+                        tableId,
+                        tableSchema,
+                        tableSchema.copy(new ArrayList<>(referencedColumnsSet)));
+        preTransformProcessorMap.put(tableId, new PreTransformProcessor(tableChangeInfo));
     }
 
     private Schema transformSchemaMetaData(
@@ -386,46 +464,27 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         return schemaBuilder.build();
     }
 
-    private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent)
-            throws Exception {
-        TableId tableId = dataChangeEvent.tableId();
-        for (PreTransformer transform : transforms) {
-            Selectors selectors = transform.getSelectors();
+    private DataChangeEvent processDataChangeEvent(DataChangeEvent dataChangeEvent) {
+        if (!transforms.isEmpty()) {
+            TableId tableId = dataChangeEvent.tableId();
+            PreTransformProcessor processor = preTransformProcessorMap.get(tableId);
+            Preconditions.checkArgument(
+                    processor != null,
+                    "Transform operator receives a data change event from table %s without a full schema view. "
+                            + "This might happen if source with distributed tables doesn't emit CreateTableEvent first after fail-over. "
+                            + "This is likely a bug, please consider filing an issue.",
+                    tableId);
 
-            if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
-                TransformProjection transformProjection = transform.getProjection().get();
-                TransformFilter transformFilter = transform.getFilter().orElse(null);
-                if (transformProjection.isValid()) {
-                    return processProjection(transformProjection, transformFilter, dataChangeEvent);
-                }
+            BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
+            BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
+            if (before != null) {
+                BinaryRecordData projectedBefore = processor.processFillDataField(before);
+                dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
             }
-        }
-        return dataChangeEvent;
-    }
-
-    private DataChangeEvent processProjection(
-            TransformProjection transformProjection,
-            @Nullable TransformFilter transformFilter,
-            DataChangeEvent dataChangeEvent) {
-        TableId tableId = dataChangeEvent.tableId();
-        PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
-        if (!preTransformProcessorMap.containsKey(tableId)
-                || !preTransformProcessorMap.get(tableId).hasTableChangeInfo()) {
-            preTransformProcessorMap.put(
-                    tableId,
-                    new PreTransformProcessor(
-                            tableChangeInfo, transformProjection, transformFilter));
-        }
-        PreTransformProcessor preTransformProcessor = preTransformProcessorMap.get(tableId);
-        BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        if (before != null) {
-            BinaryRecordData projectedBefore = preTransformProcessor.processFillDataField(before);
-            dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
-        }
-        if (after != null) {
-            BinaryRecordData projectedAfter = preTransformProcessor.processFillDataField(after);
-            dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
+            if (after != null) {
+                BinaryRecordData projectedAfter = processor.processFillDataField(after);
+                dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
+            }
         }
         return dataChangeEvent;
     }

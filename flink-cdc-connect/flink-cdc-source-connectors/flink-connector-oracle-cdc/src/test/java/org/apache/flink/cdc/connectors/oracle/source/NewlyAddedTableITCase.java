@@ -394,7 +394,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     captureTableThisRound, cityName, cityName)));
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 2: make redo log data for all tables before this round(also includes this
             // round),
@@ -419,7 +420,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             // step 3: assert fetched redo log data in this round
             waitForSinkSize("sink", fetchedDataList.size());
 
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             // step 4: trigger savepoint
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
@@ -491,7 +493,10 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                         () -> sleepMs(100));
             }
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+            // wait task to stream phase
+            sleepMs(10000);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
@@ -526,7 +531,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             JobClient jobClient = tableResult.getJobClient().get();
 
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 3: make redo log data for all tables
             List<String> expectedRedoLogDataThisRound = new ArrayList<>();
@@ -555,7 +561,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             }
 
             if (failoverPhase == FailoverPhase.REDO_LOG
-                    && TestValuesTableFactory.getRawResults("sink").size()
+                    && TestValuesTableFactory.getRawResultsAsStrings("sink").size()
                             > fetchedDataList.size()) {
                 triggerFailover(
                         failoverType,
@@ -567,7 +573,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             fetchedDataList.addAll(expectedRedoLogDataThisRound);
             // step 4: assert fetched redo log data in this round
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 5: trigger savepoint
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -681,7 +688,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             waitForUpsertSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 3: make some redo log data for this round
             makeFirstPartRedoLogForAddressTable(newlyAddedTable);
@@ -722,7 +730,8 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {
@@ -882,8 +891,10 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                         + ")",
                 ORACLE_CONTAINER.getHost(),
                 ORACLE_CONTAINER.getOraclePort(),
-                ORACLE_CONTAINER.getUsername(),
-                ORACLE_CONTAINER.getPassword(),
+                // To analyze table for approximate rowCnt computation, use admin user before chunk
+                // splitting.
+                TOP_USER,
+                TOP_SECRET,
                 ORACLE_DATABASE,
                 ORACLE_SCHEMA,
                 getTableNameRegex(captureTableNames),

@@ -141,7 +141,7 @@ public class VitessConnectorITCase extends VitessTestBase {
                         "+I[jacket, 0.600]",
                         "+I[spare tire, 22.200]");
 
-        List<String> actual = TestValuesTableFactory.getResults("sink");
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -245,7 +245,7 @@ public class VitessConnectorITCase extends VitessTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;
