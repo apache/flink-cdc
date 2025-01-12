@@ -268,6 +268,7 @@ public class DebeziumChangeFetcher<T> {
         synchronized (checkpointLock) {
             T record;
             while ((record = records.poll()) != null) {
+                // If the snapshot does not end or no latest data is entered, -1 is reported
                 emitDelay =
                         isInDbSnapshotPhase ? -1L : System.currentTimeMillis() - messageTimestamp;
                 sourceContext.collect(record);
