@@ -472,9 +472,11 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         DataChangeEvent.insertEvent(tableId, generate(schema, 3, 4.5, "Cecily")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 4, 5.6, "Derrida")));
         runJobWithEvents(truncateTestingEvents);
-        assertEqualsInAnyOrder(
+        waitAndVerify(
+                tableId,
+                3,
                 Arrays.asList("3 | 4.5 | Cecily", "4 | 5.6 | Derrida"),
-                fetchTableContent(tableId, 3));
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
     }
 
     @Test
