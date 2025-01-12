@@ -138,7 +138,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -219,13 +219,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -309,7 +309,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`NAME` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`NAME` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -386,13 +386,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -469,13 +469,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -553,13 +553,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -639,7 +639,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`ROLENAME` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`ROLENAME` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -714,12 +714,12 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` DOUBLE,`IDENTIFIER` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` DOUBLE,`IDENTIFIER` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` DOUBLE,`IDENTIFIER` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` DOUBLE,`IDENTIFIER` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -833,7 +833,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`UID` STRING,`PRICE` INT}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`UID` STRING,`PRICE` INT}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -932,7 +932,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` STRING}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -1039,7 +1039,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`UID` STRING,`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128)}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`UID` STRING,`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128)}, primaryKeys=ID, comment=null, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 

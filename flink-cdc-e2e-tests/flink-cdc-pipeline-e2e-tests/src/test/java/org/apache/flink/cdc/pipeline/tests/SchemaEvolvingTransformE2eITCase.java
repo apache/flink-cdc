@@ -389,7 +389,7 @@ public class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
     private void validateSnapshotData(String dbName, String tableName) throws Exception {
         List<String> expected =
                 Stream.of(
-                                "CreateTableEvent{tableId=%s.%s, schema=columns={`uid` STRING,`id` INT NOT NULL,`name` VARCHAR(17),`age` INT,`id_square` INT,`tag` STRING}, primaryKeys=id, options=()}",
+                                "CreateTableEvent{tableId=%s.%s, schema=columns={`uid` STRING,`id` INT NOT NULL,`name` VARCHAR(17),`age` INT,`id_square` INT,`tag` STRING}, primaryKeys=id, comment=null, options=()}",
                                 "DataChangeEvent{tableId=%s.%s, before=[], after=[1009 -> Bob, 1009, Bob, 20, -1018081, age >= 20], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId=%s.%s, before=[], after=[1008 -> Alice, 1008, Alice, 21, -1016064, age >= 20], op=INSERT, meta=()}",
                                 "DataChangeEvent{tableId=%s.%s, before=[], after=[1011 -> Derrida, 1011, Derrida, 18, 1022121, age < 20], op=INSERT, meta=()}",
