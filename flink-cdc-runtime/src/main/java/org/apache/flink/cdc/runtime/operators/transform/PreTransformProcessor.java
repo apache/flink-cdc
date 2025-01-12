@@ -62,15 +62,11 @@ public class PreTransformProcessor {
     public BinaryRecordData processFillDataField(BinaryRecordData data) {
         List<Object> valueList = new ArrayList<>();
         List<Column> columns = tableChangeInfo.getPreTransformedSchema().getColumns();
-        Map<String, RecordData.FieldGetter> sourceFieldGetters =
-                tableChangeInfo.getSourceFieldGetters();
+        Map<String, RecordData.FieldGetter> sourceFieldGetterMap =
+                tableChangeInfo.getSourceFieldGettersMap();
         for (Column column : columns) {
-            RecordData.FieldGetter fieldGetter = sourceFieldGetters.get(column.getName());
-            if (fieldGetter != null) {
-                valueList.add(fieldGetter.getFieldOrNull(data));
-            } else {
-                valueList.add(null);
-            }
+            RecordData.FieldGetter fieldGetter = sourceFieldGetterMap.get(column.getName());
+            valueList.add(fieldGetter.getFieldOrNull(data));
         }
         return tableChangeInfo
                 .getPreTransformedRecordDataGenerator()

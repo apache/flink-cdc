@@ -46,7 +46,7 @@ public class PreTransformChangeInfo {
     private final TableId tableId;
     private final Schema sourceSchema;
     private final Schema preTransformedSchema;
-    private final Map<String, RecordData.FieldGetter> sourceFieldGetters;
+    private final Map<String, RecordData.FieldGetter> sourceFieldGettersMap;
     private final BinaryRecordDataGenerator preTransformedRecordDataGenerator;
 
     public static final PreTransformChangeInfo.Serializer SERIALIZER =
@@ -56,15 +56,15 @@ public class PreTransformChangeInfo {
             TableId tableId,
             Schema sourceSchema,
             Schema preTransformedSchema,
-            RecordData.FieldGetter[] sourceFieldGetters,
+            RecordData.FieldGetter[] sourceFieldGettersMap,
             BinaryRecordDataGenerator preTransformedRecordDataGenerator) {
         this.tableId = tableId;
         this.sourceSchema = sourceSchema;
         this.preTransformedSchema = preTransformedSchema;
-        this.sourceFieldGetters = new HashMap<>(sourceSchema.getColumnCount());
+        this.sourceFieldGettersMap = new HashMap<>(sourceSchema.getColumnCount());
         for (int i = 0; i < sourceSchema.getColumns().size(); i++) {
-            this.sourceFieldGetters.put(
-                    sourceSchema.getColumns().get(i).getName(), sourceFieldGetters[i]);
+            this.sourceFieldGettersMap.put(
+                    sourceSchema.getColumns().get(i).getName(), sourceFieldGettersMap[i]);
         }
         this.preTransformedRecordDataGenerator = preTransformedRecordDataGenerator;
     }
@@ -93,8 +93,8 @@ public class PreTransformChangeInfo {
         return preTransformedSchema;
     }
 
-    public Map<String, RecordData.FieldGetter> getSourceFieldGetters() {
-        return sourceFieldGetters;
+    public Map<String, RecordData.FieldGetter> getSourceFieldGettersMap() {
+        return sourceFieldGettersMap;
     }
 
     public BinaryRecordDataGenerator getPreTransformedRecordDataGenerator() {
