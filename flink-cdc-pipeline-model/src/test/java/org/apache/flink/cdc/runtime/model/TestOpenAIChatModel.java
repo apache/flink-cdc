@@ -21,11 +21,13 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 /** A test for {@link OpenAIChatModel}. */
 public class TestOpenAIChatModel {
     @Test
+    @Disabled("For manual test as there is a limit for quota.")
     public void testEval() {
         OpenAIChatModel openAIChatModel = new OpenAIChatModel();
         Configuration configuration = new Configuration();
