@@ -113,14 +113,14 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "from_unix_time_table");
     private static final Schema FROM_UNIX_TIME_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("seconds", DataTypes.BIGINT())
                     .physicalColumn("format_str", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
     private static final Schema EXPECTED_FROM_UNIX_TIME_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("from_unix_time", DataTypes.STRING())
                     .physicalColumn("from_unix_time_format", DataTypes.STRING())
                     .primaryKey("col1")
@@ -130,14 +130,14 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "unix_timestamp_table");
     private static final Schema UNIX_TIMESTAMP_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("date_time_str", DataTypes.STRING())
                     .physicalColumn("unix_timestamp_format", DataTypes.STRING())
                     .primaryKey("col1")
                     .build();
     private static final Schema EXPECTED_UNIX_TIMESTAMP_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("unix_timestamp", DataTypes.BIGINT())
                     .physicalColumn("unix_timestamp_format", DataTypes.BIGINT())
                     .primaryKey("col1")
@@ -923,7 +923,7 @@ public class PostTransformOperatorTest {
                                 new CreateTableEvent(
                                         UNIX_TIMESTAMP_TABLEID, EXPECTED_UNIX_TIMESTAMP_SCHEMA)));
 
-        // In Berlin, "1970-01-01 08:00:01.001" formated by "yyyy-MM-dd HH:mm:ss.SSS" ==> 25201L
+        // In Berlin, "1970-01-01 08:00:01.001" formatted by "yyyy-MM-dd HH:mm:ss.SSS" ==> 25201L
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         UNIX_TIMESTAMP_TABLEID,
@@ -943,7 +943,8 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect1));
 
-        // In Berlin, "1970-01-01 08:00:01.001 +0800" formated by "yyyy-MM-dd HH:mm:ss.SSS X" ==> 1L
+        // In Berlin, "1970-01-01 08:00:01.001 +0800" formatted by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
+        // 1L
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
                         UNIX_TIMESTAMP_TABLEID,
@@ -963,7 +964,7 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect2));
 
-        // In Berlin, "1970-01-01 08:00:01.001 +0800" formated by "yyyy-MM-dd HH:mm:ss.SSS" ==>
+        // In Berlin, "1970-01-01 08:00:01.001 +0800" formatted by "yyyy-MM-dd HH:mm:ss.SSS" ==>
         // 25201L
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
@@ -984,7 +985,7 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect3));
 
-        // In Berlin, "1970-01-01 08:00:01.001" formated by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
+        // In Berlin, "1970-01-01 08:00:01.001" formatted by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
         // -9223372036854775808L
         DataChangeEvent insertEvent4 =
                 DataChangeEvent.insertEvent(
@@ -1042,7 +1043,7 @@ public class PostTransformOperatorTest {
                                 new CreateTableEvent(
                                         UNIX_TIMESTAMP_TABLEID, EXPECTED_UNIX_TIMESTAMP_SCHEMA)));
 
-        // In Shanghai, "1970-01-01 08:00:01.001" formated by "yyyy-MM-dd HH:mm:ss.SSS" ==> 1L
+        // In Shanghai, "1970-01-01 08:00:01.001" formatted by "yyyy-MM-dd HH:mm:ss.SSS" ==> 1L
         DataChangeEvent insertEvent1 =
                 DataChangeEvent.insertEvent(
                         UNIX_TIMESTAMP_TABLEID,
@@ -1062,7 +1063,7 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect1));
 
-        // In Shanghai, "1970-01-01 08:00:01.001 +0800" formated by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
+        // In Shanghai, "1970-01-01 08:00:01.001 +0100" formatted by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
         // 1L
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
@@ -1070,27 +1071,28 @@ public class PostTransformOperatorTest {
                         recordDataGenerator.generate(
                                 new Object[] {
                                     new BinaryStringData("2"),
-                                    new BinaryStringData("1970-01-01 08:00:01.001 +0800"),
+                                    new BinaryStringData("1970-01-01 08:00:01.001 +0100"),
                                     new BinaryStringData("yyyy-MM-dd HH:mm:ss.SSS X")
                                 }));
         DataChangeEvent insertEventExpect2 =
                 DataChangeEvent.insertEvent(
                         UNIX_TIMESTAMP_TABLEID,
                         expectedRecordDataGenerator.generate(
-                                new Object[] {new BinaryStringData("2"), 1L, 1L}));
+                                new Object[] {new BinaryStringData("2"), 1L, 25201L}));
         transform.processElement(new StreamRecord<>(insertEvent2));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect2));
 
-        // In Shanghai, "1970-01-01 08:00:01.001 +0800" formated by "yyyy-MM-dd HH:mm:ss.SSS" ==> 1L
+        // In Shanghai, "1970-01-01 08:00:01.001 +0100" formatted by "yyyy-MM-dd HH:mm:ss.SSS" ==>
+        // 1L
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         UNIX_TIMESTAMP_TABLEID,
                         recordDataGenerator.generate(
                                 new Object[] {
                                     new BinaryStringData("3"),
-                                    new BinaryStringData("1970-01-01 08:00:01.001 +0800"),
+                                    new BinaryStringData("1970-01-01 08:00:01.001 +0100"),
                                     new BinaryStringData("yyyy-MM-dd HH:mm:ss.SSS")
                                 }));
         DataChangeEvent insertEventExpect3 =
@@ -1103,7 +1105,7 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(insertEventExpect3));
 
-        // In Shanghai, "1970-01-01 08:00:01.001" formated by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
+        // In Shanghai, "1970-01-01 08:00:01.001" formatted by "yyyy-MM-dd HH:mm:ss.SSS X" ==>
         // -9223372036854775808L
         DataChangeEvent insertEvent4 =
                 DataChangeEvent.insertEvent(
