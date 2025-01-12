@@ -248,8 +248,8 @@ public class DebeziumChangeFetcher<T> {
                 LOG.error("Failed to deserialize record {}", record, t);
                 throw t;
             }
-
-            if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
+            // Wait for the end of the snapshot phase for the first data to trigger subsequent calculations.
+            if (isInDbSnapshotPhase && !isSnapshotRecord(record) && messageTimestamp !=0) {
                 LOG.debug("Snapshot phase finishes.");
                 isInDbSnapshotPhase = false;
             }
@@ -269,7 +269,7 @@ public class DebeziumChangeFetcher<T> {
             T record;
             while ((record = records.poll()) != null) {
                 emitDelay =
-                        isInDbSnapshotPhase ? 0L : System.currentTimeMillis() - messageTimestamp;
+                        isInDbSnapshotPhase ? -1L : System.currentTimeMillis() - messageTimestamp;
                 sourceContext.collect(record);
             }
             // update offset to state
