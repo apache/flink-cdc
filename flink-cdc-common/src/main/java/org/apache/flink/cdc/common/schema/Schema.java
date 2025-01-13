@@ -24,7 +24,6 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
-
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import javax.annotation.Nullable;
