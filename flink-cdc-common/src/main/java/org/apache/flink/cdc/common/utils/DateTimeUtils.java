@@ -43,6 +43,16 @@ public class DateTimeUtils {
      */
     public static final long MILLIS_PER_DAY = 86400000L; // = 24 * 60 * 60 * 1000
 
+    /** The SimpleDateFormat string for ISO dates, "yyyy-MM-dd". */
+    private static final String DATE_FORMAT_STRING = "yyyy-MM-dd";
+
+    /** The SimpleDateFormat string for ISO times, "HH:mm:ss". */
+    private static final String TIME_FORMAT_STRING = "HH:mm:ss";
+
+    /** The SimpleDateFormat string for ISO timestamps, "yyyy-MM-dd HH:mm:ss". */
+    private static final String TIMESTAMP_FORMAT_STRING =
+            DATE_FORMAT_STRING + " " + TIME_FORMAT_STRING;
+
     /**
      * A ThreadLocal cache map for SimpleDateFormat, because SimpleDateFormat is not thread-safe.
      * (string_format) => formatter
@@ -109,7 +119,7 @@ public class DateTimeUtils {
         } catch (ParseException e) {
             LOG.error(
                     String.format(
-                            "Exception when parsing datetime string '%s' in format '%s'",
+                            "Exception when parsing datetime string '%s' in format '%s', the default value Long.MIN_VALUE(-9223372036854775808) will be returned.",
                             dateStr, format),
                     e);
             return Long.MIN_VALUE;
@@ -126,6 +136,56 @@ public class DateTimeUtils {
         int y = year + 4800 - a;
         int m = month + 12 * a - 3;
         return day + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045;
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // UNIX TIME
+    // --------------------------------------------------------------------------------------------
+
+    /**
+     * Convert unix timestamp (seconds since '1970-01-01 00:00:00' UTC) to datetime string in the
+     * "yyyy-MM-dd HH:mm:ss" format.
+     */
+    public static String formatUnixTimestamp(long unixTime, TimeZone timeZone) {
+        return formatUnixTimestamp(unixTime, TIMESTAMP_FORMAT_STRING, timeZone);
+    }
+
+    /**
+     * Convert unix timestamp (seconds since '1970-01-01 00:00:00' UTC) to datetime string in the
+     * given format.
+     */
+    public static String formatUnixTimestamp(long unixTime, String format, TimeZone timeZone) {
+        SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
+        formatter.setTimeZone(timeZone);
+        Date date = new Date(unixTime * 1000);
+        try {
+            return formatter.format(date);
+        } catch (Exception e) {
+            LOG.error("Exception when formatting.", e);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
+     * 00:00:00' UTC.
+     */
+    public static long unixTimestamp(String dateStr, TimeZone timeZone) {
+        return unixTimestamp(dateStr, TIMESTAMP_FORMAT_STRING, timeZone);
+    }
+
+    /**
+     * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
+     * 00:00:00' UTC.
+     */
+    public static long unixTimestamp(String dateStr, String format, TimeZone timeZone) {
+        long ts = internalParseTimestampMillis(dateStr, format, timeZone);
+        if (ts == Long.MIN_VALUE) {
+            return Long.MIN_VALUE;
+        } else {
+            // return the seconds
+            return ts / 1000;
+        }
     }
 
     // --------------------------------------------------------------------------------------------
