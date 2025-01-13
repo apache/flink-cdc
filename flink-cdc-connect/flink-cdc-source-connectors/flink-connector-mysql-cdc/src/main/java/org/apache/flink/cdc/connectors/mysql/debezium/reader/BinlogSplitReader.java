@@ -53,6 +53,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -83,6 +84,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private Predicate capturedTableFilter;
     private final StoppableChangeEventSourceContext changeEventSourceContext =
             new StoppableChangeEventSourceContext();
+    private final boolean isParsingOnLineSchemaChanges;
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
@@ -93,6 +95,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
+        this.isParsingOnLineSchemaChanges =
+                statefulTaskContext.getSourceConfig().isParseOnLineSchemaChanges();
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -148,6 +152,14 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
+                if (isParsingOnLineSchemaChanges) {
+                    Optional<SourceRecord> oscRecord =
+                            parseOnLineSchemaChangeEvent(event.getRecord());
+                    if (oscRecord.isPresent()) {
+                        sourceRecords.add(oscRecord.get());
+                        continue;
+                    }
+                }
                 if (shouldEmit(event.getRecord())) {
                     sourceRecords.add(event.getRecord());
                 }
@@ -193,6 +205,20 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
         }
+    }
+
+    private Optional<SourceRecord> parseOnLineSchemaChangeEvent(SourceRecord sourceRecord) {
+        if (RecordUtils.isOnLineSchemaChangeEvent(sourceRecord)) {
+            // This is a gh-ost initialized schema change event and should be emitted if the
+            // peeled tableId matches the predicate.
+            TableId originalTableId = RecordUtils.getTableId(sourceRecord);
+            TableId peeledTableId = RecordUtils.peelTableId(originalTableId);
+            if (capturedTableFilter.test(peeledTableId)) {
+                return Optional.of(
+                        RecordUtils.setTableId(sourceRecord, originalTableId, peeledTableId));
+            }
+        }
+        return Optional.empty();
     }
 
     /**
