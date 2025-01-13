@@ -34,6 +34,7 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.FileNotFoundException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -53,6 +54,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_T
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
+import static org.junit.Assert.assertThrows;
 
 /** Unit test for {@link org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser}. */
 class YamlPipelineDefinitionParserTest {
@@ -79,6 +81,38 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(minimizedDef);
+    }
+
+    @Test
+    void testEmptyDefinition() {
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> {
+                            URL resource =
+                                    Resources.getResource(
+                                            "definitions/pipeline-definition-empty.yaml");
+                            YamlPipelineDefinitionParser parser =
+                                    new YamlPipelineDefinitionParser();
+                            parser.parse(Paths.get(resource.toURI()), new Configuration());
+                        });
+        assertThat(exception.getMessage())
+                .isEqualTo("Missing required field \"source\" in pipeline definition");
+    }
+
+    @Test
+    void testDefinitionFileNotExist() {
+        FileNotFoundException exception =
+                assertThrows(
+                        FileNotFoundException.class,
+                        () -> {
+                            YamlPipelineDefinitionParser parser =
+                                    new YamlPipelineDefinitionParser();
+                            PipelineDef pipelineDef =
+                                    parser.parse(Paths.get("not-exist"), new Configuration());
+                            assertThat(pipelineDef).isEqualTo(minimizedDef);
+                        });
+        assertThat(exception.getMessage()).isEqualTo("not-exist (No such file or directory)");
     }
 
     @Test

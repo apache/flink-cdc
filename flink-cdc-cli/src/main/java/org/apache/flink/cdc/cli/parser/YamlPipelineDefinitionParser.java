@@ -48,6 +48,7 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
 import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
+import static org.apache.flink.cdc.common.utils.Preconditions.checkArgument;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** Parser for converting YAML formatted pipeline definition to {@link PipelineDef}. */
@@ -136,21 +137,18 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 userPipelineConfig.get(PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
         // Source is required
-        SourceDef sourceDef =
-                toSourceDef(
-                        checkNotNull(
-                                pipelineDefJsonNode.get(SOURCE_KEY),
-                                "Missing required field \"%s\" in pipeline definition",
-                                SOURCE_KEY));
+        checkArgument(
+                pipelineDefJsonNode.get(SOURCE_KEY) != null,
+                "Missing required field \"%s\" in pipeline definition",
+                SOURCE_KEY);
+        SourceDef sourceDef = toSourceDef(pipelineDefJsonNode.get(SOURCE_KEY));
 
         // Sink is required
-        SinkDef sinkDef =
-                toSinkDef(
-                        checkNotNull(
-                                pipelineDefJsonNode.get(SINK_KEY),
-                                "Missing required field \"%s\" in pipeline definition",
-                                SINK_KEY),
-                        schemaChangeBehavior);
+        checkArgument(
+                pipelineDefJsonNode.get(SINK_KEY) != null,
+                "Missing required field \"%s\" in pipeline definition",
+                SINK_KEY);
+        SinkDef sinkDef = toSinkDef(pipelineDefJsonNode.get(SINK_KEY), schemaChangeBehavior);
 
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
