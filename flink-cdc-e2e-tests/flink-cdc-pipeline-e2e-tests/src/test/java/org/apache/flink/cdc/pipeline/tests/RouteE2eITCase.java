@@ -173,19 +173,19 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -270,7 +270,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -354,17 +354,17 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -454,17 +454,17 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.BETAGAMM, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.BETAGAMM, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -564,17 +564,17 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.TABLEB, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.TABLEB, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.TABLEC, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.TABLEC, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -674,7 +674,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`EXTRAS` STRING}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`EXTRAS` STRING}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -760,19 +760,19 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         routeTestDatabase.getDatabaseName()));
 
         validateResult(
@@ -880,7 +880,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 i ->
                                         String.format(
                                                 prefix
-                                                        + "CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                                                        + "CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                                                 databaseName,
                                                 i))
                         .toArray(String[]::new));

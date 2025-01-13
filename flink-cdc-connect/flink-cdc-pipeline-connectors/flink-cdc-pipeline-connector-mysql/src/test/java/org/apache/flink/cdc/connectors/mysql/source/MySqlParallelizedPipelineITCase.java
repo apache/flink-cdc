@@ -189,7 +189,7 @@ public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
                                                                 .map(
                                                                         subTaskId ->
                                                                                 String.format(
-                                                                                        "%d> CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, comment=null, options=()}",
+                                                                                        "%d> CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                                                                                         subTaskId,
                                                                                         parallelismDatabase
                                                                                                 .getDatabaseName(),

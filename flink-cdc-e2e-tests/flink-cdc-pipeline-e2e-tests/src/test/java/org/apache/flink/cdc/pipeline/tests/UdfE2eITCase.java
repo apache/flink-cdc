@@ -179,7 +179,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
-                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, comment=null, options=()}",
+                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 1011, <8.1>], op=INSERT, meta=()}",
@@ -191,7 +191,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`ANS` STRING,`TYP` STRING}, primaryKeys=ID, comment=null, options=()}",
+                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`ANS` STRING,`TYP` STRING}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Forty-two, Integer: 2011], op=INSERT, meta=()}",
@@ -311,7 +311,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
         List<String> expectedEvents =
                 Arrays.asList(
                         String.format(
-                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, comment=null, options=()}",
+                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 1011, <8.1>], op=INSERT, meta=()}",
@@ -323,7 +323,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
-                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`TYP` STRING}, primaryKeys=ID, comment=null, options=()}",
+                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`TYP` STRING}, primaryKeys=ID, options=()}",
                                 transformRenameDatabase.getDatabaseName()),
                         String.format(
                                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Integer: 2011], op=INSERT, meta=()}",

@@ -25,6 +25,8 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 
+import org.apache.commons.lang3.StringUtils;
+
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -239,7 +241,9 @@ public class Schema implements Serializable {
         if (!partitionKeys.isEmpty()) {
             sb.append(", partitionKeys=").append(String.join(";", partitionKeys));
         }
-        sb.append(", comment=").append(comment);
+        if (StringUtils.isNotBlank(comment)) {
+            sb.append(", comment=").append(comment);
+        }
         sb.append(", options=").append(describeOptions());
 
         return sb.toString();
