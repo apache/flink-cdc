@@ -186,9 +186,7 @@ public class ProjectionColumnProcessor {
                     break;
                 }
             }
-        }
 
-        for (String originalColumnName : originalColumnNames) {
             METADATA_COLUMNS.stream()
                     .filter(col -> col.f0.equals(originalColumnName))
                     .findFirst()
