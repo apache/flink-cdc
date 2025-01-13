@@ -282,7 +282,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "compare_table");
     private static final Schema COMPARE_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING())
+                    .physicalColumn("col1", DataTypes.STRING().notNull())
                     .physicalColumn("numerical_equal", DataTypes.BOOLEAN())
                     .physicalColumn("string_equal", DataTypes.BOOLEAN())
                     .physicalColumn("time_equal", DataTypes.BOOLEAN())
@@ -295,7 +295,7 @@ public class PostTransformOperatorTest {
             TableId.tableId("my_company", "my_branch", "compare_data_table");
     private static final Schema COMPARE_DATA_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("id", DataTypes.INT())
+                    .physicalColumn("id", DataTypes.INT().notNull())
                     .physicalColumn("c1", DataTypes.FLOAT().nullable())
                     .physicalColumn("c2", DataTypes.DOUBLE().nullable())
                     .physicalColumn("c3", DataTypes.TIMESTAMP().nullable())
@@ -303,7 +303,7 @@ public class PostTransformOperatorTest {
                     .build();
     private static final Schema EXPECTD_COMPARE_DATA_SCHEMA =
             Schema.newBuilder()
-                    .physicalColumn("id", DataTypes.INT())
+                    .physicalColumn("id", DataTypes.INT().notNull())
                     .physicalColumn("float_equal", DataTypes.BOOLEAN())
                     .physicalColumn("double_equal", DataTypes.BOOLEAN())
                     .physicalColumn("timestamp_equal", DataTypes.BOOLEAN())
