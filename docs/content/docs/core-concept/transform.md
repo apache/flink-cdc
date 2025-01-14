@@ -88,22 +88,22 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Comparison Functions
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| value1 = value2      | valueEquals(value1, value2) | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <> value2     | !valueEquals(value1, value2) | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 > value2      | value1 > value2             | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 >= value2     | value1 >= value2            | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2      | value1 < value2             | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <= value2     | value1 <= value2            | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value IS NULL        | null == value               | Returns TRUE if value is NULL.                                  |
-| value IS NOT NULL    | null != value               | Returns TRUE if value is not NULL.                              |
-| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
+| Function             | Janino Code                                  | Description                                                     |
+|----------------------|----------------------------------------------|-----------------------------------------------------------------|
+| value1 = value2      | valueEquals(value1, value2)                  | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <> value2     | !valueEquals(value1, value2)                 | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 > value2      | greaterThan(value1, value2)                  | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 >= value2     | greaterThanOrEqual(value1, value2)               | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 < value2      | lessThan(value1, value2)                         | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <= value2     | lessThanOrEqual(value1, value2)                  | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value IS NULL        | null == value                                | Returns TRUE if value is NULL.                                  |
+| value IS NOT NULL    | null != value                                | Returns TRUE if value is not NULL.                              |
+| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3. |
-| string1 LIKE string2 | like(string1, string2)      | Returns TRUE if string1 matches pattern string2.                |
-| string1 NOT LIKE string2 | notLike(string1, string2) | Returns TRUE if string1 does not match pattern string2.       |
-| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*) | Returns TRUE if value1 exists in the given list (value2, value3, …). |
-| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*) | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
+| string1 LIKE string2 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                |
+| string1 NOT LIKE string2 | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.       |
+| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …). |
+| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
 
 ## Logical Functions
 
