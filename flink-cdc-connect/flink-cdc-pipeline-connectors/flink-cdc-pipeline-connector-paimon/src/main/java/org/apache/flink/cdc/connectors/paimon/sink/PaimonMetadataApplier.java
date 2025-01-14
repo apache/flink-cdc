@@ -41,6 +41,8 @@ import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.table.Table;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,6 +58,8 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
  * only.
  */
 public class PaimonMetadataApplier implements MetadataApplier {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PaimonMetadataApplier.class);
 
     // Catalog is unSerializable.
     private transient Catalog catalog;
@@ -181,8 +185,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     builder.build(),
                     true);
         } catch (Catalog.TableAlreadyExistException
-                 | Catalog.DatabaseNotExistException
-                 | Catalog.DatabaseAlreadyExistException e) {
+                | Catalog.DatabaseNotExistException
+                | Catalog.DatabaseAlreadyExistException e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
@@ -285,8 +289,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     tableChangeList,
                     true);
         } catch (Catalog.TableNotExistException
-                 | Catalog.ColumnAlreadyExistException
-                 | Catalog.ColumnNotExistException e) {
+                | Catalog.ColumnAlreadyExistException
+                | Catalog.ColumnNotExistException e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
@@ -311,8 +315,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     tableChangeList,
                     true);
         } catch (Catalog.TableNotExistException
-                 | Catalog.ColumnAlreadyExistException
-                 | Catalog.ColumnNotExistException e) {
+                | Catalog.ColumnAlreadyExistException
+                | Catalog.ColumnNotExistException e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
@@ -331,8 +335,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     tableChangeList,
                     true);
         } catch (Catalog.TableNotExistException
-                 | Catalog.ColumnAlreadyExistException
-                 | Catalog.ColumnNotExistException e) {
+                | Catalog.ColumnAlreadyExistException
+                | Catalog.ColumnNotExistException e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
