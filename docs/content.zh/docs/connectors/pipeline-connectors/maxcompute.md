@@ -94,7 +94,7 @@ pipeline:
       <td>Sink 的名称.</td>
     </tr>
     <tr>
-      <td>accessId</td>
+      <td>access-id</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -102,7 +102,7 @@ pipeline:
             AccessKey管理页面</a> 获取AccessKey ID。</td>
     </tr>
     <tr>
-      <td>accessKey</td>
+      <td>access-key</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -126,14 +126,14 @@ pipeline:
            MaxCompute控制台</a>，在 工作区 > 项目管理 页面获取MaxCompute项目名称。</td>
     </tr>
     <tr>
-      <td>tunnelEndpoint</td>
+      <td>tunnel.endpoint</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>MaxCompute Tunnel服务的连接地址，通常这项配置可以根据指定的project所在的region进行自动路由。仅在使用代理等特殊网络环境下使用该配置。</td>
     </tr>
     <tr>
-      <td>quotaName</td>
+      <td>quota.name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -141,14 +141,14 @@ pipeline:
            使用 Maxcompute 独享资源组</a></td>
     </tr>
     <tr>
-      <td>stsToken</td>
+      <td>sts-token</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>当使用RAM角色颁发的短时有效的访问令牌（STS Token）进行鉴权时，需要指定该参数。</td>
     </tr>
     <tr>
-      <td>bucketsNum</td>
+      <td>buckets-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
@@ -156,35 +156,35 @@ pipeline:
            Delta Table 概述</a></td>
     </tr>
     <tr>
-      <td>compressAlgorithm</td>
+      <td>compress.algorithm</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">zlib</td>
       <td>String</td>
-      <td>写入MaxCompute时使用的数据压缩算法，当前支持<code>raw</code>（不进行压缩），<code>zlib</code>和<code>snappy</code>。</td>
+      <td>写入MaxCompute时使用的数据压缩算法，当前支持<code>raw</code>（不进行压缩），<code>zlib</code>, <code>lz4</code>和<code>snappy</code>。</td>
     </tr>
     <tr>
-      <td>totalBatchSize</td>
+      <td>total.buffer-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">64MB</td>
       <td>String</td>
       <td>内存中缓冲的数据量大小，单位为分区级（非分区表单位为表级），不同分区（表）的缓冲区相互独立，达到阈值后数据写入到MaxCompute。</td>
     </tr>
     <tr>
-      <td>bucketBatchSize</td>
+      <td>bucket.buffer-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4MB</td>
       <td>String</td>
       <td>内存中缓冲的数据量大小，单位为桶级，仅写入 Delta 表时生效。不同数据桶的缓冲区相互独立，达到阈值后将该桶数据写入到MaxCompute。</td>
     </tr>
     <tr>
-      <td>numCommitThreads</td>
+      <td>commit.thread-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
       <td>checkpoint阶段，能够同时处理的分区（表）数量。</td>
     </tr>
     <tr>
-      <td>numFlushConcurrent</td>
+      <td>flush.concurrent-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4</td>
       <td>Integer</td>

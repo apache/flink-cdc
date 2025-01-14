@@ -195,9 +195,13 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     tableChangeList,
                     true);
         } catch (Catalog.TableNotExistException
-                 | Catalog.ColumnAlreadyExistException
-                 | Catalog.ColumnNotExistException e) {
-            throw new SchemaEvolveException(event, e.getMessage(), e);
+                | Catalog.ColumnAlreadyExistException
+                | Catalog.ColumnNotExistException e) {
+            if (e instanceof Catalog.ColumnAlreadyExistException) {
+                LOG.warn("{}, skip it.", e.getMessage());
+            } else {
+                throw new SchemaEvolveException(event, e.getMessage(), e);
+            }
         }
     }
 

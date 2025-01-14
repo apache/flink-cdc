@@ -94,7 +94,7 @@ pipeline:
       <td>The name of the sink.</td>
     </tr>
     <tr>
-      <td>accessId</td>
+      <td>access-id</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -102,7 +102,7 @@ pipeline:
             AccessKey management page</a> Obtain AccessKey ID.</td>
     </tr>
     <tr>
-      <td>accessKey</td>
+      <td>access-key</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
@@ -124,63 +124,63 @@ pipeline:
       <td>The name of the MaxCompute project. You can log in to the <a href="https://maxcompute.console.aliyun.com/">MaxCompute console</a> and obtain the MaxCompute project name on the Workspace > Project Management page.</td>
     </tr>
     <tr>
-      <td>tunnelEndpoint</td>
+      <td>tunnel.endpoint</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The connection address for the MaxCompute Tunnel service. Typically, this configuration can be auto-routed based on the region where the specified project is located. It is used only in special network environments such as when using a proxy.</td>
     </tr>
     <tr>
-      <td>quotaName</td>
+      <td>quota.name</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>The name of the exclusive resource group for MaxCompute data transfer. If not specified, the shared resource group is used. For details, refer to <a href="https://help.aliyun.com/zh/maxcompute/user-guide/purchase-and-use-exclusive-resource-groups-for-dts">Using exclusive resource groups for Maxcompute</a></td>
     </tr>
     <tr>
-      <td>stsToken</td>
+      <td>sts-token</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>When using a temporary access token (STS Token) issued by a RAM role for authentication, this parameter must be specified.</td>
     </tr>
     <tr>
-      <td>bucketsNum</td>
+      <td>buckets-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
       <td>The number of buckets used when auto-creating MaxCompute Delta tables. For usage, refer to <a href="https://help.aliyun.com/zh/maxcompute/user-guide/transaction-table2-0-overview">Delta Table Overview</a></td>
     </tr>
     <tr>
-      <td>compressAlgorithm</td>
+      <td>compress.algorithm</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">zlib</td>
       <td>String</td>
-      <td>The data compression algorithm used when writing to MaxCompute. Currently supports <code>raw</code> (no compression), <code>zlib</code>, and <code>snappy</code>.</td>
+      <td>The data compression algorithm used when writing to MaxCompute. Currently supports <code>raw</code> (no compression), <code>zlib</code>, <code>lz4</code>, and <code>snappy</code>.</td>
     </tr>
     <tr>
-      <td>totalBatchSize</td>
+      <td>total.buffer-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">64MB</td>
       <td>String</td>
       <td>The size of the data buffer in memory, by partition level (for non-partitioned tables, by table level). Buffers for different partitions (tables) are independent, and data is written to MaxCompute when the threshold is reached.</td>
     </tr>
     <tr>
-      <td>bucketBatchSize</td>
+      <td>bucket.buffer-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4MB</td>
       <td>String</td>
       <td>The size of the data buffer in memory, by bucket level. This is effective only when writing to Delta tables. Buffers for different data buckets are independent, and the bucket data is written to MaxCompute when the threshold is reached.</td>
     </tr>
     <tr>
-      <td>numCommitThreads</td>
+      <td>commit.thread-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">16</td>
       <td>Integer</td>
       <td>The number of partitions (tables) that can be processed simultaneously during the checkpoint stage.</td>
     </tr>
     <tr>
-      <td>numFlushConcurrent</td>
+      <td>flush.concurrent-num</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">4</td>
       <td>Integer</td>

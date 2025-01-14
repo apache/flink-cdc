@@ -108,17 +108,17 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                         + "sink:\n"
                         + "   type: maxcompute\n"
                         + "   name: MaxComputeSink\n"
-                        + "   accessId: ak\n"
-                        + "   accessKey: sk\n"
+                        + "   access-id: ak\n"
+                        + "   access-key: sk\n"
                         + "   endpoint: "
                         + getEndpoint()
                         + "\n"
-                        + "   tunnelEndpoint: "
+                        + "   tunnel.endpoint: "
                         + getEndpoint()
                         + "\n"
                         + "   project: mocked_mc\n"
-                        + "   bucketsNum: 8\n"
-                        + "   compressAlgorithm: raw\n"
+                        + "   buckets-num: 8\n"
+                        + "   compress.algorithm: raw\n"
                         + "\n"
                         + "pipeline:\n"
                         + "   parallelism: 4";
