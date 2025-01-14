@@ -124,7 +124,10 @@ public class PaimonMetadataApplierTest {
         addedColumns.add(
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn(
-                                "col3", org.apache.flink.cdc.common.types.DataTypes.STRING())));
+                                "col3",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING(),
+                                null,
+                                "col3DefValue")));
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(TableId.parse("test.table1"), addedColumns);
         metadataApplier.applySchemaChange(addColumnEvent);
@@ -136,6 +139,12 @@ public class PaimonMetadataApplierTest {
                                 new DataField(2, "col3", DataTypes.STRING())));
         Assertions.assertEquals(
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
+
+        Assertions.assertEquals(
+                "col3DefValue",
+                catalog.getTable(Identifier.fromString("test.table1"))
+                        .options()
+                        .get("fields.col3.default-value"));
 
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newcol2");

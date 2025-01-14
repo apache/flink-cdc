@@ -213,28 +213,23 @@ public class PaimonMetadataApplier implements MetadataApplier {
         try {
             List<SchemaChange> tableChangeList = new ArrayList<>();
             for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
-                SchemaChange tableChange;
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
-                        tableChange =
+                        tableChangeList.addAll(
                                 SchemaChangeProvider.add(
                                         columnWithPosition,
                                         SchemaChange.Move.first(
-                                                columnWithPosition.getAddColumn().getName()));
-                        tableChangeList.add(tableChange);
+                                                columnWithPosition.getAddColumn().getName())));
                         break;
                     case LAST:
-                        SchemaChange schemaChangeWithLastPosition =
-                                SchemaChangeProvider.add(columnWithPosition);
-                        tableChangeList.add(schemaChangeWithLastPosition);
+                        tableChangeList.addAll(SchemaChangeProvider.add(columnWithPosition));
                         break;
                     case BEFORE:
-                        SchemaChange schemaChangeWithBeforePosition =
+                        tableChangeList.addAll(
                                 applyAddColumnWithBeforePosition(
                                         event.tableId().getSchemaName(),
                                         event.tableId().getTableName(),
-                                        columnWithPosition);
-                        tableChangeList.add(schemaChangeWithBeforePosition);
+                                        columnWithPosition));
                         break;
                     case AFTER:
                         checkNotNull(
@@ -244,8 +239,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                 SchemaChange.Move.after(
                                         columnWithPosition.getAddColumn().getName(),
                                         columnWithPosition.getExistedColumnName());
-                        tableChange = SchemaChangeProvider.add(columnWithPosition, after);
-                        tableChangeList.add(tableChange);
+                        tableChangeList.addAll(SchemaChangeProvider.add(columnWithPosition, after));
                         break;
                     default:
                         throw new SchemaEvolveException(
@@ -259,7 +253,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
         }
     }
 
-    private SchemaChange applyAddColumnWithBeforePosition(
+    private List<SchemaChange> applyAddColumnWithBeforePosition(
             String schemaName,
             String tableName,
             AddColumnEvent.ColumnWithPosition columnWithPosition)
@@ -288,7 +282,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
         try {
             List<SchemaChange> tableChangeList = new ArrayList<>();
             event.getDroppedColumnNames()
-                    .forEach((column) -> tableChangeList.add(SchemaChangeProvider.drop(column)));
+                    .forEach((column) -> tableChangeList.addAll(SchemaChangeProvider.drop(column)));
             catalog.alterTable(tableIdToIdentifier(event), tableChangeList, true);
         } catch (Catalog.TableNotExistException
                 | Catalog.ColumnAlreadyExistException
@@ -299,12 +293,19 @@ public class PaimonMetadataApplier implements MetadataApplier {
 
     private void applyRenameColumn(RenameColumnEvent event) throws SchemaEvolveException {
         try {
+            Map<String, String> options =
+                    catalog.getTable(
+                                    new Identifier(
+                                            event.tableId().getSchemaName(),
+                                            event.tableId().getTableName()))
+                            .options();
             List<SchemaChange> tableChangeList = new ArrayList<>();
             event.getNameMapping()
                     .forEach(
                             (oldName, newName) ->
-                                    tableChangeList.add(
-                                            SchemaChangeProvider.rename(oldName, newName)));
+                                    tableChangeList.addAll(
+                                            SchemaChangeProvider.rename(
+                                                    oldName, newName, options)));
             catalog.alterTable(tableIdToIdentifier(event), tableChangeList, true);
         } catch (Catalog.TableNotExistException
                 | Catalog.ColumnAlreadyExistException
