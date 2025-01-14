@@ -31,8 +31,6 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEm
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
-import com.mysql.cj.conf.PropertyKey;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,17 +57,12 @@ public class MySqlDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
-        boolean tinyInt1isBit =
-                Boolean.parseBoolean(
-                        sourceConfig
-                                .getJdbcProperties()
-                                .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
                         DebeziumChangelogMode.ALL,
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
-                        tinyInt1isBit);
+                        sourceConfig.getTinyInt1isBit());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

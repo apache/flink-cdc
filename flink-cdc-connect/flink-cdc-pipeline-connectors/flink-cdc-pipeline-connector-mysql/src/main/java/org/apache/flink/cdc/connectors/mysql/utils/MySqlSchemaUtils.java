@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlSchema;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 
-import com.mysql.cj.conf.PropertyKey;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
@@ -130,12 +129,7 @@ public class MySqlSchemaUtils {
                 new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
             TableChanges.TableChange tableSchema =
                     mySqlSchema.getTableSchema(partition, jdbc, toDbzTableId(tableId));
-            boolean tinyInt1isBit =
-                    Boolean.parseBoolean(
-                            sourceConfig
-                                    .getJdbcProperties()
-                                    .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
-            return toSchema(tableSchema.getTable(), tinyInt1isBit);
+            return toSchema(tableSchema.getTable(), sourceConfig.getTinyInt1isBit());
         }
     }
 

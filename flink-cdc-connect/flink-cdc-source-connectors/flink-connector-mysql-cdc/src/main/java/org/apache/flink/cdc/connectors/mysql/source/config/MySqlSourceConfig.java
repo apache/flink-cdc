@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import com.mysql.cj.conf.PropertyKey;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
@@ -253,5 +254,10 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isSkipSnapshotBackfill() {
         return skipSnapshotBackfill;
+    }
+
+    public boolean getTinyInt1isBit() {
+        return Boolean.parseBoolean(
+                jdbcProperties.getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
     }
 }

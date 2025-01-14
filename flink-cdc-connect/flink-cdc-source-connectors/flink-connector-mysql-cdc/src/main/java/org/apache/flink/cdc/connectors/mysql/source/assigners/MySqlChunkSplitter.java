@@ -149,12 +149,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             splitColumn =
                     ChunkUtils.getChunkKeyColumn(
                             currentSplittingTable, sourceConfig.getChunkKeyColumns());
-            boolean tinyInt1isBit =
-                    Boolean.parseBoolean(
-                            sourceConfig
-                                    .getJdbcProperties()
-                                    .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
-            splitType = ChunkUtils.getChunkKeyColumnType(splitColumn, tinyInt1isBit);
+            splitType =
+                    ChunkUtils.getChunkKeyColumnType(splitColumn, sourceConfig.getTinyInt1isBit());
             minMaxOfSplitColumn =
                     StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
