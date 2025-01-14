@@ -43,6 +43,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -618,7 +619,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
         SQLException thrown =
                 assertThrows(
-                        SQLException.class,
+                        SQLSyntaxErrorException.class,
                         () -> {
                             try (Connection conn =
                                             DriverManager.getConnection(
