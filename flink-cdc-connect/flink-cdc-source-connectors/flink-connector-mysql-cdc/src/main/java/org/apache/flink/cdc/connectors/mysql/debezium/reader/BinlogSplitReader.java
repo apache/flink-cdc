@@ -92,23 +92,23 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
-    public BinlogSplitReader(MySqlSourceConfig sourceConfig, int subTaskId) {
+    public BinlogSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
         final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
         final BinaryLogClient binaryLogClient =
                 createBinaryClient(sourceConfig.getDbzConfiguration());
         this.statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subTaskId).build();
+                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subtaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
     }
 
-    public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
+    public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subTaskId).build();
+                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subtaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
@@ -192,15 +192,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     @Override
     public void close() {
         try {
-            if (statefulTaskContext.getConnection() != null) {
-                statefulTaskContext.getConnection().close();
-            }
-            if (statefulTaskContext.getBinaryLogClient() != null) {
-                statefulTaskContext.getBinaryLogClient().disconnect();
-            }
-
-            statefulTaskContext.close();
             stopBinlogReadTask();
+            if (statefulTaskContext != null) {
+                statefulTaskContext.close();
+            }
             if (executorService != null) {
                 executorService.shutdown();
                 if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
