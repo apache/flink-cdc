@@ -28,14 +28,41 @@ and elegance of data integration via YAML to describe the data movement and tran
 The Flink CDC prioritizes efficient end-to-end data integration and offers enhanced functionalities such as 
 full database synchronization, sharding table synchronization, schema evolution and data transformation.
 
-![Flink CDC framework desigin](docs/static/fig/architecture.png)
+![Flink CDC framework design](docs/static/fig/architecture.png)
 
+### Quickstart Guide
 
+Flink CDC provides a CdcUp CLI utility to start a playground environment and run Flink CDC jobs.
+You will need to have a working Docker and Docker compose environment to use it.
+
+1. Run `git clone https://github.com/apache/flink-cdc.git --depth=1` to retrieve a copy of Flink CDC source code.
+2. Run `cd tools/cdcup/ && ./cdcup.sh init` to use the CdcUp tool to start a playground environment.
+3. Run `./cdcup.sh up` to boot-up docker containers, and wait for them to be ready.
+4. Run `./cdcup.sh mysql` to open a MySQL session, and create at least one table.
+
+```sql
+-- initialize db and table
+CREATE DATABASE cdc_playground;
+USE cdc_playground;
+CREATE TABLE test_table (id INT PRIMARY KEY, name VARCHAR(32));
+
+-- insert test data
+INSERT INTO test_table VALUES (1, 'alice'), (2, 'bob'), (3, 'cicada'), (4, 'derrida');
+
+-- verify if it has been successfully inserted
+SELECT * FROM test_table;
+```
+
+5. Run `./cdcup.sh pipeline pipeline-definition.yaml` to submit the pipeline job. You may also edit the pipeline definition file for further configurations.
+6. Run `./cdcup.sh flink` to access the Flink Web UI.
 
 ### Getting Started
 
 1. Prepare a [Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/try-flink/local_installation/#starting-and-stopping-a-local-cluster) cluster and set up `FLINK_HOME` environment variable.
 2. [Download](https://github.com/apache/flink-cdc/releases) Flink CDC tar, unzip it and put jars of pipeline connector to Flink `lib` directory.
+
+> If you're using macOS or Linux, you may use `brew install apache-flink-cdc` to install Flink CDC and compatible connectors quickly.
+
 3. Create a **YAML** file to describe the data source and data sink, the following example synchronizes all tables under MySQL app_db database to Doris :
   ```yaml
    source:
@@ -88,8 +115,6 @@ full database synchronization, sharding table synchronization, schema evolution 
 Try it out yourself with our more detailed [tutorial](docs/content/docs/get-started/quickstart/mysql-to-doris.md). 
 You can also see [connector overview](docs/content/docs/connectors/pipeline-connectors/overview.md) to view a comprehensive catalog of the
 connectors currently provided and understand more detailed configurations.
-
-
 
 ### Join the Community
 
