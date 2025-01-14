@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.db2.source.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
@@ -74,7 +73,7 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
                         sourceFetchContext.getSnapshotReceiver(),
                         snapshotSplit);
         Db2SnapshotSplitChangeEventSourceContext changeEventSourceContext =
@@ -132,7 +131,8 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 new Db2ConnectorConfig(dezConf),
                 context.getConnection(),
                 context.getMetaDataConnection(),
-                context.getDispatcher(),
+                context.getEventDispatcher(),
+                context.getWaterMarkDispatcher(),
                 context.getErrorHandler(),
                 context.getDatabaseSchema(),
                 backfillBinlogSplit);
@@ -150,7 +150,7 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
         private final Db2ConnectorConfig connectorConfig;
         private final Db2DatabaseSchema databaseSchema;
         private final Db2Connection jdbcConnection;
-        private final JdbcSourceEventDispatcher<Db2Partition> dispatcher;
+        private final EventDispatcher<Db2Partition, TableId> dispatcher;
         private final Clock clock;
         private final SnapshotSplit snapshotSplit;
         private final Db2OffsetContext offsetContext;
@@ -163,7 +163,7 @@ public class Db2ScanFetchTask extends AbstractScanFetchTask {
                 SnapshotProgressListener<Db2Partition> snapshotProgressListener,
                 Db2DatabaseSchema databaseSchema,
                 Db2Connection jdbcConnection,
-                JdbcSourceEventDispatcher<Db2Partition> dispatcher,
+                EventDispatcher<Db2Partition, TableId> dispatcher,
                 EventDispatcher.SnapshotReceiver<Db2Partition> snapshotReceiver,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);

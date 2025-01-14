@@ -22,13 +22,14 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
-import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -47,7 +48,6 @@ import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
 import org.apache.doris.flink.catalog.doris.TableSchema;
 import org.apache.doris.flink.cfg.DorisOptions;
-import org.apache.doris.flink.sink.schema.SchemaChangeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,20 +61,22 @@ import java.util.Set;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 
 /** Supports {@link DorisDataSink} to schema evolution. */
 public class DorisMetadataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(DorisMetadataApplier.class);
     private DorisOptions dorisOptions;
-    private SchemaChangeManager schemaChangeManager;
+    private DorisSchemaChangeManager schemaChangeManager;
     private Configuration config;
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
-        this.schemaChangeManager = new SchemaChangeManager(dorisOptions);
+        this.schemaChangeManager = new DorisSchemaChangeManager(dorisOptions);
         this.config = config;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
@@ -93,7 +95,13 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     @Override
     public Set<SchemaChangeEventType> getSupportedSchemaEvolutionTypes() {
-        return Sets.newHashSet(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN);
+        return Sets.newHashSet(
+                ADD_COLUMN,
+                ALTER_COLUMN_TYPE,
+                DROP_COLUMN,
+                DROP_TABLE,
+                RENAME_COLUMN,
+                TRUNCATE_TABLE);
     }
 
     @Override
@@ -117,14 +125,16 @@ public class DorisMetadataApplier implements MetadataApplier {
                     return null;
                 },
                 dropTableEvent -> {
-                    throw new UnsupportedSchemaChangeEventException(event);
+                    applyDropTableEvent(dropTableEvent);
+                    return null;
                 },
                 renameColumnEvent -> {
                     applyRenameColumnEvent(renameColumnEvent);
                     return null;
                 },
                 truncateTableEvent -> {
-                    throw new UnsupportedSchemaChangeEventException(event);
+                    applyTruncateTableEvent(truncateTableEvent);
+                    return null;
                 });
     }
 
@@ -273,6 +283,25 @@ public class DorisMetadataApplier implements MetadataApplier {
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
+        }
+    }
+
+    private void applyTruncateTableEvent(TruncateTableEvent truncateTableEvent)
+            throws SchemaEvolveException {
+        TableId tableId = truncateTableEvent.tableId();
+        try {
+            schemaChangeManager.truncateTable(tableId.getSchemaName(), tableId.getTableName());
+        } catch (Exception e) {
+            throw new SchemaEvolveException(truncateTableEvent, "fail to truncate table", e);
+        }
+    }
+
+    private void applyDropTableEvent(DropTableEvent dropTableEvent) throws SchemaEvolveException {
+        TableId tableId = dropTableEvent.tableId();
+        try {
+            schemaChangeManager.dropTable(tableId.getSchemaName(), tableId.getTableName());
+        } catch (Exception e) {
+            throw new SchemaEvolveException(dropTableEvent, "fail to drop table", e);
         }
     }
 }

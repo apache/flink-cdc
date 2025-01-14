@@ -867,4 +867,48 @@ public class SystemFunctionUtils {
         }
         return String.valueOf(object);
     }
+
+    private static int universalCompares(Object lhs, Object rhs) {
+        Class<?> leftClass = lhs.getClass();
+        Class<?> rightClass = rhs.getClass();
+        if (leftClass.equals(rightClass) && lhs instanceof Comparable) {
+            return ((Comparable) lhs).compareTo(rhs);
+        } else if (lhs instanceof Number && rhs instanceof Number) {
+            return Double.compare(((Number) lhs).doubleValue(), ((Number) rhs).doubleValue());
+        } else {
+            throw new RuntimeException(
+                    "Comparison of unsupported data types: "
+                            + leftClass.getName()
+                            + " and "
+                            + rightClass.getName());
+        }
+    }
+
+    public static boolean greaterThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) > 0;
+    }
+
+    public static boolean greaterThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) >= 0;
+    }
+
+    public static boolean lessThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) < 0;
+    }
+
+    public static boolean lessThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) <= 0;
+    }
 }
