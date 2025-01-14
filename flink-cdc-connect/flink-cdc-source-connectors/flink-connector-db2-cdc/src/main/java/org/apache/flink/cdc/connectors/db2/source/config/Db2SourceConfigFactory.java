@@ -103,6 +103,7 @@ public class Db2SourceConfigFactory extends JdbcSourceConfigFactory {
                 connectMaxRetries,
                 connectionPoolSize,
                 chunkKeyColumn,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                assignEndingChunkFirst);
     }
 }

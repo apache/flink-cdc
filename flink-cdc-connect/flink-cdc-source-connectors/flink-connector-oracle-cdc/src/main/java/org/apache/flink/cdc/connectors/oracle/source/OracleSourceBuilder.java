@@ -250,6 +250,15 @@ public class OracleSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link OracleIncrementalSource} should assign the ending chunk first or not
+     * during snapshot reading phase.
+     */
+    public OracleSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link OracleIncrementalSource}.
      *
      * @return a OracleParallelSource with the settings made for this builder.

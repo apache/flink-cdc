@@ -60,6 +60,8 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
     protected boolean scanNewlyAddedTableEnabled =
             JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
+    protected boolean assignEndingChunkFirst =
+            JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
@@ -249,6 +251,14 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     /** Whether the {@link SourceConfig} should scan the newly added tables or not. */
     public JdbcSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        return this;
+    }
+
+    /**
+     * Whether to assign the ending chunk first during snapshot reading phase. Defaults to false.
+     */
+    public JdbcSourceConfigFactory assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
         return this;
     }
 

@@ -230,6 +230,15 @@ public class SqlServerSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link SqlServerSourceBuilder} should assign the ending chunk first or not during
+     * snapshot reading phase.
+     */
+    public SqlServerSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link SqlServerIncrementalSource}.
      *
      * @return a SqlSeverParallelSource with the settings made for this builder.

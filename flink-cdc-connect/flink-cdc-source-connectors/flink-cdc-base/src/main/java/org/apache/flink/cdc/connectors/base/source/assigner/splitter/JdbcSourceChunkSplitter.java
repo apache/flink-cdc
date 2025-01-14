@@ -470,7 +470,13 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
             }
         }
         // add the ending split
-        splits.add(ChunkRange.of(chunkStart, null));
+        // assign ending split first, both the largest and smallest unbounded chunks are completed
+        // in the first two splits
+        if (sourceConfig.isAssignEndingChunkFirst()) {
+            splits.add(0, ChunkRange.of(chunkStart, null));
+        } else {
+            splits.add(ChunkRange.of(chunkStart, null));
+        }
         return splits;
     }
 
@@ -498,7 +504,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
             chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumn, max, chunkSize);
         }
         // add the ending split
-        splits.add(ChunkRange.of(chunkStart, null));
+        splits.add(0, ChunkRange.of(chunkStart, null));
         return splits;
     }
 

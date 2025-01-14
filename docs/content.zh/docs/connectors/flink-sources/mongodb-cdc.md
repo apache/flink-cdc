@@ -332,6 +332,17 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这是一项实验特性，默认为 false。
+      </td>
+    </tr>
   </tbody>
 </table>
 

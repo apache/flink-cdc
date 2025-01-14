@@ -41,18 +41,21 @@ public class SplitContext {
     private final BsonDocument collectionStats;
     private final int chunkSizeMB;
     private final int samplesPerChunk;
+    private final boolean assignEndingChunkFirst;
 
     public SplitContext(
             MongoClient mongoClient,
             TableId collectionId,
             BsonDocument collectionStats,
             int chunkSizeMB,
-            int samplesPerChunk) {
+            int samplesPerChunk,
+            boolean assignEndingChunkFirst) {
         this.mongoClient = mongoClient;
         this.collectionId = collectionId;
         this.collectionStats = collectionStats;
         this.chunkSizeMB = chunkSizeMB;
         this.samplesPerChunk = samplesPerChunk;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     public static SplitContext of(MongoDBSourceConfig sourceConfig, TableId collectionId) {
@@ -62,7 +65,8 @@ public class SplitContext {
                 collectionId,
                 collStats(mongoClient, collectionId),
                 sourceConfig.getSplitSize(),
-                sourceConfig.getSamplesPerChunk());
+                sourceConfig.getSamplesPerChunk(),
+                sourceConfig.isAssignEndingChunkFirst());
     }
 
     public MongoClient getMongoClient() {
@@ -99,5 +103,9 @@ public class SplitContext {
     /** Is a sharded collection. */
     public boolean isShardedCollection() {
         return collectionStats.getBoolean("sharded", BsonBoolean.FALSE).getValue();
+    }
+
+    public boolean isAssignEndingChunkFirst() {
+        return assignEndingChunkFirst;
     }
 }

@@ -321,6 +321,17 @@ Connector Options
       <td>Boolean</td>
       <td>MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that. Only available when parallelism snapshot is enabled.</td>
     </tr>
+     <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunk first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+        Experimental option, defaults to false.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

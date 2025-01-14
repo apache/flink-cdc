@@ -118,7 +118,9 @@ public class Db2TableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         false,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -157,7 +159,8 @@ public class Db2TableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         false,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -245,7 +248,9 @@ public class Db2TableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         false,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");

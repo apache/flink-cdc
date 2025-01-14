@@ -169,16 +169,21 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     @Parameterized.Parameter(1)
     public String chunkColumnName;
 
+    @Parameterized.Parameter(2)
+    public String assignEndingFirst;
+
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
     private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
-    @Parameterized.Parameters(name = "table: {0}, chunkColumn: {1}")
+    @Parameterized.Parameters(name = "table: {0}, chunkColumn: {1}, assignEndingFirst: {2}")
     public static Collection<Object[]> parameters() {
         return Arrays.asList(
                 new Object[][] {
-                    {"customers", null}, {"customers", "id"}, {"customers_no_pk", "id"}
+                    {"customers", null, null},
+                    {"customers", "id", "true"},
+                    {"customers_no_pk", "id", "true"}
                 });
     }
 
@@ -951,6 +956,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
+                                + " 'scan.incremental.snapshot.unbounded-chunk-first.enabled' = '%s',"
                                 + " 'server-id' = '%s'"
                                 + " %s"
                                 + ")",
@@ -962,6 +968,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
                         skipSnapshotBackfill,
+                        assignEndingFirst == null ? "false" : "true",
                         getServerId(),
                         chunkColumnName == null
                                 ? ""
