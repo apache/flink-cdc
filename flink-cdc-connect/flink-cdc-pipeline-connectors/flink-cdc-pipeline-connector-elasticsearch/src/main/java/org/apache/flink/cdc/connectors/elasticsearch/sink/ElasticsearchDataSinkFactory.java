@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.elasticsearch.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -31,8 +32,10 @@ import org.apache.http.HttpHost;
 
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,6 +48,7 @@ import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDa
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.MAX_RECORD_SIZE_IN_BYTES;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.MAX_TIME_IN_BUFFER_MS;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_KEY;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.VERSION;
 
@@ -85,6 +89,23 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
         String username = cdcConfig.get(USERNAME);
         String password = cdcConfig.get(PASSWORD);
         int version = cdcConfig.get(VERSION);
+        Map<TableId, String> shardingMaps = new HashMap<>();
+        String shardingKey = cdcConfig.get(SHARDING_KEY);
+        if (!shardingKey.isEmpty()) {
+            for (String tables : shardingKey.split(";")) {
+                String[] splits = tables.split(":");
+                if (splits.length == 2) {
+                    TableId tableId = TableId.parse(splits[0]);
+                    shardingMaps.put(tableId, splits[1].trim());
+                } else {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "%s is malformed, please refer to the documents",
+                                    SHARDING_KEY.key()));
+                }
+            }
+        }
+
         NetworkConfig networkConfig =
                 new NetworkConfig(hosts, username, password, null, null, null);
         return new ElasticsearchSinkOptions(
@@ -97,7 +118,8 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                 networkConfig,
                 version,
                 username,
-                password);
+                password,
+                shardingMaps);
     }
 
     private List<HttpHost> parseHosts(String hostsStr) {
@@ -130,6 +152,7 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MAX_RECORD_SIZE_IN_BYTES);
         optionalOptions.add(USERNAME);
         optionalOptions.add(PASSWORD);
+        optionalOptions.add(SHARDING_KEY);
         return optionalOptions;
     }
 

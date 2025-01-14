@@ -46,6 +46,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,8 +71,15 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     private final ZoneId pipelineZoneId;
 
+    private final Map<TableId, String> shardingKey;
+
     public ElasticsearchEventSerializer(ZoneId zoneId) {
+        this(zoneId, Collections.emptyMap());
+    }
+
+    public ElasticsearchEventSerializer(ZoneId zoneId, Map<TableId, String> shardingKey) {
         this.pipelineZoneId = zoneId;
+        this.shardingKey = shardingKey;
     }
 
     @Override
@@ -145,7 +153,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             case UPDATE:
                 valueMap = serializeRecord(tableId, event.after(), schema, pipelineZoneId);
                 return new IndexOperation.Builder<>()
-                        .index(tableId.toString())
+                        .index(tableSharding(tableId, valueMap))
                         .id(id)
                         .document(valueMap)
                         .build();
@@ -154,6 +162,14 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             default:
                 throw new UnsupportedOperationException("Unsupported Operation " + op);
         }
+    }
+
+    public String tableSharding(TableId tableId, Map<String, Object> valueMap) {
+        if (shardingKey.containsKey(tableId)) {
+            Object value = valueMap.get(shardingKey.get(tableId));
+            return value != null ? tableId.toString() + value : tableId.toString();
+        }
+        return tableId.toString();
     }
 
     private Object[] generateUniqueId(RecordData recordData, Schema schema, TableId tableId) {
