@@ -317,7 +317,11 @@ public class PaimonSinkITCase {
         if (enableDeleteVector) {
             Assertions.assertThatThrownBy(
                             () -> metadataApplier.applySchemaChange(truncateTableEvent))
-                    .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class);
+                    .isExactlyInstanceOf(SchemaEvolveException.class)
+                    .cause()
+                    .isExactlyInstanceOf(UnsupportedSchemaChangeEventException.class)
+                    .extracting("exceptionMessage")
+                    .isEqualTo("Unable to truncate a table with deletion vectors enabled.");
         } else {
             metadataApplier.applySchemaChange(truncateTableEvent);
             Assertions.assertThat(fetchResults(table1)).isEmpty();
