@@ -274,6 +274,15 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether the {@link PostgresSourceEnumerator} should assign the ending chunk first or not
+     * during snapshot reading phase.
+     */
+    public PostgresSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+        return this;
+    }
+
     /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
     public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
         this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);

@@ -159,7 +159,11 @@ public class SampleBucketSplitStrategy implements SplitStrategy {
                         ChunkUtils.maxUpperBoundOfId(),
                         null,
                         schema);
-        snapshotSplits.add(lastSplit);
+        if (splitContext.isAssignEndingChunkFirst()) {
+            snapshotSplits.add(0, lastSplit);
+        } else {
+            snapshotSplits.add(lastSplit);
+        }
 
         return snapshotSplits;
     }

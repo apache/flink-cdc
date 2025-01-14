@@ -77,6 +77,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
     private final boolean skipSnapshotBackfill;
+    private final boolean assignEndingChunkFirst;
 
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
@@ -103,7 +104,8 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean assignEndingChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = hostname;
@@ -128,6 +130,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     @Override
@@ -174,6 +177,7 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                             .chunkKeyColumn(chunkKeyColumn)
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
+                            .assignEndingChunkFirst(assignEndingChunkFirst)
                             .build();
             return SourceProvider.of(db2ChangeEventSource);
         } else {
@@ -234,7 +238,8 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                         distributionFactorLower,
                         chunkKeyColumn,
                         closeIdleReaders,
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        assignEndingChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
