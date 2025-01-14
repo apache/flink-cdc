@@ -35,11 +35,9 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
-import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
@@ -93,16 +91,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
     public BinlogSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
-        final MySqlConnection jdbcConnection = createMySqlConnection(sourceConfig);
-        final BinaryLogClient binaryLogClient =
-                createBinaryClient(sourceConfig.getDbzConfiguration());
-        this.statefulTaskContext =
-                new StatefulTaskContext(sourceConfig, binaryLogClient, jdbcConnection);
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subtaskId).build();
-        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
-        this.currentTaskRunning = true;
-        this.pureBinlogPhaseTables = new HashSet<>();
+        this(
+                new StatefulTaskContext(
+                        sourceConfig,
+                        createBinaryClient(sourceConfig.getDbzConfiguration()),
+                        createMySqlConnection(sourceConfig)),
+                subtaskId);
     }
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
