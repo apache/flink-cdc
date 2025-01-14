@@ -125,7 +125,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
         if (flinkVersion != null) {
             return Collections.singletonList(flinkVersion);
         } else {
-            return Arrays.asList("1.19.1", "1.20.0");
+            return Arrays.asList("1.18.1", "1.19.1", "1.20.0");
         }
     }
 
