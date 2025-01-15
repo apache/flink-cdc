@@ -1979,7 +1979,7 @@ class FlinkPipelineTransformITCase {
                                                 + "2147483648 AS greater_than_int_max, "
                                                 + "-2147483648 AS int_min, "
                                                 + "-2147483649 AS less_than_int_min, "
-                                                + "CAST(1234567890123456789 AS DECIMAL(20, 0)) AS really_big_decimal",
+                                                + "CAST(1234567890123456789 AS DECIMAL(19, 0)) AS really_big_decimal",
                                         "CAST(id AS BIGINT) + 2147483648 > 2147483649", // equivalent to id > 1
                                         null,
                                         null,
