@@ -18,11 +18,18 @@
 package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.schema.SchemaChange;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The SchemaChangeProvider class provides static methods to create SchemaChange objects that
@@ -37,13 +44,31 @@ public class SchemaChangeProvider {
      *     intended position within the schema.
      * @return A SchemaChange object representing the addition of a column.
      */
-    public static SchemaChange add(AddColumnEvent.ColumnWithPosition columnWithPosition) {
-        return SchemaChange.addColumn(
-                columnWithPosition.getAddColumn().getName(),
-                LogicalTypeConversion.toDataType(
-                        DataTypeUtils.toFlinkDataType(columnWithPosition.getAddColumn().getType())
-                                .getLogicalType()),
-                columnWithPosition.getAddColumn().getComment());
+    public static List<SchemaChange> add(AddColumnEvent.ColumnWithPosition columnWithPosition) {
+        List<SchemaChange> result = new ArrayList<>();
+        result.add(
+                SchemaChange.addColumn(
+                        columnWithPosition.getAddColumn().getName(),
+                        LogicalTypeConversion.toDataType(
+                                DataTypeUtils.toFlinkDataType(
+                                                columnWithPosition.getAddColumn().getType())
+                                        .getLogicalType()),
+                        columnWithPosition.getAddColumn().getComment()));
+        // if default value express exists, we need to set the default value to the table
+        // option
+        Column column = columnWithPosition.getAddColumn();
+        Optional.ofNullable(column.getDefaultValueExpression())
+                .ifPresent(
+                        value -> {
+                            String key =
+                                    String.format(
+                                            "%s.%s.%s",
+                                            CoreOptions.FIELDS_PREFIX,
+                                            column.getName(),
+                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
+                            result.add(SchemaChangeProvider.setOption(key, value));
+                        });
+        return result;
     }
 
     /**
@@ -55,15 +80,33 @@ public class SchemaChangeProvider {
      * @return A SchemaChange object representing the addition of a column with position
      *     information.
      */
-    public static SchemaChange add(
+    public static List<SchemaChange> add(
             AddColumnEvent.ColumnWithPosition columnWithPosition, SchemaChange.Move move) {
-        return SchemaChange.addColumn(
-                columnWithPosition.getAddColumn().getName(),
-                LogicalTypeConversion.toDataType(
-                        DataTypeUtils.toFlinkDataType(columnWithPosition.getAddColumn().getType())
-                                .getLogicalType()),
-                columnWithPosition.getAddColumn().getComment(),
-                move);
+        List<SchemaChange> result = new ArrayList<>();
+        result.add(
+                SchemaChange.addColumn(
+                        columnWithPosition.getAddColumn().getName(),
+                        LogicalTypeConversion.toDataType(
+                                DataTypeUtils.toFlinkDataType(
+                                                columnWithPosition.getAddColumn().getType())
+                                        .getLogicalType()),
+                        columnWithPosition.getAddColumn().getComment(),
+                        move));
+        // if default value express exists, we need to set the default value to the table
+        // option
+        Column column = columnWithPosition.getAddColumn();
+        Optional.ofNullable(column.getDefaultValueExpression())
+                .ifPresent(
+                        value -> {
+                            String key =
+                                    String.format(
+                                            "%s.%s.%s",
+                                            CoreOptions.FIELDS_PREFIX,
+                                            column.getName(),
+                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
+                            result.add(SchemaChangeProvider.setOption(key, value));
+                        });
+        return result;
     }
 
     /**
@@ -87,8 +130,16 @@ public class SchemaChangeProvider {
      * @param newColumnName The new name for the column.
      * @return A SchemaChange object representing the renaming of a column.
      */
-    public static SchemaChange rename(String oldColumnName, String newColumnName) {
-        return SchemaChange.renameColumn(oldColumnName, newColumnName);
+    public static List<SchemaChange> rename(
+            String oldColumnName, String newColumnName, Map<String, String> options) {
+        List<SchemaChange> result = new ArrayList<>();
+        result.add(SchemaChange.renameColumn(oldColumnName, newColumnName));
+        String defaultValue = options.get(defaultValueOptionKey(oldColumnName));
+        if (defaultValue != null) {
+            result.add(SchemaChange.removeOption(defaultValueOptionKey(oldColumnName)));
+            result.add(SchemaChange.setOption(defaultValueOptionKey(newColumnName), defaultValue));
+        }
+        return result;
     }
 
     /**
@@ -97,7 +148,27 @@ public class SchemaChangeProvider {
      * @param columnName The name of the column to be dropped.
      * @return A SchemaChange object representing the deletion of a column.
      */
-    public static SchemaChange drop(String columnName) {
-        return SchemaChange.dropColumn(columnName);
+    public static List<SchemaChange> drop(String columnName) {
+        List<SchemaChange> result = new ArrayList<>();
+        result.add(SchemaChange.dropColumn(columnName));
+        result.add(SchemaChange.removeOption(defaultValueOptionKey(columnName)));
+        return result;
+    }
+
+    public static String defaultValueOptionKey(String columnName) {
+        return String.format(
+                "%s.%s.%s",
+                CoreOptions.FIELDS_PREFIX, columnName, CoreOptions.DEFAULT_VALUE_SUFFIX);
+    }
+
+    /**
+     * Creates a SchemaChange object for setting an option.
+     *
+     * @param key The key of the option to be set.
+     * @param value The value of the option to be set.
+     * @return A SchemaChange object representing the setting of an option.
+     */
+    public static SchemaChange setOption(String key, String value) {
+        return SchemaChange.setOption(key, value);
     }
 }

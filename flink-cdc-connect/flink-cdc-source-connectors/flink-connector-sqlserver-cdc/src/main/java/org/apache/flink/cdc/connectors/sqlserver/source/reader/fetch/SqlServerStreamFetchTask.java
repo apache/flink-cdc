@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
@@ -35,7 +35,9 @@ import io.debezium.connector.sqlserver.SqlServerOffsetContext;
 import io.debezium.connector.sqlserver.SqlServerPartition;
 import io.debezium.connector.sqlserver.SqlServerStreamingChangeEventSource;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
+import io.debezium.relational.TableId;
 import io.debezium.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +65,8 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getConnection(),
                         sourceFetchContext.getMetaDataConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
+                        sourceFetchContext.getWaterMarkDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getDatabaseSchema(),
                         split);
@@ -98,7 +101,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private static final Logger LOG = LoggerFactory.getLogger(StreamSplitReadTask.class);
         private final StreamSplit lsnSplit;
-        private final JdbcSourceEventDispatcher<SqlServerPartition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
         private final ErrorHandler errorHandler;
         private ChangeEventSourceContext context;
 
@@ -106,7 +109,8 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                 SqlServerConnectorConfig connectorConfig,
                 SqlServerConnection connection,
                 SqlServerConnection metadataConnection,
-                JdbcSourceEventDispatcher<SqlServerPartition> dispatcher,
+                EventDispatcher<SqlServerPartition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 ErrorHandler errorHandler,
                 SqlServerDatabaseSchema schema,
                 StreamSplit lsnSplit) {
@@ -114,12 +118,12 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                     connectorConfig,
                     connection,
                     metadataConnection,
-                    dispatcher,
+                    eventDispatcher,
                     errorHandler,
                     Clock.system(),
                     schema);
             this.lsnSplit = lsnSplit;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
             this.errorHandler = errorHandler;
         }
 
@@ -132,7 +136,7 @@ public class SqlServerStreamFetchTask implements FetchTask<SourceSplitBase> {
                 if (currentLsnOffset.isAtOrAfter(endingOffset)) {
                     // send streaming end event
                     try {
-                        dispatcher.dispatchWatermarkEvent(
+                        watermarkDispatcher.dispatchWatermarkEvent(
                                 partition.getSourcePartition(),
                                 lsnSplit,
                                 currentLsnOffset,

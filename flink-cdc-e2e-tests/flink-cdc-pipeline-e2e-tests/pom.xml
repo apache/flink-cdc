@@ -30,8 +30,11 @@ limitations under the License.
     <properties>
         <flink-1.19>1.19.1</flink-1.19>
         <flink-1.20>1.20.0</flink-1.20>
+        <flink-major-1.19>1.19</flink-major-1.19>
+        <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.10_flink-${flink.major.version}</starrocks.connector.version>
+        <paimon.version>0.9.0</paimon.version>
     </properties>
 
     <dependencies>
@@ -100,6 +103,26 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.paimon</groupId>
+            <artifactId>paimon-flink-${flink.major.version}</artifactId>
+            <version>${paimon.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-oceanbase-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
@@ -143,6 +166,13 @@ limitations under the License.
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
             <version>${scala.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>kafka</artifactId>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -266,6 +296,16 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>kafka-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-oceanbase</artifactId>
                             <version>${project.version}</version>
                             <destFileName>oceanbase-cdc-pipeline-connector.jar</destFileName>
@@ -279,6 +319,52 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
                             <version>${project.version}</version>
                             <destFileName>maxcompute-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-oceanbase</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>oceanbase-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-paimon</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>paimon-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-shaded-hadoop-2-uber</artifactId>
+                            <version>2.8.3-10.0</version>
+                            <destFileName>flink-shade-hadoop.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.paimon</groupId>
+                            <artifactId>paimon-flink-${flink-major-1.19}</artifactId>
+                            <version>${paimon.version}</version>
+                            <destFileName>paimon-sql-connector-${flink-1.19}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.paimon</groupId>
+                            <artifactId>paimon-flink-${flink-major-1.20}</artifactId>
+                            <version>${paimon.version}</version>
+                            <destFileName>paimon-sql-connector-${flink-1.20}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

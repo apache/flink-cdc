@@ -165,7 +165,7 @@ public class Schema implements Serializable {
         return DataTypes.ROW(fields).notNull();
     }
 
-    /** Returns a copy of the schema with a replaced list of {@Column}. */
+    /** Returns a copy of the schema with a replaced list of {@link Column}. */
     public Schema copy(List<Column> columns) {
         return new Schema(
                 columns,
