@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.utils.StringUtils;
 
 import javax.annotation.Nullable;
 
