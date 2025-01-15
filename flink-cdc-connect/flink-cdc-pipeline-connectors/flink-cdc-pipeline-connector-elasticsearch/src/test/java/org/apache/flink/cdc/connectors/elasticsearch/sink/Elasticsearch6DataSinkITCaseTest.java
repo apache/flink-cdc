@@ -86,7 +86,7 @@ public class Elasticsearch6DataSinkITCaseTest {
     @Test
     public void testElasticsearchSink() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId);
 
         runJobWithEvents(events);
 
@@ -121,7 +121,7 @@ public class Elasticsearch6DataSinkITCaseTest {
     @Test
     public void testElasticsearchInsertAndDelete() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId);
 
         runJobWithEvents(events);
 
@@ -131,7 +131,7 @@ public class Elasticsearch6DataSinkITCaseTest {
     @Test
     public void testElasticsearchAddColumn() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId);
 
         runJobWithEvents(events);
 

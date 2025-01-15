@@ -28,7 +28,7 @@ public final class StartupOptions {
 
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and
-     * continue to read change events from the database’s redo logs.
+     * continue to read change events from the database's redo logs.
      */
     public static StartupOptions initial() {
         return new StartupOptions(StartupMode.INITIAL);
