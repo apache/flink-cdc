@@ -280,7 +280,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     @Override
     public final void executionAttemptFailed(
             int subTaskId, int attemptNumber, @Nullable Throwable reason) {
-        if (failedReasons != null) {
+        if (reason != null) {
             failedReasons.put(subTaskId, reason);
         }
     }
