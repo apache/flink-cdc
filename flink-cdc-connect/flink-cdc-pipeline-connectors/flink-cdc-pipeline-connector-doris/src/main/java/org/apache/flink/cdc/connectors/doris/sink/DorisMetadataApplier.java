@@ -78,7 +78,7 @@ public class DorisMetadataApplier implements MetadataApplier {
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
         this.schemaChangeManager =
-                new SchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING));
+                new DorisSchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING));
         this.config = config;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }

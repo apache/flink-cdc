@@ -27,8 +27,8 @@ import static org.apache.doris.flink.catalog.doris.DorisSystem.identifier;
 
 /** An enriched version of Doris' {@link SchemaChangeManager}. */
 public class DorisSchemaChangeManager extends SchemaChangeManager {
-    public DorisSchemaChangeManager(DorisOptions dorisOptions) {
-        super(dorisOptions);
+    public DorisSchemaChangeManager(DorisOptions dorisOptions, String charsetEncoding) {
+        super(dorisOptions, charsetEncoding);
     }
 
     public boolean truncateTable(String databaseName, String tableName)
