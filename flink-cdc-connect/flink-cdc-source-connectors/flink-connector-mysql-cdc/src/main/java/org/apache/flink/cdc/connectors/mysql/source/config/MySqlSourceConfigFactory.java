@@ -71,6 +71,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
     private boolean parseOnLineSchemaChanges = false;
+    private boolean treatTinyInt1AsBoolean = true;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -298,6 +299,11 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    public MySqlSourceConfigFactory treatTinyInt1AsBoolean(boolean treatTinyInt1AsBoolean) {
+        this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -392,6 +398,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 jdbcProperties,
                 chunkKeyColumns,
                 skipSnapshotBackfill,
-                parseOnLineSchemaChanges);
+                parseOnLineSchemaChanges,
+                treatTinyInt1AsBoolean);
     }
 }

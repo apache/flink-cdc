@@ -202,7 +202,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             Column column = columns.get(i);
 
             String colName = column.name();
-            DataType dataType = MySqlTypeUtils.fromDbzColumn(column);
+            DataType dataType =
+                    MySqlTypeUtils.fromDbzColumn(column, sourceConfig.isTreatTinyInt1AsBoolean());
             if (!column.isOptional()) {
                 dataType = dataType.notNull();
             }

@@ -71,7 +71,8 @@ public class MySqlDataSource implements DataSource {
                         DebeziumChangelogMode.ALL,
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
-                        includeComments);
+                        includeComments,
+                        sourceConfig.isTreatTinyInt1AsBoolean());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

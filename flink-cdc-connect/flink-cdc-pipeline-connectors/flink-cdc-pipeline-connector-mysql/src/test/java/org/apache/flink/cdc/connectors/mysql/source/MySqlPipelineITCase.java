@@ -272,6 +272,16 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testParseAlterStatementTinyintIsBit() throws Exception {
+        testParseAlterStatement(true);
+    }
+
+    @Test
+    public void testParseAlterStatementTinyint1IsNotBit() throws Exception {
+        testParseAlterStatement(false);
+    }
+
+    @Test
     public void testInitialStartupModeWithOpTs() throws Exception {
         inventoryDatabase.createAndInitialize();
         Configuration sourceConfiguration = new Configuration();
@@ -433,10 +443,10 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         }
     }
 
-    @Test
-    public void testParseAlterStatement() throws Exception {
+    public void testParseAlterStatement(boolean tinyInt1isBit) throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
+
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
                         .hostname(MYSQL8_CONTAINER.getHost())
@@ -448,6 +458,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .startupOptions(StartupOptions.latest())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
+                        .treatTinyInt1AsBoolean(tinyInt1isBit)
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
 
         FlinkSourceProvider sourceProvider =
@@ -548,6 +559,21 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn("cols9", DataTypes.CHAR(1))))));
 
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`products` ADD COLUMN `cols10` TINYINT(1) NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols10",
+                                                    tinyInt1isBit
+                                                            ? DataTypes.BOOLEAN()
+                                                            : DataTypes.TINYINT())))));
+
             // Drop orders table first to remove foreign key restraints
             statement.execute(
                     String.format(
@@ -569,9 +595,19 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testSchemaChangeEvents() throws Exception {
+    public void testSchemaChangeEventstinyInt1isBit() throws Exception {
+        testSchemaChangeEvents(true);
+    }
+
+    @Test
+    public void testSchemaChangeEventsTinyint1IsNotBit() throws Exception {
+        testSchemaChangeEvents(false);
+    }
+
+    public void testSchemaChangeEvents(boolean tinyInt1isBit) throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
+
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
                         .hostname(MYSQL8_CONTAINER.getHost())
@@ -583,6 +619,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .startupOptions(StartupOptions.latest())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
+                        .treatTinyInt1AsBoolean(tinyInt1isBit)
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
 
         FlinkSourceProvider sourceProvider =
@@ -614,6 +651,35 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn("newcol1", DataTypes.INT())))));
 
+            // Add a TINYINT(1) column
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `new_tinyint1_col1` TINYINT(1) NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "new_tinyint1_col1",
+                                                    tinyInt1isBit
+                                                            ? DataTypes.BOOLEAN()
+                                                            : DataTypes.TINYINT())))));
+
+            // Add a new BOOLEAN column
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `new_bool_col1` bool NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "new_bool_col1", DataTypes.BOOLEAN())))));
+
             // Test MODIFY COLUMN DDL
             statement.execute(
                     String.format(
@@ -624,6 +690,16 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                     new AlterColumnTypeEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
                             Collections.singletonMap("newcol1", DataTypes.DOUBLE())));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` MODIFY COLUMN `new_tinyint1_col1` INT;",
+                            inventoryDatabase.getDatabaseName()));
+
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonMap("new_tinyint1_col1", DataTypes.INT())));
 
             // Test CHANGE COLUMN DDL
             statement.execute(
@@ -790,7 +866,11 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn("big_decimal_c", DataTypes.STRING())
                                     .physicalColumn("bit1_c", DataTypes.BOOLEAN())
                                     .physicalColumn("bit3_c", DataTypes.BINARY(1))
-                                    .physicalColumn("tiny1_c", DataTypes.BOOLEAN())
+                                    .physicalColumn(
+                                            "tiny1_c",
+                                            tinyInt1isBit
+                                                    ? DataTypes.BOOLEAN()
+                                                    : DataTypes.TINYINT())
                                     .physicalColumn("boolean_c", DataTypes.BOOLEAN())
                                     .physicalColumn("file_uuid", DataTypes.BINARY(16))
                                     .physicalColumn("bit_c", DataTypes.BINARY(8))

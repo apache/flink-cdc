@@ -74,6 +74,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties dbzProperties;
     private final Configuration dbzConfiguration;
     private final MySqlConnectorConfig dbzMySqlConfig;
+    private final boolean treatTinyInt1AsBoolean;
 
     MySqlSourceConfig(
             String hostname,
@@ -101,7 +102,8 @@ public class MySqlSourceConfig implements Serializable {
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
             boolean skipSnapshotBackfill,
-            boolean parseOnLineSchemaChanges) {
+            boolean parseOnLineSchemaChanges,
+            boolean treatTinyInt1AsBoolean) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -130,6 +132,7 @@ public class MySqlSourceConfig implements Serializable {
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
+        this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
     }
 
     public String getHostname() {
@@ -260,5 +263,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isSkipSnapshotBackfill() {
         return skipSnapshotBackfill;
+    }
+
+    public boolean isTreatTinyInt1AsBoolean() {
+        return treatTinyInt1AsBoolean;
     }
 }

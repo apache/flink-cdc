@@ -74,12 +74,15 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
     private final Collection<ParsingException> errors = new ArrayList<>();
 
     public CustomMySqlAntlrDdlParserListener(
-            MySqlAntlrDdlParser parser, LinkedList<SchemaChangeEvent> parsedEvents) {
+            MySqlAntlrDdlParser parser,
+            LinkedList<SchemaChangeEvent> parsedEvents,
+            boolean tinyInt1isBit) {
         // initialize listeners
         listeners.add(new CreateAndAlterDatabaseParserListener(parser));
         listeners.add(new DropDatabaseParserListener(parser));
         listeners.add(new CreateTableParserListener(parser, listeners));
-        listeners.add(new CustomAlterTableParserListener(parser, listeners, parsedEvents));
+        listeners.add(
+                new CustomAlterTableParserListener(parser, listeners, parsedEvents, tinyInt1isBit));
         listeners.add(new DropTableParserListener(parser));
         listeners.add(new RenameTableParserListener(parser));
         listeners.add(new TruncateTableParserListener(parser));

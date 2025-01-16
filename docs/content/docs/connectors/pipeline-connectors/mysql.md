@@ -313,6 +313,13 @@ pipeline:
       <td>Whether enable include table and column comments, by default is false, if set to true, the table and column comments will be sent.<br>
           Note: Enable this option will bring the implications on memory usage.</td>
     </tr>
+    <tr>
+      <td>treat-tinyint1-as-boolean.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether treat TINYINT(1) as boolean, by default is true.</td>
+    </tr>
     </tbody>
 </table>
 </div>
