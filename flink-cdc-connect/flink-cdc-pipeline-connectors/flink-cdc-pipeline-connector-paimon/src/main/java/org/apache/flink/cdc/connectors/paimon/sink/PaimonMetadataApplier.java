@@ -153,6 +153,13 @@ public class PaimonMetadataApplier implements MetadataApplier {
                 });
     }
 
+    @Override
+    public void close() throws Exception {
+        if (catalog != null) {
+            catalog.close();
+        }
+    }
+
     private void applyCreateTable(CreateTableEvent event) throws SchemaEvolveException {
         try {
             if (!catalog.databaseExists(event.tableId().getSchemaName())) {
