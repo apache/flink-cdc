@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql;
 
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -33,7 +33,7 @@ import java.util.stream.Stream;
  * Basic class for testing MySQL binlog source, this contains a MySQL container which enables
  * binlog.
  */
-public abstract class LegacyMySqlTestBase extends AbstractTestBase {
+public abstract class LegacyMySqlTestBase extends AbstractTestBaseJUnit4 {
 
     private static final Logger LOG = LoggerFactory.getLogger(LegacyMySqlTestBase.class);
 
