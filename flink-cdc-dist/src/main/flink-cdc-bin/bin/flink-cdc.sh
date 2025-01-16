@@ -21,9 +21,20 @@ args=("$@")
 # Check if FLINK_HOME is set in command-line arguments by "--flink-home"
 for ((i=0; i < ${#args[@]}; i++)); do
     case "${args[i]}" in
+        --flink-home=*)
+            # Extract the value after "="
+            FLINK_HOME_VALUE="${args[i]#*=}"
+            # Check if the value is not empty
+            if [[ -n "$FLINK_HOME_VALUE" ]]; then
+                FLINK_HOME="$FLINK_HOME_VALUE"
+                echo "[INFO] Set FLINK_HOME to ${FLINK_HOME_VALUE}."
+                break
+            fi
+            ;;
         --flink-home)
             if [[ -n "${args[i+1]}" ]]; then
                 FLINK_HOME="${args[i+1]}"
+                echo "[INFO] Set FLINK_HOME to ${FLINK_HOME}."
                 break
             fi
             ;;
