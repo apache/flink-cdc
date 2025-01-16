@@ -165,20 +165,24 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
          * The final database table looks like this:
          *
          * > SELECT * FROM products;
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | id  | name               | description                                             | weight |
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
-         * | 102 | car battery        | 12V car battery                                         |    8.1 |
-         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
-         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
-         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
-         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
-         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
-         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
-         * +-----+--------------------+---------------------------------------------------------+--------+
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | id | name | description | weight |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | 101 | scooter | Small 2-wheel scooter | 3.14 |
+         * | 102 | car battery | 12V car battery | 8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from
+         * #40 to #3 | 0.8 |
+         * | 104 | hammer | 12oz carpenter's hammer | 0.75 |
+         * | 105 | hammer | 14oz carpenter's hammer | 0.875 |
+         * | 106 | hammer | 18oz carpenter hammer | 1 |
+         * | 107 | rocks | box of assorted rocks | 5.1 |
+         * | 108 | jacket | water resistent black wind breaker | 0.1 |
+         * | 109 | spare tire | 24 inch spare tire | 22.2 |
+         * | 110 | jacket | new water resistent white wind breaker | 0.5 |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
          * </pre>
          */
 
@@ -246,7 +250,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        // wait for the source startup, we don't have a better way to wait it, use sleep
+        // for now
         Thread.sleep(10000L);
 
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
@@ -469,6 +474,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
                                 + " schema_name STRING METADATA VIRTUAL,"
                                 + " table_name STRING METADATA VIRTUAL,"
+                                + " row_kind STRING METADATA FROM 'row_kind' VIRTUAL,"
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
@@ -501,6 +507,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + " database_name STRING,"
                         + " schema_name STRING,"
                         + " table_name STRING,"
+                        + " row_kind STRING,"
                         + " id INT,"
                         + " name STRING,"
                         + " description STRING,"
@@ -546,52 +553,52 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 Arrays.asList(
                         "+I("
                                 + databaseName
-                                + ",inventory,products,101,scooter,Small 2-wheel scooter,3.140)",
+                                + ",inventory,products,+I,101,scooter,Small 2-wheel scooter,3.140)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,102,car battery,12V car battery,8.100)",
+                                + ",inventory,products,+I,102,car battery,12V car battery,8.100)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
+                                + ",inventory,products,+I,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,104,hammer,12oz carpenter's hammer,0.750)",
+                                + ",inventory,products,+I,104,hammer,12oz carpenter's hammer,0.750)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,105,hammer,14oz carpenter's hammer,0.875)",
+                                + ",inventory,products,+I,105,hammer,14oz carpenter's hammer,0.875)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,106,hammer,16oz carpenter's hammer,1.000)",
+                                + ",inventory,products,+I,106,hammer,16oz carpenter's hammer,1.000)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,107,rocks,box of assorted rocks,5.300)",
+                                + ",inventory,products,+I,107,rocks,box of assorted rocks,5.300)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,108,jacket,water resistent black wind breaker,0.100)",
+                                + ",inventory,products,+I,108,jacket,water resistent black wind breaker,0.100)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,109,spare tire,24 inch spare tire,22.200)",
+                                + ",inventory,products,+I,109,spare tire,24 inch spare tire,22.200)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,110,jacket,water resistent white wind breaker,0.200)",
+                                + ",inventory,products,+I,110,jacket,water resistent white wind breaker,0.200)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.180)",
+                                + ",inventory,products,+I,111,scooter,Big 2-wheel scooter ,5.180)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,106,hammer,18oz carpenter hammer,1.000)",
+                                + ",inventory,products,+U,106,hammer,18oz carpenter hammer,1.000)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,107,rocks,box of assorted rocks,5.100)",
+                                + ",inventory,products,+U,107,rocks,box of assorted rocks,5.100)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,110,jacket,new water resistent white wind breaker,0.500)",
+                                + ",inventory,products,+U,110,jacket,new water resistent white wind breaker,0.500)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.170)",
+                                + ",inventory,products,+U,111,scooter,Big 2-wheel scooter ,5.170)",
                         "-D("
                                 + databaseName
-                                + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.170)");
+                                + ",inventory,products,-D,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         Collections.sort(actual);
         Collections.sort(expected);
@@ -679,20 +686,24 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
          * The final database table looks like this:
          *
          * > SELECT * FROM products;
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | id  | name               | description                                             | weight |
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
-         * | 102 | car battery        | 12V car battery                                         |    8.1 |
-         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
-         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
-         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
-         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
-         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
-         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
-         * +-----+--------------------+---------------------------------------------------------+--------+
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | id | name | description | weight |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | 101 | scooter | Small 2-wheel scooter | 3.14 |
+         * | 102 | car battery | 12V car battery | 8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from
+         * #40 to #3 | 0.8 |
+         * | 104 | hammer | 12oz carpenter's hammer | 0.75 |
+         * | 105 | hammer | 14oz carpenter's hammer | 0.875 |
+         * | 106 | hammer | 18oz carpenter hammer | 1 |
+         * | 107 | rocks | box of assorted rocks | 5.1 |
+         * | 108 | jacket | water resistent black wind breaker | 0.1 |
+         * | 109 | spare tire | 24 inch spare tire | 22.2 |
+         * | 110 | jacket | new water resistent white wind breaker | 0.5 |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
          * </pre>
          */
 
