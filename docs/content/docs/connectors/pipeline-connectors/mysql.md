@@ -314,7 +314,7 @@ pipeline:
           Note: Enable this option will bring the implications on memory usage.</td>
     </tr>
     <tr>
-      <td>treat-tinyint1-as-boolean</td>
+      <td>treat-tinyint1-as-boolean.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>

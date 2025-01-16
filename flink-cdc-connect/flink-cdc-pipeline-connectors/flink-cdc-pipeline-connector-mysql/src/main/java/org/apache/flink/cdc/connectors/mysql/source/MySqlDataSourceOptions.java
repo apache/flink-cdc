@@ -300,8 +300,8 @@ public class MySqlDataSourceOptions {
                                     + "Note: Enable this option will bring the implications on memory usage.");
 
     @Experimental
-    public static final ConfigOption<Boolean> TREAT_TINYINT1_AS_BOOLEAN =
-            ConfigOptions.key("treat-tinyint1-as-boolean")
+    public static final ConfigOption<Boolean> TREAT_TINYINT1_AS_BOOLEAN_ENABLED =
+            ConfigOptions.key("treat-tinyint1-as-boolean.enabled")
                     .booleanType()
                     .defaultValue(true)
                     .withDescription("Whether treat TINYINT(1) as boolean, by default is true. ");

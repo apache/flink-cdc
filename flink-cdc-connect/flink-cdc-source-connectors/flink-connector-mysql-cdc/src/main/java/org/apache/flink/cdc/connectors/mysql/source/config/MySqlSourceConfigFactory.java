@@ -71,7 +71,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
     private boolean parseOnLineSchemaChanges = false;
-    private boolean treatTinyInt1AsBoolean = false;
+    private boolean treatTinyInt1AsBoolean = true;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;

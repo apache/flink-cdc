@@ -212,13 +212,13 @@ The reason for this problem is that the reading of the full volume phase of the 
 
 ### Q16: In MySQL source table, there is a TINYINT(1) column where some rows contain values greater than 1. However, downstreams receive this data as true/false in the pipeline job. Why does this happen?
 This is because the default value of the MySQL connection parameter `tinyInt1isBit` is true and the version of Flink CDC before 3.3.0 didn't convert it, which causes the TINYINT(1) data to be interpreted as boolean values. 
-To convert it to actual values, please upgrade your CDC version to 3.3.0+ then add the configuration `treat-tinyint1-as-boolean: false` at the source node.  
+To convert it to actual values, please upgrade your CDC version to 3.3.0+ then add the configuration `treat-tinyint1-as-boolean.enabled: false` at the source node.  
 For example:
 ```yaml
 source:
   type: mysql
   ...
-  treat-tinyint1-as-boolean: false
+  treat-tinyint1-as-boolean.enabled: false
 
 sink:
   type: ...

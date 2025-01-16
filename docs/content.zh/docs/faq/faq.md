@@ -209,13 +209,13 @@ restart-strategy.fixed-delay.delay= 30s
 
 ### Q16: MySQL源表中存在TINYINT(1)类型的列，且部分行的数值>1，Pipeline作业下游接收到的数据却是true/false，为什么？
 这是由于MySQL连接参数`tinyInt1isBit`默认值为`true`，Flink CDC 3.3.0之前的版本未处理该参数，导致TINYINT(1)类型的数据被解析为布尔值。
-若需将其转换为实际值，请将CDC升级至3.3.0+，并在source节点添加配置`treat-tinyint1-as-boolean: false`。  
+若需将其转换为实际值，请将CDC升级至3.3.0+，并在source节点添加配置`treat-tinyint1-as-boolean.enabled: false`。  
 例如：
 ```yaml
 source:
   type: mysql
   ...
-  treat-tinyint1-as-boolean: false
+  treat-tinyint1-as-boolean.enabled: false
 
 sink:
   type: ...
