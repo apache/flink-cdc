@@ -133,7 +133,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
-        this.subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        this.subTaskId = getRuntimeContext().getIndexOfThisSubtask();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
         this.router = new TableIdRouter(routingRules);
