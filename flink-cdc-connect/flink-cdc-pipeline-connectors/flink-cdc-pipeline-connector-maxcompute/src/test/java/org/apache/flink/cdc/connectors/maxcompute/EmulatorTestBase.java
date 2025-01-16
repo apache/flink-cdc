@@ -41,7 +41,7 @@ public class EmulatorTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(EmulatorTestBase.class);
 
     public static final DockerImageName MAXCOMPUTE_IMAGE =
-            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.4");
+            DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.7");
 
     @ClassRule
     public static GenericContainer<?> maxcompute =
