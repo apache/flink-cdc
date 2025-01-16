@@ -41,6 +41,7 @@ import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkState;
 
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
@@ -463,6 +466,43 @@ public class SchemaUtils {
                         .collect(Collectors.toList());
 
         return lSchema.copy(mergedColumns);
+    }
+
+    public static void validateMetaSchemaCompatibility(LinkedHashSet<Schema> schemas) {
+        if (schemas.size() > 1) {
+            Schema outputSchema = null;
+            for (Schema schema : schemas) {
+                isMetaSchemaCompatible(outputSchema, schema);
+                outputSchema = schema;
+            }
+        }
+    }
+
+    public static void isMetaSchemaCompatible(
+            @Nullable Schema currentSchema, Schema upcomingSchema) {
+        if (currentSchema == null) {
+            return;
+        }
+        checkState(
+                currentSchema.primaryKeys().equals(upcomingSchema.primaryKeys()),
+                String.format(
+                        "Unable to merge schema %s and %s with different primary keys.",
+                        currentSchema, upcomingSchema));
+        checkState(
+                currentSchema.partitionKeys().equals(upcomingSchema.partitionKeys()),
+                String.format(
+                        "Unable to merge schema %s and %s with different partition keys.",
+                        currentSchema, upcomingSchema));
+        checkState(
+                currentSchema.options().equals(upcomingSchema.options()),
+                String.format(
+                        "Unable to merge schema %s and %s with different options.",
+                        currentSchema, upcomingSchema));
+        checkState(
+                Objects.equals(currentSchema.comment(), upcomingSchema.comment()),
+                String.format(
+                        "Unable to merge schema %s and %s with different comments.",
+                        currentSchema, upcomingSchema));
     }
 
     /**

@@ -499,9 +499,9 @@ class FlinkPipelineComposerLenientITCase {
                         "default_namespace.default_schema.table1",
                         "*,concat(col1,'2') as col12",
                         "col1 = '2'",
-                        null,
-                        null,
-                        null,
+                        "col1",
+                        "col12",
+                        "key1=value1",
                         "",
                         null);
         // Setup pipeline

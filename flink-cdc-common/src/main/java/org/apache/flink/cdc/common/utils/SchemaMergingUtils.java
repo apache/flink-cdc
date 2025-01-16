@@ -73,10 +73,13 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkState;
 
 /**
  * Utils for merging {@link Schema}s and {@link DataType}s. Prefer using this over {@link
@@ -169,17 +172,27 @@ public class SchemaMergingUtils {
     }
 
     /** Merge compatible schemas. */
-    public static Schema getCommonSchema(List<Schema> schemas) {
-        if (schemas.isEmpty()) {
-            return null;
-        } else if (schemas.size() == 1) {
-            return schemas.get(0);
+    public static Schema getCommonSchema(LinkedHashSet<Schema> schemas) {
+        if (schemas.size() == 1) {
+            return schemas.iterator().next();
         } else {
             Schema outputSchema = null;
             for (Schema schema : schemas) {
+                validateTransformColumnCounts(outputSchema, schema);
                 outputSchema = getLeastCommonSchema(outputSchema, schema);
             }
             return outputSchema;
+        }
+    }
+
+    public static void validateTransformColumnCounts(
+            @Nullable Schema currentSchema, Schema upcomingSchema) {
+        if (currentSchema != null) {
+            checkState(
+                    currentSchema.getColumnCount() == upcomingSchema.getColumnCount(),
+                    String.format(
+                            "Unable to merge schema %s and %s with different column counts.",
+                            currentSchema, upcomingSchema));
         }
     }
 

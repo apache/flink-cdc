@@ -378,26 +378,21 @@ class FlinkPipelineTransformITCase {
 
     @ParameterizedTest
     @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
-    void testMultiTransformSchemaColumnsCompatibilityWithNullProjection(
-            ValuesDataSink.SinkApi sinkApi) {
-        TransformDef nullProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        null,
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
+    void testMultiTransformColumnCountsCompatibility(ValuesDataSink.SinkApi sinkApi) {
         assertThatThrownBy(
                         () ->
                                 runGenericTransformTest(
                                         sinkApi,
                                         Arrays.asList(
-                                                nullProjection,
+                                                new TransformDef(
+                                                        "default_namespace.default_schema.mytable2",
+                                                        null,
+                                                        "age < 18",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null),
                                                 new TransformDef(
                                                         "default_namespace.default_schema.mytable2",
                                                         // reference part column
@@ -412,39 +407,33 @@ class FlinkPipelineTransformITCase {
                 .rootCause()
                 .isExactlyInstanceOf(IllegalStateException.class)
                 .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
+                        "Unable to merge schema columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
+                                + "and columns={`id` BIGINT NOT NULL,`name` STRING}, primaryKeys=id, options=() with different column counts.");
     }
 
     @ParameterizedTest
     @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
-    void testMultiTransformSchemaColumnsCompatibilityWithEmptyProjection(
-            ValuesDataSink.SinkApi sinkApi) {
-        TransformDef emptyProjection =
-                new TransformDef(
-                        "default_namespace.default_schema.mytable2",
-                        "",
-                        "age < 18",
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
-
+    void testMultiTransformMetaSchemaCompatibility(ValuesDataSink.SinkApi sinkApi) {
         assertThatThrownBy(
                         () ->
                                 runGenericTransformTest(
                                         sinkApi,
                                         Arrays.asList(
-                                                emptyProjection,
                                                 new TransformDef(
                                                         "default_namespace.default_schema.mytable2",
-                                                        // reference part column
+                                                        "id, name",
+                                                        "age < 18",
+                                                        null,
+                                                        "age",
+                                                        null,
+                                                        null,
+                                                        null),
+                                                new TransformDef(
+                                                        "default_namespace.default_schema.mytable2",
                                                         "id,UPPER(name) AS name",
                                                         "age >= 18",
                                                         null,
-                                                        null,
+                                                        "id",
                                                         null,
                                                         null,
                                                         null)),
@@ -452,8 +441,8 @@ class FlinkPipelineTransformITCase {
                 .rootCause()
                 .isExactlyInstanceOf(IllegalStateException.class)
                 .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
+                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, partitionKeys=age, options=() "
+                                + "and columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, partitionKeys=id, options=() with different partition keys.");
     }
 
     @ParameterizedTest
