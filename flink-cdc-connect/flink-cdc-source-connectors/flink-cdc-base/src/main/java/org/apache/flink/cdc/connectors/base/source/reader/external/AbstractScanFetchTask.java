@@ -135,7 +135,7 @@ public abstract class AbstractScanFetchTask implements FetchTask {
             Context context, SourceSplitBase split, Offset lowWatermark) throws Exception {
         if (context instanceof JdbcSourceFetchTaskContext) {
             ((JdbcSourceFetchTaskContext) context)
-                    .getDispatcher()
+                    .getWaterMarkDispatcher()
                     .dispatchWatermarkEvent(
                             ((JdbcSourceFetchTaskContext) context)
                                     .getPartition()
@@ -157,7 +157,7 @@ public abstract class AbstractScanFetchTask implements FetchTask {
             Context context, SourceSplitBase split, Offset highWatermark) throws Exception {
         if (context instanceof JdbcSourceFetchTaskContext) {
             ((JdbcSourceFetchTaskContext) context)
-                    .getDispatcher()
+                    .getWaterMarkDispatcher()
                     .dispatchWatermarkEvent(
                             ((JdbcSourceFetchTaskContext) context)
                                     .getPartition()
@@ -180,7 +180,7 @@ public abstract class AbstractScanFetchTask implements FetchTask {
             Context context, SourceSplitBase split, Offset endWatermark) throws Exception {
         if (context instanceof JdbcSourceFetchTaskContext) {
             ((JdbcSourceFetchTaskContext) context)
-                    .getDispatcher()
+                    .getWaterMarkDispatcher()
                     .dispatchWatermarkEvent(
                             ((JdbcSourceFetchTaskContext) context)
                                     .getPartition()

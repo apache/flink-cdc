@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.functions;
 
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
@@ -34,8 +35,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -80,6 +79,27 @@ public class SystemFunctionUtils {
         return timestampMillisToDate(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
+    public static String fromUnixtime(long seconds, String timezone) {
+        return DateTimeUtils.formatUnixTimestamp(seconds, TimeZone.getTimeZone(timezone));
+    }
+
+    public static String fromUnixtime(long seconds, String format, String timezone) {
+        return DateTimeUtils.formatUnixTimestamp(seconds, format, TimeZone.getTimeZone(timezone));
+    }
+
+    public static long unixTimestamp(long epochTime, String timezone) {
+        return epochTime / 1000;
+    }
+
+    public static long unixTimestamp(String dateTimeStr, long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(dateTimeStr, TimeZone.getTimeZone(timezone));
+    }
+
+    public static long unixTimestamp(
+            String dateTimeStr, String format, long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(dateTimeStr, format, TimeZone.getTimeZone(timezone));
+    }
+
     public static String dateFormat(TimestampData timestamp, String format) {
         return DateTimeUtils.formatTimestampMillis(
                 timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));
@@ -108,83 +128,127 @@ public class SystemFunctionUtils {
         }
     }
 
-    public static int timestampDiff(
-            String symbol,
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
             LocalZonedTimestampData fromTimestamp,
-            LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(String symbol, long fromDate, long toDate) {
-        Calendar from = Calendar.getInstance();
-        from.setTime(new Date(fromDate));
-        Calendar to = Calendar.getInstance();
-        to.setTime(new Date(toDate));
-        Long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
-        switch (symbol) {
-            case "SECOND":
-                return second.intValue();
-            case "MINUTE":
-                return second.intValue() / 60;
-            case "HOUR":
-                return second.intValue() / 3600;
-            case "DAY":
-                return second.intValue() / (24 * 3600);
-            case "MONTH":
-                return to.get(Calendar.YEAR) * 12
-                        + to.get(Calendar.MONDAY)
-                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONDAY));
-            case "YEAR":
-                return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
-            default:
-                LOG.error("Unsupported timestamp diff: {}", symbol);
-                throw new RuntimeException("Unsupported timestamp diff: " + symbol);
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
         }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                timezone,
+                toTimestamp.getEpochMillisecond(),
+                timezone);
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                "UTC",
+                toTimestamp.getMillisecond(),
+                "UTC");
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                "UTC",
+                toTimestamp.getEpochMillisecond(),
+                timezone);
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                timezone,
+                toTimestamp.getMillisecond(),
+                "UTC");
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static LocalZonedTimestampData timestampadd(
+            String timeIntervalUnit,
+            Integer interval,
+            LocalZonedTimestampData timePoint,
+            String timezone) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return LocalZonedTimestampData.fromEpochMillis(
+                DateTimeUtils.timestampAdd(
+                        timeIntervalUnit, interval, timePoint.getEpochMillisecond(), timezone));
+    }
+
+    public static TimestampData timestampadd(
+            String timeIntervalUnit, Integer interval, TimestampData timePoint, String timezone) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return TimestampData.fromMillis(
+                DateTimeUtils.timestampAdd(
+                        timeIntervalUnit, interval, timePoint.getMillisecond(), "UTC"));
     }
 
     public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {
@@ -237,6 +301,14 @@ public class SystemFunctionUtils {
         return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
+    public static boolean betweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
+    }
+
     public static boolean notBetweenAsymmetric(String value, String minValue, String maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
@@ -263,6 +335,11 @@ public class SystemFunctionUtils {
 
     public static boolean notBetweenAsymmetric(
             BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
@@ -294,6 +371,10 @@ public class SystemFunctionUtils {
         return Arrays.stream(values).anyMatch(item -> value.equals(item));
     }
 
+    public static boolean in(DecimalData value, DecimalData... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
     public static boolean notIn(String value, String... values) {
         return !in(value, values);
     }
@@ -319,6 +400,10 @@ public class SystemFunctionUtils {
     }
 
     public static boolean notIn(BigDecimal value, BigDecimal... values) {
+        return !in(value, values);
+    }
+
+    public static boolean notIn(DecimalData value, DecimalData... values) {
         return !in(value, values);
     }
 
@@ -557,8 +642,24 @@ public class SystemFunctionUtils {
     }
 
     /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
+    public static DecimalData round(DecimalData b0) {
+        return round(b0, 0);
+    }
+
+    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
     public static BigDecimal round(BigDecimal b0, int b1) {
         return b0.movePointRight(b1).setScale(0, RoundingMode.HALF_UP).movePointLeft(b1);
+    }
+
+    /** SQL <code>ROUND</code> operator applied to DecimalData values. */
+    public static DecimalData round(DecimalData b0, int b1) {
+        return DecimalData.fromBigDecimal(
+                b0.toBigDecimal()
+                        .movePointRight(b1)
+                        .setScale(0, RoundingMode.HALF_UP)
+                        .movePointLeft(b1),
+                b0.precision(),
+                b0.scale());
     }
 
     /** SQL <code>ROUND</code> operator applied to float values. */
@@ -628,6 +729,8 @@ public class SystemFunctionUtils {
             return !object.equals(0d);
         } else if (object instanceof BigDecimal) {
             return ((BigDecimal) object).compareTo(BigDecimal.ZERO) != 0;
+        } else if (object instanceof DecimalData) {
+            return ((DecimalData) object).compareTo(DecimalData.zero(1, 0)) != 0;
         }
         return Boolean.valueOf(castToString(object));
     }
@@ -641,6 +744,9 @@ public class SystemFunctionUtils {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).byteValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().byteValue();
         }
         if (object instanceof Double) {
             return ((Double) object).byteValue();
@@ -672,6 +778,9 @@ public class SystemFunctionUtils {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).shortValue();
         }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().shortValue();
+        }
         if (object instanceof Double) {
             return ((Double) object).shortValue();
         }
@@ -701,6 +810,9 @@ public class SystemFunctionUtils {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).intValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().intValue();
         }
         if (object instanceof Double) {
             return ((Double) object).intValue();
@@ -732,6 +844,9 @@ public class SystemFunctionUtils {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).longValue();
         }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().longValue();
+        }
         if (object instanceof Double) {
             return ((Double) object).longValue();
         }
@@ -762,6 +877,9 @@ public class SystemFunctionUtils {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).floatValue();
         }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().floatValue();
+        }
         if (object instanceof Double) {
             return ((Double) object).floatValue();
         }
@@ -784,6 +902,9 @@ public class SystemFunctionUtils {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).doubleValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().doubleValue();
         }
         if (object instanceof Double) {
             return (Double) object;
@@ -822,6 +943,30 @@ public class SystemFunctionUtils {
         return bigDecimal;
     }
 
+    public static DecimalData castToDecimalData(Object object, int precision, int scale) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof Boolean) {
+            object = (Boolean) object ? 1 : 0;
+        }
+
+        BigDecimal bigDecimal;
+        try {
+            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
+        // non-serializable object into the pipeline that breaks downstream.
+        if (bigDecimal.precision() > precision) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
+    }
+
     public static TimestampData castToTimestamp(Object object, String timezone) {
         if (object == null) {
             return null;
@@ -845,5 +990,49 @@ public class SystemFunctionUtils {
             return Boolean.valueOf(castToString(object)) ? "1" : "0";
         }
         return String.valueOf(object);
+    }
+
+    private static int universalCompares(Object lhs, Object rhs) {
+        Class<?> leftClass = lhs.getClass();
+        Class<?> rightClass = rhs.getClass();
+        if (leftClass.equals(rightClass) && lhs instanceof Comparable) {
+            return ((Comparable) lhs).compareTo(rhs);
+        } else if (lhs instanceof Number && rhs instanceof Number) {
+            return Double.compare(((Number) lhs).doubleValue(), ((Number) rhs).doubleValue());
+        } else {
+            throw new RuntimeException(
+                    "Comparison of unsupported data types: "
+                            + leftClass.getName()
+                            + " and "
+                            + rightClass.getName());
+        }
+    }
+
+    public static boolean greaterThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) > 0;
+    }
+
+    public static boolean greaterThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) >= 0;
+    }
+
+    public static boolean lessThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) < 0;
+    }
+
+    public static boolean lessThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) <= 0;
     }
 }

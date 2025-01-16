@@ -165,7 +165,9 @@ public class TransformParser {
                         SqlOperatorTables.chain(transformSqlOperatorTable, udfOperatorTable),
                         calciteCatalogReader,
                         factory,
-                        SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
+                        SqlValidator.Config.DEFAULT
+                                .withIdentifierExpansion(true)
+                                .withConformance(SqlConformanceEnum.MYSQL_5));
         SqlNode validateSqlNode = validator.validate(sqlNode);
         SqlToRelConverter sqlToRelConverter =
                 new SqlToRelConverter(
@@ -176,8 +178,8 @@ public class TransformParser {
                                 new HepPlanner(new HepProgramBuilder().build()),
                                 new RexBuilder(factory)),
                         StandardConvertletTable.INSTANCE,
-                        SqlToRelConverter.config().withTrimUnusedFields(false));
-        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, true);
+                        SqlToRelConverter.config().withTrimUnusedFields(true));
+        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, false);
         return relRoot.rel;
     }
 

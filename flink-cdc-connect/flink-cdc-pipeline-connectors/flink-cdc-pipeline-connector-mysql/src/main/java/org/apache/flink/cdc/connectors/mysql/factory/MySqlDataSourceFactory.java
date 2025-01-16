@@ -37,9 +37,11 @@ import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
+import org.apache.flink.cdc.debezium.table.DebeziumOptions;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +68,9 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.INCLUDE_COMMENTS_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.METADATA_LIST;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
@@ -131,6 +135,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         double distributionFactorLower = config.get(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
 
         boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
+        boolean includeComments = config.get(INCLUDE_COMMENTS_ENABLED);
 
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
@@ -139,6 +144,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         boolean scanBinlogNewlyAddedTableEnabled =
                 config.get(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+        boolean isParsingOnLineSchemaChanges = config.get(PARSE_ONLINE_SCHEMA_CHANGES);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -150,6 +156,13 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         Map<String, String> configMap = config.toMap();
         OptionUtils.printOptions(IDENTIFIER, config.toMap());
+        if (includeComments) {
+            // set debezium config 'include.schema.comments' to true
+            configMap.put(
+                    DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX
+                            + RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                    "true");
+        }
 
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -175,7 +188,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .includeSchemaChanges(includeSchemaChanges)
                         .debeziumProperties(getDebeziumProperties(configMap))
                         .jdbcProperties(getJdbcProperties(configMap))
-                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+                        .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                        .parseOnLineSchemaChanges(isParsingOnLineSchemaChanges);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
@@ -307,6 +321,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         options.add(METADATA_LIST);
+        options.add(INCLUDE_COMMENTS_ENABLED);
         return options;
     }
 

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.connectors.elasticsearch.config.ElasticsearchSinkOptions;
+import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchContainer;
 import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchTestUtils;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -35,21 +36,23 @@ import co.elastic.clients.elasticsearch.core.GetResponse;
 import co.elastic.clients.json.jackson.JacksonJsonpMapper;
 import co.elastic.clients.transport.rest_client.RestClientTransport;
 import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScope;
+import org.apache.http.auth.UsernamePasswordCredentials;
+import org.apache.http.client.CredentialsProvider;
+import org.apache.http.impl.client.BasicCredentialsProvider;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.elasticsearch.ElasticsearchContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -67,11 +70,8 @@ public class ElasticsearchDataSinkITCaseTest {
     private static final Logger LOG =
             LoggerFactory.getLogger(ElasticsearchDataSinkITCaseTest.class);
     private static final String ELASTICSEARCH_VERSION = "8.12.1";
-    private static final DockerImageName ELASTICSEARCH_IMAGE =
-            DockerImageName.parse(
-                            "docker.elastic.co/elasticsearch/elasticsearch:"
-                                    + ELASTICSEARCH_VERSION)
-                    .asCompatibleSubstituteFor("docker.elastic.co/elasticsearch/elasticsearch");
+    private static final String DEFAULT_USERNAME = "elastic";
+    private static final String DEFAULT_PASSWORD = "123456";
 
     @Container
     private static final ElasticsearchContainer ELASTICSEARCH_CONTAINER =
@@ -94,7 +94,7 @@ public class ElasticsearchDataSinkITCaseTest {
     @Test
     public void testElasticsearchSink() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId);
 
         runJobWithEvents(events);
 
@@ -129,7 +129,7 @@ public class ElasticsearchDataSinkITCaseTest {
     @Test
     public void testElasticsearchInsertAndDelete() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId);
 
         runJobWithEvents(events);
 
@@ -139,7 +139,7 @@ public class ElasticsearchDataSinkITCaseTest {
     @Test
     public void testElasticsearchAddColumn() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId);
 
         runJobWithEvents(events);
 
@@ -147,16 +147,17 @@ public class ElasticsearchDataSinkITCaseTest {
     }
 
     private static ElasticsearchContainer createElasticsearchContainer() {
-        return new ElasticsearchContainer(ELASTICSEARCH_IMAGE)
-                .withEnv("discovery.type", "single-node")
-                .withEnv("xpack.security.enabled", "false")
-                .withEnv("ES_JAVA_OPTS", "-Xms2g -Xmx2g")
-                .withEnv("logger.org.elasticsearch", "ERROR")
-                .withLogConsumer(new Slf4jLogConsumer(LOG))
-                .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
+        ElasticsearchContainer esContainer = new ElasticsearchContainer(ELASTICSEARCH_VERSION);
+        esContainer.withLogConsumer(new Slf4jLogConsumer(LOG));
+        esContainer.withPassword(DEFAULT_PASSWORD);
+        esContainer.withEnv("xpack.security.enabled", "true");
+        return esContainer;
     }
 
     private ElasticsearchClient createElasticsearchClient() {
+        final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+        credentialsProvider.setCredentials(
+                AuthScope.ANY, new UsernamePasswordCredentials(DEFAULT_USERNAME, DEFAULT_PASSWORD));
         RestClientTransport transport =
                 new RestClientTransport(
                         RestClient.builder(
@@ -164,6 +165,16 @@ public class ElasticsearchDataSinkITCaseTest {
                                                 ELASTICSEARCH_CONTAINER.getHost(),
                                                 ELASTICSEARCH_CONTAINER.getFirstMappedPort(),
                                                 "http"))
+                                .setHttpClientConfigCallback(
+                                        new RestClientBuilder.HttpClientConfigCallback() {
+                                            @Override
+                                            public HttpAsyncClientBuilder customizeHttpClient(
+                                                    HttpAsyncClientBuilder httpAsyncClientBuilder) {
+                                                return httpAsyncClientBuilder
+                                                        .setDefaultCredentialsProvider(
+                                                                credentialsProvider);
+                                            }
+                                        })
                                 .build(),
                         new JacksonJsonpMapper());
         return new ElasticsearchClient(transport);
@@ -196,7 +207,16 @@ public class ElasticsearchDataSinkITCaseTest {
                         null);
 
         return new ElasticsearchSinkOptions(
-                5, 1, 10, 50 * 1024 * 1024, 1000, 10 * 1024 * 1024, networkConfig, 8, null, null);
+                5,
+                1,
+                10,
+                50 * 1024 * 1024,
+                1000,
+                10 * 1024 * 1024,
+                networkConfig,
+                8,
+                DEFAULT_USERNAME,
+                DEFAULT_PASSWORD);
     }
 
     private StreamExecutionEnvironment createStreamExecutionEnvironment() {

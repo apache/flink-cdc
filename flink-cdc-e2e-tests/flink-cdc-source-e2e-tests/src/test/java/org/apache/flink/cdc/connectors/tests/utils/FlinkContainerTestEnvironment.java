@@ -186,7 +186,8 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                             dockerClient.removeContainerCmd(container.getId()).exec();
                         });
 
-        // List all images and remove the ones that are not flink、mysql、testcontainers related.
+        // List all images and remove the ones that are not Flink, MySQL, and TestContainers
+        // related.
         dockerClient.listImagesCmd().exec().stream()
                 .filter(
                         image ->

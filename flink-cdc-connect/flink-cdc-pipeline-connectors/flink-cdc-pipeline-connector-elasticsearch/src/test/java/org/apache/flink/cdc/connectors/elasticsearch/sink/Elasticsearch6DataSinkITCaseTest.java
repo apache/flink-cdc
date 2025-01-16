@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.connectors.elasticsearch.config.ElasticsearchSinkOptions;
+import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchContainer;
 import org.apache.flink.cdc.connectors.elasticsearch.sink.utils.ElasticsearchTestUtils;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
 import org.apache.flink.elasticsearch6.shaded.org.apache.http.HttpHost;
@@ -43,14 +44,10 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.elasticsearch.ElasticsearchContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -67,11 +64,6 @@ public class Elasticsearch6DataSinkITCaseTest {
     private static final Logger LOG =
             LoggerFactory.getLogger(ElasticsearchDataSinkITCaseTest.class);
     private static final String ELASTICSEARCH_VERSION = "6.8.20";
-    private static final DockerImageName ELASTICSEARCH_IMAGE =
-            DockerImageName.parse(
-                            "docker.elastic.co/elasticsearch/elasticsearch:"
-                                    + ELASTICSEARCH_VERSION)
-                    .asCompatibleSubstituteFor("docker.elastic.co/elasticsearch/elasticsearch");
 
     @Container
     private static final ElasticsearchContainer ELASTICSEARCH_CONTAINER =
@@ -94,7 +86,7 @@ public class Elasticsearch6DataSinkITCaseTest {
     @Test
     public void testElasticsearchSink() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId);
 
         runJobWithEvents(events);
 
@@ -129,7 +121,7 @@ public class Elasticsearch6DataSinkITCaseTest {
     @Test
     public void testElasticsearchInsertAndDelete() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId);
 
         runJobWithEvents(events);
 
@@ -139,7 +131,7 @@ public class Elasticsearch6DataSinkITCaseTest {
     @Test
     public void testElasticsearchAddColumn() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
-        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId); // 使用工具类
+        List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId);
 
         runJobWithEvents(events);
 
@@ -147,13 +139,9 @@ public class Elasticsearch6DataSinkITCaseTest {
     }
 
     private static ElasticsearchContainer createElasticsearchContainer() {
-        return new ElasticsearchContainer(ELASTICSEARCH_IMAGE)
-                .withEnv("discovery.type", "single-node")
-                .withEnv("xpack.security.enabled", "false")
-                .withEnv("ES_JAVA_OPTS", "-Xms2g -Xmx2g")
-                .withEnv("logger.org.elasticsearch", "ERROR")
-                .withLogConsumer(new Slf4jLogConsumer(LOG))
-                .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofMinutes(5)));
+        ElasticsearchContainer esContainer = new ElasticsearchContainer(ELASTICSEARCH_VERSION);
+        esContainer.withLogConsumer(new Slf4jLogConsumer(LOG));
+        return esContainer;
     }
 
     private RestHighLevelClient createElasticsearchClient() {

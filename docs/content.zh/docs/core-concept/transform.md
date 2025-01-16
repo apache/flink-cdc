@@ -92,10 +92,10 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 |----------------------|-----------------------------|-----------------------------------------------------------------|
 | value1 = value2      | valueEquals(value1, value2) | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
 | value1 <> value2     | !valueEquals(value1, value2) | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 > value2      | value1 > value2             | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 >= value2     | value1 >= value2            | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2      | value1 < value2             | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <= value2     | value1 <= value2            | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 > value2      | greaterThan(value1, value2)     | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 >= value2     | greaterThanOrEqual(value1, value2) | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 < value2      | lessThan(value1, value2)        | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <= value2     | lessThanOrEqual(value1, value2) | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
 | value IS NULL        | null == value               | Returns TRUE if value is NULL.                                  |
 | value IS NOT NULL    | null != value               | Returns TRUE if value is not NULL.                              |
 | value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
@@ -157,9 +157,13 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | CURRENT_TIMESTAMP | currentTimestamp() | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3). |
 | NOW() | now() | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP. |
 | DATE_FORMAT(timestamp, string) | dateFormat(timestamp, string) | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat. |
+| TIMESTAMPADD(timeintervalunit, interval, timepoint)   | timestampadd(timeintervalunit, interval, timepoint)  | Returns the timestamp of timepoint2 after timepoint added interval. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.     |
 | TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR. |
 | TO_DATE(string1[, string2]) | toDate(string1[, string2]) | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date. |
 | TO_TIMESTAMP(string1[, string2]) | toTimestamp(string1[, string2]) | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone. |
+| FROM_UNIXTIME(numeric[, string]) | fromUnixtime(NUMERIC[, STRING]) | Returns a representation of the numeric argument as a value in string format (default is ‘yyyy-MM-dd HH:mm:ss’). numeric is an internal timestamp value representing seconds since ‘1970-01-01 00:00:00’ UTC, such as produced by the UNIX_TIMESTAMP() function. The return value is expressed in the session time zone (specified in TableConfig). E.g., FROM_UNIXTIME(44) returns ‘1970-01-01 00:00:44’ if in UTC time zone, but returns ‘1970-01-01 09:00:44’ if in ‘Asia/Tokyo’ time zone. |
+| UNIX_TIMESTAMP() | unixTimestamp() | Gets current Unix timestamp in seconds. This function is not deterministic which means the value would be recalculated for each record. |
+| UNIX_TIMESTAMP(string1[, string2]) | unixTimestamp(STRING1[, STRING2]) | Converts a date time string string1 with format string2 (by default: yyyy-MM-dd HH:mm:ss if not specified) to Unix timestamp (in seconds), using the specified timezone in table config.<br/>If a time zone is specified in the date time string and parsed by UTC+X format such as “yyyy-MM-dd HH:mm:ss.SSS X”, this function will use the specified timezone in the date time string instead of the timezone in table config. If the date time string can not be parsed, the default value Long.MIN_VALUE(-9223372036854775808) will be returned.|
 
 ## Conditional Functions
 

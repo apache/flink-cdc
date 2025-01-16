@@ -63,6 +63,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private final boolean includeSchemaChanges;
     private final boolean tinyInt1isBit;
+    private final boolean includeComments;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
@@ -70,18 +71,20 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private List<MySqlReadableMetadata> readableMetadataList;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
-        this(changelogMode, includeSchemaChanges, new ArrayList<>(), true);
+            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges, boolean tinyInt1isBit) {
+        this(changelogMode, includeSchemaChanges, new ArrayList<>(), false, true);
     }
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
             List<MySqlReadableMetadata> readableMetadataList,
+            boolean includeComments,
             boolean tinyInt1isBit) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
+        this.includeComments = includeComments;
         this.tinyInt1isBit = tinyInt1isBit;
     }
 
@@ -89,7 +92,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser(tinyInt1isBit);
+                customParser = new CustomMySqlAntlrDdlParser(includeComments, tinyInt1isBit);
                 tables = new Tables();
             }
 

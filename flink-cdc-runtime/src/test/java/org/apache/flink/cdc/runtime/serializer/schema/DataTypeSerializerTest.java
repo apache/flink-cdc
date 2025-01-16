@@ -28,6 +28,8 @@ import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -40,6 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /** A test for the {@link DataTypeSerializer}. */
 public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DataTypeSerializerTest.class);
+
     @Override
     protected TypeSerializer<DataType> createSerializer() {
         return new DataTypeSerializer();
@@ -104,12 +109,12 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
 
         // Log to ensure INSTANCE is initialized
         assertNotNull(RowTypeSerializer.INSTANCE, "RowTypeSerializer.INSTANCE is null");
-        System.out.println("RowTypeSerializer.INSTANCE is initialized");
+        LOG.info("RowTypeSerializer.INSTANCE is initialized");
 
         // Copy the RowType
         RowType copiedRow = (RowType) serializer.copy(outerRowType);
         assertNotNull(copiedRow, "Copied RowType is null");
-        System.out.println("Copied RowType: " + copiedRow);
+        LOG.info("Copied RowType: {}", copiedRow);
 
         // Serialize the RowType
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -126,6 +131,6 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
         assertNotNull(deserializedRow, "Deserialized RowType is null");
         assertEquals(
                 outerRowType, deserializedRow, "Deserialized RowType does not match the original");
-        System.out.println("Deserialized RowType: " + deserializedRow);
+        LOG.info("Deserialized RowType: {}", deserializedRow);
     }
 }

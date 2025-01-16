@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
@@ -42,6 +43,16 @@ public class DateTimeUtils {
      * <p>This is the modulo 'mask' used when converting TIMESTAMP values to DATE and TIME values.
      */
     public static final long MILLIS_PER_DAY = 86400000L; // = 24 * 60 * 60 * 1000
+
+    /** The SimpleDateFormat string for ISO dates, "yyyy-MM-dd". */
+    private static final String DATE_FORMAT_STRING = "yyyy-MM-dd";
+
+    /** The SimpleDateFormat string for ISO times, "HH:mm:ss". */
+    private static final String TIME_FORMAT_STRING = "HH:mm:ss";
+
+    /** The SimpleDateFormat string for ISO timestamps, "yyyy-MM-dd HH:mm:ss". */
+    private static final String TIMESTAMP_FORMAT_STRING =
+            DATE_FORMAT_STRING + " " + TIME_FORMAT_STRING;
 
     /**
      * A ThreadLocal cache map for SimpleDateFormat, because SimpleDateFormat is not thread-safe.
@@ -109,7 +120,7 @@ public class DateTimeUtils {
         } catch (ParseException e) {
             LOG.error(
                     String.format(
-                            "Exception when parsing datetime string '%s' in format '%s'",
+                            "Exception when parsing datetime string '%s' in format '%s', the default value Long.MIN_VALUE(-9223372036854775808) will be returned.",
                             dateStr, format),
                     e);
             return Long.MIN_VALUE;
@@ -129,6 +140,56 @@ public class DateTimeUtils {
     }
 
     // --------------------------------------------------------------------------------------------
+    // UNIX TIME
+    // --------------------------------------------------------------------------------------------
+
+    /**
+     * Convert unix timestamp (seconds since '1970-01-01 00:00:00' UTC) to datetime string in the
+     * "yyyy-MM-dd HH:mm:ss" format.
+     */
+    public static String formatUnixTimestamp(long unixTime, TimeZone timeZone) {
+        return formatUnixTimestamp(unixTime, TIMESTAMP_FORMAT_STRING, timeZone);
+    }
+
+    /**
+     * Convert unix timestamp (seconds since '1970-01-01 00:00:00' UTC) to datetime string in the
+     * given format.
+     */
+    public static String formatUnixTimestamp(long unixTime, String format, TimeZone timeZone) {
+        SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
+        formatter.setTimeZone(timeZone);
+        Date date = new Date(unixTime * 1000);
+        try {
+            return formatter.format(date);
+        } catch (Exception e) {
+            LOG.error("Exception when formatting.", e);
+            return null;
+        }
+    }
+
+    /**
+     * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
+     * 00:00:00' UTC.
+     */
+    public static long unixTimestamp(String dateStr, TimeZone timeZone) {
+        return unixTimestamp(dateStr, TIMESTAMP_FORMAT_STRING, timeZone);
+    }
+
+    /**
+     * Returns the value of the argument as an unsigned integer in seconds since '1970-01-01
+     * 00:00:00' UTC.
+     */
+    public static long unixTimestamp(String dateStr, String format, TimeZone timeZone) {
+        long ts = internalParseTimestampMillis(dateStr, format, timeZone);
+        if (ts == Long.MIN_VALUE) {
+            return Long.MIN_VALUE;
+        } else {
+            // return the seconds
+            return ts / 1000;
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
     // Format
     // --------------------------------------------------------------------------------------------
 
@@ -137,5 +198,94 @@ public class DateTimeUtils {
         formatter.setTimeZone(timeZone);
         Date dateTime = new Date(ts);
         return formatter.format(dateTime);
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Compare
+    // --------------------------------------------------------------------------------------------
+
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            long fromDate,
+            String fromTimezone,
+            long toDate,
+            String toTimezone) {
+        Calendar from = Calendar.getInstance(TimeZone.getTimeZone(fromTimezone));
+        from.setTime(new Date(fromDate));
+        Calendar to = Calendar.getInstance(TimeZone.getTimeZone(toTimezone));
+        to.setTime(new Date(toDate));
+        long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
+        switch (timeIntervalUnit) {
+            case "SECOND":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second;
+            case "MINUTE":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / 60;
+            case "HOUR":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / 3600;
+            case "DAY":
+                if (second > Integer.MAX_VALUE) {
+                    return null;
+                }
+                return (int) second / (24 * 3600);
+            case "MONTH":
+                return to.get(Calendar.YEAR) * 12
+                        + to.get(Calendar.MONTH)
+                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONTH));
+            case "YEAR":
+                return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
+            default:
+                throw new RuntimeException(
+                        String.format(
+                                "Unsupported timestamp interval unit %s. Supported units are: SECOND, MINUTE, HOUR, DAY, MONTH, YEAR",
+                                timeIntervalUnit));
+        }
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Add
+    // --------------------------------------------------------------------------------------------
+
+    public static long timestampAdd(
+            String timeIntervalUnit, int interval, long timePoint, String timezone) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeZone(TimeZone.getTimeZone(timezone));
+        calendar.setTime(new Date(timePoint));
+        int field;
+        switch (timeIntervalUnit) {
+            case "SECOND":
+                field = Calendar.SECOND;
+                break;
+            case "MINUTE":
+                field = Calendar.MINUTE;
+                break;
+            case "HOUR":
+                field = Calendar.HOUR;
+                break;
+            case "DAY":
+                field = Calendar.DATE;
+                break;
+            case "MONTH":
+                field = Calendar.MONTH;
+                break;
+            case "YEAR":
+                field = Calendar.YEAR;
+                break;
+            default:
+                throw new RuntimeException(
+                        String.format(
+                                "Unsupported timestamp interval unit %s. Supported units are: SECOND, MINUTE, HOUR, DAY, MONTH, YEAR",
+                                timeIntervalUnit));
+        }
+        calendar.add(field, interval);
+        return calendar.getTimeInMillis();
     }
 }

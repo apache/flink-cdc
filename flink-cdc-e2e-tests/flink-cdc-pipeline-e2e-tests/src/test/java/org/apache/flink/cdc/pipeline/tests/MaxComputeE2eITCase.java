@@ -37,6 +37,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
@@ -64,7 +65,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                     .withExposedPorts(8080)
                     .waitingFor(
                             Wait.forLogMessage(".*Started MaxcomputeEmulatorApplication.*\\n", 1))
-                    .withLogConsumer(frame -> System.out.print(frame.getUtf8String()));
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public final MaxComputeOptions testOptions =
             MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc")
@@ -80,7 +81,7 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                         "select * from table1 order by col1;");
         instance.waitForSuccess();
         List<Record> result = SQLTask.getResult(instance);
-        System.out.println(result);
+        LOG.info("{}", result);
         Assert.assertEquals(2, result.size());
         // 2,x
         Assert.assertEquals("2", result.get(0).get(0));
@@ -108,17 +109,17 @@ public class MaxComputeE2eITCase extends PipelineTestEnvironment {
                         + "sink:\n"
                         + "   type: maxcompute\n"
                         + "   name: MaxComputeSink\n"
-                        + "   accessId: ak\n"
-                        + "   accessKey: sk\n"
+                        + "   access-id: ak\n"
+                        + "   access-key: sk\n"
                         + "   endpoint: "
                         + getEndpoint()
                         + "\n"
-                        + "   tunnelEndpoint: "
+                        + "   tunnel.endpoint: "
                         + getEndpoint()
                         + "\n"
                         + "   project: mocked_mc\n"
-                        + "   bucketsNum: 8\n"
-                        + "   compressAlgorithm: raw\n"
+                        + "   buckets-num: 8\n"
+                        + "   compress.algorithm: raw\n"
                         + "\n"
                         + "pipeline:\n"
                         + "   parallelism: 4";

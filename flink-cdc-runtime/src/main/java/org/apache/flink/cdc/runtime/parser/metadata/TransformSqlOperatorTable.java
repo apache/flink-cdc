@@ -212,6 +212,27 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     return SqlSyntax.FUNCTION;
                 }
             };
+    public static final SqlFunction UNIX_TIMESTAMP =
+            new SqlFunction(
+                    "UNIX_TIMESTAMP",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.BIGINT_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.NILADIC,
+                            OperandTypes.family(SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.TIMEDATE);
+    public static final SqlFunction FROM_UNIXTIME =
+            new SqlFunction(
+                    "FROM_UNIXTIME",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.VARCHAR_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.INTEGER),
+                            OperandTypes.family(SqlTypeFamily.INTEGER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.TIMEDATE);
     public static final SqlFunction DATE_FORMAT =
             new SqlFunction(
                     "DATE_FORMAT",
@@ -232,6 +253,26 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     null,
                     OperandTypes.family(
                             SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.TIMESTAMP),
+                    SqlFunctionCategory.TIMEDATE);
+    public static final SqlFunction TIMESTAMPDIFF =
+            new SqlFunction(
+                    "TIMESTAMPDIFF",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.INTEGER),
+                            SqlTypeTransforms.FORCE_NULLABLE),
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.TIMESTAMP),
+                    SqlFunctionCategory.TIMEDATE);
+    public static final SqlFunction TIMESTAMPADD =
+            new SqlFunction(
+                    "TIMESTAMPADD",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.ARG2_TIMESTAMP_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.family(
+                            SqlTypeFamily.ANY, SqlTypeFamily.INTEGER, SqlTypeFamily.TIMESTAMP),
                     SqlFunctionCategory.TIMEDATE);
     public static final SqlFunction TO_DATE =
             new SqlFunction(

@@ -31,6 +31,8 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEm
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,11 +59,19 @@ public class MySqlDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
+        boolean includeComments =
+                sourceConfig
+                        .getDbzConfiguration()
+                        .getBoolean(
+                                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                                false);
+
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
                         DebeziumChangelogMode.ALL,
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
+                        includeComments,
                         sourceConfig.getTinyInt1isBit());
 
         MySqlSource<Event> source =

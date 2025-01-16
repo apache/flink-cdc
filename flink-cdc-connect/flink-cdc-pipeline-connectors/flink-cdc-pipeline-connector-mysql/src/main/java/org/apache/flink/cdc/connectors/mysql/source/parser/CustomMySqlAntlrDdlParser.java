@@ -23,6 +23,7 @@ import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.DataTypeResolver;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
+import io.debezium.relational.Tables;
 
 import java.sql.Types;
 import java.util.ArrayList;
@@ -36,8 +37,8 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
     private final LinkedList<SchemaChangeEvent> parsedEvents;
     private final boolean tinyInt1isBit;
 
-    public CustomMySqlAntlrDdlParser(boolean tinyInt1isBit) {
-        super();
+    public CustomMySqlAntlrDdlParser(boolean includeComments, boolean tinyInt1isBit) {
+        super(true, false, includeComments, null, Tables.TableFilter.includeAll());
         this.parsedEvents = new LinkedList<>();
         this.tinyInt1isBit = tinyInt1isBit;
     }

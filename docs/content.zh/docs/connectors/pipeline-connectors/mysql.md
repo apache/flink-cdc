@@ -286,6 +286,25 @@ pipeline:
           scan.binlog.newly-added-table.enabled: 只在 binlog 读取阶段读取新增表的增量数据。
       </td>
     </tr>
+    <tr>
+      <td>scan.parse.online.schema.changes.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
+        这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
+        <br>
+        这是一项实验性功能。
+      </td>
+    </tr>
+    <tr>
+      <td>include-comments.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用同步表、字段注释特性，默认关闭。注意：开启此特性将会对内存使用产生影响。</td>
+    </tr>
     </tbody>
 </table>
 </div>
