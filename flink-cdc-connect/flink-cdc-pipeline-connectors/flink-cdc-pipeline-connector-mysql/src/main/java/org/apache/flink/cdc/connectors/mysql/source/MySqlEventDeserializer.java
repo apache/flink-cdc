@@ -71,8 +71,15 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private List<MySqlReadableMetadata> readableMetadataList;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges, boolean tinyInt1isBit) {
-        this(changelogMode, includeSchemaChanges, new ArrayList<>(), false, true);
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            boolean tinyInt1isBit) {
+        this(
+                changelogMode,
+                includeSchemaChanges,
+                new ArrayList<>(),
+                includeSchemaChanges,
+                tinyInt1isBit);
     }
 
     public MySqlEventDeserializer(

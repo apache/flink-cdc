@@ -32,7 +32,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import com.mysql.cj.conf.PropertyKey;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -42,7 +41,6 @@ import org.testcontainers.lifecycle.Startables;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -537,9 +535,6 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                         .map(tableName -> database.getDatabaseName() + "." + tableName)
                         .toArray(String[]::new);
 
-        Properties jdbcProperties = new Properties();
-        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyint1IsBit));
-
         return new MySqlSourceConfigFactory()
                 .startupOptions(StartupOptions.latest())
                 .databaseList(database.getDatabaseName())
@@ -552,7 +547,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                 .username(database.getUsername())
                 .password(database.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
-                .jdbcProperties(jdbcProperties)
+                .treatTinyInt1AsBoolean(tinyint1IsBit)
                 .createConfig(0);
     }
 }

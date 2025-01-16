@@ -72,7 +72,7 @@ public class MySqlDataSource implements DataSource {
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
                         includeComments,
-                        sourceConfig.getTinyInt1isBit());
+                        sourceConfig.isTreatTinyInt1AsBoolean());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

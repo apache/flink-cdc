@@ -129,7 +129,7 @@ public class MySqlSchemaUtils {
                 new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
             TableChanges.TableChange tableSchema =
                     mySqlSchema.getTableSchema(partition, jdbc, toDbzTableId(tableId));
-            return toSchema(tableSchema.getTable(), sourceConfig.getTinyInt1isBit());
+            return toSchema(tableSchema.getTable(), sourceConfig.isTreatTinyInt1AsBoolean());
         }
     }
 

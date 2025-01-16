@@ -55,7 +55,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
-import com.mysql.cj.conf.PropertyKey;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -73,7 +72,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -449,9 +447,6 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
 
-        Properties jdbcProperties = new Properties();
-        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyInt1isBit));
-
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
                         .hostname(MYSQL8_CONTAINER.getHost())
@@ -463,7 +458,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .startupOptions(StartupOptions.latest())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
-                        .jdbcProperties(jdbcProperties)
+                        .treatTinyInt1AsBoolean(tinyInt1isBit)
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
 
         FlinkSourceProvider sourceProvider =
@@ -613,9 +608,6 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
 
-        Properties jdbcProperties = new Properties();
-        jdbcProperties.put(PropertyKey.tinyInt1isBit.getKeyName(), String.valueOf(tinyInt1isBit));
-
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
                         .hostname(MYSQL8_CONTAINER.getHost())
@@ -627,7 +619,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .startupOptions(StartupOptions.latest())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
-                        .jdbcProperties(jdbcProperties)
+                        .treatTinyInt1AsBoolean(tinyInt1isBit)
                         .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
 
         FlinkSourceProvider sourceProvider =
@@ -674,6 +666,19 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                                     tinyInt1isBit
                                                             ? DataTypes.BOOLEAN()
                                                             : DataTypes.TINYINT())))));
+
+            // Add a new BOOLEAN column
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `new_bool_col1` bool NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "new_bool_col1", DataTypes.BOOLEAN())))));
 
             // Test MODIFY COLUMN DDL
             statement.execute(

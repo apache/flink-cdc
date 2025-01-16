@@ -22,7 +22,6 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
-import com.mysql.cj.conf.PropertyKey;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
@@ -75,6 +74,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties dbzProperties;
     private final Configuration dbzConfiguration;
     private final MySqlConnectorConfig dbzMySqlConfig;
+    private final boolean treatTinyInt1AsBoolean;
 
     MySqlSourceConfig(
             String hostname,
@@ -102,7 +102,8 @@ public class MySqlSourceConfig implements Serializable {
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
             boolean skipSnapshotBackfill,
-            boolean parseOnLineSchemaChanges) {
+            boolean parseOnLineSchemaChanges,
+            boolean treatTinyInt1AsBoolean) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -131,6 +132,7 @@ public class MySqlSourceConfig implements Serializable {
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
+        this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
     }
 
     public String getHostname() {
@@ -263,8 +265,7 @@ public class MySqlSourceConfig implements Serializable {
         return skipSnapshotBackfill;
     }
 
-    public boolean getTinyInt1isBit() {
-        return Boolean.parseBoolean(
-                jdbcProperties.getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
+    public boolean isTreatTinyInt1AsBoolean() {
+        return treatTinyInt1AsBoolean;
     }
 }

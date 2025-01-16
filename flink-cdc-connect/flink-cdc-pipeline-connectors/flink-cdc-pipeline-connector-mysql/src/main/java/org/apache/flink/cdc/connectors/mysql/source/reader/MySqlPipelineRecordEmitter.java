@@ -203,7 +203,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
             String colName = column.name();
             DataType dataType =
-                    MySqlTypeUtils.fromDbzColumn(column, sourceConfig.getTinyInt1isBit());
+                    MySqlTypeUtils.fromDbzColumn(column, sourceConfig.isTreatTinyInt1AsBoolean());
             if (!column.isOptional()) {
                 dataType = dataType.notNull();
             }

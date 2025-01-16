@@ -305,6 +305,13 @@ pipeline:
       <td>Boolean</td>
       <td>是否启用同步表、字段注释特性，默认关闭。注意：开启此特性将会对内存使用产生影响。</td>
     </tr>
+    <tr>
+      <td>treat-tinyint1-as-boolean</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否将TINYINT(1)类型当做Boolean类型处理，默认true。</td>
+    </tr>
     </tbody>
 </table>
 </div>

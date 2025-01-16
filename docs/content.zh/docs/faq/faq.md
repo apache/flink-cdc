@@ -208,14 +208,14 @@ restart-strategy.fixed-delay.delay= 30s
 2. 如果要同步排除products和orders表之外的整个my_db库，tableList选项值应该类似于‘my_db.(?!products｜orders).*’。
 
 ### Q16: MySQL源表中存在TINYINT(1)类型的列，且部分行的数值>1，Pipeline作业下游接收到的数据却是true/false，为什么？
-这是由于MySQL连接参数`tinyInt1isBit`默认值为`true`，导致TINYINT(1)类型的数据被解析为布尔值。
-若需将其转换为实际值，请在source节点添加配置`jdbc.properties.tinyInt1isBit: false`。  
+这是由于MySQL连接参数`tinyInt1isBit`默认值为`true`，Flink CDC 3.3.0之前的版本未处理该参数，导致TINYINT(1)类型的数据被解析为布尔值。
+若需将其转换为实际值，请将CDC升级至3.3.0+，并在source节点添加配置`treat-tinyint1-as-boolean: false`。  
 例如：
 ```yaml
 source:
   type: mysql
   ...
-  jdbc.properties.tinyInt1isBit: false
+  treat-tinyint1-as-boolean: false
 
 sink:
   type: ...
