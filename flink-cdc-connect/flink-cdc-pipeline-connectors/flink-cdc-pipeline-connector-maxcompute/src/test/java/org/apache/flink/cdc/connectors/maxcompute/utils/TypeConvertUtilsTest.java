@@ -167,7 +167,7 @@ public class TypeConvertUtilsTest {
                             123456.789d,
                             12345,
                             12345,
-                            TimestampData.fromTimestamp(Timestamp.from(Instant.ofEpochSecond(0))),
+                            TimestampData.fromTimestamp(Timestamp.valueOf("1970-01-01 00:00:00")),
                             LocalZonedTimestampData.fromInstant(Instant.ofEpochSecond(0)),
                             ZonedTimestampData.fromZonedDateTime(
                                     ZonedDateTime.ofInstant(
@@ -179,7 +179,7 @@ public class TypeConvertUtilsTest {
         TypeConvertUtils.toMaxComputeRecord(schemaWithoutComplexType, record1, arrayRecord);
 
         String expect =
-                "char,varchar,string,false,=01=02=03=04=05,=01=02=03=04=05=06=07=08=09=0A,0.00,1,2,12345,12345,123.456,123456.789,00:00:00.012345,2003-10-20,1970-01-01T08:00,1970-01-01T00:00:00Z,1970-01-01T00:00:00Z";
+                "char,varchar,string,false,=01=02=03=04=05,=01=02=03=04=05=06=07=08=09=0A,0.00,1,2,12345,12345,123.456,123456.789,00:00:00.012345,2003-10-20,1970-01-01T00:00,1970-01-01T00:00:00Z,1970-01-01T00:00:00Z";
         Assert.assertEquals(expect, arrayRecord.toString());
     }
 }
