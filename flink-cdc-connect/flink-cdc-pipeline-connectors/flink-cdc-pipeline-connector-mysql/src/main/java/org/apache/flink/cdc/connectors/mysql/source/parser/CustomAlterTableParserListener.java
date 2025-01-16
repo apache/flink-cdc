@@ -122,6 +122,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     if (tableEditor.hasPrimaryKey()) {
                         builder.primaryKey(tableEditor.primaryKeyColumnNames());
                     }
+                    builder.comment(tableEditor.create().comment());
                     changes.add(
                             new CreateTableEvent(
                                     toCdcTableId(tableEditor.tableId()), builder.build()));
@@ -411,6 +412,21 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                             changes.add(new DropTableEvent(toCdcTableId(tableId)));
                         });
         super.exitDropTable(ctx);
+    }
+
+    @Override
+    public void enterTableOptionComment(MySqlParser.TableOptionCommentContext ctx) {
+        if (!parser.skipComments()) {
+            parser.runIfNotNull(
+                    () -> {
+                        if (ctx.COMMENT() != null) {
+                            tableEditor.setComment(
+                                    parser.withoutQuotes(ctx.STRING_LITERAL().getText()));
+                        }
+                    },
+                    tableEditor);
+        }
+        super.enterTableOptionComment(ctx);
     }
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
