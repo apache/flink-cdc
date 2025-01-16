@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.debezium.reader;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
@@ -61,6 +62,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+
 /**
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
  * snapshot data that {@link SnapshotSplitReader} read.
@@ -88,10 +92,19 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
-    public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subTaskId) {
+    public BinlogSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
+        this(
+                new StatefulTaskContext(
+                        sourceConfig,
+                        createBinaryClient(sourceConfig.getDbzConfiguration()),
+                        createMySqlConnection(sourceConfig)),
+                subtaskId);
+    }
+
+    public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
         this.statefulTaskContext = statefulTaskContext;
         ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subTaskId).build();
+                new ThreadFactoryBuilder().setNameFormat("binlog-reader-" + subtaskId).build();
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureBinlogPhaseTables = new HashSet<>();
@@ -185,14 +198,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     @Override
     public void close() {
         try {
-            if (statefulTaskContext.getConnection() != null) {
-                statefulTaskContext.getConnection().close();
-            }
-            if (statefulTaskContext.getBinaryLogClient() != null) {
-                statefulTaskContext.getBinaryLogClient().disconnect();
-            }
-
             stopBinlogReadTask();
+            if (statefulTaskContext != null) {
+                statefulTaskContext.close();
+            }
             if (executorService != null) {
                 executorService.shutdown();
                 if (!executorService.awaitTermination(READER_CLOSE_TIMEOUT, TimeUnit.SECONDS)) {
@@ -201,7 +210,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                             READER_CLOSE_TIMEOUT);
                 }
             }
-            statefulTaskContext.getDatabaseSchema().close();
         } catch (Exception e) {
             LOG.error("Close binlog reader error", e);
         }
