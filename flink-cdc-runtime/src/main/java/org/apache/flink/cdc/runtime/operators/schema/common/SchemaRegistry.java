@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -130,6 +131,12 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     public void close() throws Exception {
         LOG.info("Closing SchemaRegistry - {}.", operatorName);
         coordinatorExecutor.shutdown();
+        try {
+            metadataApplier.close();
+        } catch (Exception e) {
+            LOG.error("Failed to close metadata applier.", e);
+            throw new IOException("Failed to close metadata applier.", e);
+        }
     }
 
     // ------------------------------
