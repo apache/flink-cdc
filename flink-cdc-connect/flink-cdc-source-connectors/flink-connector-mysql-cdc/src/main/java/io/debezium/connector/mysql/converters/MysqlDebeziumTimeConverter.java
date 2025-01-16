@@ -44,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Debezium converts the datetime type in MySQL into a UTC timestamp by default ({@link
- * io.debezium.time.Timestamp} )，The time zone is hard-coded and cannot be changed. causing
+ * io.debezium.time.Timestamp} ), The time zone is hard-coded and cannot be changed. causing
  * conversion errors part of the time Enable this converter to convert the four times "DATE",
  * "DATETIME", "TIME", and "TIMESTAMP" into the format corresponding to the configured time zone
  * (for example, yyyy-MM-dd)

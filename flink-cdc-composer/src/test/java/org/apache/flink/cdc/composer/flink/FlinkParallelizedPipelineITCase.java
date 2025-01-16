@@ -47,6 +47,8 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -64,6 +66,9 @@ import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOA
 /** Integration test for {@link FlinkPipelineComposer} in parallelized schema evolution cases. */
 @Timeout(value = 600, unit = java.util.concurrent.TimeUnit.SECONDS)
 class FlinkParallelizedPipelineITCase {
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(FlinkParallelizedPipelineITCase.class);
 
     private static final int MAX_PARALLELISM = 4;
     private static final int UPSTREAM_TABLE_COUNT = 4;
@@ -144,11 +149,11 @@ class FlinkParallelizedPipelineITCase {
     @AfterEach
     void cleanup() {
         System.setOut(standardOut);
-        System.out.println(
+        LOG.debug(
                 "NOTICE: This is a semi-fuzzy test. Please also check if value sink prints expected events:");
-        System.out.println("================================");
-        System.out.print(outCaptor);
-        System.out.println("================================");
+        LOG.debug("================================");
+        LOG.debug(outCaptor.toString());
+        LOG.debug("================================");
         outCaptor.reset();
     }
 

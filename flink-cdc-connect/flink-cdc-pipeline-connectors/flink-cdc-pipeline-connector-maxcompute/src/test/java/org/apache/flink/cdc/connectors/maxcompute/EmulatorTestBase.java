@@ -22,7 +22,10 @@ import org.apache.flink.cdc.connectors.maxcompute.utils.MaxComputeUtils;
 
 import com.aliyun.odps.Odps;
 import org.junit.ClassRule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
@@ -34,6 +37,9 @@ import java.net.UnknownHostException;
 
 /** init maxcompute-emulator use for e2e test. */
 public class EmulatorTestBase {
+
+    private static final Logger LOG = LoggerFactory.getLogger(EmulatorTestBase.class);
+
     public static final DockerImageName MAXCOMPUTE_IMAGE =
             DockerImageName.parse("maxcompute/maxcompute-emulator:v0.0.4");
 
@@ -43,7 +49,7 @@ public class EmulatorTestBase {
                     .withExposedPorts(8080)
                     .waitingFor(
                             Wait.forLogMessage(".*Started MaxcomputeEmulatorApplication.*\\n", 1))
-                    .withLogConsumer(frame -> System.out.print(frame.getUtf8String()));
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public final MaxComputeOptions testOptions =
             MaxComputeOptions.builder("ak", "sk", getEndpoint(), "mocked_mc").build();
