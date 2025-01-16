@@ -120,6 +120,13 @@ pipeline:
       <td> 是否通过FE重定向写入，直连BE写入 </td>
     </tr>
     <tr>
+      <td>charset-encoding</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td> Doris Http客户端字符集编码，默认UTF-8 </td>
+    </tr>
+    <tr>
       <td>sink.enable.batch-mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>

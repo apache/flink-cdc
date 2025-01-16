@@ -64,6 +64,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUM
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
+import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.CHARSET_ENCODING;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.TABLE_CREATE_PROPERTIES_PREFIX;
 
 /** Supports {@link DorisDataSink} to schema evolution. */
@@ -76,7 +77,8 @@ public class DorisMetadataApplier implements MetadataApplier {
 
     public DorisMetadataApplier(DorisOptions dorisOptions, Configuration config) {
         this.dorisOptions = dorisOptions;
-        this.schemaChangeManager = new DorisSchemaChangeManager(dorisOptions);
+        this.schemaChangeManager =
+                new DorisSchemaChangeManager(dorisOptions, config.get(CHARSET_ENCODING));
         this.config = config;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
@@ -147,6 +149,7 @@ public class DorisMetadataApplier implements MetadataApplier {
             tableSchema.setDatabase(tableId.getSchemaName());
             tableSchema.setFields(buildFields(schema));
             tableSchema.setDistributeKeys(buildDistributeKeys(schema));
+            tableSchema.setTableComment(schema.comment());
 
             if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
                 tableSchema.setModel(DataModel.DUPLICATE);

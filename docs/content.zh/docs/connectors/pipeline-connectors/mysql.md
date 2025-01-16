@@ -298,6 +298,13 @@ pipeline:
         这是一项实验性功能。
       </td>
     </tr>
+    <tr>
+      <td>include-comments.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用同步表、字段注释特性，默认关闭。注意：开启此特性将会对内存使用产生影响。</td>
+    </tr>
     </tbody>
 </table>
 </div>

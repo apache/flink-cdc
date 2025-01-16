@@ -75,7 +75,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.INCLUDE_COMMENTS_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
@@ -929,6 +936,98 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(
                 expectedEvents.stream().map(Object::toString).collect(Collectors.toList()),
                 actual.stream().map(Object::toString).collect(Collectors.toList()));
+    }
+
+    @Test
+    public void testIncludeComments() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        TableId tableId =
+                TableId.tableId(inventoryDatabase.getDatabaseName(), "products_with_comments");
+
+        String createTableSql =
+                String.format(
+                        "CREATE TABLE IF NOT EXISTS `%s`.`%s` (\n"
+                                + "  id INTEGER NOT NULL AUTO_INCREMENT COMMENT 'column comment of id' PRIMARY KEY,\n"
+                                + "  name VARCHAR(255) NOT NULL DEFAULT 'flink' COMMENT 'column comment of name',\n"
+                                + "  weight FLOAT(6) COMMENT 'column comment of weight'\n"
+                                + ")\n"
+                                + "COMMENT 'table comment of products';",
+                        inventoryDatabase.getDatabaseName(), "products_with_comments");
+        executeSql(inventoryDatabase, createTableSql);
+
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL8_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL8_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(SERVER_TIME_ZONE.key(), "UTC");
+        options.put(INCLUDE_COMMENTS_ENABLED.key(), "true");
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".products_with_comments");
+        Factory.Context context =
+                new FactoryHelper.DefaultContext(
+                        Configuration.fromMap(options), null, this.getClass().getClassLoader());
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) dataSource.getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        // add some column
+        String addColumnSql =
+                String.format(
+                        "ALTER TABLE `%s`.`products_with_comments` ADD COLUMN `description` VARCHAR(512) comment 'column comment of description';",
+                        inventoryDatabase.getDatabaseName());
+        executeSql(inventoryDatabase, addColumnSql);
+
+        List<Event> expectedEvents = getEventsWithComments(tableId);
+        List<Event> actual = fetchResults(events, expectedEvents.size());
+        assertEqualsInAnyOrder(
+                expectedEvents.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
+    }
+
+    private void executeSql(UniqueDatabase database, String sql) throws SQLException {
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
+    }
+
+    private List<Event> getEventsWithComments(TableId tableId) {
+        return Arrays.asList(
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn(
+                                        "id", DataTypes.INT().notNull(), "column comment of id")
+                                .physicalColumn(
+                                        "name",
+                                        DataTypes.VARCHAR(255).notNull(),
+                                        "column comment of name",
+                                        "flink")
+                                .physicalColumn(
+                                        "weight", DataTypes.FLOAT(), "column comment of weight")
+                                .primaryKey(Collections.singletonList("id"))
+                                .comment("table comment of products")
+                                .build()),
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn(
+                                                "description",
+                                                DataTypes.VARCHAR(512),
+                                                "column comment of description")))));
     }
 
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
