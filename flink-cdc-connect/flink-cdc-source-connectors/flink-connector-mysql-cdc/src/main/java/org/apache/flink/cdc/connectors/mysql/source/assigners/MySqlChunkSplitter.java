@@ -32,7 +32,6 @@ import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
 
-import com.mysql.cj.conf.PropertyKey;
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
@@ -388,12 +387,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             Object max,
             int chunkSize,
             long approximateRowCnt) {
-        boolean tinyInt1isBit =
-                Boolean.parseBoolean(
-                        sourceConfig
-                                .getJdbcProperties()
-                                .getProperty(PropertyKey.tinyInt1isBit.getKeyName(), "true"));
-        if (!isEvenlySplitColumn(splitColumn, tinyInt1isBit)) {
+        if (!isEvenlySplitColumn(splitColumn, sourceConfig.isTreatTinyInt1AsBoolean())) {
             return -1;
         }
         final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
