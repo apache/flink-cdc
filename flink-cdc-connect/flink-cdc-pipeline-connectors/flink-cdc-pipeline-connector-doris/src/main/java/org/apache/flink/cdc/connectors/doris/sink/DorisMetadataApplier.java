@@ -167,7 +167,10 @@ public class DorisMetadataApplier implements MetadataApplier {
 
             Tuple2<String, String> partitionInfo =
                     DorisSchemaUtils.getPartitionInfo(config, schema, tableId);
-            tableSchema.setPartitionInfo(partitionInfo);
+            if (partitionInfo != null) {
+                LOG.info("Partition info of {} is: {}.", tableId.identifier(), partitionInfo);
+                tableSchema.setPartitionInfo(partitionInfo);
+            }
             schemaChangeManager.createTable(tableSchema);
         } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);

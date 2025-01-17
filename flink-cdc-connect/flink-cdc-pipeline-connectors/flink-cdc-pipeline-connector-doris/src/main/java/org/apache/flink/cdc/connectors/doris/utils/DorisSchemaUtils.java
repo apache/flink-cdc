@@ -60,48 +60,72 @@ public class DorisSchemaUtils {
         Map<String, String> autoPartitionProperties =
                 DorisDataSinkOptions.getPropertiesByPrefix(
                         config, TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX);
-        String excludes = autoPartitionProperties.get(TABLE_CREATE_PARTITION_EXCLUDE);
-        if (!StringUtils.isNullOrWhitespaceOnly(excludes)) {
-            Selectors selectExclude =
-                    new Selectors.SelectorsBuilder().includeTables(excludes).build();
-            if (selectExclude.isMatch(tableId)) {
-                return null;
-            }
+        if (autoPartitionProperties.isEmpty()) {
+            return null;
         }
 
-        String includes = autoPartitionProperties.get(TABLE_CREATE_PARTITION_INCLUDE);
-        if (!StringUtils.isNullOrWhitespaceOnly(includes)) {
-            Selectors selectInclude =
-                    new Selectors.SelectorsBuilder().includeTables(includes).build();
-            if (!selectInclude.isMatch(tableId)) {
-                return null;
-            }
+        if (isExcluded(autoPartitionProperties, tableId)
+                || !isIncluded(autoPartitionProperties, tableId)) {
+            return null;
         }
 
         String partitionKey =
-                autoPartitionProperties.get(
-                        tableId.identifier() + "." + TABLE_CREATE_PARTITION_KEY);
+                getPartitionProperty(
+                        autoPartitionProperties,
+                        tableId,
+                        TABLE_CREATE_PARTITION_KEY,
+                        TABLE_CREATE_DEFAULT_PARTITION_KEY);
+        if (partitionKey == null || !schema.getColumn(partitionKey).isPresent()) {
+            return null;
+        }
+
         String partitionUnit =
-                autoPartitionProperties.get(
-                        tableId.identifier() + "." + TABLE_CREATE_PARTITION_UNIT);
-        if (StringUtils.isNullOrWhitespaceOnly(partitionKey)) {
-            partitionKey = autoPartitionProperties.get(TABLE_CREATE_DEFAULT_PARTITION_KEY);
-        }
-        if (StringUtils.isNullOrWhitespaceOnly(partitionUnit)) {
-            partitionUnit = autoPartitionProperties.get(TABLE_CREATE_DEFAULT_PARTITION_UNIT);
+                getPartitionProperty(
+                        autoPartitionProperties,
+                        tableId,
+                        TABLE_CREATE_PARTITION_UNIT,
+                        TABLE_CREATE_DEFAULT_PARTITION_UNIT);
+        if (partitionUnit == null) {
+            return null;
         }
 
-        if (schema.getColumn(partitionKey).isPresent()
-                && !StringUtils.isNullOrWhitespaceOnly(partitionKey)) {
+        DataType dataType = schema.getColumn(partitionKey).get().getType();
+        return isValidDataType(dataType) ? new Tuple2<>(partitionKey, partitionUnit) : null;
+    }
 
-            DataType dataType = schema.getColumn(partitionKey).get().getType();
-            if (dataType instanceof LocalZonedTimestampType
-                    || dataType instanceof TimestampType
-                    || dataType instanceof ZonedTimestampType
-                    || dataType instanceof DateType) {
-                return new Tuple2<>(partitionKey, partitionUnit);
-            }
+    private static boolean isExcluded(Map<String, String> properties, TableId tableId) {
+        String excludes = properties.get(TABLE_CREATE_PARTITION_EXCLUDE);
+        if (!StringUtils.isNullOrWhitespaceOnly(excludes)) {
+            Selectors selectExclude =
+                    new Selectors.SelectorsBuilder().includeTables(excludes).build();
+            return selectExclude.isMatch(tableId);
         }
-        return null;
+        return false;
+    }
+
+    private static boolean isIncluded(Map<String, String> properties, TableId tableId) {
+        String includes = properties.get(TABLE_CREATE_PARTITION_INCLUDE);
+        if (!StringUtils.isNullOrWhitespaceOnly(includes)) {
+            Selectors selectInclude =
+                    new Selectors.SelectorsBuilder().includeTables(includes).build();
+            return selectInclude.isMatch(tableId);
+        }
+        return true;
+    }
+
+    private static String getPartitionProperty(
+            Map<String, String> properties,
+            TableId tableId,
+            String specificKey,
+            String defaultKey) {
+        String key = properties.get(tableId.identifier() + "." + specificKey);
+        return StringUtils.isNullOrWhitespaceOnly(key) ? properties.get(defaultKey) : key;
+    }
+
+    private static boolean isValidDataType(DataType dataType) {
+        return dataType instanceof LocalZonedTimestampType
+                || dataType instanceof TimestampType
+                || dataType instanceof ZonedTimestampType
+                || dataType instanceof DateType;
     }
 }

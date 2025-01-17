@@ -192,10 +192,10 @@ pipeline:
         These properties are supported now：<br/>
         <code> table.create.auto-partition.properties.include</code>A collection of tables after route to include, separated by commas, supports regular expressions;<br/>
         <code> table.create.auto-partition.properties.exclude</code>A collection of tables after route to exclude, separated by commas, supports regular expressions;<br/>
-        <code> table.create.auto-partition.properties.default_partition_key</code>The default partition key;<br/>
-        <code> table.create.auto-partition.properties.default_partition_unit</code>The default partition unit;<br/>
-        <code> table.create.auto-partition.properties.DB.TABLE.partition_key</code>The partition key of a specific table. If not set, the default partition key is used;<br/>
-        <code> table.create.auto-partition.properties.DB.TABLE.partition_unit</code>The partition unit of a specific table. If not set, the default partition unit is used.<br/>
+        <code> table.create.auto-partition.properties.default-partition-key</code>The default partition key;<br/>
+        <code> table.create.auto-partition.properties.default-partition-unit</code>The default partition unit;<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-key</code>The partition key of a specific table. If not set, the default partition key is used;<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-unit</code>The partition unit of a specific table. If not set, the default partition unit is used.<br/>
         Note:<br/>
         1: If the partition key is not DATE/DATETIME type, auto partition tables won't be created.<br/>
         2: Doris AUTO RANGE PARTITION does not support NULLABLE columns as partition key, if Flink CDC get a NULL value or a NULLABLE partition key was added after the table was created, will automatically fill it with a default value(DATE:<code>1970-01-01</code>, DATETIME:<code>1970-01-01 00:00:00</code>), chose a suitable partition key is very important.
