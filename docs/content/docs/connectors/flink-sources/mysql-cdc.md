@@ -401,7 +401,19 @@ During a snapshot operation, the connector will query each included table to pro
         Schema change events are applied to a "shadow" table and then swapped with the original table later.
         <br>
         This is an experimental feature, and subject to change in the future.
-      </td> 
+      </td>
+    </tr>
+    <tr>
+      <td>use.legacy.json.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>Whether to use legacy JSON format to cast JSON type data in binlog. <br>
+          It determines whether to use the legacy JSON format when retrieving JSON type data in binlog. 
+          If the user configures 'use.legacy.json.format' = 'true', whitespace before values and after commas in the JSON type data is removed. For example,
+          JSON type data {"key1": "value1", "key2": "value2"} in binlog would be converted to {"key1":"value1","key2":"value2"}.
+          When 'use.legacy.json.format' = 'false', the data would be converted to {"key1": "value1", "key2": "value2"}, with whitespace before values and after commas preserved.
+      </td>
     </tr>
     </tbody>
 </table>
