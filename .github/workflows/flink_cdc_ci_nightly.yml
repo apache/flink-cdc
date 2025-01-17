@@ -16,7 +16,7 @@
 name: Flink CDC CI Nightly
 on:
   schedule:
-    - cron: '0 0 * * *' # Deploy every day
+    - cron: '43 0 * * *' # Run daily, but not at 00:00 UTC to avoid job failure due to network throttle
   workflow_dispatch:
 
 concurrency:
