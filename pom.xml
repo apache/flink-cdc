@@ -29,7 +29,7 @@ limitations under the License.
 
     <groupId>org.apache.flink</groupId>
     <artifactId>flink-cdc-parent</artifactId>
-    <version>${revision}</version>
+    <version>3.3.0</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -59,7 +59,7 @@ limitations under the License.
     </scm>
 
     <properties>
-        <revision>3.3-SNAPSHOT</revision>
+        <revision>3.3.0</revision>
         <scala.binary.version>2.12</scala.binary.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
