@@ -158,6 +158,29 @@ public class DorisDataSinkOptions {
     public static final String STREAM_LOAD_PROP_PREFIX = "sink.properties.";
     // Prefix for Doris Create table.
     public static final String TABLE_CREATE_PROPERTIES_PREFIX = "table.create.properties.";
+    // Prefix for Doris Create auto partition table.
+    public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX =
+            "table.create.auto-partition.properties.";
+    public static final String TABLE_CREATE_PARTITION_KEY = "partition-key";
+    public static final String TABLE_CREATE_PARTITION_UNIT = "partition-unit";
+
+    public static final String TABLE_CREATE_DEFAULT_PARTITION_KEY =
+            "default-" + TABLE_CREATE_PARTITION_KEY;
+    public static final String TABLE_CREATE_DEFAULT_PARTITION_UNIT =
+            "default-" + TABLE_CREATE_PARTITION_UNIT;
+
+    public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_DEFAULT_PARTITION_KEY =
+            TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX + TABLE_CREATE_DEFAULT_PARTITION_KEY;
+    public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_DEFAULT_PARTITION_UNIT =
+            TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX + TABLE_CREATE_DEFAULT_PARTITION_UNIT;
+
+    public static final String TABLE_CREATE_PARTITION_INCLUDE = "include";
+    public static final String TABLE_CREATE_PARTITION_EXCLUDE = "exclude";
+
+    public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_INCLUDE =
+            TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX + TABLE_CREATE_PARTITION_INCLUDE;
+    public static final String TABLE_CREATE_AUTO_PARTITION_PROPERTIES_EXCLUDE =
+            TABLE_CREATE_AUTO_PARTITION_PROPERTIES_PREFIX + TABLE_CREATE_PARTITION_EXCLUDE;
 
     public static Map<String, String> getPropertiesByPrefix(
             Configuration tableOptions, String prefix) {
