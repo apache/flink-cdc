@@ -79,6 +79,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.INCLUDE_COMMENTS_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
@@ -1070,6 +1071,75 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         executeSql(inventoryDatabase, addColumnSql);
 
         List<Event> expectedEvents = getEventsWithComments(tableId);
+        List<Event> actual = fetchResults(events, expectedEvents.size());
+        assertEqualsInAnyOrder(
+                expectedEvents.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
+    }
+
+    @Test
+    public void testIncludeCommentsForScanBinlogNewlyAddedTableEnabled() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "products");
+        TableId newTableId =
+                TableId.tableId(inventoryDatabase.getDatabaseName(), "products_with_comments2");
+
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL8_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL8_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(SERVER_TIME_ZONE.key(), "UTC");
+        options.put(INCLUDE_COMMENTS_ENABLED.key(), "true");
+        options.put(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".products\\.*");
+        Factory.Context context =
+                new FactoryHelper.DefaultContext(
+                        Configuration.fromMap(options), null, this.getClass().getClassLoader());
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) dataSource.getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        String createTableSql =
+                String.format(
+                        "CREATE TABLE IF NOT EXISTS `%s`.`%s` (\n"
+                                + "  id INTEGER NOT NULL AUTO_INCREMENT COMMENT 'column comment of id' PRIMARY KEY,\n"
+                                + "  name VARCHAR(255) NOT NULL DEFAULT 'flink' COMMENT 'column comment of name',\n"
+                                + "  weight FLOAT COMMENT 'column comment of weight'\n"
+                                + ")\n"
+                                + "COMMENT 'table comment of products';",
+                        inventoryDatabase.getDatabaseName(), "products_with_comments2");
+        executeSql(inventoryDatabase, createTableSql);
+
+        // add some column
+        String addColumnSql =
+                String.format(
+                        "ALTER TABLE `%s`.`products_with_comments2` ADD COLUMN `description` VARCHAR(512) comment 'column comment of description';",
+                        inventoryDatabase.getDatabaseName());
+        executeSql(inventoryDatabase, addColumnSql);
+
+        List<Event> expectedEvents = new ArrayList<>();
+        CreateTableEvent productCreateTableEvent = getProductsCreateTableEvent(tableId);
+        expectedEvents.add(productCreateTableEvent);
+        // generate snapshot data
+        List<Event> productExpectedSnapshot = getSnapshotExpected(tableId);
+        expectedEvents.addAll(productExpectedSnapshot);
+
+        List<Event> newTableExpectedEvents = getEventsWithComments(newTableId);
+        expectedEvents.addAll(newTableExpectedEvents);
+
         List<Event> actual = fetchResults(events, expectedEvents.size());
         assertEqualsInAnyOrder(
                 expectedEvents.stream().map(Object::toString).collect(Collectors.toList()),
