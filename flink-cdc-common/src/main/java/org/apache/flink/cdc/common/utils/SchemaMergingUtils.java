@@ -78,6 +78,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkState;
 
@@ -178,14 +179,14 @@ public class SchemaMergingUtils {
         } else {
             Schema outputSchema = null;
             for (Schema schema : schemas) {
-                validateTransformColumnCounts(outputSchema, schema);
+                validateTransformColumn(outputSchema, schema);
                 outputSchema = getLeastCommonSchema(outputSchema, schema);
             }
             return outputSchema;
         }
     }
 
-    public static void validateTransformColumnCounts(
+    public static void validateTransformColumn(
             @Nullable Schema currentSchema, Schema upcomingSchema) {
         if (currentSchema != null) {
             checkState(
@@ -193,6 +194,28 @@ public class SchemaMergingUtils {
                     String.format(
                             "Unable to merge schema %s and %s with different column counts.",
                             currentSchema, upcomingSchema));
+
+            List<Column> currentColumns = currentSchema.getColumns();
+            List<Column> upcomingColumns = upcomingSchema.getColumns();
+            IntStream.range(0, currentColumns.size())
+                    .forEach(
+                            i -> {
+                                Column currentColumn = currentColumns.get(i);
+                                Column upcomingColumn = upcomingColumns.get(i);
+                                checkState(
+                                        Objects.equals(
+                                                currentColumn.getName(), upcomingColumn.getName()),
+                                        String.format(
+                                                "Unable to merge column %s and %s with different name.",
+                                                currentColumn, upcomingColumn));
+                                checkState(
+                                        Objects.equals(
+                                                currentColumn.getComment(),
+                                                upcomingColumn.getComment()),
+                                        String.format(
+                                                "Unable to merge column %s and %s with different comments.",
+                                                currentColumn, upcomingColumn));
+                            });
         }
     }
 

@@ -413,6 +413,40 @@ class FlinkPipelineTransformITCase {
 
     @ParameterizedTest
     @EnumSource
+    void testMultiTransformColumNameCompatibility(ValuesDataSink.SinkApi sinkApi) {
+        assertThatThrownBy(
+                        () ->
+                                runGenericTransformTest(
+                                        sinkApi,
+                                        Arrays.asList(
+                                                new TransformDef(
+                                                        "default_namespace.default_schema.mytable2",
+                                                        "id,age",
+                                                        "age < 18",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null),
+                                                new TransformDef(
+                                                        "default_namespace.default_schema.mytable2",
+                                                        // reference part column
+                                                        "id,UPPER(name) AS name",
+                                                        "age >= 18",
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null)),
+                                        Collections.emptyList()))
+                .rootCause()
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .hasMessage(
+                        "Unable to merge column `age` TINYINT and `name` STRING with different name.");
+    }
+
+    @ParameterizedTest
+    @EnumSource
     void testMultiTransformMetaSchemaCompatibility(ValuesDataSink.SinkApi sinkApi) {
         assertThatThrownBy(
                         () ->
