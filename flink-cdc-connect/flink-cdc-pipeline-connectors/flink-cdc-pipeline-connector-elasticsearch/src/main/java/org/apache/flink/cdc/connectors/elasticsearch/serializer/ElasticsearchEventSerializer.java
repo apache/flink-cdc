@@ -153,7 +153,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             case UPDATE:
                 valueMap = serializeRecord(tableId, event.after(), schema, pipelineZoneId);
                 return new IndexOperation.Builder<>()
-                        .index(tableSharding(tableId, valueMap))
+                        .index(tableSharding(tableId, schema, valueMap))
                         .id(id)
                         .document(valueMap)
                         .build();
@@ -164,12 +164,14 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
         }
     }
 
-    public String tableSharding(TableId tableId, Map<String, Object> valueMap) {
+    public String tableSharding(TableId tableId, Schema schema, Map<String, Object> valueMap) {
+        Object value = null;
         if (shardingKey.containsKey(tableId)) {
-            Object value = valueMap.get(shardingKey.get(tableId));
-            return value != null ? tableId.toString() + value : tableId.toString();
+            value = valueMap.get(shardingKey.get(tableId));
+        } else if (!schema.partitionKeys().isEmpty()) {
+            value = valueMap.get(schema.partitionKeys().get(0));
         }
-        return tableId.toString();
+        return value != null ? tableId.toString() + value : tableId.toString();
     }
 
     private Object[] generateUniqueId(RecordData recordData, Schema schema, TableId tableId) {

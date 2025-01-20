@@ -104,7 +104,7 @@ public class ElasticsearchDataSinkOptions {
                     .stringType()
                     .defaultValue("")
                     .withDescription(
-                            "Sharding suffix key for each table, allow setting sharding suffix key for multiTables.Default sink table name is test_table${suffix_key}.Tables are separated by ';'.For example, we can set sharding.suffix.key by 'table1:col1;table2:col2'");
+                            "Sharding suffix key for each table, allow setting sharding suffix key for multiTables.Default sink table name is test_table${suffix_key}.Default sharding column is first partition column.Tables are separated by ';'.Table and column are separated by ':'.For example, we can set sharding.suffix.key by 'table1:col1;table2:col2'");
 
     private ElasticsearchDataSinkOptions() {
         // This class should not be instantiated

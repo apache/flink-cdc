@@ -32,8 +32,10 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -60,11 +62,25 @@ public class ElasticsearchEventSerializerTest {
     }
 
     @Test
+    void testTableShardingWithDate() {
+        HashMap<TableId, String> shardingKey = new HashMap<>();
+        shardingKey.put(tableId, "dt");
+        String index = getShardingString(shardingKey);
+        assertThat(index).isEqualTo("test2025-01-01");
+    }
+
+    @Test
     void testTableShardingWithNull() {
         HashMap<TableId, String> shardingKey = new HashMap<>();
         shardingKey.put(tableId, "col2");
         String index = getShardingString(shardingKey);
         assertThat(index).isEqualTo("test");
+    }
+
+    @Test
+    void testTableShardingWithPartitionCol() {
+        String index = getShardingString(Collections.emptyMap());
+        assertThat(index).isEqualTo("test2025-01-01");
     }
 
     private String getShardingString(Map<TableId, String> shardingKey) {
@@ -76,9 +92,10 @@ public class ElasticsearchEventSerializerTest {
                             DataTypes.FLOAT(),
                             DataTypes.VARCHAR(45),
                             DataTypes.VARCHAR(55),
-                            DataTypes.TIMESTAMP_TZ()
+                            DataTypes.TIMESTAMP_TZ(),
+                            DataTypes.DATE()
                         },
-                        new String[] {"id", "name", "weight", "col1", "col2", "create_time"});
+                        new String[] {"id", "name", "weight", "col1", "col2", "create_time", "dt"});
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
         DataChangeEvent event =
                 DataChangeEvent.insertEvent(
@@ -92,7 +109,8 @@ public class ElasticsearchEventSerializerTest {
                                     null,
                                     ZonedTimestampData.fromZonedDateTime(
                                             LocalDateTime.of(2023, 11, 11, 11, 11, 11, 11)
-                                                    .atZone(ZoneId.systemDefault()))
+                                                    .atZone(ZoneId.systemDefault())),
+                                    (int) LocalDate.of(2025, 1, 1).toEpochDay()
                                 }));
         ElasticsearchEventSerializer serializer =
                 new ElasticsearchEventSerializer(ZoneId.of("UTC"), shardingKey);
@@ -104,6 +122,8 @@ public class ElasticsearchEventSerializerTest {
                         .physicalColumn("col1", DataTypes.VARCHAR(45))
                         .physicalColumn("col2", DataTypes.VARCHAR(55))
                         .physicalColumn("create_time", DataTypes.TIMESTAMP_TZ())
+                        .physicalColumn("dt", DataTypes.DATE())
+                        .partitionKey("dt")
                         .build();
 
         serializer.apply(new CreateTableEvent(tableId, tableSchema), new MockContext());

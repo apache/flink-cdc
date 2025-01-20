@@ -169,7 +169,7 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>Long</td>
-      <td>每个表的分片后缀字段，允许为多个表设置分片后缀字段。默认sink表名为test_table${suffix_key}。表之间用';'分隔。例如，我们设置sharding.suffix.key为'table1:col1;table2:col2'。</td>
+      <td>每个表的分片后缀字段，允许为多个表设置分片后缀字段。默认sink表名为test_table${suffix_key}。默认分片字段为第一个分区列。表之间用';'分隔。表和字段之间用‘:’分割。例如，我们设置sharding.suffix.key为'table1:col1;table2:col2'。</td>
     </tr>
     </tbody>
 </table>    
