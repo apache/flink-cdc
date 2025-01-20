@@ -39,10 +39,13 @@ e2e-tests:
   - flink-cdc-e2e-tests/**/*
 migration-tests:
   - flink-cdc-migration-tests/**/*
+add-ons:
+  - flink-cdc-pipeline-model/**/*
+  - flink-cdc-pipeline-udf-examples/**/*
 base:
   - flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base/**/*
 debezium:
-  - flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-debezium/**/*
+  - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-debezium/**/*
 connector-test-util:
   - flink-cdc-connect/flink-cdc-source-connectors/flink-connector-test-util/**/*
 db2-cdc-connector:
@@ -86,3 +89,7 @@ starrocks-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks/**/*
 elasticsearch-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch/**/*
+oceanbase-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase/**/*
+maxcompute-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute/**/*
