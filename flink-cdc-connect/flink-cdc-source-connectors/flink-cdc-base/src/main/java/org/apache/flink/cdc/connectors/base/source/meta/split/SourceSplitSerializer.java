@@ -50,7 +50,7 @@ import java.util.Map;
 public abstract class SourceSplitSerializer
         implements SimpleVersionedSerializer<SourceSplitBase>, OffsetDeserializerSerializer {
 
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -126,6 +126,7 @@ public abstract class SourceSplitSerializer
             case 3:
             case 4:
             case 5:
+            case 6:
                 return deserializeSplit(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -175,6 +176,12 @@ public abstract class SourceSplitSerializer
             if (version == 5) {
                 isSuspended = in.readBoolean();
             }
+
+            boolean isSnapshotCompleted = false;
+            if (version >= 6) {
+                isSnapshotCompleted = in.readBoolean();
+            }
+
             in.releaseArrays();
             return new StreamSplit(
                     splitId,
@@ -183,7 +190,8 @@ public abstract class SourceSplitSerializer
                     finishedSplitsInfo,
                     tableChangeMap,
                     totalFinishedSplitSize,
-                    isSuspended);
+                    isSuspended,
+                    isSnapshotCompleted);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
         }
