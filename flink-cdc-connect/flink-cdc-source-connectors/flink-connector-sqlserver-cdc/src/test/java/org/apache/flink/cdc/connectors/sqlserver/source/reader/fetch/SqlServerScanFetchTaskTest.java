@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.sqlserver.source.read.fetch;
+package org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
@@ -34,8 +34,6 @@ import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceCo
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnFactory;
-import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask;
-import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.RecordsFormatter;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
@@ -54,14 +52,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
+import static org.apache.flink.cdc.connectors.sqlserver.SqlServerTestBase.getConfigFactory;
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
-/** Tests for {@link SqlServerScanFetchTask}. */
+/**
+ * Tests for {@link
+ * org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask}.
+ */
 public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
     @Test
@@ -346,19 +347,6 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
         }
         snapshotSplitAssigner.close();
         return snapshotSplitList;
-    }
-
-    public static SqlServerSourceConfigFactory getConfigFactory(
-            String databaseName, String[] captureTables, int splitSize) {
-        return (SqlServerSourceConfigFactory)
-                new SqlServerSourceConfigFactory()
-                        .hostname(MSSQL_SERVER_CONTAINER.getHost())
-                        .port(MSSQL_SERVER_CONTAINER.getMappedPort(MS_SQL_SERVER_PORT))
-                        .username(MSSQL_SERVER_CONTAINER.getUsername())
-                        .password(MSSQL_SERVER_CONTAINER.getPassword())
-                        .databaseList(databaseName)
-                        .tableList(captureTables)
-                        .splitSize(splitSize);
     }
 
     private boolean executeSql(SqlServerSourceConfig sourceConfig, String[] sqlStatements) {

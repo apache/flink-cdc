@@ -233,6 +233,7 @@ public abstract class SourceSplitSerializer
                 case 3:
                 case 4:
                 case 5:
+                case 6:
                     final int len = in.readInt();
                     final byte[] bytes = new byte[len];
                     in.read(bytes);
