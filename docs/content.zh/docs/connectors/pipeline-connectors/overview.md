@@ -40,6 +40,16 @@ Flink CDC 提供了可用于 YAML 作业的 Pipeline Source 和 Sink 连接器�
 | [StarRocks]({{< ref "docs/connectors/pipeline-connectors/starrocks" >}}) | Sink   | <li> [StarRocks](https://www.starrocks.io/): 2.x, 3.x                                                                                                                                                                                                                                                                                                                                                  |
 | [OceanBase]({{< ref "docs/connectors/pipeline-connectors/oceanbase" >}}) | Sink   | <li> [OceanBase](https://www.oceanbase.com/): 3.x, 4.x                                                                                                                                                                                                                                                                                                                                                 |
 
+## Supported Flink Versions
+下表展示了 Flink<sup>®</sup> CDC 管道连接器和 Flink<sup>®</sup> 之间的版本映射
+
+|    Flink<sup>®</sup> CDC Version    |                                                        Flink<sup>®</sup> Version                                                         | Pipeline Source |               Pipeline Sink                | 备注                                |
+|:-----------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------:|:---------------:|:------------------------------------------:|:----------------------------------|
+| <font color="DarkCyan">3.0.x</font> |                        <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>                        |      Mysql      |              StarRocks,Doris               |                                   |
+| <font color="DarkCyan">3.1.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |      Mysql      |        StarRocks,Doris,Paimon,Kafka        | 仅 flink-cdc 3.1.1 支持 flink 1.19.* |
+| <font color="DarkCyan">3.2.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |      Mysql      | StarRocks,Doris,Paimon,Kafka,ElasticSearch |                                   |
+
+
 ## Develop Your Own Connector
 
 如果现有的连接器无法满足您的需求，您可以自行开发自己的连接器，以将您的外部系统集成到 Flink CDC 数据管道中。查阅 [Flink CDC APIs]({{< ref "docs/developer-guide/understand-flink-cdc-api" >}}) 了解如何开发您自己的连接器。

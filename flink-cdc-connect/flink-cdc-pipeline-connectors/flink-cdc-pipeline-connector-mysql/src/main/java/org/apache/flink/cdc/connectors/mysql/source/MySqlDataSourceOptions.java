@@ -298,4 +298,19 @@ public class MySqlDataSourceOptions {
                     .withDescription(
                             "Whether enable include table and column comments, by default is false, if set to true, table and column comments will be sent. "
                                     + "Note: Enable this option will bring the implications on memory usage.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> TREAT_TINYINT1_AS_BOOLEAN_ENABLED =
+            ConfigOptions.key("treat-tinyint1-as-boolean.enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription("Whether treat TINYINT(1) as boolean, by default is true. ");
+
+    @Experimental
+    public static final ConfigOption<Boolean> USE_LEGACY_JSON_FORMAT =
+            ConfigOptions.key("use.legacy.json.format")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether to use legacy json format. The default value is true, which means there is no whitespace before value and after comma in json format.");
 }

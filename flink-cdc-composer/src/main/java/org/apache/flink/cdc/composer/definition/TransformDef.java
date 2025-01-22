@@ -20,7 +20,6 @@ package org.apache.flink.cdc.composer.definition;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Definition of a transformation.
@@ -75,24 +74,24 @@ public class TransformDef {
         return sourceTable;
     }
 
-    public Optional<String> getProjection() {
-        return Optional.ofNullable(projection);
+    public String getProjection() {
+        return projection;
     }
 
     public boolean isValidProjection() {
         return !StringUtils.isNullOrWhitespaceOnly(projection);
     }
 
-    public Optional<String> getFilter() {
-        return Optional.ofNullable(filter);
+    public String getFilter() {
+        return filter;
     }
 
     public boolean isValidFilter() {
         return !StringUtils.isNullOrWhitespaceOnly(filter);
     }
 
-    public Optional<String> getDescription() {
-        return Optional.ofNullable(description);
+    public String getDescription() {
+        return description;
     }
 
     public String getPrimaryKeys() {

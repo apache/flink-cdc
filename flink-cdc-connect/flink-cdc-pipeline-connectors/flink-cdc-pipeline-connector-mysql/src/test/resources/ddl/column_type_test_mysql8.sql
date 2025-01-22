@@ -185,3 +185,21 @@ VALUES (DEFAULT,
         29,
         31,
         37);
+
+CREATE TABLE json_types
+(
+    id                   SERIAL,
+    json_c0               JSON,
+    json_c1               JSON,
+    json_c2               JSON,
+    int_c  INTEGER,
+    PRIMARY KEY (id)
+) DEFAULT CHARSET=utf8;
+
+INSERT INTO json_types
+VALUES (DEFAULT,
+        '{"key1":"value1"}',
+        '{"key1":"value1","key2":"value2"}',
+        '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]',
+        1
+        );

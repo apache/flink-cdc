@@ -18,7 +18,9 @@
 package org.apache.flink.cdc.connectors.postgres.table;
 
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
+import org.apache.flink.cdc.debezium.table.RowDataMetadataConverter;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
@@ -94,6 +96,28 @@ public enum PostgreSQLReadableMetadata {
                     Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
                     return TimestampData.fromEpochMillis(
                             (Long) sourceStruct.get(AbstractSourceInfo.TIMESTAMP_KEY));
+                }
+            }),
+
+    /**
+     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D' means DELETE
+     * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
+     */
+    ROW_KIND(
+            "row_kind",
+            DataTypes.STRING().notNull(),
+            new RowDataMetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(RowData rowData) {
+                    return StringData.fromString(rowData.getRowKind().shortString());
+                }
+
+                @Override
+                public Object read(SourceRecord record) {
+                    throw new UnsupportedOperationException(
+                            "Please call read(RowData rowData) method instead.");
                 }
             });
 

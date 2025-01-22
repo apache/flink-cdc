@@ -154,6 +154,11 @@ public class MySqlSnapshotSplitReadTask
             hooks.getPreLowWatermarkAction().accept(jdbcConnection, snapshotSplit);
         }
         final BinlogOffset lowWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+        lowWatermark
+                .getOffset()
+                .put(
+                        BinlogOffset.TIMESTAMP_KEY,
+                        String.valueOf(clock.currentTime().getEpochSecond()));
         LOG.info(
                 "Snapshot step 1 - Determining low watermark {} for split {}",
                 lowWatermark,
@@ -187,6 +192,11 @@ public class MySqlSnapshotSplitReadTask
         } else {
             // Get the current binlog offset as HW
             highWatermark = DebeziumUtils.currentBinlogOffset(jdbcConnection);
+            highWatermark
+                    .getOffset()
+                    .put(
+                            BinlogOffset.TIMESTAMP_KEY,
+                            String.valueOf(clock.currentTime().getEpochSecond()));
         }
 
         LOG.info(
