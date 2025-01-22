@@ -119,18 +119,18 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Arithmetic Functions
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| numeric1 + numeric2  | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
-| numeric1 - numeric2  | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
-| numeric1 * numeric2  | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
-| numeric1 / numeric2  | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
-| numeric1 % numeric2  | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
-| ABS(numeric)         | abs(numeric)                | Returns the absolute value of numeric.                          |
-| CEIL(numeric)        | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
-| FLOOR(numeric)       | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
-| ROUND(numeric, int)  | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
-| UUID()               | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
+| Function                           | Janino Code                 | Description                                                     |
+|------------------------------------|-----------------------------|-----------------------------------------------------------------|
+| numeric1 + numeric2                | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
+| numeric1 - numeric2                | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
+| numeric1 * numeric2                | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
+| numeric1 / numeric2                | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
+| numeric1 % numeric2                | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
+| ABS(numeric)                       | abs(numeric)                | Returns the absolute value of numeric.                          |
+| CEIL(numeric)<br/>CEILING(numeric) | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
+| FLOOR(numeric)                     | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
+| ROUND(numeric, int)                | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
+| UUID()                             | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
 
 ## String Functions
 
