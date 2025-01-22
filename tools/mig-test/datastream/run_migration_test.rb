@@ -93,7 +93,7 @@ def test_migration(from_version, to_version)
   end
 end
 
-version_list = %w[3.2.0 3.2.1 3.3-SNAPSHOT]
+version_list = %w[3.2.0 3.2.1 3.3.0 3.4-SNAPSHOT]
 version_result = Hash.new('❓')
 @failures = []
 
