@@ -951,7 +951,7 @@ class FlinkPipelineTransformITCase {
         execution.execute();
 
         // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().replace("\r\n", "\n").trim().split("\n");
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
 
         Arrays.stream(outputEvents).forEach(this::extractDataLines);
     }
