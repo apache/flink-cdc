@@ -96,7 +96,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
@@ -347,7 +346,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         // Check all snapshot records are sent with exactly-once semantics
         assertEqualsInAnyOrder(
                 Arrays.asList(expectedSnapshotData),
-                fetchAndConvert(iterator, expectedSnapshotData.length, RowData::toString));
+                fetchAndConvert(
+                        iterator,
+                        expectedSnapshotData.length,
+                        MySqlSourceITCase::convertRowDataToRowString));
         assertTrue(!hasNextData(iterator));
         jobClient.cancel().get();
     }
@@ -1073,26 +1075,19 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         assertThat(iterator.hasNext()).isFalse();
     }
 
-    private static List<String> convertRowDataToRowString(List<RowData> rows) {
+    private static String convertRowDataToRowString(RowData row) {
         LinkedHashMap<String, Integer> map = new LinkedHashMap<>();
         map.put("id", 0);
         map.put("name", 1);
         map.put("address", 2);
         map.put("phone_number", 3);
-        return rows.stream()
-                .map(
-                        row ->
-                                RowUtils.createRowWithNamedPositions(
-                                                row.getRowKind(),
-                                                new Object[] {
-                                                    row.getLong(0),
-                                                    row.getString(1),
-                                                    row.getString(2),
-                                                    row.getString(3)
-                                                },
-                                                map)
-                                        .toString())
-                .collect(Collectors.toList());
+        return RowUtils.createRowWithNamedPositions(
+                        row.getRowKind(),
+                        new Object[] {
+                            row.getLong(0), row.getString(1), row.getString(2), row.getString(3)
+                        },
+                        map)
+                .toString();
     }
 
     private String getTableNameRegex(String[] captureCustomerTables) {

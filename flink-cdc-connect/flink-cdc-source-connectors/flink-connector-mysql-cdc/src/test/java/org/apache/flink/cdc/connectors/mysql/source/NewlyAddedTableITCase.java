@@ -489,7 +489,10 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                     .collect(Collectors.toList())
                             : expectedCustomersResult;
             List<String> rows =
-                    fetchAndConvert(iterator, expectedSnapshotResult.size(), RowData::toString);
+                    fetchAndConvert(
+                            iterator,
+                            expectedSnapshotResult.size(),
+                            NewlyAddedTableITCase::convertRowDataToRowString);
             assertEqualsInAnyOrder(expectedSnapshotResult, rows);
 
             // make binlog events
@@ -505,7 +508,11 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         "UPDATE " + tableId + " SET address = 'Update2' where id = 103");
                 connection.commit();
             }
-            rows = fetchAndConvert(iterator, expectedBinlogResult.size(), RowData::toString);
+            rows =
+                    fetchAndConvert(
+                            iterator,
+                            expectedBinlogResult.size(),
+                            NewlyAddedTableITCase::convertRowDataToRowString);
             assertEqualsInAnyOrder(expectedBinlogResult, rows);
 
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -542,28 +549,24 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private static List<String> convertRowDataToRowString(List<RowData> rows) {
+    private static String convertRowDataToRowString(RowData row) {
         LinkedHashMap<String, Integer> map = new LinkedHashMap<>();
         map.put("id", 0);
         map.put("name", 1);
         map.put("address", 2);
         map.put("phone_number", 3);
         map.put("_table_name", 4);
-        return rows.stream()
-                .map(
-                        row ->
-                                RowUtils.createRowWithNamedPositions(
-                                                row.getRowKind(),
-                                                new Object[] {
-                                                    row.getLong(0),
-                                                    row.getString(1),
-                                                    row.getString(2),
-                                                    row.getString(3),
-                                                    row.getString(4)
-                                                },
-                                                map)
-                                        .toString())
-                .collect(Collectors.toList());
+        return RowUtils.createRowWithNamedPositions(
+                        row.getRowKind(),
+                        new Object[] {
+                            row.getLong(0),
+                            row.getString(1),
+                            row.getString(2),
+                            row.getString(3),
+                            row.getString(4)
+                        },
+                        map)
+                .toString();
     }
 
     private void testRemoveTablesOneByOne(
