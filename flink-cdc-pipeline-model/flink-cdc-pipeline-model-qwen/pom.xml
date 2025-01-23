@@ -18,34 +18,49 @@ limitations under the License.
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
     <parent>
-        <artifactId>flink-cdc-parent</artifactId>
         <groupId>org.apache.flink</groupId>
+        <artifactId>flink-cdc-pipeline-model</artifactId>
         <version>${revision}</version>
     </parent>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
 
-    <modelVersion>4.0.0</modelVersion>
+    <artifactId>flink-cdc-pipeline-model-qwen</artifactId>
 
-    <artifactId>flink-cdc-pipeline-model</artifactId>
+    <name>flink-cdc-pipeline-model-openai</name>
 
-    <modules>
-        <module>flink-cdc-pipeline-model-openai</module>
-        <module>flink-cdc-pipeline-model-qwen</module>
-    </modules>
+    <properties>
+        <langchain4j.version>0.23.0</langchain4j.version>
+    </properties>
 
     <dependencies>
         <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-common</artifactId>
-            <version>${project.version}</version>
-            <scope>provided</scope>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-test-utils-junit</artifactId>
-            <version>${flink.version}</version>
-            <scope>test</scope>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-dashscope</artifactId>
+            <version>${langchain4j.version}</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>test-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

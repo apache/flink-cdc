@@ -449,6 +449,20 @@ The following built-in models are provided:
 | openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
 | openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
 
+#### QwenChatModel
+
+| parameter          | type   | optional/required | meaning                                                                                                                                                                                                                                                                                                            |
+|--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | required          | Name of model to be called, for example: "qwen-plus", Available options are "qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext", "qwen2.5-0.5b-instruct", "qwen2.5-1.5b-instruct", "qwen2.5-3b-instruct", "qwen2.5-7b-instruct", "qwen2.5-14b-instruct", "qwen2.5-32b-instruct", "qwen2.5-72b-instruct". |
+| openai.apikey      | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                                                                                                                                                                 |
+| openai.chat.prompt | STRING | optional          | Prompt for chatting with Qwen, for example: "Please summary this ".                                                                                                                                                                                                                                                |
+
+#### QwenEmbeddingModel
+
+| parameter     | type   | optional/required | meaning                                                                                                                                            |
+|---------------|--------|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-v1", Available options are "text-embedding-v1", "text-embedding-v2", "text-embedding-v3". |
+| openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                 |
 
 # Known limitations
 * Currently, transform doesn't work with route rules. It will be supported in future versions.
