@@ -169,8 +169,8 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         testName,
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
@@ -188,7 +188,7 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
         waitForSnapshotStarted(iterator);
         assertEqualsInAnyOrder(
                 Arrays.asList(snapshotExpected),
-                fetchAndConvert(iterator, snapshotExpected.length, Row::toString));
+                fetchAndConvert(iterator, snapshotExpected.length, WAITING_TIMEOUT, Row::toString));
 
         // test binlog phase
         try (Connection connection = getJdbcConnection();
@@ -200,7 +200,7 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
         }
         assertEqualsInAnyOrder(
                 Arrays.asList(binlogExpected),
-                fetchAndConvert(iterator, binlogExpected.length, Row::toString));
+                fetchAndConvert(iterator, binlogExpected.length, WAITING_TIMEOUT, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
