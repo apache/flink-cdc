@@ -62,7 +62,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +78,7 @@ import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static org.apache.flink.api.common.restartstrategy.RestartStrategies.noRestart;
+import static org.apache.flink.cdc.common.utils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
@@ -487,7 +487,11 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                             expectedCustomersResult.stream())
                                     .collect(Collectors.toList())
                             : expectedCustomersResult;
-            List<String> rows = fetchRowData(iterator, expectedSnapshotResult.size());
+            List<String> rows =
+                    fetchAndConvert(
+                            iterator,
+                            expectedSnapshotResult.size(),
+                            NewlyAddedTableITCase::convertRowDataToRowString);
             assertEqualsInAnyOrder(expectedSnapshotResult, rows);
 
             // make binlog events
@@ -503,7 +507,11 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         "UPDATE " + tableId + " SET address = 'Update2' where id = 103");
                 connection.commit();
             }
-            rows = fetchRowData(iterator, expectedBinlogResult.size());
+            rows =
+                    fetchAndConvert(
+                            iterator,
+                            expectedBinlogResult.size(),
+                            NewlyAddedTableITCase::convertRowDataToRowString);
             assertEqualsInAnyOrder(expectedBinlogResult, rows);
 
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -540,38 +548,24 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private List<String> fetchRowData(Iterator<RowData> iter, int size) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return convertRowDataToRowString(rows);
-    }
-
-    private static List<String> convertRowDataToRowString(List<RowData> rows) {
+    private static String convertRowDataToRowString(RowData row) {
         LinkedHashMap<String, Integer> map = new LinkedHashMap<>();
         map.put("id", 0);
         map.put("name", 1);
         map.put("address", 2);
         map.put("phone_number", 3);
         map.put("_table_name", 4);
-        return rows.stream()
-                .map(
-                        row ->
-                                RowUtils.createRowWithNamedPositions(
-                                                row.getRowKind(),
-                                                new Object[] {
-                                                    row.getLong(0),
-                                                    row.getString(1),
-                                                    row.getString(2),
-                                                    row.getString(3),
-                                                    row.getString(4)
-                                                },
-                                                map)
-                                        .toString())
-                .collect(Collectors.toList());
+        return RowUtils.createRowWithNamedPositions(
+                        row.getRowKind(),
+                        new Object[] {
+                            row.getLong(0),
+                            row.getString(1),
+                            row.getString(2),
+                            row.getString(3),
+                            row.getString(4)
+                        },
+                        map)
+                .toString();
     }
 
     private void testRemoveTablesOneByOne(

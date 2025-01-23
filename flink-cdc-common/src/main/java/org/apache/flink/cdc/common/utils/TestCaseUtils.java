@@ -19,11 +19,19 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.util.function.SupplierWithException;
 
+import javax.annotation.Nullable;
+
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /** Some utility methods for creating repeated-checking test cases. */
 public class TestCaseUtils {
@@ -90,5 +98,79 @@ public class TestCaseUtils {
             }
         }
         throw new RuntimeException("Timeout when waiting for state to be ready.");
+    }
+
+    /**
+     * Fetches at most {@code size} entries from {@link Iterator} {@code iter} within {@code
+     * DEFAULT_TIMEOUT}.
+     */
+    public static <T> List<T> fetch(Iterator<T> iter, final int size) throws InterruptedException {
+        return fetch(iter, size, DEFAULT_TIMEOUT);
+    }
+
+    /**
+     * Fetches at most {@code size} entries from {@link Iterator} {@code iter}. <br>
+     * It may return a list with less than {@code size} elements, if {@code iter} doesn't provide
+     * results or {@code timeout} exceeds.
+     */
+    public static <T> List<T> fetch(Iterator<T> iter, final int size, @Nullable Duration timeout)
+            throws InterruptedException {
+        long deadline = Long.MAX_VALUE;
+        if (timeout != null) {
+            deadline = System.currentTimeMillis() + timeout.toMillis();
+        }
+
+        ConcurrentLinkedQueue<T> results = new ConcurrentLinkedQueue<>();
+        AtomicReference<Throwable> fetchException = new AtomicReference<>();
+
+        Thread thread =
+                new Thread(
+                        () -> {
+                            try {
+                                int remainingSize = size;
+                                while (remainingSize > 0 && iter.hasNext()) {
+                                    T row = iter.next();
+                                    results.add(row);
+                                    remainingSize--;
+                                }
+                            } catch (Throwable t) {
+                                fetchException.set(t);
+                            }
+                        });
+
+        thread.start();
+
+        while (true) {
+            // Raise any exception thrown by the fetching thread
+            if (fetchException.get() != null) {
+                throw (RuntimeException) fetchException.get();
+            }
+
+            // Stop if fetching thread has exited
+            if (!thread.isAlive()) {
+                break;
+            }
+
+            // Stop waiting if deadline has arrived
+            if (System.currentTimeMillis() > deadline) {
+                thread.interrupt();
+                break;
+            }
+
+            Thread.sleep(1000L);
+        }
+
+        return new ArrayList<>(results);
+    }
+
+    public static <S, T> List<T> fetchAndConvert(
+            Iterator<S> iter, int size, Function<S, T> converter) throws InterruptedException {
+        return fetch(iter, size).stream().map(converter).collect(Collectors.toList());
+    }
+
+    public static <S, T> List<T> fetchAndConvert(
+            Iterator<S> iter, int size, Duration timeout, Function<S, T> converter)
+            throws InterruptedException {
+        return fetch(iter, size, timeout).stream().map(converter).collect(Collectors.toList());
     }
 }

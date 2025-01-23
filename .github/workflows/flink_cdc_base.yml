@@ -108,6 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
+      fail-fast: false
       matrix:
         java-version: ${{ fromJSON(inputs.java-version) }}
         flink-version: ${{ fromJSON(inputs.flink-version) }}
@@ -148,7 +149,7 @@ jobs:
           maven-version: 3.8.6
 
       - name: Compile and test
-        timeout-minutes: 90
+        timeout-minutes: 60
         run: |
           set -o pipefail
 

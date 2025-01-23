@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.utils.TestCaseUtils.fetchAndConvert;
 
 /**
  * Database Polardbx supported the mysql protocol, but there are some different features in ddl. So
@@ -83,8 +84,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
@@ -108,7 +109,9 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
             expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
         }
 
-        List<String> realSnapshotData = fetchRows(iterator, expectedSnapshotData.size());
+        List<String> realSnapshotData =
+                fetchAndConvert(
+                        iterator, expectedSnapshotData.size(), WAITING_TIMEOUT, Row::toString);
         assertEqualsInAnyOrder(expectedSnapshotData, realSnapshotData);
 
         // second step: check the sink data
@@ -155,7 +158,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedBinlogData.addAll(Arrays.asList(expectedBinlog));
         }
-        List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
+        List<String> realBinlog =
+                fetchAndConvert(iterator, expectedBinlog.length, WAITING_TIMEOUT, Row::toString);
         assertEqualsInOrder(expectedBinlogData, realBinlog);
         tableResult.getJobClient().get().cancel().get();
     }
@@ -234,8 +238,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
@@ -245,7 +249,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
 
         TableResult tableResult = tEnv.executeSql("select * from polardbx_full_types");
         CloseableIterator<Row> iterator = tableResult.collect();
-        List<String> realSnapshotData = fetchRows(iterator, 1);
+        List<String> realSnapshotData =
+                fetchAndConvert(iterator, 1, WAITING_TIMEOUT, Row::toString);
         String[] expectedSnapshotData =
                 new String[] {
                     "+I[100001, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, "
@@ -301,8 +306,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
@@ -326,7 +331,9 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
             expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
         }
 
-        List<String> realSnapshotData = fetchRows(iterator, expectedSnapshotData.size());
+        List<String> realSnapshotData =
+                fetchAndConvert(
+                        iterator, expectedSnapshotData.size(), WAITING_TIMEOUT, Row::toString);
         assertEqualsInAnyOrder(expectedSnapshotData, realSnapshotData);
 
         // second step: check the sink data
@@ -375,7 +382,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                     "+I[7, 9999, 9999, 1007, 2022-01-17T00:00]",
                     "-D[7, 9999, 9999, 1007, 2022-01-17T00:00]"
                 };
-        List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
+        List<String> realBinlog =
+                fetchAndConvert(iterator, expectedBinlog.length, WAITING_TIMEOUT, Row::toString);
         assertEqualsInAnyOrder(Arrays.asList(expectedBinlog), realBinlog);
         tableResult.getJobClient().get().cancel().get();
     }

@@ -36,6 +36,8 @@ import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
 
+import static org.apache.flink.cdc.common.utils.TestCaseUtils.fetchAndConvert;
+
 /** Test supporting different column charsets for Polardbx. */
 @RunWith(Parameterized.class)
 public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
@@ -167,8 +169,8 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         testName,
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
@@ -185,7 +187,8 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
         assertEqualsInAnyOrder(
-                Arrays.asList(snapshotExpected), fetchRows(iterator, snapshotExpected.length));
+                Arrays.asList(snapshotExpected),
+                fetchAndConvert(iterator, snapshotExpected.length, WAITING_TIMEOUT, Row::toString));
 
         // test binlog phase
         try (Connection connection = getJdbcConnection();
@@ -196,7 +199,8 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
                             DATABASE, testName));
         }
         assertEqualsInAnyOrder(
-                Arrays.asList(binlogExpected), fetchRows(iterator, binlogExpected.length));
+                Arrays.asList(binlogExpected),
+                fetchAndConvert(iterator, binlogExpected.length, WAITING_TIMEOUT, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 

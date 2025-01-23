@@ -22,7 +22,6 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
-import org.apache.flink.types.Row;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -43,9 +42,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -222,16 +219,6 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         postgresSourceConfigFactory.setLsnCommitCheckpointsDelay(1);
         return postgresSourceConfigFactory;
-    }
-
-    public static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {

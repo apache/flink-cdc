@@ -17,13 +17,10 @@
 
 package org.apache.flink.cdc.connectors.polardbx;
 
+import org.apache.flink.cdc.common.utils.TestCaseUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
-import org.apache.flink.types.Row;
 
-import com.github.dockerjava.api.model.ExposedPort;
-import com.github.dockerjava.api.model.PortBinding;
-import com.github.dockerjava.api.model.Ports;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -42,9 +39,7 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
@@ -64,36 +59,37 @@ import static org.junit.Assert.assertTrue;
 public abstract class PolardbxSourceTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
-    protected static final Integer PORT = 8527;
-    protected static final String HOST_NAME = "127.0.0.1";
-    protected static final String USER_NAME = "polardbx_root";
-    protected static final String PASSWORD = "123456";
+
     private static final String IMAGE_VERSION = "2.1.0";
     private static final DockerImageName POLARDBX_IMAGE =
             DockerImageName.parse("polardbx/polardb-x:" + IMAGE_VERSION);
 
+    protected static final Integer INNER_PORT = 8527;
+    protected static final String USER_NAME = "polardbx_root";
+    protected static final String PASSWORD = "123456";
+    protected static final Duration WAITING_TIMEOUT = Duration.ofMinutes(1);
+
     protected static final GenericContainer POLARDBX_CONTAINER =
             new GenericContainer<>(POLARDBX_IMAGE)
-                    .withExposedPorts(PORT)
+                    .withExposedPorts(INNER_PORT)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
-                    .withStartupTimeout(Duration.ofMinutes(3))
-                    .withCreateContainerCmdModifier(
-                            c ->
-                                    c.withPortBindings(
-                                            new PortBinding(
-                                                    Ports.Binding.bindPort(PORT),
-                                                    new ExposedPort(PORT))));
+                    .withStartupTimeout(Duration.ofMinutes(3));
+
+    protected static String getHost() {
+        return POLARDBX_CONTAINER.getHost();
+    }
+
+    protected static int getPort() {
+        return POLARDBX_CONTAINER.getMappedPort(INNER_PORT);
+    }
 
     @BeforeClass
-    public static void startContainers() throws InterruptedException {
-        // no need to start container when the port 8527 is listening
-        if (!checkConnection()) {
-            LOG.info("Polardbx connection is not valid, so try to start containers...");
-            Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
-            LOG.info("Containers are started.");
-            // here should wait 10s that make sure the polardbx is ready
-            Thread.sleep(10 * 1000);
-        }
+    public static void startContainers() {
+        Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
+        LOG.info("Containers are started.");
+
+        TestCaseUtils.repeatedCheck(
+                PolardbxSourceTestBase::checkConnection, WAITING_TIMEOUT, Duration.ofSeconds(1));
     }
 
     @AfterClass
@@ -104,7 +100,7 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
     }
 
     protected static String getJdbcUrl() {
-        return String.format("jdbc:mysql://%s:%s", HOST_NAME, PORT);
+        return String.format("jdbc:mysql://%s:%s", getHost(), getPort());
     }
 
     protected static Connection getJdbcConnection() throws SQLException {
@@ -158,16 +154,6 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    protected static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     protected String getTableNameRegex(String[] captureCustomerTables) {
