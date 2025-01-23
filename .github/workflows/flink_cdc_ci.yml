@@ -59,6 +59,7 @@ jobs:
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
   ut:
     strategy:
+      fail-fast: false
       matrix:
         module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
     name: Unit Tests
@@ -68,6 +69,7 @@ jobs:
       module: ${{ matrix.module }}
   pipeline_e2e:
     strategy:
+      fail-fast: false
       matrix:
         parallelism: [ 1, 4 ]
     name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
