@@ -105,6 +105,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean parseOnLineSchemaChanges =
                 config.get(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         boolean useLegacyJsonFormat = config.get(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
+        boolean assignEndingChunkFirst =
+                config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -150,7 +152,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 chunkKeyColumn,
                 skipSnapshotBackFill,
                 parseOnLineSchemaChanges,
-                useLegacyJsonFormat);
+                useLegacyJsonFormat,
+                assignEndingChunkFirst);
     }
 
     @Override
@@ -198,6 +201,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
+        options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST);
         return options;
     }
 

@@ -284,6 +284,14 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * Whether to assign the ending chunk first during snapshot reading phase. Defaults to false.
+     */
+    public MySqlSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.

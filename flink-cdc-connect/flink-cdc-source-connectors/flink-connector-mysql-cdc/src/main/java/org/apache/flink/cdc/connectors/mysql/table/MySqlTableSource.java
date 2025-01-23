@@ -100,6 +100,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     final boolean skipSnapshotBackFill;
     final boolean parseOnlineSchemaChanges;
     private final boolean useLegacyJsonFormat;
+    private final boolean assignEndingChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -139,7 +140,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             @Nullable String chunkKeyColumn,
             boolean skipSnapshotBackFill,
             boolean parseOnlineSchemaChanges,
-            boolean useLegacyJsonFormat) {
+            boolean useLegacyJsonFormat,
+            boolean assignEndingChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -171,6 +173,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.chunkKeyColumn = chunkKeyColumn;
         this.skipSnapshotBackFill = skipSnapshotBackFill;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     @Override
@@ -228,6 +231,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .skipSnapshotBackfill(skipSnapshotBackFill)
                             .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
                             .useLegacyJsonFormat(useLegacyJsonFormat)
+                            .assignEndingChunkFirst(assignEndingChunkFirst)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -315,7 +319,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         chunkKeyColumn,
                         skipSnapshotBackFill,
                         parseOnlineSchemaChanges,
-                        useLegacyJsonFormat);
+                        useLegacyJsonFormat,
+                        assignEndingChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

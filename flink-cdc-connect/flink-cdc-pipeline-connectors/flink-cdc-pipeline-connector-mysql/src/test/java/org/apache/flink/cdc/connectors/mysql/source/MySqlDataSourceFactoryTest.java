@@ -37,9 +37,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
@@ -258,10 +260,17 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
 
         // optional option
         options.put(TREAT_TINYINT1_AS_BOOLEAN_ENABLED.key(), "false");
+        options.put(PARSE_ONLINE_SCHEMA_CHANGES.key(), "false");
+        options.put(SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST.key(), "false");
 
         Factory.Context context = new MockContext(Configuration.fromMap(options));
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
         assertThat(factory.optionalOptions().contains(TREAT_TINYINT1_AS_BOOLEAN_ENABLED))
+                .isEqualTo(true);
+        assertThat(factory.optionalOptions().contains(PARSE_ONLINE_SCHEMA_CHANGES)).isEqualTo(true);
+        assertThat(
+                        factory.optionalOptions()
+                                .contains(SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST))
                 .isEqualTo(true);
 
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);

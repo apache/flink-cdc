@@ -137,4 +137,12 @@ public class SourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether capture the newly added tables when restoring from a savepoint/checkpoint or not, by default is false.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST =
+            ConfigOptions.key("scan.incremental.snapshot.assign-ending-first.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to assign the ending chunk first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
 }

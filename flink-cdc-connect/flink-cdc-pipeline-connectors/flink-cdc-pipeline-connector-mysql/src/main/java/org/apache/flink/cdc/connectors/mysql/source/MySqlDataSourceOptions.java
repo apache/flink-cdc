@@ -313,4 +313,12 @@ public class MySqlDataSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to use legacy json format. The default value is true, which means there is no whitespace before value and after comma in json format.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_FIRST =
+            ConfigOptions.key("scan.incremental.snapshot.assign-ending-first.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to assign the ending chunk first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
 }
