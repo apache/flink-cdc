@@ -135,7 +135,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // O ---> Source
         DataStream<Event> stream =
-                sourceTranslator.translate(pipelineDef.getSource(), dataSource, env, parallelism);
+                sourceTranslator.translate(
+                        pipelineDef.getSource(),
+                        dataSource,
+                        env,
+                        pipelineDef.getSource().getParallelism().orElse(parallelism));
 
         // Source ---> PreTransform
         stream =
@@ -205,7 +209,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Schema Operator -> Sink -> X
         sinkTranslator.translate(
-                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
+                pipelineDef.getSink(),
+                stream,
+                dataSink,
+                schemaOperatorIDGenerator.generate(),
+                pipelineDef.getSink().getParallelism().orElse(parallelism));
     }
 
     private void addFrameworkJars() {

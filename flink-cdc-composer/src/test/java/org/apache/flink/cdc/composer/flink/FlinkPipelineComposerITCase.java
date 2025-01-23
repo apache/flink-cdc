@@ -42,6 +42,8 @@ import org.apache.flink.cdc.composer.definition.RouteDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
+import org.apache.flink.cdc.composer.testsource.factory.DistributedDataSourceFactory;
+import org.apache.flink.cdc.composer.testsource.source.DistributedSourceOptions;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
@@ -52,6 +54,10 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -69,6 +75,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1523,6 +1530,119 @@ class FlinkPipelineComposerITCase {
                         .toArray(String[]::new);
 
         assertThat(outputEvents).containsExactlyInAnyOrder(expected);
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testRegularSourceSnkParallelism(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.MULTI_SPLITS_SINGLE_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig, 9);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef =
+                new SinkDef(
+                        ValuesDataFactory.IDENTIFIER,
+                        "Value Sink",
+                        sinkConfig,
+                        new HashSet<>(),
+                        10);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, MAX_PARALLELISM);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        String jsonPlan = execution.getPlan();
+        int sourceParallelism = getParallelismByType(jsonPlan, "Source: Value Source");
+        // SinkV2 or SinkFunction
+        int sinkParallelism = getParallelismByType(jsonPlan, "Sink: Sink Writer: Value Sink");
+        if (sinkParallelism == -1) {
+            sinkParallelism = getParallelismByType(jsonPlan, "Sink Writer: Value Sink");
+        }
+        assertThat(sourceParallelism).isEqualTo(9);
+        assertThat(sinkParallelism).isEqualTo(10);
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testDistributedSourceSnkParallelism(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(DistributedSourceOptions.DISTRIBUTED_TABLES, true);
+        sourceConfig.set(DistributedSourceOptions.TABLE_COUNT, 4);
+        SourceDef sourceDef =
+                new SourceDef(
+                        DistributedDataSourceFactory.IDENTIFIER,
+                        "Distributed Source",
+                        sourceConfig,
+                        9);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef =
+                new SinkDef(
+                        ValuesDataFactory.IDENTIFIER,
+                        "Value Sink",
+                        sinkConfig,
+                        new HashSet<>(),
+                        10);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, MAX_PARALLELISM);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        String jsonPlan = execution.getPlan();
+        int sourceParallelism = getParallelismByType(jsonPlan, "Source: Distributed Source");
+        // SinkV2 or SinkFunction
+        int sinkParallelism = getParallelismByType(jsonPlan, "Sink: Sink Writer: Value Sink");
+        if (sinkParallelism == -1) {
+            sinkParallelism = getParallelismByType(jsonPlan, "Sink Writer: Value Sink");
+        }
+        assertThat(sourceParallelism).isEqualTo(9);
+        assertThat(sinkParallelism).isEqualTo(10);
+    }
+
+    private int getParallelismByType(String jsonPlan, String targetType) {
+        JsonElement plan = JsonParser.parseString(jsonPlan);
+        JsonArray nodes = plan.getAsJsonObject().get("nodes").getAsJsonArray();
+        for (JsonElement element : nodes) {
+            JsonObject node = element.getAsJsonObject();
+            if (node.get("type").getAsString().equals(targetType)) {
+                return node.get("parallelism").getAsInt();
+            }
+        }
+        return -1;
     }
 
     private List<Event> generateTemporalColumnEvents(String tableNamePrefix) {

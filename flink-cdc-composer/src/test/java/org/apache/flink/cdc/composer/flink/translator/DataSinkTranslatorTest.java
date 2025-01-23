@@ -53,7 +53,8 @@ class DataSinkTranslatorTest {
                 inputStream,
                 mockPreWriteWithoutCommitSink,
                 "testPreWriteWithoutCommitSink",
-                new OperatorID());
+                new OperatorID(),
+                inputStream.getParallelism());
 
         // Check if the `addPreWriteTopology` is called, and the uid is set when the transformation
         // added

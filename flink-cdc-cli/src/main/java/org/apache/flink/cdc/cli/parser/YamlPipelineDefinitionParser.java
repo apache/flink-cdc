@@ -66,6 +66,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     // Source / sink keys
     private static final String TYPE_KEY = "type";
     private static final String NAME_KEY = "name";
+    private static final String PARALLELISM_KEY = "parallelism";
     private static final String INCLUDE_SCHEMA_EVOLUTION_TYPES = "include.schema.changes";
     private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
 
@@ -192,7 +193,14 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sourceMap.remove(NAME_KEY);
 
-        return new SourceDef(type, name, Configuration.fromMap(sourceMap));
+        // "parallelism" field is optional
+        Integer parallelismValue = null;
+        String parallelism = sourceMap.remove(PARALLELISM_KEY);
+        if (parallelism != null) {
+            parallelismValue = Integer.parseInt(parallelism);
+        }
+
+        return new SourceDef(type, name, Configuration.fromMap(sourceMap), parallelismValue);
     }
 
     private SinkDef toSinkDef(JsonNode sinkNode, SchemaChangeBehavior schemaChangeBehavior) {
@@ -230,8 +238,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
             ((ObjectNode) sinkNode).remove(EXCLUDE_SCHEMA_EVOLUTION_TYPES);
         }
 
-        Map<String, String> sinkMap =
-                mapper.convertValue(sinkNode, new TypeReference<Map<String, String>>() {});
+        Map<String, String> sinkMap = mapper.convertValue(sinkNode, new TypeReference<>() {});
 
         // "type" field is required
         String type =
@@ -243,7 +250,15 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
+        // "parallelism" field is optional
+        Integer parallelismValue = null;
+        String parallelism = sinkMap.remove(PARALLELISM_KEY);
+        if (parallelism != null) {
+            parallelismValue = Integer.parseInt(parallelism);
+        }
+
+        return new SinkDef(
+                type, name, Configuration.fromMap(sinkMap), declaredSETypes, parallelismValue);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {

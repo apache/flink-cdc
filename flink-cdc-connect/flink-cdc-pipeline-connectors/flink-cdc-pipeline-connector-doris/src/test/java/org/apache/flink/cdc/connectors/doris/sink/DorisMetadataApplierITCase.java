@@ -571,7 +571,8 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new SinkDef("doris", "Dummy Doris Sink", config),
                 stream,
                 dorisSink,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                stream.getParallelism());
 
         env.execute("Doris Schema Evolution Test");
     }

@@ -81,7 +81,8 @@ public class DataSinkTranslator {
             SinkDef sinkDef,
             DataStream<Event> input,
             DataSink dataSink,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            int parallelism) {
         // Get sink provider
         EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
         String sinkName = generateSinkName(sinkDef);
@@ -89,13 +90,13 @@ public class DataSinkTranslator {
             // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
-            sinkTo(input, sink, sinkName, schemaOperatorID);
+            sinkTo(input, sink, sinkName, schemaOperatorID, parallelism);
         } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
             // SinkFunction
             FlinkSinkFunctionProvider sinkFunctionProvider =
                     (FlinkSinkFunctionProvider) eventSinkProvider;
             SinkFunction<Event> sinkFunction = sinkFunctionProvider.getSinkFunction();
-            sinkTo(input, sinkFunction, sinkName, schemaOperatorID);
+            sinkTo(input, sinkFunction, sinkName, schemaOperatorID, parallelism);
         }
     }
 
@@ -104,8 +105,11 @@ public class DataSinkTranslator {
             DataStream<Event> input,
             Sink<Event> sink,
             String sinkName,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            int parallelism) {
         DataStream<Event> stream = input;
+        stream.getExecutionEnvironment().setParallelism(parallelism);
+
         // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
             stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
@@ -125,7 +129,8 @@ public class DataSinkTranslator {
             DataStream<Event> input,
             SinkFunction<Event> sinkFunction,
             String sinkName,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            int parallelism) {
         DataSinkFunctionOperator sinkOperator =
                 new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
         final StreamExecutionEnvironment executionEnvironment = input.getExecutionEnvironment();
@@ -134,7 +139,7 @@ public class DataSinkTranslator {
                         input.getTransformation(),
                         SINK_WRITER_PREFIX + sinkName,
                         sinkOperator,
-                        executionEnvironment.getParallelism(),
+                        parallelism,
                         false);
         executionEnvironment.addOperator(transformation);
     }
