@@ -27,6 +27,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_SEPARATOR;
+
 /** Elasticsearch DataSink Options reference {@link ElasticsearchSinkOptions}. */
 public class ElasticsearchSinkOptions implements Serializable {
 
@@ -67,7 +69,7 @@ public class ElasticsearchSinkOptions implements Serializable {
                 username,
                 password,
                 Collections.emptyMap(),
-                "_");
+                SHARDING_SUFFIX_SEPARATOR.defaultValue());
     }
 
     public ElasticsearchSinkOptions(

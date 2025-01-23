@@ -53,6 +53,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_SEPARATOR;
+
 /** A serializer for Event to BulkOperationVariant. */
 public class ElasticsearchEventSerializer implements ElementConverter<Event, BulkOperationVariant> {
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -75,7 +77,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     private final String shardingSeparator;
 
     public ElasticsearchEventSerializer(ZoneId zoneId) {
-        this(zoneId, Collections.emptyMap(), "_");
+        this(zoneId, Collections.emptyMap(), SHARDING_SUFFIX_SEPARATOR.defaultValue());
     }
 
     public ElasticsearchEventSerializer(

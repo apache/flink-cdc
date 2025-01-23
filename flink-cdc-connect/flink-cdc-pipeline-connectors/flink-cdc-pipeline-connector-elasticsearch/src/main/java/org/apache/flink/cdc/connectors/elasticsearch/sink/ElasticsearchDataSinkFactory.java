@@ -57,6 +57,7 @@ import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDa
 public class ElasticsearchDataSinkFactory implements DataSinkFactory {
 
     public static final String IDENTIFIER = "elasticsearch";
+    private static final String ES_INDEX_ILLEGAL_CHARS = "\\/*?\"<>| ,#";
 
     @Override
     public DataSink createDataSink(Context context) {
@@ -188,8 +189,7 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                             SHARDING_SUFFIX_SEPARATOR.key()));
         }
 
-        String illegalChars = "\\/*?\"<>| ,#";
-        for (char c : illegalChars.toCharArray()) {
+        for (char c : ES_INDEX_ILLEGAL_CHARS.toCharArray()) {
             if (separator.indexOf(c) != -1) {
                 throw new ValidationException(
                         String.format(
