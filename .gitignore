@@ -25,3 +25,6 @@ build-targetatlassian-ide-plugin.xml
 docs/_build
 **/.flattened-pom.xml
 **/dependency-reduced-pom.xml
+.idea/vcs.xml
+.gitignore
+.idea/vcs.xml
