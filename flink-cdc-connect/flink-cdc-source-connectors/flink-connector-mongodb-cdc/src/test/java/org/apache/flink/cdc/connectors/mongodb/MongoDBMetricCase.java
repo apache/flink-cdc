@@ -1,10 +1,8 @@
-package org.apache.flink.cdc.connectors.mongodb.source;
+package org.apache.flink.cdc.connectors.mongodb;
 
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
@@ -14,23 +12,23 @@ import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
+
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
-import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
-import com.ververica.cdc.connectors.mongodb.MongoDBSource;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -39,7 +37,6 @@ import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLI
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-
 
 /** IT tests for {@link MongoDBSource}. */
 @RunWith(Parameterized.class)
@@ -60,24 +57,29 @@ public class MongoDBMetricCase extends MongoDBSourceTestBase {
         String customerDatabase = mongoContainer.executeCommandFileInSeparateDatabase("customer");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
-        SourceFunction<String> sourceFunction = MongoDBSource.<String>builder()
-                .hosts(mongoContainer.getHostAndPort())
-                .username(FLINK_USER)
-                .password(FLINK_USER_PASSWORD)
-                .databaseList(customerDatabase) // 设置捕获的数据库，支持正则表达式
-                .collectionList(getCollectionNameRegex(customerDatabase, new String[] {"customers"})) //设置捕获的集合，支持正则表达式
-                .deserializer(new JsonDebeziumDeserializationSchema())
-                .build();
-        DataStreamSource<String> stream =
-                env.addSource(sourceFunction, "MongoDB CDC Source");
+        env.enableCheckpointing(200L);
+        SourceFunction<String> sourceFunction =
+                MongoDBSource.<String>builder()
+                        .hosts(mongoContainer.getHostAndPort())
+                        .username(FLINK_USER)
+                        .password(FLINK_USER_PASSWORD)
+                        .databaseList(customerDatabase) // 设置捕获的数据库，支持正则表达式
+                        .collectionList(
+                                getCollectionNameRegex(
+                                        customerDatabase,
+                                        new String[] {"customers"})) // 设置捕获的集合，支持正则表达式
+                        .deserializer(new JsonDebeziumDeserializationSchema())
+                        .build();
+        DataStreamSource<String> stream = env.addSource(sourceFunction, "MongoDB");
         CollectResultIterator<String> iterator = addCollector(env, stream);
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
 
-        // ---------------------------- Snapshot phase ------------------------------
-        // Wait until we receive all 21 snapshot records
+        //        // ---------------------------- Snapshot phase ------------------------------
+        //        // Wait until we receive all 21 snapshot records
         int numSnapshotRecordsExpected = 21;
         int numSnapshotRecordsReceived = 0;
+
         while (numSnapshotRecordsReceived < numSnapshotRecordsExpected && iterator.hasNext()) {
             iterator.next();
             numSnapshotRecordsReceived++;
@@ -85,7 +87,8 @@ public class MongoDBMetricCase extends MongoDBSourceTestBase {
 
         // Check metrics
         List<OperatorMetricGroup> metricGroups =
-                metricReporter.findOperatorMetricGroups(jobClient.getJobID(), "MongoDB CDC Source");
+                metricReporter.findOperatorMetricGroups(jobClient.getJobID(), "MongoDB");
+
         // There should be only 1 parallelism of source, so it's safe to get the only group
         OperatorMetricGroup group = metricGroups.get(0);
         Map<String, Metric> metrics = metricReporter.getMetricsByGroup(group);
@@ -100,51 +103,48 @@ public class MongoDBMetricCase extends MongoDBSourceTestBase {
         Gauge<Long> currentEmitEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
         assertEquals(
-//                InternalSourceReaderMetricGroup.UNDEFINED,
-                -1L,
+                InternalSourceReaderMetricGroup.UNDEFINED,
                 (long) currentEmitEventTimeLag.getValue());
-
         // currentFetchEventTimeLag should be UNDEFINED during snapshot phase
-//        assertTrue(metrics.containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG));
-//        Gauge<Long> currentFetchEventTimeLag =
-//                (Gauge<Long>) metrics.get(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
-//        assertEquals(
-//                -1L, (long) currentFetchEventTimeLag.getValue());
+        assertTrue(metrics.containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG));
+        Gauge<Long> currentFetchEventTimeLag =
+                (Gauge<Long>) metrics.get(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
+        assertEquals(
+                InternalSourceReaderMetricGroup.UNDEFINED,
+                (long) currentFetchEventTimeLag.getValue());
+        // sourceIdleTime should be positive (we can't know the exact value)
+        assertTrue(metrics.containsKey(MetricNames.SOURCE_IDLE_TIME));
+        Gauge<Long> sourceIdleTime = (Gauge<Long>) metrics.get(MetricNames.SOURCE_IDLE_TIME);
+        assertTrue(sourceIdleTime.getValue() > 0);
+        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
 
-//        // sourceIdleTime should be positive (we can't know the exact value)
-//        assertTrue(metrics.containsKey(MetricNames.SOURCE_IDLE_TIME));
-//        Gauge<Long> sourceIdleTime = (Gauge<Long>) metrics.get(MetricNames.SOURCE_IDLE_TIME);
-//        assertTrue(sourceIdleTime.getValue() > 0);
-//        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
-//
-//        // --------------------------------- Binlog phase -----------------------------
-//        makeFirstPartChangeStreamEvents(
-//                mongodbClient.getDatabase(customerDatabase), "customers");
-//        // Wait until we receive 4 changes made above
-//        int numBinlogRecordsExpected = 4;
-//        int numBinlogRecordsReceived = 0;
-//        while (numBinlogRecordsReceived < numBinlogRecordsExpected && iterator.hasNext()) {
-//            iterator.next();
-//            numBinlogRecordsReceived++;
-//        }
-//
-//        // Check metrics
-//        // numRecordsOut
-//        assertEquals(
-//                numSnapshotRecordsExpected + numBinlogRecordsExpected,
-//                group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
-//
-//        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-//        assertTrue(currentEmitEventTimeLag.getValue() > 0);
-//        assertTrue(currentEmitEventTimeLag.getValue() < TIMEOUT.toMillis());
-//
-//        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-//        assertTrue(currentFetchEventTimeLag.getValue() > 0);
-//        assertTrue(currentFetchEventTimeLag.getValue() < TIMEOUT.toMillis());
-//
-//        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-//        assertTrue(sourceIdleTime.getValue() > 0);
-//        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        // --------------------------------- Binlog phase -----------------------------
+        makeFirstPartChangeStreamEvents(mongodbClient.getDatabase(customerDatabase), "customers");
+        // Wait until we receive 4 changes made above
+        int numBinlogRecordsExpected = 4;
+        int numBinlogRecordsReceived = 0;
+        while (numBinlogRecordsReceived < numBinlogRecordsExpected && iterator.hasNext()) {
+            iterator.next();
+            numBinlogRecordsReceived++;
+        }
+
+        // Check metrics
+        // numRecordsOut
+        assertEquals(
+                numSnapshotRecordsExpected + numBinlogRecordsExpected,
+                group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
+
+        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
+        assertTrue(currentEmitEventTimeLag.getValue() > 0);
+        assertTrue(currentEmitEventTimeLag.getValue() < TIMEOUT.toMillis());
+
+        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
+        assertTrue(currentFetchEventTimeLag.getValue() > 0);
+        assertTrue(currentFetchEventTimeLag.getValue() < TIMEOUT.toMillis());
+
+        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
+        assertTrue(sourceIdleTime.getValue() > 0);
+        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
 
         jobClient.cancel().get();
         iterator.close();
@@ -153,7 +153,7 @@ public class MongoDBMetricCase extends MongoDBSourceTestBase {
     private <T> CollectResultIterator<T> addCollector(
             StreamExecutionEnvironment env, DataStream<T> stream) {
         TypeSerializer<T> serializer =
-                stream.getTransformation().getOutputType().createSerializer(env.getConfig());
+                stream.getTransformation().getOutputType().createSerializer(env.getConfig()); //
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
         CollectSinkOperatorFactory<T> factory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);

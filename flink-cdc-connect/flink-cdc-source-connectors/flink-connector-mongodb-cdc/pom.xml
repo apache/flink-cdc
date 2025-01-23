@@ -107,14 +107,6 @@ limitations under the License.
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.ververica/flink-connector-mongodb-cdc -->
-        <dependency>
-            <groupId>com.ververica</groupId>
-            <artifactId>flink-connector-mongodb-cdc</artifactId>
-            <version>3.0.1</version>
-            <scope>test</scope>
-        </dependency>
-
 
         <dependency>
             <groupId>org.apache.flink</groupId>
