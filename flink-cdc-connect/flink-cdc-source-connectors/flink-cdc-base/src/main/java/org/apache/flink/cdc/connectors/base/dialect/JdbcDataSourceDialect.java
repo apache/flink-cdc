@@ -37,11 +37,11 @@ import java.util.Map;
 @Experimental
 public interface JdbcDataSourceDialect extends DataSourceDialect<JdbcSourceConfig> {
 
-    /** Discovers the list of table to capture. */
+    /** Discovers the list of table to capture. 发现需要捕获的表的lie*/
     @Override
     List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig);
 
-    /** Discovers the captured tables' schema by {@link SourceConfig}. */
+    /** Discovers the captured tables' schema by {@link SourceConfig}. 发现表的schema信息*/
     @Override
     Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig);
 

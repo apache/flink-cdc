@@ -69,6 +69,7 @@ import static io.debezium.connector.oracle.logminer.LogMinerHelper.setLogFilesFo
  *
  * <p>Diff: Make createProcessor method as protected to produce a LogMinerEventProcessor with
  * enhanced processRow method to distinguish whether is bounded.
+ *
  */
 public class LogMinerStreamingChangeEventSource
         implements StreamingChangeEventSource<OraclePartition, OracleOffsetContext> {
@@ -131,7 +132,7 @@ public class LogMinerStreamingChangeEventSource
 
     /**
      * This is the loop to get changes from LogMiner.
-     *
+     * 从logminer获取日志数据
      * @param context change event source context
      */
     @Override
@@ -144,7 +145,7 @@ public class LogMinerStreamingChangeEventSource
             return;
         }
         try {
-            // We explicitly expect auto-commit to be disabled
+            // We explicitly expect auto-commit to be disabled 取消数据库事务的自动提交
             jdbcConnection.setAutoCommit(false);
 
             startScn = offsetContext.getScn();
@@ -617,7 +618,7 @@ public class LogMinerStreamingChangeEventSource
 
     /**
      * Sets the NLS parameters for the mining session.
-     *
+     * 设置LNLS参数
      * @param connection database connection, should not be {@code null}
      * @throws SQLException if a database exception occurred
      */

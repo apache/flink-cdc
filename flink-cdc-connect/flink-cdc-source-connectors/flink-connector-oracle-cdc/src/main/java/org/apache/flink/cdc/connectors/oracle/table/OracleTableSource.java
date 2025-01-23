@@ -53,6 +53,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 /**
  * A {@link DynamicTableSource} that describes how to create a Oracle redo log from a logical
  * description.
+ * 描述从逻辑构件redo log
  */
 public class OracleTableSource implements ScanTableSource, SupportsReadingMetadata {
 
@@ -91,6 +92,33 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
 
+    /**
+     * 构造函数
+     * @param physicalSchema
+     * @param url
+     * @param port
+     * @param hostname
+     * @param database
+     * @param tableName
+     * @param schemaName
+     * @param username
+     * @param password
+     * @param dbzProperties
+     * @param startupOptions
+     * @param enableParallelRead
+     * @param splitSize
+     * @param splitMetaGroupSize
+     * @param fetchSize
+     * @param connectTimeout
+     * @param connectMaxRetries
+     * @param connectionPoolSize
+     * @param distributionFactorUpper
+     * @param distributionFactorLower
+     * @param chunkKeyColumn
+     * @param closeIdleReaders
+     * @param skipSnapshotBackfill
+     * @param scanNewlyAddedTableEnabled
+     */
     public OracleTableSource(
             ResolvedSchema physicalSchema,
             @Nullable String url,
@@ -144,6 +172,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
     }
 
+    /**
+     * 获取日志变更模式
+     */
     @Override
     public ChangelogMode getChangelogMode() {
         return ChangelogMode.all();

@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
-/** Validates the version of the database connecting to. */
+/** Validates the version of the database connecting to.验证Oracle数据库的版本 */
 public class OracleValidator implements Validator {
 
     private static final long serialVersionUID = 1L;
@@ -43,6 +43,7 @@ public class OracleValidator implements Validator {
         this.properties = properties;
     }
 
+    //判断数据库是否满足处理数据的版本要求
     @Override
     public void validate() {
         try (Connection connection = openConnection(properties)) {
@@ -62,11 +63,13 @@ public class OracleValidator implements Validator {
         }
     }
 
+    //建立数据库连接
     public static Connection openConnection(Properties properties) throws SQLException {
         DriverManager.registerDriver(new oracle.jdbc.OracleDriver());
         String url = OracleJdbcUrlUtils.getConnectionUrlWithSid(properties);
         String userName = properties.getProperty("database.user");
         String userpwd = properties.getProperty("database.password");
+        System.out.println("========数据库连接===");
         return DriverManager.getConnection(url, userName, userpwd);
     }
 }

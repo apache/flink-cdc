@@ -17,6 +17,13 @@
 
 package org.apache.flink.cdc.debezium;
 
+import io.debezium.document.DocumentReader;
+import io.debezium.document.DocumentWriter;
+import io.debezium.embedded.Connect;
+import io.debezium.engine.DebeziumEngine;
+import io.debezium.engine.spi.OffsetCommitPolicy;
+import io.debezium.heartbeat.Heartbeat;
+import org.apache.commons.collections.map.LinkedMap;
 import org.apache.flink.api.common.state.CheckpointListener;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -27,50 +34,28 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
-import org.apache.flink.cdc.debezium.internal.DebeziumChangeConsumer;
-import org.apache.flink.cdc.debezium.internal.DebeziumChangeFetcher;
-import org.apache.flink.cdc.debezium.internal.DebeziumOffset;
-import org.apache.flink.cdc.debezium.internal.DebeziumOffsetSerializer;
-import org.apache.flink.cdc.debezium.internal.FlinkDatabaseHistory;
-import org.apache.flink.cdc.debezium.internal.FlinkDatabaseSchemaHistory;
-import org.apache.flink.cdc.debezium.internal.FlinkOffsetBackingStore;
-import org.apache.flink.cdc.debezium.internal.Handover;
-import org.apache.flink.cdc.debezium.internal.SchemaRecord;
+import org.apache.flink.cdc.debezium.internal.*;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
-
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
-
-import io.debezium.document.DocumentReader;
-import io.debezium.document.DocumentWriter;
-import io.debezium.embedded.Connect;
-import io.debezium.engine.DebeziumEngine;
-import io.debezium.engine.spi.OffsetCommitPolicy;
-import io.debezium.heartbeat.Heartbeat;
-import org.apache.commons.collections.map.LinkedMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static org.apache.flink.cdc.debezium.internal.Handover.ClosedException.isGentlyClosedException;
 import static org.apache.flink.cdc.debezium.utils.DatabaseHistoryUtil.registerHistory;

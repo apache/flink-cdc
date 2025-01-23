@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
  *
  * <p>Line 356: Replace < condition with <= to be able to catch ongoing transactions during snapshot
  * if current SCN points to START/INSERT/DELETE/UPDATE event.
+ * 如果当前 SCN 指向 START/INSERT/DELETE/UPDATE 事件，则将 < 条件替换为 <=，以便能够在快照期间捕获正在进行的事务。
  */
 public class LogMinerAdapter extends AbstractStreamingAdapter {
 
@@ -98,6 +99,18 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
         return new LogMinerOracleOffsetContextLoader(connectorConfig);
     }
 
+    /**
+     * 从 DB 日志（例如 MySQL 的 binlog 或类似日志）发出事件的变更事件源
+     * @param connection
+     * @param dispatcher
+     * @param errorHandler
+     * @param clock
+     * @param schema
+     * @param taskContext
+     * @param jdbcConfig
+     * @param streamingMetrics
+     * @return
+     */
     @Override
     public StreamingChangeEventSource<OraclePartition, OracleOffsetContext> getSource(
             OracleConnection connection,
@@ -119,6 +132,14 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
                 streamingMetrics);
     }
 
+    /**
+     * 获取快照的偏移量
+     * @param ctx the relational snapshot context, should never be {@code null}
+     * @param connectorConfig the connector configuration, should never be {@code null}
+     * @param connection the database connection, should never be {@code null}
+     * @return
+     * @throws SQLException
+     */
     @Override
     public OracleOffsetContext determineSnapshotOffset(
             RelationalSnapshotContext<OraclePartition, OracleOffsetContext> ctx,
@@ -161,6 +182,13 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
         }
     }
 
+    /**
+     * 获取当前的SCN（System Change Number） 是在某个时间点定义数据库已提交版本的时间戳标记
+     * @param latestTableDdlScn
+     * @param connection
+     * @return
+     * @throws SQLException
+     */
     private Optional<Scn> getCurrentScn(Scn latestTableDdlScn, OracleConnection connection)
             throws SQLException {
         final String query = "SELECT CURRENT_SCN FROM V$DATABASE";
@@ -175,6 +203,15 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
         return Optional.ofNullable(currentScn);
     }
 
+    /**
+     * 获取等待的事务
+     * @param latestTableDdlScn
+     * @param connection
+     * @param transactions
+     * @param transactionTableName
+     * @return
+     * @throws SQLException
+     */
     private Optional<Scn> getPendingTransactions(
             Scn latestTableDdlScn,
             OracleConnection connection,
@@ -285,6 +322,12 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
                 .build();
     }
 
+    /**
+     * 将logs添加到session中
+     * @param logs
+     * @param connection
+     * @throws SQLException
+     */
     private void addLogsToSession(List<LogFile> logs, OracleConnection connection)
             throws SQLException {
         for (LogFile logFile : logs) {
@@ -294,6 +337,11 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
         }
     }
 
+    /**
+     * 启动一个事务会话
+     * @param connection
+     * @throws SQLException
+     */
     private void startSession(OracleConnection connection) throws SQLException {
         // We explicitly use the ONLINE data dictionary mode here.
         // Since we are only concerned about non-SQL columns, it is safe to always use this mode
@@ -319,6 +367,9 @@ public class LogMinerAdapter extends AbstractStreamingAdapter {
         }
     }
 
+    /**
+     *
+     */
     private Scn getOldestScnAvailableInLogs(
             OracleConnectorConfig config, OracleConnection connection) throws SQLException {
         final Duration archiveLogRetention = config.getLogMiningArchiveLogRetention();

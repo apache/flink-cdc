@@ -31,8 +31,10 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
  * A builder to build a SourceFunction which can read snapshot and continue to consume log miner.
+ *
  */
 public class OracleSource {
+
 
     private static final String DATABASE_SERVER_NAME = "oracle_logminer";
 
@@ -40,7 +42,7 @@ public class OracleSource {
         return new Builder<>();
     }
 
-    /** Builder class of {@link OracleSource}. */
+    /** Builder class of {@link OracleSource}. 构件类*/
     public static class Builder<T> {
 
         private Integer port = 1521; // default 1521 port
@@ -136,6 +138,7 @@ public class OracleSource {
             return this;
         }
 
+        // 构件源处理oracle数据的日志数据
         public DebeziumSourceFunction<T> build() {
             Properties props = new Properties();
             props.setProperty("connector.class", OracleConnector.class.getCanonicalName());
@@ -195,6 +198,7 @@ public class OracleSource {
             }
 
             return new DebeziumSourceFunction<>(
+                    //对于传入的数据库配置参数进行校验
                     deserializer, props, null, new OracleValidator(props));
         }
     }
