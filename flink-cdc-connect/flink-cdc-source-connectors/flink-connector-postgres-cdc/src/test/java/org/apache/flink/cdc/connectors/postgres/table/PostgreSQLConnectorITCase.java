@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.flink.cdc.common.utils.TestCaseUtils.fetchAndConvert;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -784,7 +785,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         expected.addAll(Arrays.asList("-U[1, a]", "+U[1, null]"));
         CloseableIterator<Row> iterator = tableResult.collect();
-        assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
+        assertEqualsInAnyOrder(expected, fetchAndConvert(iterator, expected.size(), Row::toString));
         tableResult.getJobClient().get().cancel().get();
         RowUtils.USE_LEGACY_TO_STRING = true;
     }

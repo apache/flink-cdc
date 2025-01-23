@@ -41,12 +41,12 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
+
+import static org.apache.flink.cdc.common.utils.TestCaseUtils.fetchAndConvert;
 
 /** Integration tests for MySQL shardding tables. */
 @RunWith(Parameterized.class)
@@ -269,7 +269,8 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
                     "+U[221, user_221, Shanghai, 123567891234, null, 20]",
                 };
 
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -339,16 +340,6 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
                 return 0;
             }
         }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {

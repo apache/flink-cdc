@@ -32,13 +32,12 @@ import org.junit.Test;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.utils.TestCaseUtils.fetchAndConvert;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -207,19 +206,9 @@ public class VitessConnectorITCase extends VitessTestBase {
                         "-U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Hello World, abc, 123.102, 404.4443, 123.4567, 346, true]",
                         "+U[1, 127, 255, 32767, 65535, 2147483647, 4294967295, 2147483647, 9223372036854775807, Bye World, abc, 123.102, 404.4443, 123.4567, 346, true]");
 
-        List<String> actual = fetchRows(result.collect(), expected.size());
+        List<String> actual = fetchAndConvert(result.collect(), expected.size(), Row::toString);
         assertEquals(expected, actual);
         result.getJobClient().get().cancel().get();
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     public static void assertEqualsInAnyOrder(List<String> actual, List<String> expected) {
