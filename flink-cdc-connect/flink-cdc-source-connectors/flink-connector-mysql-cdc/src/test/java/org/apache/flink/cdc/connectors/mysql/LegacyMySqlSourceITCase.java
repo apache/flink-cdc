@@ -28,8 +28,11 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.alibaba.fastjson.JSONObject;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.connect.json.JsonConverterConfig;
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -43,8 +46,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetch;
-import static org.junit.Assert.assertTrue;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 
 /** Integration tests for the legacy {@link MySqlSource}. */
@@ -98,9 +100,9 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                 StreamTableEnvironment.create(
                         env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-        final JSONObject expected =
-                JSONObject.parseObject(readLines(expectedFile), JSONObject.class);
-        JSONObject expectSnapshot = expected.getJSONObject("expected_snapshot");
+        final JsonNode expected =
+                new ObjectMapper().readValue(readLines(expectedFile), JsonNode.class);
+        JsonNode expectSnapshot = expected.get("expected_snapshot");
 
         DataStreamSource<String> source = env.addSource(sourceFunction);
         tEnv.createTemporaryView("full_types", source);
@@ -109,9 +111,10 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         // check the snapshot result
         CloseableIterator<Row> snapshot = result.collect();
         waitForSnapshotStarted(snapshot);
-        assertTrue(
-                dataInJsonIsEquals(
-                        fetch(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
+
+        assertJsonEquals(
+                fetchAndConvert(snapshot, 1, LegacyMySqlSourceITCase::extractJsonBody).get(0),
+                expectSnapshot);
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
@@ -120,8 +123,10 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
         // check the binlog result
         CloseableIterator<Row> binlog = result.collect();
-        JSONObject expectBinlog = expected.getJSONObject("expected_binlog");
-        assertTrue(dataInJsonIsEquals(fetch(binlog, 1).get(0).toString(), expectBinlog.toString()));
+        JsonNode expectBinlog = expected.get("expected_binlog");
+        assertJsonEquals(
+                fetchAndConvert(binlog, 1, LegacyMySqlSourceITCase::extractJsonBody).get(0),
+                expectBinlog);
         result.getJobClient().get().cancel().get();
     }
 
@@ -144,25 +149,23 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         return Files.readAllBytes(path);
     }
 
-    private static boolean dataInJsonIsEquals(String actual, String expect) {
-        JSONObject actualJsonObject = JSONObject.parseObject(actual);
-        JSONObject expectJsonObject = JSONObject.parseObject(expect);
-
-        if (expectJsonObject.getJSONObject("payload") != null
-                && actualJsonObject.getJSONObject("payload") != null) {
-            expectJsonObject = expectJsonObject.getJSONObject("payload");
-            actualJsonObject = actualJsonObject.getJSONObject("payload");
+    private static void assertJsonEquals(JsonNode actual, JsonNode expect) throws Exception {
+        if (actual.get("payload") != null && expect.get("payload") != null) {
+            actual = actual.get("payload");
+            expect = expect.get("payload");
         }
-        return jsonObjectEquals(
-                        expectJsonObject.getJSONObject("after"),
-                        actualJsonObject.getJSONObject("after"))
-                && jsonObjectEquals(
-                        expectJsonObject.getJSONObject("before"),
-                        actualJsonObject.getJSONObject("before"))
-                && Objects.equals(expectJsonObject.get("op"), actualJsonObject.get("op"));
+        Assertions.assertThat(actual.get("after")).isEqualTo(expect.get("after"));
+        Assertions.assertThat(actual.get("before")).isEqualTo(expect.get("before"));
+        Assertions.assertThat(actual.get("op")).isEqualTo(expect.get("op"));
     }
 
-    private static boolean jsonObjectEquals(JSONObject a, JSONObject b) {
-        return (a == b) || (a != null && a.toString().equals(b.toString()));
+    private static JsonNode extractJsonBody(Row row) {
+        try {
+            String body = row.toString();
+            return new ObjectMapper()
+                    .readValue(body.substring(3, body.length() - 1), JsonNode.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Invalid JSON format.", e);
+        }
     }
 }
