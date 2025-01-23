@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -100,7 +101,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection("inventory");
                 Statement statement = connection.createStatement()) {
@@ -118,7 +119,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
 
         /*
          * <pre>
@@ -205,7 +206,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection("inventory");
                 Statement statement = connection.createStatement()) {
@@ -220,7 +221,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 15);
+        waitForSinkSize("sink", false, 15);
 
         List<String> expected =
                 Arrays.asList(
@@ -284,7 +285,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection("inventory");
                 Statement statement = connection.createStatement()) {
@@ -304,7 +305,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
 
         List<String> expected =
                 Arrays.asList(
@@ -374,7 +375,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection("inventory");
                 Statement statement = connection.createStatement()) {
@@ -382,7 +383,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
         }
 
-        waitForSinkSize("sink", 10);
+        waitForSinkSize("sink", false, 10);
 
         List<String> expected =
                 Arrays.asList(
@@ -519,7 +520,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "INSERT INTO sink SELECT id, tiny_c, tiny_un_c, small_c, small_un_c, medium_c, medium_un_c, int_c, int_un_c, int11_c, big_c, big_un_c, varchar_c, char_c, real_c, float_c, double_c, decimal_c, numeric_c, big_decimal_c, bit1_c, tiny1_c, boolean_c, date_c, time_c, datetime3_c, datetime6_c, cast(timestamp_c as timestamp), file_uuid, bit_c, text_c, tiny_blob_c, blob_c, medium_blob_c, long_blob_c, year_c, enum_c, set_c, json_c FROM tidb_source");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", false, 1);
 
         try (Connection connection = getJdbcConnection("column_type_test");
                 Statement statement = connection.createStatement()) {
@@ -527,7 +528,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         List<String> expected =
                 Arrays.asList(
@@ -599,7 +600,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "INSERT INTO sink select `id`, date_c, time_c,datetime3_c, datetime6_c, cast(timestamp_c as timestamp) FROM tidb_source t");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", false, 1);
 
         try (Connection connection = getJdbcConnection("column_type_test");
                 Statement statement = connection.createStatement()) {
@@ -607,7 +608,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         List<String> expected =
                 Arrays.asList(
@@ -617,24 +618,6 @@ public class TiDBConnectorITCase extends TiDBTestBase {
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {

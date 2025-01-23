@@ -38,10 +38,10 @@ import org.junit.rules.Timeout;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** IT tests for {@link Db2IncrementalSource}. */
@@ -217,7 +217,8 @@ public class Db2SourceITCase extends Db2TestBase {
         }
 
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+                expectedSnapshotData,
+                fetchAndConvert(iterator, expectedSnapshotData.size(), Row::toString));
 
         // second step: check the change stream data
         for (String tableId : captureCustomerTables) {
@@ -250,7 +251,8 @@ public class Db2SourceITCase extends Db2TestBase {
             expectedRedoLogsData.addAll(Arrays.asList(redoLogsForSingleTable));
         }
         assertEqualsInAnyOrder(
-                expectedRedoLogsData, fetchRows(iterator, expectedRedoLogsData.size()));
+                expectedRedoLogsData,
+                fetchAndConvert(iterator, expectedRedoLogsData.size(), Row::toString));
         tableResult.getJobClient().get().cancel().get();
     }
 
@@ -273,16 +275,6 @@ public class Db2SourceITCase extends Db2TestBase {
             Thread.sleep(millis);
         } catch (InterruptedException ignored) {
         }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     /** The type of failover. */

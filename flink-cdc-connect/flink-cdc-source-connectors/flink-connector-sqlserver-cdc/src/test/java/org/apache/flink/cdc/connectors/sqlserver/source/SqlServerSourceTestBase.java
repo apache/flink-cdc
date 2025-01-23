@@ -24,7 +24,6 @@ import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipCont
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
@@ -196,30 +195,6 @@ public abstract class SqlServerSourceTestBase extends TestLogger {
         assertTrue(expected != null && actual != null);
         assertEquals(expected.size(), actual.size());
         assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
-    }
-
-    protected static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    protected static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    protected static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 
     protected Connection getJdbcConnection() throws SQLException {

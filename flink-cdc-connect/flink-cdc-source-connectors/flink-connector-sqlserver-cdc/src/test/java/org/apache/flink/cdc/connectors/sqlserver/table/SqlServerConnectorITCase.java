@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -165,7 +167,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
             statement.execute("UPDATE inventory.dbo.products SET volume='1.2' WHERE id=110;");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -267,7 +269,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         statement.execute(
                 "INSERT INTO inventory.dbo.products (name,description,weight) VALUES ('scooter','Big 3-wheel scooter',5.20);");
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         String[] expected =
                 new String[] {
@@ -379,7 +381,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                     "UPDATE column_type_test.dbo.full_types SET val_int=8888 WHERE id=0;");
         }
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         List<String> expected =
                 Arrays.asList(
@@ -463,7 +465,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         }
 
         // waiting for change events finished.
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
 
         List<String> expected =
                 Arrays.asList(
@@ -549,7 +551,7 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
 
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM evenly_shopping_cart");
-        waitForSinkSize("sink", 12);
+        waitForSinkSize("sink", false, 12);
         result.getJobClient().get().cancel().get();
     }
 }

@@ -54,10 +54,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.getTableNameRegex;
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.triggerFailover;
-import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.waitForSinkSize;
-import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.waitForUpsertSinkSize;
 
 /** IT tests to cover various newly added tables during capture process. */
 public class NewlyAddedTableITCase extends OracleSourceTestBase {
@@ -393,7 +392,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                             format(
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     captureTableThisRound, cityName, cityName)));
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -418,7 +417,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                                     cityName)));
 
             // step 3: assert fetched redo log data in this round
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
 
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
@@ -492,7 +491,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                         miniClusterResource.getMiniCluster(),
                         () -> sleepMs(100));
             }
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             // wait task to stream phase
@@ -530,7 +529,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             TableResult tableResult = tEnv.executeSql("insert into sink select * from address");
             JobClient jobClient = tableResult.getJobClient().get();
 
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -572,7 +571,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
 
             fetchedDataList.addAll(expectedRedoLogDataThisRound);
             // step 4: assert fetched redo log data in this round
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -687,7 +686,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
                         () -> sleepMs(100));
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
@@ -726,7 +725,7 @@ public class NewlyAddedTableITCase extends OracleSourceTestBase {
             // step 5: assert fetched redo log data in this round
             fetchedDataList.addAll(expectedRedoLogUpsertDataThisRound);
 
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);

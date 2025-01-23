@@ -46,10 +46,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
-import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -175,11 +175,11 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 Updates.set("weight", 5.17));
 
         // Delay delete operations to avoid unstable tests.
-        waitForSinkSize("sink", 19);
+        waitForSinkSize("sink", false, 19);
 
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         // The final database table looks like this:
         //
@@ -296,7 +296,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         products.insertOne(
                 productDocOf("100000000000000000000111", "scooter", "Big 2-wheel scooter", 5.18));
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         String[] expected = new String[] {"jacket,0.200", "scooter,5.180"};
 
@@ -438,7 +438,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 Filters.eq("_id", new ObjectId("5d505646cf6d4fe581014ab2")),
                 Updates.set("int64Field", 510L));
 
-        waitForSinkSize("sink", 3);
+        waitForSinkSize("sink", false, 3);
 
         // 2021-09-03T18:36:04.123Z
         BsonDateTime updatedDateTime = new BsonDateTime(1630694164123L);
@@ -454,7 +454,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                         Updates.set("timestampField", updatedTimestamp),
                         Updates.set("timestampToLocalTimestampField", updatedTimestamp)));
 
-        waitForSinkSize("sink", 5);
+        waitForSinkSize("sink", false, 5);
 
         List<String> expected =
                 Arrays.asList(
@@ -520,7 +520,7 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO meta_sink SELECT * FROM mongodb_source");
 
         // wait for snapshot finished and start change stream
-        waitForSinkSize("meta_sink", 9);
+        waitForSinkSize("meta_sink", false, 9);
 
         MongoCollection<Document> products =
                 mongodbClient.getDatabase(database).getCollection("products");
@@ -554,11 +554,11 @@ public class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                 Updates.set("weight", 5.17));
 
         // Delay delete operations to avoid unstable tests.
-        waitForSinkSize("meta_sink", 15);
+        waitForSinkSize("meta_sink", false, 15);
 
         products.deleteOne(Filters.eq("_id", new ObjectId("100000000000000000000111")));
 
-        waitForSinkSize("meta_sink", 16);
+        waitForSinkSize("meta_sink", false, 16);
 
         List<String> expected =
                 Stream.of(

@@ -33,10 +33,10 @@ import org.junit.runners.Parameterized;
 
 import java.util.List;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSinkSize;
-import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 
@@ -92,7 +92,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         TableResult result = submitTestCase(null, collectionRegex);
 
         // 3. Wait snapshot finished
-        waitForSinkSize("mongodb_sink", 4);
+        waitForSinkSize("mongodb_sink", false, 4);
 
         // 4. Insert new records in database: [coll_a1.A102, coll_a2.A202, coll_b1.B102,
         // coll_b1.B102]
@@ -100,7 +100,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         insertRecordsInDatabase(db1);
 
         // 5. Wait change stream records come
-        waitForSinkSize("mongodb_sink", 8);
+        waitForSinkSize("mongodb_sink", false, 8);
 
         // 6. Check results
         String[] expected =
@@ -137,7 +137,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         TableResult result = submitTestCase(databaseRegex, null);
 
         // 3. Wait snapshot finished
-        waitForSinkSize("mongodb_sink", 8);
+        waitForSinkSize("mongodb_sink", false, 8);
 
         // 4. Insert new records in database: [coll_a1.A102, coll_a2.A202, coll_b1.B102,
         // coll_b1.B102]
@@ -146,7 +146,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         insertRecordsInDatabase(db2);
 
         // 5. Wait change stream records come
-        waitForSinkSize("mongodb_sink", 16);
+        waitForSinkSize("mongodb_sink", false, 16);
 
         // 6. Check results
         String[] expected =
@@ -189,7 +189,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         TableResult result = submitTestCase(null, collectionRegex);
 
         // 3. Wait snapshot finished
-        waitForSinkSize("mongodb_sink", 2);
+        waitForSinkSize("mongodb_sink", false, 2);
 
         // 4. Insert new records in database: [coll_a1.A102, coll_a2.A202, coll_b1.B102,
         // coll_b1.B102]
@@ -197,7 +197,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         insertRecordsInDatabase(db1);
 
         // 5. Wait change stream records come
-        waitForSinkSize("mongodb_sink", 4);
+        waitForSinkSize("mongodb_sink", false, 4);
 
         // 6. Check results
         String[] expected =
@@ -228,7 +228,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         TableResult result = submitTestCase(db0, collectionRegex);
 
         // 3. Wait snapshot finished
-        waitForSinkSize("mongodb_sink", 2);
+        waitForSinkSize("mongodb_sink", false, 2);
 
         // 4. Insert new records in database: [coll_a1.A102, coll_a2.A202, coll_b1.B102,
         // coll_b1.B102]
@@ -236,7 +236,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         insertRecordsInDatabase(db1);
 
         // 5. Wait change stream records come
-        waitForSinkSize("mongodb_sink", 4);
+        waitForSinkSize("mongodb_sink", false, 4);
 
         // 6. Check results
         String[] expected =
@@ -262,7 +262,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         TableResult result = submitTestCase(db0, "coll-a1");
 
         // 2. Wait change stream records come
-        waitForSinkSize("mongodb_sink", 1);
+        waitForSinkSize("mongodb_sink", false, 1);
 
         // 3. Check results
         String[] expected = new String[] {String.format("+I[%s, coll-a1, A101]", db0)};
@@ -282,7 +282,7 @@ public class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
         TableResult result = submitTestCase(db, db + "[.]coll[.]name");
 
         // 2. Wait change stream records come
-        waitForSinkSize("mongodb_sink", 3);
+        waitForSinkSize("mongodb_sink", false, 3);
 
         // 3. Check results
         String[] expected =

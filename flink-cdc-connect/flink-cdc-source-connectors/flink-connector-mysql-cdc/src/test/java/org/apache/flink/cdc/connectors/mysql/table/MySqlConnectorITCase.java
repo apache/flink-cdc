@@ -57,7 +57,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -65,6 +64,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.apache.flink.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.assertContainsErrorMsg;
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
@@ -236,7 +238,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -341,7 +343,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         // wait until the snapshot phase finished
-        waitForSinkSize("sink", 11);
+        waitForSinkSize("sink", false, 11);
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -360,7 +362,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("DELETE FROM products_no_pk WHERE type=111;");
         }
 
-        waitForSinkSize("sink", incrementalSnapshot ? 25 : 29);
+        waitForSinkSize("sink", false, incrementalSnapshot ? 25 : 29);
 
         /*
          * <pre>
@@ -473,7 +475,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[109, spare tire, 24 inch spare tire, 22.200]"
                 };
         assertEqualsInAnyOrder(
-                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
+                Arrays.asList(expectedSnapshot),
+                fetchAndConvert(iterator, expectedSnapshot.length, Row::toString));
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -499,7 +502,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
         assertEqualsInOrder(
-                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
+                Arrays.asList(expectedBinlog),
+                fetchAndConvert(iterator, expectedBinlog.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -760,7 +764,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "]",
                 };
 
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -830,7 +835,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[0, 1024, " + getIntegerSeqString(2, tableColumnCount) + "]"
                 };
 
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -897,7 +903,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM big_table");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", tableRowNumber * 2);
+        waitForSinkSize("sink", false, tableRowNumber * 2);
 
         try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -907,7 +913,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("UPDATE big_table2 SET str = '2049' WHERE id=3;");
         }
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", tableRowNumber * 2 + 4);
+        waitForSinkSize("sink", false, tableRowNumber * 2 + 4);
 
         List<String> expected = new ArrayList<>();
         // snapshot result after upsert into the sink
@@ -988,7 +994,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM mysql_users");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         try (Connection connection = userDatabase1.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -1003,7 +1009,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         }
 
         // waiting for binlog finished (5 more events)
-        waitForSinkSize("sink", 7);
+        waitForSinkSize("sink", false, 7);
 
         List<String> expected =
                 Stream.of(
@@ -1096,7 +1102,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[111, scooter, Big 2-wheel scooter , 5.170]",
                     "-D[111, scooter, Big 2-wheel scooter , 5.170]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -1174,7 +1181,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[[4, 4, 4, 4, 4, 4, 4, 5], 2021-03-08, 50, 500, flink]",
                     "-D[[4, 4, 4, 4, 4, 4, 4, 6], 2021-03-08, 30, 500, flink-sql]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -1241,7 +1249,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[416927583791428523, China, Hangzhou, West Town address 2]",
                     "+I[418257940021724075, Germany, Berlin, West Town address 3]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -1307,7 +1316,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[103, user_3, Hangzhou, 123567891234]",
                     "+I[110, newCustomer, Berlin, 12345678]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
         customer3_0Database.dropDatabase();
     }
@@ -1381,7 +1391,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[1019, user_20, Shanghai, 123567891234]",
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -1519,7 +1530,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "     tiny_un_c TINYINT UNSIGNED DEFAULT ' 28 '"
                             + " );");
         }
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         jobClient.cancel().get();
     }
 
@@ -1588,7 +1600,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute(
                     "alter table default_value_test add column `int_test` INT DEFAULT ' 30 ';");
         }
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         jobClient.cancel().get();
     }
 
@@ -1667,7 +1680,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         }
 
         // We only expect 5 records here as all UPDATE_BEFOREs are ignored with primary key defined
-        waitForSinkSize("sink", 5);
+        waitForSinkSize("sink", false, 5);
 
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
@@ -1768,7 +1781,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         }
 
         // We only expect 5 records here as all UPDATE_BEFOREs are ignored with primary key defined
-        waitForSinkSize("sink", 5);
+        waitForSinkSize("sink", false, 5);
 
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
@@ -1837,7 +1850,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
 
         String[] expected =
                 new String[] {
@@ -1923,7 +1936,7 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 5);
+        waitForSinkSize("sink", false, 5);
 
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
@@ -1986,7 +1999,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[123458.6789, KIND_003, user_3, my shopping cart]",
                     "+I[123459.1234, KIND_004, user_4, null]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -2051,7 +2065,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[E, 3, flink]",
                     "+I[e, 4, flink]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -2183,7 +2198,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+I[1, 127, 255, 255, 32767, 65535, 65535, 2023]",
                     "+I[2, 127, 255, 255, 32767, 65535, 65535, 2024]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -2229,46 +2245,6 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
         }
         stringBuilder.append(end - 1);
         return stringBuilder.toString();
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
-    }
-
-    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
-        while (!iterator.hasNext()) {
-            Thread.sleep(100);
-        }
     }
 
     @Test
@@ -2348,7 +2324,8 @@ public class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "+U[6, BAQEBAQEBAU=, 2021-03-08, 50, 500, flink]",
                     "-D[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]"
                 };
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 }

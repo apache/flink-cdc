@@ -20,9 +20,7 @@ package org.apache.flink.cdc.connectors.postgres;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
-import org.apache.flink.types.Row;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -43,9 +41,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -161,42 +157,6 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         return new PostgresConnection(JdbcConfiguration.adapt(config), "test-connection");
     }
 
-    protected void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(300);
-        }
-    }
-
-    protected void waitForSinkResult(String sinkName, List<String> expected)
-            throws InterruptedException {
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
-        actual = actual.stream().sorted().collect(Collectors.toList());
-        while (actual.size() != expected.size() || !actual.equals(expected)) {
-            actual =
-                    TestValuesTableFactory.getResultsAsStrings(sinkName).stream()
-                            .sorted()
-                            .collect(Collectors.toList());
-            Thread.sleep(1000);
-        }
-    }
-
-    protected void waitForSinkSize(String sinkName, int expectedSize) throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    protected int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
     protected PostgresSourceConfigFactory getMockPostgresSourceConfigFactory(
             UniqueDatabase database, String schemaName, String tableName, int splitSize) {
         return getMockPostgresSourceConfigFactory(
@@ -222,16 +182,6 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         postgresSourceConfigFactory.setLsnCommitCheckpointsDelay(1);
         return postgresSourceConfigFactory;
-    }
-
-    public static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {

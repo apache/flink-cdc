@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mongodb.table;
 
+import org.apache.flink.cdc.common.testutils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -33,7 +34,6 @@ import org.junit.runners.Parameterized;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
@@ -154,7 +154,8 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
                 break;
         }
 
-        List<String> actualSnapshot = fetchRows(iterator, expectedSnapshot.length);
+        List<String> actualSnapshot =
+                TestCaseUtils.fetchAndConvert(iterator, expectedSnapshot.length, Row::toString);
         assertThat(actualSnapshot, containsInAnyOrder(expectedSnapshot));
 
         result.getJobClient().get().cancel().get();
@@ -217,19 +218,10 @@ public class MongoDBTimeZoneITCase extends MongoDBSourceTestBase {
                 break;
         }
 
-        List<String> actualSnapshot = fetchRows(iterator, expectedSnapshot.length);
+        List<String> actualSnapshot =
+                TestCaseUtils.fetchAndConvert(iterator, expectedSnapshot.length, Row::toString);
         assertThat(actualSnapshot, containsInAnyOrder(expectedSnapshot));
 
         result.getJobClient().get().cancel().get();
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 }

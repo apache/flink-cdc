@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.junit.Assert.assertEquals;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 

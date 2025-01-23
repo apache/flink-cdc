@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.debezium.converters;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.cdc.common.testutils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.mysql.MySqlValidatorTest;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceBuilder;
@@ -60,7 +61,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
@@ -227,7 +227,7 @@ public class MysqlDebeziumTimeConverterITCase {
         return debeziumProperties;
     }
 
-    private void checkData(TableResult tableResult) {
+    private void checkData(TableResult tableResult) throws Exception {
         String[] snapshotForSingleTable =
                 new String[] {
                     "+I[1, 14:23:00, 2023-04-01 14:24:00, 2023-04-01, 14:25:00]",
@@ -240,17 +240,8 @@ public class MysqlDebeziumTimeConverterITCase {
         CloseableIterator<Row> collect = tableResult.collect();
         tableResult.getJobClient().get().getJobID();
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(collect, expectedSnapshotData.size()));
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
+                expectedSnapshotData,
+                TestCaseUtils.fetchAndConvert(collect, expectedSnapshotData.size(), Row::toString));
     }
 
     protected MySqlContainer createMySqlContainer(String timezone) {

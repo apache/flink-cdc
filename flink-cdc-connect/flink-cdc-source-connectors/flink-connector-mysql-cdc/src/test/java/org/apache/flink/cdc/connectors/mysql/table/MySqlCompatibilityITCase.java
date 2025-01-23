@@ -44,16 +44,14 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
@@ -185,7 +183,8 @@ public class MySqlCompatibilityITCase {
                     "+I[109, spare tire, 24 inch spare tire, 22.200]"
                 };
         assertEqualsInAnyOrder(
-                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
+                Arrays.asList(expectedSnapshot),
+                fetchAndConvert(iterator, expectedSnapshot.length, Row::toString));
 
         try (Connection connection = testDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -218,7 +217,8 @@ public class MySqlCompatibilityITCase {
                 };
 
         assertEqualsInOrder(
-                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
+                Arrays.asList(expectedBinlog),
+                fetchAndConvert(iterator, expectedBinlog.length, Row::toString));
         result.getJobClient().get().cancel().get();
         mySqlContainer.stop();
     }
@@ -227,16 +227,6 @@ public class MySqlCompatibilityITCase {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         return serverId + "-" + (serverId + env.getParallelism());
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     private String buildCustomMySqlConfig(MySqlVersion version, boolean enableGtid) {

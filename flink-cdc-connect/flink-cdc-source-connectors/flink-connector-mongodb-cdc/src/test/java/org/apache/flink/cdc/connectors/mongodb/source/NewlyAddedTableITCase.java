@@ -60,6 +60,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -398,8 +399,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                             format(
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     collection0, cityName0, cityName0)));
-
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -416,7 +416,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                             format(
                                     "+I[%s, %d, China, %s, %s West Town address 4]",
                                     collection0, 417022095255614380L, cityName0, cityName0)));
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -464,7 +464,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                             format(
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     captureTableThisRound, cityName, cityName)));
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -509,7 +509,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                                     cityName)));
 
             // assert fetched changelog data in this round
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
 
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
@@ -588,7 +588,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                         miniClusterResource.getMiniCluster(),
                         () -> sleepMs(100));
             }
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -627,7 +627,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                             "insert into sink select collection_name, cid, country, city, detail_address from address");
             JobClient jobClient = tableResult.getJobClient().get();
 
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -676,7 +676,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
 
             fetchedDataList.addAll(expectedOplogDataThisRound);
             // step 4: assert fetched oplog data in this round
-            MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
 
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
@@ -796,7 +796,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                         () -> sleepMs(100));
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
@@ -838,7 +838,7 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             // step 5: assert fetched changelog data in this round
             fetchedDataList.addAll(expectedOplogUpsertDataThisRound);
 
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
@@ -1011,24 +1011,6 @@ public class NewlyAddedTableITCase extends MongoDBSourceTestBase {
                                                                 "'%s'='%s'",
                                                                 e.getKey(), e.getValue()))
                                         .collect(Collectors.joining(",")));
-    }
-
-    protected static void waitForUpsertSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (upsertSinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    protected static int upsertSinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 
     private String getCollectionNameRegex(String database, String[] captureCustomerCollections) {

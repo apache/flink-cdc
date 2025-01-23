@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.oracle.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.cdc.common.testutils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
@@ -52,12 +53,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.triggerFailover;
 import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
@@ -490,7 +489,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
-            records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            records = fetchAndConvert(iterator, fetchSize, customerTable::stringify);
             env.close();
         }
         return records;
@@ -617,7 +616,9 @@ public class OracleSourceITCase extends OracleSourceTestBase {
 
         LOG.info("snapshot data start");
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+                expectedSnapshotData,
+                TestCaseUtils.fetchAndConvert(
+                        iterator, expectedSnapshotData.size(), Row::toString));
 
         // second step: check the redo log data
         for (String tableId : captureCustomerTables) {
@@ -650,7 +651,8 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             expectedRedoLogData.addAll(Arrays.asList(redoLogForSingleTable));
         }
         assertEqualsInAnyOrder(
-                expectedRedoLogData, fetchRows(iterator, expectedRedoLogData.size()));
+                expectedRedoLogData,
+                TestCaseUtils.fetchAndConvert(iterator, expectedRedoLogData.size(), Row::toString));
         tableResult.getJobClient().get().cancel().get();
     }
 
@@ -673,27 +675,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             Thread.sleep(millis);
         } catch (InterruptedException ignored) {
         }
-    }
-
-    private static List<String> fetchRowData(
-            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return rows.stream().map(stringifier).collect(Collectors.toList());
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     private String getTableNameRegex(String[] captureCustomerTables) {

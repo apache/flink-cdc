@@ -56,11 +56,10 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils.assertEqualsInAnyOrder;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchRowData;
-import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.fetchRows;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils.triggerFailover;
 import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
@@ -584,7 +583,7 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
-            records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            records = fetchAndConvert(iterator, fetchSize, customerTable::stringify);
             env.close();
         }
         return records;
@@ -713,7 +712,8 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         }
 
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+                expectedSnapshotData,
+                fetchAndConvert(iterator, expectedSnapshotData.size(), Row::toString));
 
         // second step: check the change stream data
         for (String collectionName : captureCustomerCollections) {
@@ -747,7 +747,8 @@ public class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         for (int i = 0; i < captureCustomerCollections.length; i++) {
             expectedChangeStreamData.addAll(Arrays.asList(changeEventsForSingleTable));
         }
-        List<String> actualChangeStreamData = fetchRows(iterator, expectedChangeStreamData.size());
+        List<String> actualChangeStreamData =
+                fetchAndConvert(iterator, expectedChangeStreamData.size(), Row::toString);
         assertEqualsInAnyOrder(expectedChangeStreamData, actualChangeStreamData);
         tableResult.getJobClient().get().cancel().get();
     }

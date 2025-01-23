@@ -45,6 +45,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -158,7 +161,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -266,7 +269,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 5);
+        waitForSinkSize("sink", false, 5);
 
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
@@ -442,7 +445,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
 
-        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", false, 1);
         // wait a bit to make sure the replication slot is ready
         Thread.sleep(5000);
 
@@ -452,7 +455,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=1;");
         }
 
-        waitForSinkSize("sink", 3);
+        waitForSinkSize("sink", false, 3);
 
         List<String> expected =
                 Arrays.asList(
@@ -546,7 +549,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         }
 
         // waiting for change events finished.
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
         String databaseName = POSTGRES_CONTAINER.getDatabaseName();
 
         List<String> expected =
@@ -679,7 +682,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -784,7 +787,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         expected.addAll(Arrays.asList("-U[1, a]", "+U[1, null]"));
         CloseableIterator<Row> iterator = tableResult.collect();
-        assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
+        assertEqualsInAnyOrder(expected, fetchAndConvert(iterator, expected.size(), Row::toString));
         tableResult.getJobClient().get().cancel().get();
         RowUtils.USE_LEGACY_TO_STRING = true;
     }

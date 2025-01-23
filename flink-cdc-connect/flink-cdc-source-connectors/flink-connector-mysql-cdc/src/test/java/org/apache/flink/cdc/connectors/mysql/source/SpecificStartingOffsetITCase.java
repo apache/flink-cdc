@@ -62,18 +62,15 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration test for validating specifying starting offset. */
@@ -150,7 +147,7 @@ public class SpecificStartingOffsetITCase {
         // Execute job and validate results
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
-        List<String> rows = fetchRowData(iterator, 3, customers::stringify);
+        List<String> rows = fetchAndConvert(iterator, 3, customers::stringify);
         assertThat(rows)
                 .containsExactly(
                         "+I[15213, Alice, Rome, 123456987]",
@@ -176,7 +173,7 @@ public class SpecificStartingOffsetITCase {
         setupSavepoint(restoredEnv, savepointPath);
         JobClient restoredJobClient = restoredEnv.executeAsync();
         iterator.setJobClient(restoredJobClient);
-        List<String> rowsAfterRestored = fetchRowData(iterator, 2, customers::stringify);
+        List<String> rowsAfterRestored = fetchAndConvert(iterator, 2, customers::stringify);
         assertThat(rowsAfterRestored)
                 .containsExactly(
                         "-U[15213, Alice, Rome, 123456987]", "+U[15213, Alicia, Rome, 123456987]");
@@ -225,7 +222,7 @@ public class SpecificStartingOffsetITCase {
         // Execute job and validate results
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
-        List<String> rows = fetchRowData(iterator, 3, customers::stringify);
+        List<String> rows = fetchAndConvert(iterator, 3, customers::stringify);
         assertThat(rows)
                 .containsExactly(
                         "+I[15213, Alice, Rome, 123456987]",
@@ -251,7 +248,7 @@ public class SpecificStartingOffsetITCase {
         setupSavepoint(restoredEnv, savepointPath);
         JobClient restoredJobClient = restoredEnv.executeAsync("snapshotSplitTest");
         iterator.setJobClient(restoredJobClient);
-        List<String> rowsAfterRestored = fetchRowData(iterator, 2, customers::stringify);
+        List<String> rowsAfterRestored = fetchAndConvert(iterator, 2, customers::stringify);
         assertThat(rowsAfterRestored)
                 .containsExactly(
                         "-U[15213, Alice, Rome, 123456987]", "+U[15213, Alicia, Rome, 123456987]");
@@ -398,7 +395,7 @@ public class SpecificStartingOffsetITCase {
         // Execute job and validate results
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
-        List<String> rows = fetchRowData(iterator, 3, customers::stringify);
+        List<String> rows = fetchAndConvert(iterator, 3, customers::stringify);
         assertThat(rows)
                 .containsExactly(
                         "+I[19613, Tom, NewYork, 123456987]",
@@ -424,7 +421,7 @@ public class SpecificStartingOffsetITCase {
         setupSavepoint(restoredEnv, savepointPath);
         JobClient restoredJobClient = restoredEnv.executeAsync("snapshotSplitTest");
         iterator.setJobClient(restoredJobClient);
-        List<String> rowsAfterRestored = fetchRowData(iterator, 2, customers::stringify);
+        List<String> rowsAfterRestored = fetchAndConvert(iterator, 2, customers::stringify);
         assertThat(rowsAfterRestored)
                 .containsExactly(
                         "-U[18213, Charlie, Paris, 123456987]",
@@ -498,17 +495,6 @@ public class SpecificStartingOffsetITCase {
         sink.name("Data stream collect sink");
         env.addOperator(sink.getTransformation());
         return iterator;
-    }
-
-    private List<String> fetchRowData(
-            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return rows.stream().map(stringifier).collect(Collectors.toList());
     }
 
     private static String buildMySqlConfigWithTimezone(File resourceDirectory, String timezone) {

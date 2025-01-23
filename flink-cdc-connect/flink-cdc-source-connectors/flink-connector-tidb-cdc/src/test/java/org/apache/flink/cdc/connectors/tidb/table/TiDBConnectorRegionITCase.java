@@ -35,6 +35,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+
 /** Integration tests for TiDB change stream event SQL source. */
 public class TiDBConnectorRegionITCase extends TiDBTestBase {
 
@@ -87,7 +89,7 @@ public class TiDBConnectorRegionITCase extends TiDBTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM tidb_source");
 
-        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", false, 1);
 
         int count = 0;
 
@@ -125,25 +127,7 @@ public class TiDBConnectorRegionITCase extends TiDBTestBase {
             LOG.info("count: {}", count);
         }
 
-        waitForSinkSize("sink", count);
+        waitForSinkSize("sink", false, count);
         result.getJobClient().get().cancel().get();
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 }

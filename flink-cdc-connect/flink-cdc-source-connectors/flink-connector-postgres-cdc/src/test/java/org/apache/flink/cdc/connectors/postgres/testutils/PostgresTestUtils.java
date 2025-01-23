@@ -21,7 +21,6 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.table.api.TableResult;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
 import org.apache.commons.lang3.StringUtils;
@@ -84,24 +83,6 @@ public class PostgresTestUtils {
         miniCluster.terminateTaskManager(0).get();
         afterFailAction.run();
         miniCluster.startTaskManager();
-    }
-
-    public static void waitForUpsertSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (upsertSinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    public static int upsertSinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 
     public static String getTableNameRegex(String[] captureCustomerTables) {

@@ -36,6 +36,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 
 /**
  * Database Polardbx supported the mysql protocol, but there are some different features in ddl. So
@@ -108,7 +110,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
             expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
         }
 
-        List<String> realSnapshotData = fetchRows(iterator, expectedSnapshotData.size());
+        List<String> realSnapshotData =
+                fetchAndConvert(iterator, expectedSnapshotData.size(), Row::toString);
         assertEqualsInAnyOrder(expectedSnapshotData, realSnapshotData);
 
         // second step: check the sink data
@@ -126,7 +129,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                         + ")");
         tableResult = tEnv.executeSql("insert into sink select * from orders_source");
 
-        waitForSinkSize("sink", realSnapshotData.size());
+        waitForSinkSize("sink", false, realSnapshotData.size());
         assertEqualsInAnyOrder(
                 expectedSnapshotData, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -155,7 +158,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedBinlogData.addAll(Arrays.asList(expectedBinlog));
         }
-        List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
+        List<String> realBinlog = fetchAndConvert(iterator, expectedBinlog.length, Row::toString);
         assertEqualsInOrder(expectedBinlogData, realBinlog);
         tableResult.getJobClient().get().cancel().get();
     }
@@ -245,7 +248,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
 
         TableResult tableResult = tEnv.executeSql("select * from polardbx_full_types");
         CloseableIterator<Row> iterator = tableResult.collect();
-        List<String> realSnapshotData = fetchRows(iterator, 1);
+        List<String> realSnapshotData = fetchAndConvert(iterator, 1, Row::toString);
         String[] expectedSnapshotData =
                 new String[] {
                     "+I[100001, 127, 255, 32767, 65535, 8388607, 16777215, 2147483647, 4294967295, 2147483647, "
@@ -326,7 +329,8 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
             expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
         }
 
-        List<String> realSnapshotData = fetchRows(iterator, expectedSnapshotData.size());
+        List<String> realSnapshotData =
+                fetchAndConvert(iterator, expectedSnapshotData.size(), Row::toString);
         assertEqualsInAnyOrder(expectedSnapshotData, realSnapshotData);
 
         // second step: check the sink data
@@ -345,7 +349,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
 
         tEnv.executeSql("insert into multi_key_sink select * from orders_with_multi_pks");
 
-        waitForSinkSize("multi_key_sink", realSnapshotData.size());
+        waitForSinkSize("multi_key_sink", false, realSnapshotData.size());
         assertEqualsInAnyOrder(
                 expectedSnapshotData,
                 TestValuesTableFactory.getRawResultsAsStrings("multi_key_sink"));
@@ -375,7 +379,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
                     "+I[7, 9999, 9999, 1007, 2022-01-17T00:00]",
                     "-D[7, 9999, 9999, 1007, 2022-01-17T00:00]"
                 };
-        List<String> realBinlog = fetchRows(iterator, expectedBinlog.length);
+        List<String> realBinlog = fetchAndConvert(iterator, expectedBinlog.length, Row::toString);
         assertEqualsInAnyOrder(Arrays.asList(expectedBinlog), realBinlog);
         tableResult.getJobClient().get().cancel().get();
     }

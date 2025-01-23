@@ -34,6 +34,8 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+
 /** Integration tests for OceanBase Oracle mode table source. */
 @Ignore("Test ignored before oceanbase-xe docker image is available")
 public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
@@ -205,7 +207,7 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
                                 + " DECODE(VAL_BLOB_INLINE, 'UTF-8')"
                                 + " FROM full_types");
 
-        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", false, 1);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -213,7 +215,7 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
                     "UPDATE FULL_TYPES SET VAL_TS = '2022-10-30 12:34:56.12545' WHERE id=1;");
         }
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         List<String> expected =
                 Arrays.asList(

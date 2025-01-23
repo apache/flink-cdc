@@ -39,14 +39,12 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 
 /** Integration tests for MySQL Table source. */
 @RunWith(Parameterized.class)
@@ -100,7 +98,7 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testJsonArrayAsKeyIndex() {
+    public void testJsonArrayAsKeyIndex() throws InterruptedException {
         UniqueDatabase jaakiDatabase =
                 new UniqueDatabase(container, "json_array_as_key", TEST_USER, TEST_PASSWORD);
         jaakiDatabase.createAndInitialize();
@@ -161,23 +159,14 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
                     "+I[17]", "+I[18]", "+I[19]", "-D[19]",
                 };
 
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
 
         try {
             result.getJobClient().get().cancel().get();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     private String getServerId() {

@@ -44,6 +44,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.sinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createLogProxyContainer;
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
 
@@ -155,8 +157,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM ob_source");
 
-        waitForSinkSize("sink", 9);
-        int snapshotSize = sinkSize("sink");
+        waitForSinkSize("sink", false, 9);
+        int snapshotSize = sinkSize("sink", false);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -174,7 +176,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
             statement.execute("DELETE FROM products WHERE id=111;");
         }
 
-        waitForSinkSize("sink", snapshotSize + 7);
+        waitForSinkSize("sink", false, snapshotSize + 7);
 
         /*
          * <pre>
@@ -269,8 +271,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM ob_source");
 
-        waitForSinkSize("sink", 9);
-        int snapshotSize = sinkSize("sink");
+        waitForSinkSize("sink", false, 9);
+        int snapshotSize = sinkSize("sink", false);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -279,7 +281,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
         }
 
-        waitForSinkSize("sink", snapshotSize + 1);
+        waitForSinkSize("sink", false, snapshotSize + 1);
 
         String tenant = metadata().getTenantName();
 
@@ -467,8 +469,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                                 + "json_c\n"
                                 + " FROM ob_source");
 
-        waitForSinkSize("sink", 1);
-        int snapshotSize = sinkSize("sink");
+        waitForSinkSize("sink", false, 1);
+        int snapshotSize = sinkSize("sink", false);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -477,7 +479,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
-        waitForSinkSize("sink", snapshotSize + 1);
+        waitForSinkSize("sink", false, snapshotSize + 1);
 
         List<String> expected =
                 Arrays.asList(
@@ -551,8 +553,8 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                         "INSERT INTO sink SELECT `id`, date_c, time_c, datetime3_c, datetime6_c, cast(timestamp_c as timestamp) FROM ob_source");
 
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 1);
-        int snapshotSize = sinkSize("sink");
+        waitForSinkSize("sink", false, 1);
+        int snapshotSize = sinkSize("sink", false);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -561,7 +563,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
                     "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
         }
 
-        waitForSinkSize("sink", snapshotSize + 1);
+        waitForSinkSize("sink", false, snapshotSize + 1);
 
         List<String> expected =
                 Arrays.asList(
@@ -612,7 +614,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM ob_source");
 
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         List<String> expected =
                 Arrays.asList(

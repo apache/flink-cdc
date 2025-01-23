@@ -26,7 +26,6 @@ import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.InMemoryReporter;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
@@ -173,23 +172,5 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         miniCluster.terminateTaskManager(0).get();
         afterFailAction.run();
         miniCluster.startTaskManager();
-    }
-
-    protected static void waitForUpsertSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (upsertSinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    protected static int upsertSinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 }

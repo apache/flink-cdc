@@ -54,6 +54,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.CONNECTOR_PWD;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.CONNECTOR_USER;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.ORACLE_CONTAINER;
@@ -166,7 +168,7 @@ public class OracleConnectorITCase {
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
         // There are 9 records in the table, wait until the snapshot phase finished
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -186,7 +188,7 @@ public class OracleConnectorITCase {
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -303,7 +305,7 @@ public class OracleConnectorITCase {
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
         // There are 9 records in the table, wait until the snapshot phase finished
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -320,7 +322,7 @@ public class OracleConnectorITCase {
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -419,7 +421,7 @@ public class OracleConnectorITCase {
                 tEnv.executeSql(
                         "INSERT INTO sink SELECT NAME, SUM(WEIGHT) FROM debezium_source GROUP BY NAME");
 
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -437,7 +439,7 @@ public class OracleConnectorITCase {
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         String[] expected =
                 new String[] {
@@ -517,7 +519,7 @@ public class OracleConnectorITCase {
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
 
-        waitForSinkSize("sink", 9);
+        waitForSinkSize("sink", false, 9);
 
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -534,7 +536,7 @@ public class OracleConnectorITCase {
             statement.execute("UPDATE debezium.products SET WEIGHT=5.17 WHERE ID=112");
             statement.execute("DELETE FROM debezium.products WHERE ID=112");
         }
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
         List<String> expected =
                 Arrays.asList(
                         "+I[ORCLCDB, DEBEZIUM, PRODUCTS, 101, scooter, Small 2-wheel scooter, 3.140]",
@@ -620,7 +622,7 @@ public class OracleConnectorITCase {
             statement.execute("DELETE FROM debezium.products WHERE id=111");
         }
 
-        waitForSinkSize("sink", 7);
+        waitForSinkSize("sink", false, 7);
 
         String[] expected =
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
@@ -721,7 +723,7 @@ public class OracleConnectorITCase {
         waitForSnapshotStarted("test_numeric_sink");
 
         // waiting for change events finished.
-        waitForSinkSize("test_numeric_sink", 2);
+        waitForSinkSize("test_numeric_sink", false, 2);
 
         List<String> expected =
                 Arrays.asList(
@@ -823,7 +825,7 @@ public class OracleConnectorITCase {
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM full_types");
 
         // waiting for change events finished.
-        waitForSinkSize("sink", 1);
+        waitForSinkSize("sink", false, 1);
 
         String[] expected =
                 new String[] {
@@ -902,7 +904,7 @@ public class OracleConnectorITCase {
         finishFuture.get(10, TimeUnit.MINUTES);
         LOG.info("all async runners were finished");
 
-        waitForSinkSize("sink", RECORDS_COUNT);
+        waitForSinkSize("sink", false, RECORDS_COUNT);
 
         List<Integer> actual =
                 TestValuesTableFactory.getResultsAsStrings("sink").stream()
@@ -982,32 +984,6 @@ public class OracleConnectorITCase {
         return () -> possibleValues.get(ThreadLocalRandom.current().nextInt(size));
     }
 
-    // ------------------------------------------------------------------------------------
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
     @Test
     public void testCompositePkTableSplitsUnevenlyWithChunkKeyColumn() throws Exception {
         if (parallelismSnapshot) {
@@ -1070,7 +1046,7 @@ public class OracleConnectorITCase {
 
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM evenly_shopping_cart");
-        waitForSinkSize("sink", 12);
+        waitForSinkSize("sink", false, 12);
         result.getJobClient().get().cancel().get();
     }
 }

@@ -35,11 +35,11 @@ import org.junit.runners.Parameterized;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Random;
+
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 
 /** Test supporting different column charsets for MySQL Table source. */
 @RunWith(Parameterized.class)
@@ -379,7 +379,8 @@ public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
         assertEqualsInAnyOrder(
-                Arrays.asList(snapshotExpected), fetchRows(iterator, snapshotExpected.length));
+                Arrays.asList(snapshotExpected),
+                fetchAndConvert(iterator, snapshotExpected.length, Row::toString));
 
         // test binlog phase
         try (Connection connection = charsetTestDatabase.getJdbcConnection();
@@ -387,7 +388,8 @@ public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
             statement.execute(String.format("UPDATE %s SET table_id = table_id + 10;", testName));
         }
         assertEqualsInAnyOrder(
-                Arrays.asList(binlogExpected), fetchRows(iterator, binlogExpected.length));
+                Arrays.asList(binlogExpected),
+                fetchAndConvert(iterator, binlogExpected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -395,21 +397,5 @@ public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         return serverId + "-" + (serverId + env.getParallelism());
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
-    }
-
-    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
-        while (!iterator.hasNext()) {
-            Thread.sleep(100);
-        }
     }
 }

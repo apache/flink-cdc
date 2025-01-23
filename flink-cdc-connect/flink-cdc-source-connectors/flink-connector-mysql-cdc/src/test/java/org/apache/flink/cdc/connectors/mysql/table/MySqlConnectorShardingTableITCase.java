@@ -41,12 +41,14 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
+
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 
 /** Integration tests for MySQL shardding tables. */
 @RunWith(Parameterized.class)
@@ -176,7 +178,7 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
             statement.execute("INSERT INTO sharding_table_1 values(3, true),(4, false)");
         }
         // wait for snapshot finished and begin binlog
-        waitForSinkSize("sink", 4);
+        waitForSinkSize("sink", false, 4);
 
         try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -191,7 +193,7 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
             statement.execute("INSERT INTO sharding_table_2 values(5, true),(6, false)");
         }
 
-        waitForSinkSize("sink", 6);
+        waitForSinkSize("sink", false, 6);
         String[] expected =
                 new String[] {
                     "+I[1, 1]", "+I[2, 0]", "+I[3, 1]", "+I[4, 0]", "+I[5, 1]", "+I[6, 0]",
@@ -269,7 +271,8 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
                     "+U[221, user_221, Shanghai, 123567891234, null, 20]",
                 };
 
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        assertEqualsInAnyOrder(
+                Arrays.asList(expected), fetchAndConvert(iterator, expected.length, Row::toString));
         result.getJobClient().get().cancel().get();
     }
 
@@ -315,45 +318,5 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
         }
         stringBuilder.append(end - 1);
         return stringBuilder.toString();
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
-    }
-
-    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
-        while (!iterator.hasNext()) {
-            Thread.sleep(100);
-        }
     }
 }

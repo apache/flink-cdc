@@ -23,8 +23,8 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.testutils.TestCaseUtils;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.utils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
@@ -52,9 +52,7 @@ import org.testcontainers.lifecycle.Startables;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
@@ -62,8 +60,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_INTERVAL;
-import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.DEFAULT_INTERVAL;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.DEFAULT_TIMEOUT;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 
 /**
  * IT case for Evolving MySQL schema with gh-ost/pt-osc utility. See <a
@@ -227,7 +226,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                         "+I[1019, user_20, Shanghai, 123567891234]",
                         "+I[2000, user_21, Shanghai, 123567891234]"
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
 
         // Wait for a little while until we're in Binlog streaming mode.
@@ -261,7 +262,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     new String[] {
                         "+I[10000, Alice, Beijing, 123567891234]",
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
 
         {
@@ -291,7 +294,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     new String[] {
                         "+I[10001, Bob, Chongqing, 123567891234]",
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
 
         {
@@ -321,7 +326,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     new String[] {
                         "+I[10002, Cicada, Urumqi, 123567891234]",
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
     }
 
@@ -395,7 +402,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                         "+I[1019, user_20, Shanghai, 123567891234]",
                         "+I[2000, user_21, Shanghai, 123567891234]"
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
 
         // Wait for a little while until we're in Binlog streaming mode.
@@ -429,7 +438,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     new String[] {
                         "+I[10000, Alice, Beijing, 123567891234]",
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
 
         LOG.info("Step 3: Evolve schema with pt-osc - MODIFY COLUMN");
@@ -458,7 +469,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     new String[] {
                         "+I[10001, Bob, Chongqing, 123567891234]",
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
 
         LOG.info("Step 4: Evolve schema with pt-osc - DROP COLUMN");
@@ -487,7 +500,9 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                     new String[] {
                         "+I[10002, Cicada, Urumqi, 123567891234]",
                     };
-            assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+            assertEqualsInAnyOrder(
+                    Arrays.asList(expected),
+                    fetchAndConvert(iterator, expected.length, Row::toString));
         }
     }
 
@@ -560,39 +575,5 @@ public class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
 
     protected String getServerId(int base) {
         return base + "-" + (base + DEFAULT_PARALLELISM);
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 }

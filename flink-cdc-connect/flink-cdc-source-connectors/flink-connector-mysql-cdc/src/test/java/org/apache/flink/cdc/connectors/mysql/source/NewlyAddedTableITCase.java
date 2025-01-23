@@ -62,7 +62,6 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,6 +78,8 @@ import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static org.apache.flink.api.common.restartstrategy.RestartStrategies.noRestart;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
@@ -487,7 +488,8 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                             expectedCustomersResult.stream())
                                     .collect(Collectors.toList())
                             : expectedCustomersResult;
-            List<String> rows = fetchRowData(iterator, expectedSnapshotResult.size());
+            List<String> rows =
+                    fetchAndConvert(iterator, expectedSnapshotResult.size(), RowData::toString);
             assertEqualsInAnyOrder(expectedSnapshotResult, rows);
 
             // make binlog events
@@ -503,7 +505,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         "UPDATE " + tableId + " SET address = 'Update2' where id = 103");
                 connection.commit();
             }
-            rows = fetchRowData(iterator, expectedBinlogResult.size());
+            rows = fetchAndConvert(iterator, expectedBinlogResult.size(), RowData::toString);
             assertEqualsInAnyOrder(expectedBinlogResult, rows);
 
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -538,16 +540,6 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         stream.getExecutionEnvironment().getCheckpointConfig(),
                         10000L);
         return iterator;
-    }
-
-    private List<String> fetchRowData(Iterator<RowData> iter, int size) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return convertRowDataToRowString(rows);
     }
 
     private static List<String> convertRowDataToRowString(List<RowData> rows) {
@@ -638,7 +630,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         miniClusterResource.getMiniCluster(),
                         () -> sleepMs(100));
             }
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -674,7 +666,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             TableResult tableResult = tEnv.executeSql("insert into sink select * from address");
             JobClient jobClient = tableResult.getJobClient().get();
 
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -715,7 +707,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
             fetchedDataList.addAll(expectedBinlogDataThisRound);
             // step 4: assert fetched binlog data in this round
-            waitForSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", false, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
@@ -830,7 +822,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                         () -> sleepMs(100));
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
@@ -870,7 +862,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             // step 5: assert fetched binlog data in this round
             fetchedDataList.addAll(expectedBinlogUpsertDataThisRound);
 
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
@@ -1104,24 +1096,6 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
     private void testNewlyAddedTableOneByOneWithCreateBeforeStart(
             int parallelism, Map<String, String> sourceOptions, String... captureAddressTables)
             throws Exception {
@@ -1181,7 +1155,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     newlyAddedTable, cityName, cityName));
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
             // step 3: make some binlog data for this round
@@ -1209,7 +1183,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                                     newlyAddedTable, cityName, cityName));
             // step 5: assert fetched binlog data in this round
             fetchedDataList.addAll(expectedBinlogUpsertDataThisRound);
-            waitForUpsertSinkSize("sink", fetchedDataList.size());
+            waitForSinkSize("sink", true, fetchedDataList.size());
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);

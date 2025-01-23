@@ -84,7 +84,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,12 +96,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -347,7 +347,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         // Check all snapshot records are sent with exactly-once semantics
         assertEqualsInAnyOrder(
                 Arrays.asList(expectedSnapshotData),
-                fetchRowData(iterator, expectedSnapshotData.length));
+                fetchAndConvert(iterator, expectedSnapshotData.length, RowData::toString));
         assertTrue(!hasNextData(iterator));
         jobClient.cancel().get();
     }
@@ -638,7 +638,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
-            List<String> records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            List<String> records = fetchAndConvert(iterator, fetchSize, customerTable::stringify);
             return records;
         }
     }
@@ -693,7 +693,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         DataStreamSource<RowData> source =
                 env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
         try (CloseableIterator<RowData> iterator = source.executeAndCollect()) {
-            List<String> rows = fetchRowData(iterator, expectedChangelogAfterStart.size());
+            List<String> rows =
+                    fetchAndConvert(
+                            iterator, expectedChangelogAfterStart.size(), RowData::toString);
             assertEqualsInAnyOrder(expectedChangelogAfterStart, rows);
         }
     }
@@ -1027,7 +1029,8 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         }
 
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+                expectedSnapshotData,
+                fetchAndConvert(iterator, expectedSnapshotData.size(), Row::toString));
     }
 
     private void checkBinlogData(
@@ -1064,8 +1067,10 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             expectedBinlogData.addAll(secondPartBinlogEvents);
         }
 
-        assertEqualsInAnyOrder(expectedBinlogData, fetchRows(iterator, expectedBinlogData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertEqualsInAnyOrder(
+                expectedBinlogData,
+                fetchAndConvert(iterator, expectedBinlogData.size(), Row::toString));
+        assertThat(iterator.hasNext()).isFalse();
     }
 
     private static List<String> convertRowDataToRowString(List<RowData> rows) {
@@ -1088,37 +1093,6 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                                 map)
                                         .toString())
                 .collect(Collectors.toList());
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
-    }
-
-    private List<String> fetchRowData(
-            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return rows.stream().map(stringifier).collect(Collectors.toList());
-    }
-
-    private static List<String> fetchRowData(Iterator<RowData> iter, int size) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return convertRowDataToRowString(rows);
     }
 
     private String getTableNameRegex(String[] captureCustomerTables) {

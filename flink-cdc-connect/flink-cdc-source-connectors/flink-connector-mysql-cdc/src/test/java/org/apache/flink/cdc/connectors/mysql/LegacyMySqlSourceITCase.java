@@ -39,14 +39,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetch;
 import static org.junit.Assert.assertTrue;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 
 /** Integration tests for the legacy {@link MySqlSource}. */
 public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
@@ -112,7 +111,7 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         waitForSnapshotStarted(snapshot);
         assertTrue(
                 dataInJsonIsEquals(
-                        fetchRows(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
+                        fetch(snapshot, 1).get(0).toString(), expectSnapshot.toString()));
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
@@ -122,9 +121,7 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
         // check the binlog result
         CloseableIterator<Row> binlog = result.collect();
         JSONObject expectBinlog = expected.getJSONObject("expected_binlog");
-        assertTrue(
-                dataInJsonIsEquals(
-                        fetchRows(binlog, 1).get(0).toString(), expectBinlog.toString()));
+        assertTrue(dataInJsonIsEquals(fetch(binlog, 1).get(0).toString(), expectBinlog.toString()));
         result.getJobClient().get().cancel().get();
     }
 
@@ -134,23 +131,6 @@ public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
                         ? "file/debezium-data-schema-include.json"
                         : "file/debezium-data-schema-exclude.json";
         testConsumingAllEventsWithJsonFormat(includeSchema, null, expectedFile);
-    }
-
-    private static List<Object> fetchRows(Iterator<Row> iter, int size) {
-        List<Object> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            // ignore rowKind marker
-            rows.add(row.getField(0));
-            size--;
-        }
-        return rows;
-    }
-
-    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
-        while (!iterator.hasNext()) {
-            Thread.sleep(100);
-        }
     }
 
     private static byte[] readLines(String resource) throws IOException, URISyntaxException {

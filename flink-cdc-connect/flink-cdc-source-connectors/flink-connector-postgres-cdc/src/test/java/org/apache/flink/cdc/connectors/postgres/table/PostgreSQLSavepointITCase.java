@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
@@ -123,19 +124,24 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
 
         // wait for the source startup, we don't have a better way to wait it, use sleep for now
         Thread.sleep(10000L);
-        waitForSinkResult(
-                "sink",
-                Arrays.asList(
-                        "+I[101, scooter, Small 2-wheel scooter, 3.140]",
-                        "+I[102, car battery, 12V car battery, 8.100]",
-                        "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.800]",
-                        "+I[104, hammer, 12oz carpenter's hammer, 0.750]",
-                        "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
-                        "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
-                        "+I[107, rocks, box of assorted rocks, 5.300]",
-                        "+I[108, jacket, water resistent black wind breaker, 0.100]",
-                        "+I[109, spare tire, 24 inch spare tire, 22.200]",
-                        "+I[110, jacket, new water resistent white wind breaker, 0.500]"));
+
+        waitForSinkSize("sink", false, 10);
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        assertThat(
+                actual,
+                containsInAnyOrder(
+                        Arrays.asList(
+                                "+I[101, scooter, Small 2-wheel scooter, 3.140]",
+                                "+I[102, car battery, 12V car battery, 8.100]",
+                                "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.800]",
+                                "+I[104, hammer, 12oz carpenter's hammer, 0.750]",
+                                "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
+                                "+I[106, hammer, 16oz carpenter's hammer, 1.000]",
+                                "+I[107, rocks, box of assorted rocks, 5.300]",
+                                "+I[108, jacket, water resistent black wind breaker, 0.100]",
+                                "+I[109, spare tire, 24 inch spare tire, 22.200]",
+                                "+I[110, jacket, new water resistent white wind breaker, 0.500]")));
 
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         jobClient.cancel().get();
@@ -162,7 +168,7 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
         result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         jobClient = result.getJobClient().get();
 
-        waitForSinkSize("sink", 15);
+        waitForSinkSize("sink", false, 15);
 
         String[] expected =
                 new String[] {
@@ -179,7 +185,7 @@ public class PostgreSQLSavepointITCase extends PostgresTestBase {
                     "+I[112, jacket, new water resistent white wind breaker, 0.500]"
                 };
 
-        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        actual = TestValuesTableFactory.getResultsAsStrings("sink");
         assertThat(actual, containsInAnyOrder(expected));
 
         jobClient.cancel().get();

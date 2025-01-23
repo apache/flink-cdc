@@ -45,16 +45,15 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
@@ -189,7 +188,8 @@ public class MySqlTimezoneITCase {
                     "+I[2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22]"
                 };
         assertEqualsInAnyOrder(
-                Arrays.asList(expectedSnapshot), fetchRows(iterator, expectedSnapshot.length));
+                Arrays.asList(expectedSnapshot),
+                fetchAndConvert(iterator, expectedSnapshot.length, Row::toString));
 
         try (Connection connection = fullTypesDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -205,7 +205,8 @@ public class MySqlTimezoneITCase {
                 };
 
         assertEqualsInOrder(
-                Arrays.asList(expectedBinlog), fetchRows(iterator, expectedBinlog.length));
+                Arrays.asList(expectedBinlog),
+                fetchAndConvert(iterator, expectedBinlog.length, Row::toString));
 
         result.getJobClient().get().cancel().get();
         mySqlContainer.stop();
@@ -226,16 +227,6 @@ public class MySqlTimezoneITCase {
             return 4;
         }
         return 0;
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     private String buildMySqlConfigWithTimezone(String timezone) {

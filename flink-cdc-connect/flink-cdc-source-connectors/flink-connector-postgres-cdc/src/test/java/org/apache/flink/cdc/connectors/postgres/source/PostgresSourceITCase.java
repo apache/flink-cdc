@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.cdc.common.testutils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -59,15 +60,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.fetchAndConvert;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.hasNextData;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.triggerFailover;
 import static org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils.waitUntilJobRunning;
@@ -773,7 +773,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
-            records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            records = fetchAndConvert(iterator, fetchSize, customerTable::stringify);
             env.close();
         }
         return records;
@@ -943,7 +943,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         }
 
         assertEqualsInAnyOrder(
-                expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+                expectedSnapshotData,
+                TestCaseUtils.fetchAndConvert(
+                        iterator, expectedSnapshotData.size(), Row::toString));
     }
 
     private void checkStreamData(
@@ -984,7 +986,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // wait for the stream reading
         Thread.sleep(2000L);
 
-        assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
+        assertEqualsInAnyOrder(
+                expectedStreamData,
+                TestCaseUtils.fetchAndConvert(iterator, expectedStreamData.size(), Row::toString));
         assertTrue(!hasNextData(iterator));
     }
 
@@ -1053,7 +1057,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // wait for the stream reading
         Thread.sleep(2000L);
 
-        assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
+        assertEqualsInAnyOrder(
+                expectedStreamData,
+                TestCaseUtils.fetchAndConvert(iterator, expectedStreamData.size(), Row::toString));
         assertTrue(!hasNextData(iterator));
     }
 
@@ -1109,7 +1115,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // wait for the stream reading
         Thread.sleep(2000L);
 
-        assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
+        assertEqualsInAnyOrder(
+                expectedStreamData,
+                TestCaseUtils.fetchAndConvert(iterator, expectedStreamData.size(), Row::toString));
         assertTrue(!hasNextData(iterator));
     }
 
@@ -1128,27 +1136,6 @@ public class PostgresSourceITCase extends PostgresTestBase {
             // pattern that matches multiple tables
             return format("(%s)", StringUtils.join(captureCustomerTables, "|"));
         }
-    }
-
-    private static List<String> fetchRowData(
-            Iterator<RowData> iter, int size, Function<RowData, String> stringifier) {
-        List<RowData> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            RowData row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return rows.stream().map(stringifier).collect(Collectors.toList());
-    }
-
-    public static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 
     /**

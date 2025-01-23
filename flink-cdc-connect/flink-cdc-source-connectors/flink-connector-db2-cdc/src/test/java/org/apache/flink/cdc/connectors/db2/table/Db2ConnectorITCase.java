@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSinkSize;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.waitForSnapshotStarted;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -174,7 +176,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;");
         }
 
-        waitForSinkSize("sink", 20);
+        waitForSinkSize("sink", false, 20);
 
         /*
          * <pre>
@@ -296,7 +298,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("UPDATE DB2INST1.FULL_TYPES SET SMALL_C=0 WHERE ID=1;");
         }
 
-        waitForSinkSize("sink", 2);
+        waitForSinkSize("sink", false, 2);
 
         List<String> expected =
                 Arrays.asList(
@@ -368,7 +370,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111");
         }
 
-        waitForSinkSize("sink", 5);
+        waitForSinkSize("sink", false, 5);
 
         String[] expected =
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
@@ -449,7 +451,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
             statement.execute("DELETE FROM DB2INST1.PRODUCTS WHERE ID=111;");
         }
 
-        waitForSinkSize("sink", 16);
+        waitForSinkSize("sink", false, 16);
 
         List<String> expected =
                 Arrays.asList(
@@ -475,29 +477,5 @@ public class Db2ConnectorITCase extends Db2TestBase {
         Collections.sort(actual);
         assertEquals(expected, actual);
         cancelJobIfRunning(result);
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(1000L);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(1000L);
-        }
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
     }
 }

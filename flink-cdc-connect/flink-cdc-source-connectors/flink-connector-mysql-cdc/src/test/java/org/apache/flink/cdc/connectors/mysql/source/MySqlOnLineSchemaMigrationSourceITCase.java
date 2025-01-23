@@ -24,8 +24,8 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.testutils.TestCaseUtils;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.utils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -36,7 +36,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.types.Row;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -54,9 +53,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
@@ -64,8 +61,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_INTERVAL;
-import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.DEFAULT_INTERVAL;
+import static org.apache.flink.cdc.common.testutils.TestCaseUtils.DEFAULT_TIMEOUT;
 
 /**
  * IT case for Evolving MySQL schema with gh-ost/pt-osc utility. See <a
@@ -549,36 +546,5 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
 
     protected String getServerId(int base) {
         return base + "-" + (base + DEFAULT_PARALLELISM);
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize) {
-        TestCaseUtils.repeatedCheck(() -> sinkSize(sinkName) >= expectedSize);
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 }
