@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.sqlserver;
 
+import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
+import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
@@ -47,6 +49,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
+import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Utility class for sqlserver tests. */
 public class SqlServerTestBase extends AbstractTestBase {
@@ -221,5 +224,20 @@ public class SqlServerTestBase extends AbstractTestBase {
                 return 0;
             }
         }
+    }
+
+    public static SqlServerSourceConfigFactory getConfigFactory(
+            String databaseName, String[] captureTables, int splitSize) {
+        return (SqlServerSourceConfigFactory)
+                new SqlServerSourceConfigFactory()
+                        .hostname(SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getHost())
+                        .port(
+                                SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getMappedPort(
+                                        MS_SQL_SERVER_PORT))
+                        .username(SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getUsername())
+                        .password(SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getPassword())
+                        .databaseList(databaseName)
+                        .tableList(captureTables)
+                        .splitSize(splitSize);
     }
 }
