@@ -72,14 +72,17 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     private final ZoneId pipelineZoneId;
 
     private final Map<TableId, String> shardingKey;
+    private final String shardingSeparator;
 
     public ElasticsearchEventSerializer(ZoneId zoneId) {
-        this(zoneId, Collections.emptyMap());
+        this(zoneId, Collections.emptyMap(), "_");
     }
 
-    public ElasticsearchEventSerializer(ZoneId zoneId, Map<TableId, String> shardingKey) {
+    public ElasticsearchEventSerializer(
+            ZoneId zoneId, Map<TableId, String> shardingKey, String shardingSeparator) {
         this.pipelineZoneId = zoneId;
         this.shardingKey = shardingKey;
+        this.shardingSeparator = shardingSeparator;
     }
 
     @Override
@@ -171,7 +174,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
         } else if (!schema.partitionKeys().isEmpty()) {
             value = valueMap.get(schema.partitionKeys().get(0));
         }
-        return value != null ? tableId.toString() + value : tableId.toString();
+        return value != null ? tableId.toString() + shardingSeparator + value : tableId.toString();
     }
 
     private Object[] generateUniqueId(RecordData recordData, Schema schema, TableId tableId) {

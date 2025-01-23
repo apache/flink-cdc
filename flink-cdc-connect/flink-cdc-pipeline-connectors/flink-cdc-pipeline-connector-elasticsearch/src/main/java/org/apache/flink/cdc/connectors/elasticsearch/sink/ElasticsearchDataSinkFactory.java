@@ -48,7 +48,8 @@ import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDa
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.MAX_RECORD_SIZE_IN_BYTES;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.MAX_TIME_IN_BUFFER_MS;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.PASSWORD;
-import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_KEY;
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_KEY;
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_SEPARATOR;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.VERSION;
 
@@ -90,7 +91,8 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
         String password = cdcConfig.get(PASSWORD);
         int version = cdcConfig.get(VERSION);
         Map<TableId, String> shardingMaps = new HashMap<>();
-        String shardingKey = cdcConfig.get(SHARDING_KEY);
+        String shardingKey = cdcConfig.get(SHARDING_SUFFIX_KEY);
+        String shardingSeparator = cdcConfig.get(SHARDING_SUFFIX_SEPARATOR);
         if (!shardingKey.isEmpty()) {
             for (String tables : shardingKey.split(";")) {
                 String[] splits = tables.split(":");
@@ -101,10 +103,11 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                     throw new IllegalArgumentException(
                             String.format(
                                     "%s is malformed, please refer to the documents",
-                                    SHARDING_KEY.key()));
+                                    SHARDING_SUFFIX_KEY.key()));
                 }
             }
         }
+        validateShardingSeparator(shardingSeparator);
 
         NetworkConfig networkConfig =
                 new NetworkConfig(hosts, username, password, null, null, null);
@@ -119,7 +122,8 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                 version,
                 username,
                 password,
-                shardingMaps);
+                shardingMaps,
+                shardingSeparator);
     }
 
     private List<HttpHost> parseHosts(String hostsStr) {
@@ -152,7 +156,8 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MAX_RECORD_SIZE_IN_BYTES);
         optionalOptions.add(USERNAME);
         optionalOptions.add(PASSWORD);
-        optionalOptions.add(SHARDING_KEY);
+        optionalOptions.add(SHARDING_SUFFIX_KEY);
+        optionalOptions.add(SHARDING_SUFFIX_SEPARATOR);
         return optionalOptions;
     }
 
@@ -172,6 +177,25 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                             missingOptions.stream()
                                     .map(ConfigOption::key)
                                     .collect(Collectors.joining("\n"))));
+        }
+    }
+
+    private void validateShardingSeparator(String separator) {
+        if (!separator.equals(separator.toLowerCase())) {
+            throw new ValidationException(
+                    String.format(
+                            "%s is malformed, elasticsearch index only support lowercase.",
+                            SHARDING_SUFFIX_SEPARATOR.key()));
+        }
+
+        String illegalChars = "\\/*?\"<>| ,#";
+        for (char c : illegalChars.toCharArray()) {
+            if (separator.indexOf(c) != -1) {
+                throw new ValidationException(
+                        String.format(
+                                "%s is malformed, elasticsearch index cannot include \\, /, *, ?, \", <, >, |, ` ` (space character), ,, #",
+                                SHARDING_SUFFIX_SEPARATOR.key()));
+            }
         }
     }
 }

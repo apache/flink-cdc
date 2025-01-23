@@ -41,6 +41,7 @@ public class ElasticsearchSinkOptions implements Serializable {
     private final String username;
     private final String password;
     private final Map<TableId, String> shardingKey;
+    private final String shardingSeparator;
 
     /** Constructor for ElasticsearchSinkOptions. */
     public ElasticsearchSinkOptions(
@@ -65,7 +66,8 @@ public class ElasticsearchSinkOptions implements Serializable {
                 version,
                 username,
                 password,
-                Collections.emptyMap());
+                Collections.emptyMap(),
+                "_");
     }
 
     public ElasticsearchSinkOptions(
@@ -79,7 +81,8 @@ public class ElasticsearchSinkOptions implements Serializable {
             int version,
             String username,
             String password,
-            Map<TableId, String> shardingKey) {
+            Map<TableId, String> shardingKey,
+            String shardingSeparator) {
         this.maxBatchSize = maxBatchSize;
         this.maxInFlightRequests = maxInFlightRequests;
         this.maxBufferedRequests = maxBufferedRequests;
@@ -91,6 +94,7 @@ public class ElasticsearchSinkOptions implements Serializable {
         this.username = username;
         this.password = password;
         this.shardingKey = shardingKey;
+        this.shardingSeparator = shardingSeparator;
     }
 
     /** @return the maximum batch size */
@@ -147,5 +151,9 @@ public class ElasticsearchSinkOptions implements Serializable {
 
     public Map<TableId, String> getShardingKey() {
         return shardingKey;
+    }
+
+    public String getShardingSeparator() {
+        return shardingSeparator;
     }
 }

@@ -49,7 +49,7 @@ public class ElasticsearchEventSerializerTest {
     void testTableShardingWithString() {
         HashMap<TableId, String> shardingKey = new HashMap<>();
         shardingKey.put(tableId, "col1");
-        String index = getShardingString(shardingKey);
+        String index = getShardingString(shardingKey, "");
         assertThat(index).isEqualTo("testc-10");
     }
 
@@ -57,7 +57,7 @@ public class ElasticsearchEventSerializerTest {
     void testTableShardingWithInteger() {
         HashMap<TableId, String> shardingKey = new HashMap<>();
         shardingKey.put(tableId, "id");
-        String index = getShardingString(shardingKey);
+        String index = getShardingString(shardingKey, "");
         assertThat(index).isEqualTo("test110");
     }
 
@@ -65,7 +65,7 @@ public class ElasticsearchEventSerializerTest {
     void testTableShardingWithDate() {
         HashMap<TableId, String> shardingKey = new HashMap<>();
         shardingKey.put(tableId, "dt");
-        String index = getShardingString(shardingKey);
+        String index = getShardingString(shardingKey, "");
         assertThat(index).isEqualTo("test2025-01-01");
     }
 
@@ -73,17 +73,23 @@ public class ElasticsearchEventSerializerTest {
     void testTableShardingWithNull() {
         HashMap<TableId, String> shardingKey = new HashMap<>();
         shardingKey.put(tableId, "col2");
-        String index = getShardingString(shardingKey);
+        String index = getShardingString(shardingKey, "");
         assertThat(index).isEqualTo("test");
     }
 
     @Test
     void testTableShardingWithPartitionCol() {
-        String index = getShardingString(Collections.emptyMap());
-        assertThat(index).isEqualTo("test2025-01-01");
+        String index = getShardingString(Collections.emptyMap(), "_");
+        assertThat(index).isEqualTo("test_2025-01-01");
     }
 
-    private String getShardingString(Map<TableId, String> shardingKey) {
+    @Test
+    void testTableShardingWithSeparator() {
+        String index = getShardingString(Collections.emptyMap(), "$");
+        assertThat(index).isEqualTo("test$2025-01-01");
+    }
+
+    private String getShardingString(Map<TableId, String> shardingKey, String shardingSeparator) {
         RowType rowType =
                 RowType.of(
                         new DataType[] {
@@ -113,7 +119,7 @@ public class ElasticsearchEventSerializerTest {
                                     (int) LocalDate.of(2025, 1, 1).toEpochDay()
                                 }));
         ElasticsearchEventSerializer serializer =
-                new ElasticsearchEventSerializer(ZoneId.of("UTC"), shardingKey);
+                new ElasticsearchEventSerializer(ZoneId.of("UTC"), shardingKey, shardingSeparator);
         Schema tableSchema =
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT().notNull())
