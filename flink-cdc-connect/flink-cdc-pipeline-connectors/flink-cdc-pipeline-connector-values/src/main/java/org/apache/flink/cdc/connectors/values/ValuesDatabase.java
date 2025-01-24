@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -104,7 +105,8 @@ public class ValuesDatabase {
                     SchemaChangeEventType.ALTER_COLUMN_TYPE,
                     SchemaChangeEventType.CREATE_TABLE,
                     SchemaChangeEventType.DROP_COLUMN,
-                    SchemaChangeEventType.RENAME_COLUMN);
+                    SchemaChangeEventType.RENAME_COLUMN,
+                    SchemaChangeEventType.ALTER_TABLE_COMMENT);
         }
 
         @Override
@@ -223,6 +225,7 @@ public class ValuesDatabase {
         for (Column column : table.columns) {
             builder.physicalColumn(column.getName(), column.getType());
         }
+        builder.comment(table.comment);
         return builder.primaryKey(table.primaryKeys).build();
     }
 
@@ -296,6 +299,8 @@ public class ValuesDatabase {
         // indexes of primaryKeys in columns
         private final List<Integer> primaryKeyIndexes;
 
+        private String comment;
+
         public ValuesTable(TableId tableId, Schema schema) {
             this.tableId = tableId;
             this.lock = new Object();
@@ -304,6 +309,7 @@ public class ValuesDatabase {
             this.records = new HashMap<>();
             this.primaryKeys = new LinkedList<>(schema.primaryKeys());
             this.primaryKeyIndexes = new ArrayList<>();
+            this.comment = schema.comment();
             updatePrimaryKeyIndexes();
         }
 
@@ -384,6 +390,8 @@ public class ValuesDatabase {
                     applyRenameColumnEvent((RenameColumnEvent) event);
                 } else if (event instanceof AlterColumnTypeEvent) {
                     applyAlterColumnTypeEvent((AlterColumnTypeEvent) event);
+                } else if (event instanceof AlterTableCommentEvent) {
+                    applyAlterTableCommentEvent((AlterTableCommentEvent) event);
                 }
                 updatePrimaryKeyIndexes();
             }
@@ -412,16 +420,25 @@ public class ValuesDatabase {
         }
 
         private void applyAlterColumnTypeEvent(AlterColumnTypeEvent event) {
+            Map<String, String> comments = event.getComments();
             event.getTypeMapping()
                     .forEach(
                             (columnName, columnType) -> {
                                 for (int i = 0; i < columns.size(); i++) {
                                     if (columns.get(i).getName().equals(columnName)) {
                                         columns.set(
-                                                i, Column.physicalColumn(columnName, columnType));
+                                                i,
+                                                Column.physicalColumn(
+                                                        columnName,
+                                                        columnType,
+                                                        comments.get(columnName)));
                                     }
                                 }
                             });
+        }
+
+        private void applyAlterTableCommentEvent(AlterTableCommentEvent event) {
+            this.comment = event.getComment();
         }
 
         private void applyAddColumnEvent(AddColumnEvent event) {

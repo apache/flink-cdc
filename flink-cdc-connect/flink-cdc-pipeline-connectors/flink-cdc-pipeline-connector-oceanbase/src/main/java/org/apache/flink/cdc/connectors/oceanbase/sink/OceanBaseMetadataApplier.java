@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.oceanbase.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -94,6 +95,10 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
                 truncateTableEvent -> {
                     applyTruncateTableEvent(truncateTableEvent);
                     return null;
+                },
+                alterTableCommentEvent -> {
+                    applyAlterTableCommentEvent(alterTableCommentEvent);
+                    return null;
                 });
     }
 
@@ -152,13 +157,15 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
     private void applyAlterColumnTypeEvent(AlterColumnTypeEvent alterColumnTypeEvent) {
         TableId tableId = alterColumnTypeEvent.tableId();
         Map<String, DataType> typeMapping = alterColumnTypeEvent.getTypeMapping();
+        Map<String, String> comments = alterColumnTypeEvent.getComments();
 
         for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
             catalog.alterColumnType(
                     tableId.getSchemaName(),
                     tableId.getTableName(),
                     entry.getKey(),
-                    entry.getValue());
+                    entry.getValue(),
+                    comments.get(entry.getKey()));
         }
     }
 
@@ -189,6 +196,22 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
             throw new OceanBaseCatalogException(
                     String.format(
                             "Failed to truncate table %s.%s, because the table not exist",
+                            tableId.getSchemaName(), tableId.getTableName()));
+        }
+    }
+
+    private void applyAlterTableCommentEvent(AlterTableCommentEvent alterTableCommentEvent) {
+        TableId tableId = alterTableCommentEvent.tableId();
+        // check table exists
+        if (catalog.tableExists(tableId.getSchemaName(), tableId.getTableName())) {
+            catalog.alterTable(
+                    tableId.getSchemaName(),
+                    tableId.getTableName(),
+                    alterTableCommentEvent.getComment());
+        } else {
+            throw new OceanBaseCatalogException(
+                    String.format(
+                            "Failed to alter table %s.%s, because the table not exist",
                             tableId.getSchemaName(), tableId.getTableName()));
         }
     }

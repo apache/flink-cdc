@@ -320,7 +320,10 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
                     Map<String, DataType> typeMapping = new HashMap<>();
                     typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
-                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    AlterColumnTypeEvent alterColumnTypeEvent =
+                            new AlterColumnTypeEvent(currentTable, typeMapping);
+                    alterColumnTypeEvent.addColumnComment(column.name(), column.comment());
+                    changes.add(alterColumnTypeEvent);
 
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
@@ -371,7 +374,10 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     Column column = columnDefinitionListener.getColumn();
                     Map<String, DataType> typeMapping = new HashMap<>();
                     typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
-                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    AlterColumnTypeEvent alterColumnTypeEvent =
+                            new AlterColumnTypeEvent(currentTable, typeMapping);
+                    alterColumnTypeEvent.addColumnComment(column.name(), column.comment());
+                    changes.add(alterColumnTypeEvent);
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);

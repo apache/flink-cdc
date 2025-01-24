@@ -22,6 +22,8 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 
+import javax.annotation.Nullable;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -44,24 +46,44 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
 
     private final Map<String, DataType> oldTypeMapping;
 
-    public AlterColumnTypeEvent(TableId tableId, Map<String, DataType> typeMapping) {
+    /** key => column name, value => column comment after changing. */
+    private final Map<String, String> comments;
+
+    public AlterColumnTypeEvent(
+            TableId tableId,
+            Map<String, DataType> typeMapping,
+            Map<String, DataType> oldTypeMapping,
+            Map<String, String> comments) {
         this.tableId = tableId;
         this.typeMapping = typeMapping;
-        this.oldTypeMapping = new HashMap<>();
+        this.oldTypeMapping = oldTypeMapping;
+        this.comments = comments;
+    }
+
+    public AlterColumnTypeEvent(TableId tableId, Map<String, DataType> typeMapping) {
+        this(tableId, typeMapping, new HashMap<>());
     }
 
     public AlterColumnTypeEvent(
             TableId tableId,
             Map<String, DataType> typeMapping,
             Map<String, DataType> oldTypeMapping) {
-        this.tableId = tableId;
-        this.typeMapping = typeMapping;
-        this.oldTypeMapping = oldTypeMapping;
+        this(tableId, typeMapping, oldTypeMapping, new HashMap<>());
+    }
+
+    public void addColumnComment(String columnName, @Nullable String comment) {
+        if (comment != null) {
+            this.comments.put(columnName, comment);
+        }
     }
 
     /** Returns the type mapping. */
     public Map<String, DataType> getTypeMapping() {
         return typeMapping;
+    }
+
+    public Map<String, String> getComments() {
+        return comments;
     }
 
     @Override
@@ -75,12 +97,13 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
         AlterColumnTypeEvent that = (AlterColumnTypeEvent) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(typeMapping, that.typeMapping)
-                && Objects.equals(oldTypeMapping, that.oldTypeMapping);
+                && Objects.equals(oldTypeMapping, that.oldTypeMapping)
+                && Objects.equals(comments, that.comments);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(tableId, typeMapping, oldTypeMapping);
+        return Objects.hash(tableId, typeMapping, oldTypeMapping, comments);
     }
 
     @Override
@@ -93,6 +116,8 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
                     + typeMapping
                     + ", oldTypeMapping="
                     + oldTypeMapping
+                    + ", comments='"
+                    + comments
                     + '}';
         } else {
             return "AlterColumnTypeEvent{"
@@ -100,6 +125,8 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
                     + tableId
                     + ", typeMapping="
                     + typeMapping
+                    + ", comments='"
+                    + comments
                     + '}';
         }
     }
