@@ -116,7 +116,7 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
                     + typeMapping
                     + ", oldTypeMapping="
                     + oldTypeMapping
-                    + ", comments='"
+                    + ", comments="
                     + comments
                     + '}';
         } else {
@@ -125,7 +125,7 @@ public class AlterColumnTypeEvent implements SchemaChangeEventWithPreSchema, Sch
                     + tableId
                     + ", typeMapping="
                     + typeMapping
-                    + ", comments='"
+                    + ", comments="
                     + comments
                     + '}';
         }
