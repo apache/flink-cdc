@@ -146,7 +146,7 @@ Pipeline Connector Options
     <tr>
       <td>batch.size.max.bytes</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">5242880</td>
+      <td style="word-wrap: break-word;">52428800</td>
       <td>Long</td>
       <td>每个批量请求的缓冲操作在内存中的最大值(以byte为单位)。</td>
     </tr>
