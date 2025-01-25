@@ -146,7 +146,7 @@ Pipeline Connector Options
     <tr>
       <td>batch.size.max.bytes</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">5242880</td>
+      <td style="word-wrap: break-word;">52428800</td>
       <td>Long</td>
       <td>The maximum size of batch requests in bytes.</td>
     </tr>
