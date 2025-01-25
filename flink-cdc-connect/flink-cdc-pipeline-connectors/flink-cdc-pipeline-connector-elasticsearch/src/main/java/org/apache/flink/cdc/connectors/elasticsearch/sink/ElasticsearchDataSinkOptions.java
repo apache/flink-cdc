@@ -59,7 +59,7 @@ public class ElasticsearchDataSinkOptions {
     public static final ConfigOption<Long> MAX_BATCH_SIZE_IN_BYTES =
             ConfigOptions.key("batch.size.max.bytes")
                     .longType()
-                    .defaultValue(5L * 1024L * 1024L)
+                    .defaultValue(50L * 1024L * 1024L)
                     .withDescription("The maximum size of batch requests in bytes.");
 
     /** The maximum time to wait for incomplete batches before flushing. */
