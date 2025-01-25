@@ -19,17 +19,14 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
-import org.apache.flink.types.RowKind;
+import org.apache.flink.table.data.RowData;
 
-import org.apache.iceberg.data.GenericRecord;
-import org.apache.iceberg.flink.data.StructRowData;
 import org.apache.iceberg.types.TypeUtil;
-import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.DateTimeUtil;
 import org.apache.iceberg.util.DecimalUtil;
 
@@ -40,8 +37,10 @@ import java.util.List;
 
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
 
+/** A Util class for {@link IcebergWriter} to convert {@link Event} into {@link RowData}. */
 public class IcebergWriterHelper {
 
+    /** Create a list of {@link RecordData.FieldGetter} for the given {@link Schema}. */
     public static List<RecordData.FieldGetter> createFieldGetters(Schema schema, ZoneId zoneId) {
         List<Column> columns = schema.getColumns();
         List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(columns.size());
@@ -59,7 +58,10 @@ public class IcebergWriterHelper {
         switch (fieldType.getTypeRoot()) {
             case CHAR:
             case VARCHAR:
-                fieldGetter = row -> row.getString(fieldPos).toString();
+                fieldGetter =
+                        row ->
+                                org.apache.flink.table.data.StringData.fromString(
+                                        row.getString(fieldPos).toString());
                 break;
             case BOOLEAN:
                 fieldGetter = row -> row.getBoolean(fieldPos);
@@ -98,6 +100,8 @@ public class IcebergWriterHelper {
                 fieldGetter = row -> row.getDouble(fieldPos);
                 break;
             case INTEGER:
+                fieldGetter = row -> row.getInt(fieldPos);
+                break;
             case DATE:
             case TIME_WITHOUT_TIME_ZONE:
                 // Time in RowData is in milliseconds (Integer), while iceberg's time is
@@ -143,35 +147,5 @@ public class IcebergWriterHelper {
             }
             return fieldGetter.getFieldOrNull(row);
         };
-    }
-
-    public static GenericRecord convertEventToGenericRow(
-            DataChangeEvent dataChangeEvent, List<RecordData.FieldGetter> fieldGetters) {
-        StructRowData structRowData;
-        GenericRecord genericRow = null;
-        RecordData recordData;
-        switch (dataChangeEvent.op()) {
-            case INSERT:
-            case UPDATE:
-            case REPLACE:
-                {
-                    recordData = dataChangeEvent.after();
-                    structRowData = new StructRowData(Types.StructType.of(), RowKind.INSERT);
-                    break;
-                }
-            case DELETE:
-                {
-                    recordData = dataChangeEvent.before();
-                    structRowData = new StructRowData(Types.StructType.of(), RowKind.DELETE);
-                    break;
-                }
-            default:
-                throw new IllegalArgumentException("don't support type of " + dataChangeEvent.op());
-        }
-        for (int i = 0; i < recordData.getArity(); i++) {
-            // todo : how to set this row to
-            genericRow.setField(null, fieldGetters.get(i).getFieldOrNull(recordData));
-        }
-        return genericRow;
     }
 }
