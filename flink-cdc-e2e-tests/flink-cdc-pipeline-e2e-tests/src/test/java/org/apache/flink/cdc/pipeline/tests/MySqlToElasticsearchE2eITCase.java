@@ -107,11 +107,6 @@ public class MySqlToElasticsearchE2eITCase extends PipelineTestEnvironment {
         return parameters;
     }
 
-    protected String getElasticsearchDockerImageTag() {
-        return String.format(
-                "docker.elastic.co/elasticsearch/elasticsearch:%s", elasticsearchVersion);
-    }
-
     @Before
     public void before() throws Exception {
         super.before();
