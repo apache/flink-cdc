@@ -1,7 +1,8 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
+import org.apache.flink.table.data.GenericRowData;
+
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.data.GenericRecord;
 
 public class IcebergEvent {
 
@@ -9,19 +10,19 @@ public class IcebergEvent {
     TableIdentifier tableId;
 
     // The actual record to be written to iceberg table.
-    GenericRecord genericRow;
+    GenericRowData genericRow;
 
     // if true, means that table schema has changed right before this genericRow.
     boolean shouldRefreshSchema;
 
     public IcebergEvent(
-            TableIdentifier tableId, GenericRecord genericRow, boolean shouldRefreshSchema) {
+            TableIdentifier tableId, GenericRowData genericRow, boolean shouldRefreshSchema) {
         this.tableId = tableId;
         this.genericRow = genericRow;
         this.shouldRefreshSchema = shouldRefreshSchema;
     }
 
-    public IcebergEvent(TableIdentifier tableId, GenericRecord genericRow) {
+    public IcebergEvent(TableIdentifier tableId, GenericRowData genericRow) {
         this.tableId = tableId;
         this.genericRow = genericRow;
         this.shouldRefreshSchema = false;
@@ -35,11 +36,11 @@ public class IcebergEvent {
         this.tableId = tableId;
     }
 
-    public GenericRecord getGenericRow() {
+    public GenericRowData getGenericRow() {
         return genericRow;
     }
 
-    public void setGenericRow(GenericRecord genericRow) {
+    public void setGenericRow(GenericRowData genericRow) {
         this.genericRow = genericRow;
     }
 

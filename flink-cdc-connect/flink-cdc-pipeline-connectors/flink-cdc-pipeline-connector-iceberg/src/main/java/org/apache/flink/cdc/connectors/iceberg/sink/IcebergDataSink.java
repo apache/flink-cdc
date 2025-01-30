@@ -8,7 +8,7 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergEventSink;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergEventSinkV2;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergRecordSerializer;
 
 import java.io.Serializable;
@@ -53,8 +53,8 @@ public class IcebergDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        IcebergEventSink icebergEventSink =
-                new IcebergEventSink(
+        IcebergEventSinkV2 icebergEventSink =
+                new IcebergEventSinkV2(
                         tableOptions, commitUser, serializer, schemaOperatorUid, zoneId);
         return FlinkSinkProvider.of(icebergEventSink);
     }

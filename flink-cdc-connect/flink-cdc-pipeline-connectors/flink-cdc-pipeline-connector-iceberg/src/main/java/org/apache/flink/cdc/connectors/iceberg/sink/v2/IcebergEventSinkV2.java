@@ -3,18 +3,17 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.iceberg.flink.sink.FlinkSink;
 
 import java.time.ZoneId;
 import java.util.Map;
 
-public class IcebergEventSink extends IcebergSink implements SupportsPreWriteTopology<Event> {
+public class IcebergEventSinkV2 extends IcebergSinkV2 implements SupportsPreWriteTopology<Event> {
 
     public final String schemaOperatorUid;
 
     public final ZoneId zoneId;
 
-    public IcebergEventSink(
+    public IcebergEventSinkV2(
             Map<String, String> catalogOptions,
             String commitUser,
             IcebergRecordSerializer<Event> serializer,
@@ -27,7 +26,6 @@ public class IcebergEventSink extends IcebergSink implements SupportsPreWriteTop
 
     @Override
     public DataStream<Event> addPreWriteTopology(DataStream<Event> dataStream) {
-
         return dataStream;
     }
 }

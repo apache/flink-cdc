@@ -7,9 +7,9 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.table.data.GenericRowData;
 
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.data.GenericRecord;
 
 import java.io.IOException;
 import java.time.ZoneId;
@@ -50,8 +50,8 @@ public class IcebergRecordEventSerializer implements IcebergRecordSerializer<Eve
             return new IcebergEvent(tableId, null, true);
         } else if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            GenericRecord genericRecord =
-                    IcebergWriterHelper.convertEventToGenericRow(
+            GenericRowData genericRecord =
+                    IcebergWriterHelper.convertEventToRow(
                             dataChangeEvent,
                             schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
             return new IcebergEvent(tableId, genericRecord, false);

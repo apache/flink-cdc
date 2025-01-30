@@ -16,7 +16,7 @@ import org.apache.iceberg.catalog.ImmutableTableCommit;
 import java.io.IOException;
 import java.util.Map;
 
-public class IcebergSink
+public class IcebergSinkV2
         implements Sink<Event>,
                 SupportsPreWriteTopology<Event>,
                 SupportsCommitter<ImmutableTableCommit> {
@@ -30,14 +30,14 @@ public class IcebergSink
 
     private final IcebergRecordSerializer<Event> serializer;
 
-    public IcebergSink(
+    public IcebergSinkV2(
             Map<String, String> catalogOptions, IcebergRecordSerializer<Event> serializer) {
         this.catalogOptions = catalogOptions;
         this.serializer = serializer;
         commitUser = DEFAULT_COMMIT_USER;
     }
 
-    public IcebergSink(
+    public IcebergSinkV2(
             Map<String, String> catalogOptions,
             String commitUser,
             IcebergRecordSerializer<Event> serializer) {

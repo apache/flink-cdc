@@ -24,12 +24,10 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
+import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.types.RowKind;
 
-import org.apache.iceberg.data.GenericRecord;
-import org.apache.iceberg.flink.data.StructRowData;
 import org.apache.iceberg.types.TypeUtil;
-import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.DateTimeUtil;
 import org.apache.iceberg.util.DecimalUtil;
 
@@ -145,10 +143,9 @@ public class IcebergWriterHelper {
         };
     }
 
-    public static GenericRecord convertEventToGenericRow(
+    public static GenericRowData convertEventToRow(
             DataChangeEvent dataChangeEvent, List<RecordData.FieldGetter> fieldGetters) {
-        StructRowData structRowData;
-        GenericRecord genericRow = null;
+        GenericRowData genericRow;
         RecordData recordData;
         switch (dataChangeEvent.op()) {
             case INSERT:
@@ -156,21 +153,20 @@ public class IcebergWriterHelper {
             case REPLACE:
                 {
                     recordData = dataChangeEvent.after();
-                    structRowData = new StructRowData(Types.StructType.of(), RowKind.INSERT);
+                    genericRow = new GenericRowData(RowKind.INSERT, recordData.getArity());
                     break;
                 }
             case DELETE:
                 {
                     recordData = dataChangeEvent.before();
-                    structRowData = new StructRowData(Types.StructType.of(), RowKind.DELETE);
+                    genericRow = new GenericRowData(RowKind.DELETE, recordData.getArity());
                     break;
                 }
             default:
                 throw new IllegalArgumentException("don't support type of " + dataChangeEvent.op());
         }
         for (int i = 0; i < recordData.getArity(); i++) {
-            // todo : how to set this row to
-            genericRow.setField(null, fieldGetters.get(i).getFieldOrNull(recordData));
+            genericRow.setField(i, fieldGetters.get(i).getFieldOrNull(recordData));
         }
         return genericRow;
     }
