@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oceanbase;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oceanbase.source.OceanBaseRichSourceFunction;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -38,7 +37,7 @@ import java.util.Properties;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A builder to build a SourceFunction which can read snapshot and change events of OceanBase. */
-@PublicEvolving
+@Deprecated
 public class OceanBaseSource {
 
     public static <T> Builder<T> builder() {

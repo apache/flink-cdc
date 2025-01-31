@@ -36,7 +36,7 @@ import java.util.List;
 
 /** Integration tests for OceanBase Oracle mode table source. */
 @Ignore("Test ignored before oceanbase-xe docker image is available")
-public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
+public class LegacyOceanBaseOracleModeITCase extends OceanBaseTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -49,6 +49,14 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
     @Override
     protected OceanBaseCdcMetadata metadata() {
         return METADATA;
+    }
+
+    @Override
+    protected String commonOptionsString() {
+        return super.commonOptionsString()
+                + " , "
+                + " 'scan.incremental.snapshot.enabled' = 'false', "
+                + " 'jdbc.driver' = 'com.oceanbase.jdbc.Driver'";
     }
 
     @Override

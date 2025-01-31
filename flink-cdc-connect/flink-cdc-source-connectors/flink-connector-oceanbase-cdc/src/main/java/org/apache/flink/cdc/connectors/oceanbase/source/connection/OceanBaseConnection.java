@@ -18,11 +18,11 @@
 package org.apache.flink.cdc.connectors.oceanbase.source.connection;
 
 import org.apache.flink.cdc.connectors.oceanbase.utils.OceanBaseUtils;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.jdbc.JdbcConfiguration;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
+import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import org.slf4j.Logger;
@@ -43,8 +43,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /** {@link JdbcConnection} extension to be used with OceanBase server. */
 public class OceanBaseConnection extends JdbcConnection {
@@ -123,6 +123,16 @@ public class OceanBaseConnection extends JdbcConnection {
         return defaultJdbcProperties;
     }
 
+    public OceanBaseConnection(
+            JdbcConfiguration config,
+            ConnectionFactory connectionFactory,
+            String compatibleMode,
+            String openingQuoteCharacter,
+            String closingQuoteCharacter) {
+        super(config, connectionFactory, openingQuoteCharacter, closingQuoteCharacter);
+        this.compatibleMode = compatibleMode;
+    }
+
     private static char getQuote(String compatibleMode) {
         return "mysql".equalsIgnoreCase(compatibleMode) ? '`' : '"';
     }
@@ -174,54 +184,48 @@ public class OceanBaseConnection extends JdbcConnection {
      * @throws SQLException If a database access error occurs.
      */
     public List<TableId> getTables(String dbPattern, String tbPattern) throws SQLException {
-        List<TableId> result = new ArrayList<>();
-        DatabaseMetaData metaData = connection().getMetaData();
-        switch (compatibleMode.toLowerCase()) {
-            case "mysql":
-                List<String> dbNames = getResultList(metaData.getCatalogs(), "TABLE_CAT");
-                dbNames =
-                        dbNames.stream()
-                                .filter(dbName -> Pattern.matches(dbPattern, dbName))
-                                .collect(Collectors.toList());
-                for (String dbName : dbNames) {
-                    List<String> tableNames =
-                            getResultList(
-                                    metaData.getTables(dbName, null, null, supportedTableTypes()),
-                                    "TABLE_NAME");
-                    tableNames.stream()
-                            .filter(tbName -> Pattern.matches(tbPattern, tbName))
-                            .forEach(tbName -> result.add(new TableId(dbName, null, tbName)));
-                }
-                break;
-            case "oracle":
-                List<String> schemaNames = getResultList(metaData.getSchemas(), "TABLE_SCHEM");
-                schemaNames =
-                        schemaNames.stream()
-                                .filter(schemaName -> Pattern.matches(dbPattern, schemaName))
-                                .collect(Collectors.toList());
-                for (String schemaName : schemaNames) {
-                    List<String> tableNames =
-                            getResultList(
-                                    metaData.getTables(
-                                            null, schemaName, null, supportedTableTypes()),
-                                    "TABLE_NAME");
-                    tableNames.stream()
-                            .filter(tbName -> Pattern.matches(tbPattern, tbName))
-                            .forEach(tbName -> result.add(new TableId(null, schemaName, tbName)));
-                }
-                break;
-            default:
-                throw new FlinkRuntimeException("Unsupported compatible mode: " + compatibleMode);
-        }
-        return result;
+        return listTables(
+                db -> Pattern.matches(dbPattern, db),
+                tableId -> Pattern.matches(tbPattern, tableId.table()));
     }
 
-    private List<String> getResultList(ResultSet resultSet, String columnName) throws SQLException {
-        List<String> result = new ArrayList<>();
-        while (resultSet.next()) {
-            result.add(resultSet.getString(columnName));
+    public List<TableId> listTables(RelationalTableFilters tableFilters) throws SQLException {
+        return listTables(tableFilters.databaseFilter(), tableFilters.dataCollectionFilter());
+    }
+
+    private List<TableId> listTables(
+            Predicate<String> databaseFilter, Tables.TableFilter tableFilter) throws SQLException {
+        List<TableId> tableIds = new ArrayList<>();
+        DatabaseMetaData metaData = connection().getMetaData();
+        ResultSet rs = metaData.getCatalogs();
+        List<String> dbList = new ArrayList<>();
+        boolean isMySql = "mysql".equalsIgnoreCase(compatibleMode);
+        while (rs.next()) {
+            String db = rs.getString(isMySql ? "TABLE_CAT" : "TABLE_SCHEM");
+            if (databaseFilter.test(db)) {
+                dbList.add(db);
+            }
         }
-        return result;
+        for (String db : dbList) {
+            String catalog = isMySql ? db : null;
+            String schema = isMySql ? null : db;
+            rs = metaData.getTables(catalog, schema, null, supportedTableTypes());
+            while (rs.next()) {
+                TableId tableId = new TableId(catalog, schema, rs.getString("TABLE_NAME"));
+                if (tableFilter.isIncluded(tableId)) {
+                    tableIds.add(tableId);
+                }
+            }
+        }
+        return tableIds;
+    }
+
+    public String readSystemVariable(String variable) throws SQLException {
+        return querySingleValue(
+                connection(),
+                "SHOW VARIABLES LIKE ?",
+                ps -> ps.setString(1, variable),
+                rs -> rs.getString("VALUE"));
     }
 
     @Override

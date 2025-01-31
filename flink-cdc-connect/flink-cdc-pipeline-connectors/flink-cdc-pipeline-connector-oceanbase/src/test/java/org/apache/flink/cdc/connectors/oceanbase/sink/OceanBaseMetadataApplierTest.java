@@ -46,13 +46,13 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseMySQLModeITCase.NETWORK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
@@ -62,6 +62,8 @@ public class OceanBaseMetadataApplierTest {
 
     private OceanBaseMetadataApplier metadataApplier;
     private OceanBaseTestMySQLCatalog catalog;
+
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
     public static final OceanBaseContainer OB_SERVER =

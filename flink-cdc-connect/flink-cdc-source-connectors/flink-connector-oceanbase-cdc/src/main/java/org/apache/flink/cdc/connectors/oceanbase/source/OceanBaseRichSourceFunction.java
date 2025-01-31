@@ -81,6 +81,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  *
  * @param <T> The type created by the deserializer.
  */
+@Deprecated
 public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         implements CheckpointListener, CheckpointedFunction, ResultTypeQueryable<T> {
 
@@ -171,8 +172,9 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
         super.open(config);
         this.outputCollector = new OutputCollector<>();
         this.connectorConfig =
-                new OceanBaseConnectorConfig(compatibleMode, serverTimeZone, debeziumProperties);
-        this.sourceInfo = new OceanBaseSourceInfo(connectorConfig, tenantName);
+                new OceanBaseConnectorConfig(
+                        compatibleMode, serverTimeZone, tenantName, debeziumProperties);
+        this.sourceInfo = new OceanBaseSourceInfo(connectorConfig);
     }
 
     @Override
