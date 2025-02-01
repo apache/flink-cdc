@@ -85,7 +85,6 @@ public class IcebergWriter<InputT> implements CommittingSinkWriter<InputT, Write
         // Write the data to Iceberg
         if (icebergEvent.getGenericRow() != null) {
             TaskWriter<RowData> writer = writes.computeIfAbsent(tableId, id -> getTaskWriter());
-
             try {
                 writer.write(icebergEvent.getGenericRow());
             } catch (Exception e) {

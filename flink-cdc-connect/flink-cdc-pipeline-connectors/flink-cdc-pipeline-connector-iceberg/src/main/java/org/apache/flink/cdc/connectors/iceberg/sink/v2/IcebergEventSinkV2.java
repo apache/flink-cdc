@@ -7,7 +7,8 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import java.time.ZoneId;
 import java.util.Map;
 
-public class IcebergEventSinkV2 extends IcebergSinkV2 implements SupportsPreWriteTopology<Event> {
+public class IcebergEventSinkV2 extends IcebergSinkV2<Event>
+        implements SupportsPreWriteTopology<Event> {
 
     public final String schemaOperatorUid;
 

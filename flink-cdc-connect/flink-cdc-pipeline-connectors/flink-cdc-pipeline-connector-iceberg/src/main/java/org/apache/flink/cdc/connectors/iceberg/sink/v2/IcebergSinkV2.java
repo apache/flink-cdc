@@ -1,25 +1,17 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
-import org.apache.flink.api.connector.sink2.CommitterInitContext;
-import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
-import org.apache.flink.api.connector.sink2.SupportsCommitter;
-import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
+import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
+import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
-
-import org.apache.iceberg.catalog.ImmutableTableCommit;
 
 import java.io.IOException;
 import java.util.Map;
 
-public class IcebergSinkV2
-        implements Sink<Event>,
-                SupportsPreWriteTopology<Event>,
-                SupportsCommitter<ImmutableTableCommit> {
+public class IcebergSinkV2<InputT> implements WithPreCommitTopology<InputT, IcebergCommittable> {
 
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
@@ -47,28 +39,23 @@ public class IcebergSinkV2
     }
 
     @Override
-    public DataStream<Event> addPreWriteTopology(DataStream<Event> dataStream) {
+    public Committer<IcebergCommittable> createCommitter() {
+        return new IcebergCommitter(catalogOptions, commitUser);
+    }
+
+    @Override
+    public SimpleVersionedSerializer<IcebergCommittable> getCommittableSerializer() {
+        return new IcebergCommittableSerializer();
+    }
+
+    @Override
+    public SinkWriter<InputT> createWriter(InitContext initContext) throws IOException {
         return null;
     }
 
     @Override
-    public Committer<ImmutableTableCommit> createCommitter(
-            CommitterInitContext committerInitContext) throws IOException {
-        return null;
-    }
-
-    @Override
-    public SimpleVersionedSerializer<ImmutableTableCommit> getCommittableSerializer() {
-        return null;
-    }
-
-    @Override
-    public SinkWriter<Event> createWriter(InitContext initContext) throws IOException {
-        return null;
-    }
-
-    @Override
-    public SinkWriter<Event> createWriter(WriterInitContext context) throws IOException {
-        return Sink.super.createWriter(context);
+    public DataStream<CommittableMessage<IcebergCommittable>> addPreCommitTopology(
+            DataStream<CommittableMessage<IcebergCommittable>> dataStream) {
+        return dataStream;
     }
 }

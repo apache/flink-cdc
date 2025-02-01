@@ -1,9 +1,7 @@
 package org.apache.flink.cdc.connectors.iceberg.sink;
 
-import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
@@ -62,17 +60,5 @@ public class IcebergDataSink implements DataSink, Serializable {
     @Override
     public MetadataApplier getMetadataApplier() {
         return new IcebergMetadataApplier(catalogOptions, tableOptions, partitionMaps);
-    }
-
-    @Override
-    public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider() {
-        // TODO getDataChangeEventHashFunctionProvider if use
-        return DataSink.super.getDataChangeEventHashFunctionProvider();
-    }
-
-    @Override
-    public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider(
-            int parallelism) {
-        return DataSink.super.getDataChangeEventHashFunctionProvider(parallelism);
     }
 }
