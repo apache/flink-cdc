@@ -24,17 +24,17 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Definition
-When connecting to external systems, it is necessary to establish a mapping relationship with the storage objects of the external system. This is what **Table Id** refers to.
+# 定义
+在连接外部系统时，有必要建立一个与外部系统存储对象（例如表）的映射关系。这就是 **Table Id** 所代表的含义。
 
-# Example
-To be compatible with most external systems, the Table Id is represented by a 3-tuple : (namespace, schemaName, tableName).   
-Connectors should establish the mapping between Table Id and storage objects in external systems.
+# 示例
+为了兼容大部分外部系统，Table Id 被表示为 3 元组：(namespace, schemaName, tableName)。
+连接器应该在连接外部系统时建立与外部系统存储对象的映射关系。
 
-The following table lists the parts in table Id of different data systems:
+下面是不同数据系统对应的 tableId 的格式：
 
-| data system           | parts in tableId         | String example      |
-|-----------------------|--------------------------|---------------------|
-| Oracle/PostgreSQL     | database, schema, table  | mydb.default.orders |
-| MySQL/Doris/StarRocks | database, table          | mydb.orders         |
-| Kafka                 | topic                    | orders              |
+| 数据系统                  | tableId 的组成             | 字符串示例               |
+|-----------------------|-------------------------|---------------------|
+| Oracle/PostgreSQL     | database, schema, table | mydb.default.orders |
+| MySQL/Doris/StarRocks | database, table         | mydb.orders         |
+| Kafka                 | topic                   | orders              |

@@ -24,24 +24,24 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Definition
-**Route** specifies the rule of matching a list of source-table and mapping to sink-table. The most typical scenario is the merge of sub-databases and sub-tables, routing multiple upstream source tables to the same sink table.
+# 定义
+**Route** 代表一个路由规则，用来匹配一个或多个source 表，并映射到 sink 表。最常见的场景是合并子数据库和子表，将多个上游源表路由到同一个目标表。
 
-# Parameters
-To describe a route, the follows are required:  
+# 参数
+为了定义一个路由规则，需要提供以下参数：
 
-| parameter      | meaning                                                                                     | optional/required |
-|----------------|---------------------------------------------------------------------------------------------|-------------------|
-| source-table   | Source table id, supports regular expressions                                               | required          |
-| sink-table     | Sink table id, supports symbol replacement                                                  | required          |
-| replace-symbol | Special symbol in sink-table for pattern replacing, will be replaced by original table name | optional          |
-| description    | Routing rule description(a default value provided)                                          | optional          |
+| 参数             | 含义                                       | optional/required |
+|----------------|------------------------------------------|-------------------|
+| source-table   | Source 的 table id， 支持正则表达式               | required          |
+| sink-table     | Sink 的 table id，支持符号替换                   | required          |
+| replace-symbol | 用于在 sink-table 中进行模式替换的特殊字符串， 会被源表中的表名替换 | optional          |
+| description    | Route 规则的描述(提供了一个默认描述)                   | optional          |
 
-A route module can contain a list of source-table/sink-table rules.
+一个 Route 模块可以包含一个或多个 source-table/sink-table 规则。
 
-# Example
-## Route one Data Source table to one Data Sink table
-if synchronize the table `web_order` in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+# 示例
+## 路由一个 Data Source 表到一个 Data Sink 表
+如果同步一个 `mydb` 数据库中的 `web_order` 表到一个相同库的 `ods_web_order` 表，我们可以使用下面的 yaml 文件来定义这个路由：
 
 ```yaml
 route:
@@ -50,17 +50,16 @@ route:
     description: sync table to one destination table with given prefix ods_
 ```
 
-## Route multiple Data Source tables to one Data Sink table
-What's more, if you want to synchronize the sharding tables in the database `mydb` to a Doris table `ods_web_order`, we can use this yaml file to define this route：
+## 路由多个 Data Source 表到一个 Data Sink 表
+更进一步的，如果同步一个 `mydb` 数据库中的多个分表到一个相同库的 `ods_web_order` 表，我们可以使用下面的 yaml 文件来定义这个路由：
 ```yaml
 route:
   - source-table: mydb\.*
     sink-table: mydb.ods_web_order
     description: sync sharding tables to one destination table
 ```
-
-## Complex Route via combining route rules
-What's more, if you want to specify many different mapping rules, we can use this yaml file to define this route：
+## 使用多个路由规则
+更进一步的，如果需要定义多个路由规则，我们可以使用下面的 yaml 文件来定义这个路由：
 ```yaml
 route:
   - source-table: mydb.orders
@@ -74,9 +73,9 @@ route:
     description: sync products table to ods_products
 ```
 
-## Pattern Replacement in routing rules
+## 包含符号替换的路由规则
 
-If you'd like to route source tables and rename them to sink tables with specific patterns, `replace-symbol` could be used to resemble source table names like this:
+如果你想将源表路由到 sink 表，并使用特定的模式替换源表名，那么 `replace-symbol` 就可以做到这一点：
 
 ```yaml
 route:
@@ -86,4 +85,4 @@ route:
     description: route all tables in source_db to sink_db
 ```
 
-Then, all tables including `source_db.XXX` will be routed to `sink_db.XXX` without hassle.
+然后，`source_db` 库下所有的表都会被同步到 `sink_db` 库下。

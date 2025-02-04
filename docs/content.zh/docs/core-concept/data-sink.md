@@ -24,21 +24,21 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Definition
-**Data Sink** is used to apply schema changes and write change data to external systems.    
-A Data Sink can write to multiple tables simultaneously.
+# 定义
+**Data Sink** 是 用来应用 schema 变更并写入 change data 到外部系统的组件。
+一个 Data Sink 可以同时写入多个表。
 
-# Parameters
-To describe a data sink, the follows are required:
+# 参数
+为了定义一个 Data Sink，需要提供以下参数：
 
-| parameter                   | meaning                                                                                         | optional/required |
-|-----------------------------|-------------------------------------------------------------------------------------------------|-------------------|
-| type                        | The type of the sink, such as doris or starrocks.                                               | required          |
-| name                        | The name of the sink, which is user-defined (a default value provided).                         | optional          |
-| configurations of Data Sink | Configurations to build the Data Sink e.g. connection configurations and sink table properties. | optional          |
+| 参数                          | 含义                              | optional/required |
+|-----------------------------|---------------------------------|-------------------|
+| type                        | sink 的类型，例如 doris 或者 starrocks。 | required          |
+| name                        | sink 的名称，允许用户配置 (提供了一个默认值)。     | optional          |
+| configurations of Data Sink | 用于构建 sink 组件的配置，例如连接参数或者表属性的配置。 | optional          |
 
-# Example
-We could use this yaml file to define a doris sink:
+# 示例
+我们可以使用以下的 yaml 文件来定义一个 doris sink：
 ```yaml
 sink:
     type: doris
