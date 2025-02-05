@@ -51,7 +51,7 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Pip
 | <font color="DarkCyan">3.0.x</font> |                        <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>                        |       Mysql       |              StarRocks,Doris               |                                           |
 | <font color="DarkCyan">3.1.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |       Mysql       |        StarRocks,Doris,Paimon,Kafka        | only flink-cdc 3.1.1 support flink 1.19.* |
 | <font color="DarkCyan">3.2.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |       Mysql       | StarRocks,Doris,Paimon,Kafka,ElasticSearch |                                           |
-| <font color="DarkCyan">3.3.x</font> |                       <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                         |       Mysql       | StarRocks,Doris,Paimon,Kafka,ElasticSearch |                                           |
+| <font color="DarkCyan">3.3.x</font> |                       <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                         |       Mysql       | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute |                                           |
 
 
 ## Develop Your Own Connector
