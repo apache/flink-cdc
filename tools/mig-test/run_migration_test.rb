@@ -19,7 +19,7 @@
 require 'pathname'
 require 'securerandom'
 
-WAITING_SECONDS = 20
+WAITING_SECONDS = 30
 FLINK_HOME = ENV['FLINK_HOME']
 throw 'Unspecified `FLINK_HOME` environment variable.' if FLINK_HOME.nil?
 FLINK_HOME = Pathname.new(FLINK_HOME).realpath
