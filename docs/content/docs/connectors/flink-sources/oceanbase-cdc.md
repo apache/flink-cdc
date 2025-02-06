@@ -585,7 +585,7 @@ Metrics can help understand the progress of assignments, and the following are t
 
 Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
-2. For databases with only two-level mapping relationships, such as MySQL, the `namespace` will be set to the default value "", which is an empty string.
+2. For OceanBase, the `namespace` will be set to the default value "", and the group name will be like `test_database.test_table`.
 
 Data Type Mapping
 ----------------
