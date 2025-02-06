@@ -37,7 +37,7 @@ def put_mystery_data(mystery)
 end
 
 def ensure_mystery_data(mystery)
-  throw StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
+  raise StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
 end
 
 def extract_job_id(output)

@@ -32,12 +32,18 @@ def exec_sql_source(sql)
   `mysql -h 127.0.0.1 -P#{SOURCE_PORT} -uroot --skip-password -e "USE #{DATABASE_NAME}; #{sql}"`
 end
 
+def extract_job_id(output)
+  current_job_id = output.split("\n").filter { _1.start_with?('Job has been submitted with JobID ') }.first&.split&.last
+  raise StandardError, "Failed to submit Flink job. Output: #{output}" unless current_job_id&.length == 32
+  current_job_id
+end
+
 def put_mystery_data(mystery)
   exec_sql_source("REPLACE INTO girl(id, name) VALUES (17, '#{mystery}');")
 end
 
 def ensure_mystery_data(mystery)
-  throw StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
+  raise StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
 end
 
 puts '   Waiting for source to start up...'
@@ -52,8 +58,8 @@ def test_migration_chore(from_version, to_version)
   # Clear previous savepoints and logs
   `rm -rf savepoints`
 
-  old_job_id = `#{FLINK_HOME}/bin/flink run -p 1 -c DataStreamJob --detached datastream-#{from_version}/target/datastream-job-#{from_version}-jar-with-dependencies.jar`.split.last
-  raise StandardError, 'Failed to submit Flink job' unless old_job_id.length == 32
+  old_output = `#{FLINK_HOME}/bin/flink run -p 1 -c DataStreamJob --detached datastream-#{from_version}/target/datastream-job-#{from_version}.jar`
+  old_job_id = extract_job_id(old_output)
 
   puts "Submitted job at #{from_version} as #{old_job_id}"
 
@@ -64,8 +70,8 @@ def test_migration_chore(from_version, to_version)
 
   puts `#{FLINK_HOME}/bin/flink stop --savepointPath #{Dir.pwd}/savepoints #{old_job_id}`
   savepoint_file = `ls savepoints`.split("\n").last
-  new_job_id = `#{FLINK_HOME}/bin/flink run --fromSavepoint #{Dir.pwd}/savepoints/#{savepoint_file} -p 1 -c DataStreamJob --detached datastream-#{to_version}/target/datastream-job-#{to_version}-jar-with-dependencies.jar`.split.last
-  raise StandardError, 'Failed to submit Flink job' unless new_job_id.length == 32
+  new_output = `#{FLINK_HOME}/bin/flink run --fromSavepoint #{Dir.pwd}/savepoints/#{savepoint_file} -p 1 -c DataStreamJob --detached datastream-#{to_version}/target/datastream-job-#{to_version}.jar`
+  new_job_id = extract_job_id(new_output)
 
   puts "Submitted job at #{to_version} as #{new_job_id}"
   random_string_2 = SecureRandom.hex(8)
