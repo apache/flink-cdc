@@ -360,7 +360,8 @@ source:
 | namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
 
 注意:
-Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于只有两级映射关系的数据库类型，例如 MySQL，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串。
 
 ## 数据类型映射
 
