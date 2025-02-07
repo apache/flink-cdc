@@ -80,7 +80,7 @@ public class MySqlMultipleTablesRenamingITCase {
     @RegisterExtension static MiniClusterExtension miniCluster = new MiniClusterExtension();
 
     @SuppressWarnings("unchecked")
-    private final MySqlContainer mysql =
+    private static final MySqlContainer mysql =
             (MySqlContainer)
                     new MySqlContainer()
                             .withConfigurationOverride(
