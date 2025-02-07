@@ -74,9 +74,9 @@ import java.util.UUID;
  * Integration tests for handling schema changes regard to renaming multiple tables within a single
  * statement.
  */
-public class MySqlRenameTablesSchemaFixITCase {
+public class MySqlMultipleTablesRenamingITCase {
     private static final Logger LOG =
-            LoggerFactory.getLogger(MySqlRenameTablesSchemaFixITCase.class);
+            LoggerFactory.getLogger(MySqlMultipleTablesRenamingITCase.class);
     @RegisterExtension static MiniClusterExtension miniCluster = new MiniClusterExtension();
 
     @SuppressWarnings("unchecked")
