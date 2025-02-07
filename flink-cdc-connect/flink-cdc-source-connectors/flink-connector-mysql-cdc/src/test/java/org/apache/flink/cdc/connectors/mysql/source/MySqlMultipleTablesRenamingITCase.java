@@ -42,7 +42,9 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.mysql.MySqlConnection;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -80,7 +82,7 @@ public class MySqlMultipleTablesRenamingITCase {
     @RegisterExtension static MiniClusterExtension miniCluster = new MiniClusterExtension();
 
     @SuppressWarnings("unchecked")
-    private static final MySqlContainer mysql =
+    private static final MySqlContainer MYSQL_CONTAINER =
             (MySqlContainer)
                     new MySqlContainer()
                             .withConfigurationOverride(
@@ -93,15 +95,24 @@ public class MySqlMultipleTablesRenamingITCase {
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     private final UniqueDatabase customDatabase =
-            new UniqueDatabase(mysql, "customer", "mysqluser", "mysqlpw");
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
     private final TestTable customers =
             new TestTable(customDatabase, "customers", TestTableSchemas.CUSTOMERS);
 
     private MySqlConnection connection;
 
+    @BeforeAll
+    public static void before() throws Exception {
+        MYSQL_CONTAINER.start();
+    }
+
+    @AfterAll
+    public static void after() throws Exception {
+        MYSQL_CONTAINER.stop();
+    }
+
     @BeforeEach
     void prepare() throws Exception {
-        mysql.start();
         connection = getConnection();
         customDatabase.createAndInitialize();
         flushLogs();
@@ -111,7 +122,6 @@ public class MySqlMultipleTablesRenamingITCase {
     void tearDown() throws Exception {
         customDatabase.dropDatabase();
         connection.close();
-        mysql.stop();
     }
 
     /**
@@ -253,8 +263,8 @@ public class MySqlMultipleTablesRenamingITCase {
 
     private MySqlSourceBuilder<String> getSourceBuilder() {
         return MySqlSource.<String>builder()
-                .hostname(mysql.getHost())
-                .port(mysql.getDatabasePort())
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
                 .username(customDatabase.getUsername())
                 .password(customDatabase.getPassword())
                 .databaseList(customDatabase.getDatabaseName())
@@ -264,8 +274,8 @@ public class MySqlMultipleTablesRenamingITCase {
 
     private MySqlConnection getConnection() {
         Map<String, String> properties = new HashMap<>();
-        properties.put("database.hostname", mysql.getHost());
-        properties.put("database.port", String.valueOf(mysql.getDatabasePort()));
+        properties.put("database.hostname", MYSQL_CONTAINER.getHost());
+        properties.put("database.port", String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
         properties.put("database.user", customDatabase.getUsername());
         properties.put("database.password", customDatabase.getPassword());
         io.debezium.config.Configuration configuration =
