@@ -34,6 +34,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,7 +131,47 @@ public class ElasticsearchDataSinkFactoryTest {
         Assertions.assertThat(dataSink).isInstanceOf(ElasticsearchDataSink.class);
     }
 
+    /**
+     * Test the `validateShardingSeparator` method with illegal sharding separators. This test
+     * checks two scenarios: 1. Separators containing illegal characters. 2. A separator with
+     * uppercase letters.
+     */
+    @Test
+    void testIllegalShardingSeparator()
+            throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        ElasticsearchDataSinkFactory sinkFactory =
+                (ElasticsearchDataSinkFactory) getElasticsearchDataSinkFactory();
+        Method method =
+                ElasticsearchDataSinkFactory.class.getDeclaredMethod(
+                        "validateShardingSeparator", String.class);
+        method.setAccessible(true);
+
+        // Test an array of invalid separators with illegal characters
+        String[] invalidSeparators = {"*", " ", ">", "<", "|", "?", "\"", ",", "#", "\\"};
+        for (String invalidSeparator : invalidSeparators) {
+            Throwable thrown =
+                    Assertions.catchThrowable(() -> method.invoke(sinkFactory, invalidSeparator));
+            Assertions.assertThat(extractException(thrown))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining(
+                            "sharding.suffix.separator is malformed, elasticsearch index cannot include \\, /, *, ?, \", <, >, |, ` ` (space character), ,, #");
+        }
+
+        // Test a separator with uppercase letters
+        Throwable thrown = Assertions.catchThrowable(() -> method.invoke(sinkFactory, "_TEST"));
+        Assertions.assertThat(extractException(thrown))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "sharding.suffix.separator is malformed, elasticsearch index only support lowercase.");
+    }
+
     // Helper methods
+
+    /** Helper method to extract the actual cause from an InvocationTargetException. */
+    private Throwable extractException(Throwable ex) {
+        Assertions.assertThat(ex).isInstanceOf(InvocationTargetException.class);
+        return ex.getCause();
+    }
 
     private DataSinkFactory getElasticsearchDataSinkFactory() {
         DataSinkFactory sinkFactory =
