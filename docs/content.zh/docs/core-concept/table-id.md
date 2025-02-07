@@ -35,7 +35,7 @@ under the License.
 
 下面是一些常见的外部数据系统及其对应的 Table Id 格式：
 
-| 数据系统                  | Table id 构造参数           | 字符串示例               |
+| 数据系统                  | Table Id 构造参数           | 字符串示例               |
 |-----------------------|-------------------------|---------------------|
 | Oracle/PostgreSQL     | database, schema, table | mydb.default.orders |
 | MySQL/Doris/StarRocks | database, table         | mydb.orders         |
