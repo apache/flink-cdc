@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
@@ -91,6 +92,9 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
 
     public static final OperatorID SINK_OPERATOR_ID = new OperatorID(15214L, 15514L);
 
+    private static final Duration DEFAULT_RPC_TIMEOUT =
+            PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
+
     private final OP operator;
     private final int numOutputs;
     private final SchemaCoordinator schemaRegistry;
@@ -130,7 +134,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 null,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 SchemaChangeBehavior.EVOLVE,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -143,7 +147,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 SchemaChangeBehavior.EVOLVE,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -159,7 +163,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -176,7 +180,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 enabledEventTypes,
                 Collections.emptySet());
@@ -195,7 +199,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 enabledEventTypes,
                 errorOnEventTypes);

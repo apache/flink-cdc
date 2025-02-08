@@ -336,8 +336,8 @@ public class SchemaCoordinator extends SchemaRegistry {
                             LOG.info(
                                     "SchemaOperator {} has not submitted schema change request yet. Waiting...",
                                     sourceSubTaskId),
-                    Duration.ofMillis(100),
-                    rpcTimeout);
+                    rpcTimeout,
+                    Duration.ofMillis(100));
         } catch (TimeoutException e) {
             throw new RuntimeException(
                     "Timeout waiting for schema change request from SchemaOperator.", e);
