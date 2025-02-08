@@ -54,10 +54,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
-/** OceanBase flink cdc pipeline connector sink integrate test. */
+/** End-to-end tests for mysql cdc to OceanBase pipeline job. */
 @RunWith(Parameterized.class)
-public class OceanBaseE2eITCase extends PipelineTestEnvironment {
-    private static final Logger LOG = LoggerFactory.getLogger(OceanBaseE2eITCase.class);
+public class MySqlToOceanBaseE2eITCase extends PipelineTestEnvironment {
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlToOceanBaseE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
     // MySQL Variables (we always use MySQL as the data source for easier verifying)
@@ -83,8 +83,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public final UniqueDatabase mysqlInventoryDatabase =
-            new UniqueDatabase(
-                    MYSQL, "mysql_2_oceanbase_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+            new UniqueDatabase(MYSQL, "oceanbase_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
     private final String uniqueDatabaseName = mysqlInventoryDatabase.getDatabaseName();
 

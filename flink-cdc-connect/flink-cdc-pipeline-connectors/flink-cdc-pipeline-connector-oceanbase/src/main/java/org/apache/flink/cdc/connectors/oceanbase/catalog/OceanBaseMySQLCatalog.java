@@ -236,7 +236,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 "table name cannot be null or empty.");
 
         OceanBaseUtils.CdcDataTypeTransformer cdcDataTypeTransformer =
-                new OceanBaseUtils.CdcDataTypeTransformer(false, new OceanBaseColumn.Builder());
+                new OceanBaseUtils.CdcDataTypeTransformer(new OceanBaseColumn.Builder());
         OceanBaseColumn oceanBaseColumn =
                 dataType.accept(cdcDataTypeTransformer).setColumnName(columnName).build();
         String alterTypeSql =
@@ -463,10 +463,12 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 return String.format("DECIMAL(%d, %s)", columnSize.get(), decimalDigits.get());
             case "CHAR":
             case "VARCHAR":
+            case "BINARY":
             case "VARBINARY":
                 Preconditions.checkArgument(
                         columnSize.isPresent(), type + " type must have column size");
                 return String.format("%s(%d)", dataType, columnSize.get());
+            case "TIME":
             case "DATETIME":
             case "TIMESTAMP":
                 return columnSize
