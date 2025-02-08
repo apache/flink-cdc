@@ -87,16 +87,12 @@ public class DataSinkOperatorWithSchemaEvolveTest {
         // Create the flush event to process before the schema change event
         FlushEvent flushEvent = createFlushEvent(tableId, event);
 
-        // Send schema change request to coordinator
-        schemaOperatorHarness.requestSchemaChangeEvent(tableId, event);
-
         // Send flush event to SinkWriterOperator
         dataSinkWriterOperator.processElement(new StreamRecord<>(flushEvent));
 
-        // Wait for coordinator to complete the schema change and get the finished schema change
-        // events
+        // Send schema change request to coordinator
         SchemaChangeResponse schemaEvolveResponse =
-                schemaOperatorHarness.requestSchemaChangeResult(tableId, event);
+                schemaOperatorHarness.requestSchemaChangeEvent(tableId, event);
         List<SchemaChangeEvent> finishedSchemaChangeEvents =
                 schemaEvolveResponse.getAppliedSchemaChangeEvents();
 
