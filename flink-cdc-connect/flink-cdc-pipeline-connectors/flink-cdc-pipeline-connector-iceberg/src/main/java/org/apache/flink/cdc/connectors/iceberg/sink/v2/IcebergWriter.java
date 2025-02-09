@@ -51,6 +51,10 @@ import java.util.Map;
 /** A {@link SinkWriter} for Apache Iceberg. */
 public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWrapper> {
 
+    public static final String DEFAULT_FILE_FORMAT = "parquet";
+
+    public static final long DEFAULT_MAX_FILE_SIZE = 256 * 1024 * 1024;
+
     Map<TableId, RowDataTaskWriterFactory> writerFactoryMap;
 
     Map<TableId, TaskWriter<RowData>> writerMap;
@@ -84,12 +88,7 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
     @Override
     public Collection<WriteResultWrapper> prepareCommit() throws IOException, InterruptedException {
         List<WriteResultWrapper> list = new ArrayList<>(temporaryWriteResult);
-        for (Map.Entry<TableId, TaskWriter<RowData>> entry : writerMap.entrySet()) {
-            WriteResult writeResult = entry.getValue().complete();
-            list.add(new WriteResultWrapper(writeResult, entry.getKey()));
-        }
-        writerMap.clear();
-        writerFactoryMap.clear();
+        list.addAll(getWriteResult());
         return list;
     }
 
@@ -100,8 +99,8 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
                 new RowDataTaskWriterFactory(
                         table,
                         rowType,
-                        1024 * 1024 * 128,
-                        FileFormat.PARQUET,
+                        DEFAULT_MAX_FILE_SIZE,
+                        FileFormat.fromString(DEFAULT_FILE_FORMAT),
                         new HashMap<>(),
                         new ArrayList<>(table.schema().identifierFieldIds()),
                         true);
@@ -135,13 +134,18 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
 
     @Override
     public void flush(boolean flush) throws IOException {
-        temporaryWriteResult = new ArrayList<>();
+        temporaryWriteResult = getWriteResult();
+    }
+
+    private List<WriteResultWrapper> getWriteResult() throws IOException {
+        List<WriteResultWrapper> writeResults = new ArrayList<>();
         for (Map.Entry<TableId, TaskWriter<RowData>> entry : writerMap.entrySet()) {
             WriteResult writeResult = entry.getValue().complete();
-            temporaryWriteResult.add(new WriteResultWrapper(writeResult, entry.getKey()));
+            writeResults.add(new WriteResultWrapper(writeResult, entry.getKey()));
         }
         writerMap.clear();
         writerFactoryMap.clear();
+        return writeResults;
     }
 
     @Override

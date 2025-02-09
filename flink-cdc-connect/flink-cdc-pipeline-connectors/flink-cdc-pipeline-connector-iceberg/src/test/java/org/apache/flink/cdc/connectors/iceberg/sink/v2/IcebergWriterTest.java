@@ -37,11 +37,13 @@ import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequ
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -54,6 +56,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -132,20 +135,32 @@ public class IcebergWriterTest {
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
-        CloseableIterable<Record> records =
-                IcebergGenerics.read(
-                                catalog.loadTable(
-                                        TableIdentifier.of(
-                                                tableId.getSchemaName(), tableId.getTableName())))
-                        .build();
-        List<String> result = new ArrayList<>();
-        for (Record record : records) {
-            result.add(record.toString());
-        }
+        List<String> result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
-                .containsExactlyInAnyOrder("Record(1, Mark, 10, test)", "Record(2, Bob, 10, test)");
+                .containsExactlyInAnyOrder("1, Mark, 10, test", "2, Bob, 10, test");
 
         // Add column.
+        RecordData recordData3 =
+                binaryRecordDataGenerator.generate(
+                        new Object[] {
+                            3L,
+                            BinaryStringData.fromString("Bob"),
+                            10,
+                            BinaryStringData.fromString("test")
+                        });
+        DataChangeEvent dataChangeEvent3 = DataChangeEvent.insertEvent(tableId, recordData3);
+        icebergWriter.write(dataChangeEvent3, null);
+        RecordData recordData4 =
+                binaryRecordDataGenerator.generate(
+                        new Object[] {
+                            4L,
+                            BinaryStringData.fromString("Bob"),
+                            10,
+                            BinaryStringData.fromString("test")
+                        });
+        DataChangeEvent dataChangeEvent4 = DataChangeEvent.insertEvent(tableId, recordData4);
+        icebergWriter.write(dataChangeEvent4, null);
+        icebergWriter.flush(false);
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(
                         tableId,
@@ -164,36 +179,29 @@ public class IcebergWriterTest {
                                         createTableEvent.getSchema(), addColumnEvent)
                                 .getColumnDataTypes()
                                 .toArray(new DataType[0]));
-        recordData =
+        RecordData recordData5 =
                 binaryRecordDataGenerator.generate(
                         new Object[] {
-                            3L,
+                            5L,
                             BinaryStringData.fromString("Mark"),
                             10,
                             BinaryStringData.fromString("test"),
                             BinaryStringData.fromString("newStringColumn"),
                         });
-        dataChangeEvent = DataChangeEvent.insertEvent(tableId, recordData);
-        icebergWriter.write(dataChangeEvent, null);
+        DataChangeEvent dataChangeEvent5 = DataChangeEvent.insertEvent(tableId, recordData5);
+        icebergWriter.write(dataChangeEvent5, null);
         writeResults = icebergWriter.prepareCommit();
         collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
-        records =
-                IcebergGenerics.read(
-                                catalog.loadTable(
-                                        TableIdentifier.of(
-                                                tableId.getSchemaName(), tableId.getTableName())))
-                        .build();
-        result = new ArrayList<>();
-        for (Record record : records) {
-            result.add(record.toString());
-        }
+        result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
-                        "Record(1, Mark, 10, test, null)",
-                        "Record(2, Bob, 10, test, null)",
-                        "Record(3, Mark, 10, test, newStringColumn)");
+                        "1, Mark, 10, test, null",
+                        "2, Bob, 10, test, null",
+                        "3, Bob, 10, test, null",
+                        "4, Bob, 10, test, null",
+                        "5, Mark, 10, test, newStringColumn");
     }
 
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
@@ -204,5 +212,24 @@ public class IcebergWriterTest {
                     InternalSinkCommitterMetricGroup.wrap(
                             UnregisteredMetricsGroup.createOperatorMetricGroup()));
         }
+    }
+
+    private List<String> fetchTableContent(Catalog catalog, TableId tableId) {
+        List<String> results = new ArrayList<>();
+        Table table =
+                catalog.loadTable(
+                        TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
+        org.apache.iceberg.Schema schema = table.schema();
+        CloseableIterable<Record> records = IcebergGenerics.read(table).project(schema).build();
+        for (Record record : records) {
+            List<String> fieldValues = new ArrayList<>();
+            for (Types.NestedField field : schema.columns()) {
+                String fieldValue = Objects.toString(record.getField(field.name()), "null");
+                fieldValues.add(fieldValue);
+            }
+            String joinedString = String.join(", ", fieldValues);
+            results.add(joinedString);
+        }
+        return results;
     }
 }

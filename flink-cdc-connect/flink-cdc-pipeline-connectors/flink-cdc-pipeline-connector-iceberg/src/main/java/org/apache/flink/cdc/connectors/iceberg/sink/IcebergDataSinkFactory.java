@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.OptionUtils;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -44,6 +45,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
 
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
+        OptionUtils.printOptions(IDENTIFIER, allOptions);
+
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
         allOptions.forEach(
@@ -82,13 +85,13 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(IcebergDataSinkOptions.TYPE);
         return options;
     }
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(IcebergDataSinkOptions.TYPE);
         options.add(IcebergDataSinkOptions.WAREHOUSE);
         options.add(IcebergDataSinkOptions.URI);
         options.add(IcebergDataSinkOptions.PARTITION_KEY);

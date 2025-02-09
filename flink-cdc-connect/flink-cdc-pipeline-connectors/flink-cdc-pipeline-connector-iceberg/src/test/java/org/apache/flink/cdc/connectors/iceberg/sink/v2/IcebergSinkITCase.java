@@ -36,11 +36,13 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /** A test for {@link IcebergSink}. */
@@ -89,14 +92,14 @@ public class IcebergSinkITCase {
 
     @Test
     public void testIcebergSink() throws Exception {
-        DataStream<Event> stream =
-                env.fromData(generateEvents(tableId), TypeInformation.of(Event.class));
+        List<Event> events = new ArrayList<>();
+        events.addAll(generateEvents(tableId));
+        events.addAll(generateEvents(TableId.tableId("test_db", "test_table_2")));
+        events.addAll(generateEvents(tableId));
+        DataStream<Event> stream = env.fromData(events, TypeInformation.of(Event.class));
 
         Sink<Event> icebergSink = new IcebergSink(catalogOptions, null, null);
-        String[] expected =
-                new String[] {
-                    "Record(21, 1.732, Disenchanted, 2)", "Record(17, 6.28, Doris Day, 3)"
-                };
+        String[] expected = new String[] {"21, 1.732, Disenchanted", "17, 6.28, Doris Day"};
         stream.sinkTo(icebergSink);
         env.execute("Values to Iceberg Sink");
 
@@ -107,7 +110,18 @@ public class IcebergSinkITCase {
                 throw new RuntimeException("Timeout waiting for table to be populated");
             }
             Thread.sleep(1000);
-            actual = fetchTableContent(tableId);
+            actual = fetchTableContent(catalog, tableId);
+        }
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+
+        expected = new String[] {"21, 1.732, Disenchanted", "17, 6.28, Doris Day"};
+        actual = new ArrayList<>();
+        while (actual.size() != expected.length) {
+            if (System.currentTimeMillis() - startTime > DEFAULT_TIMEOUT_MS) {
+                throw new RuntimeException("Timeout waiting for table to be populated");
+            }
+            Thread.sleep(1000);
+            actual = fetchTableContent(catalog, TableId.tableId("test_db", "test_table_2"));
         }
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
     }
@@ -158,16 +172,21 @@ public class IcebergSinkITCase {
                                 })));
     }
 
-    private List<String> fetchTableContent(TableId tableId) {
+    private List<String> fetchTableContent(Catalog catalog, TableId tableId) {
         List<String> results = new ArrayList<>();
-        CloseableIterable<Record> records =
-                IcebergGenerics.read(
-                                catalog.loadTable(
-                                        TableIdentifier.of(
-                                                tableId.getSchemaName(), tableId.getTableName())))
-                        .build();
+        Table table =
+                catalog.loadTable(
+                        TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
+        org.apache.iceberg.Schema schema = table.schema();
+        CloseableIterable<Record> records = IcebergGenerics.read(table).project(schema).build();
         for (Record record : records) {
-            results.add(record.toString());
+            List<String> fieldValues = new ArrayList<>();
+            for (Types.NestedField field : schema.columns()) {
+                String fieldValue = Objects.toString(record.getField(field.name()), "null");
+                fieldValues.add(fieldValue);
+            }
+            String joinedString = String.join(", ", fieldValues);
+            results.add(joinedString);
         }
         return results;
     }

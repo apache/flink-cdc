@@ -30,17 +30,18 @@ public class IcebergDataSinkOptions {
     // prefix for passing properties for catalog creation.
     public static final String PREFIX_CATALOG_PROPERTIES = "catalog.properties.";
 
-    public static final ConfigOption<String> WAREHOUSE =
-            key("catalog.properties.warehouse")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("The warehouse root path of catalog.");
-
     public static final ConfigOption<String> TYPE =
             key("catalog.properties.type")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("Type of iceberg catalog, supports `hadoop` and `hive`.");
+
+    public static final ConfigOption<String> WAREHOUSE =
+            key("catalog.properties.warehouse")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The warehouse root path of catalog, only usable when catalog.properties.type is `hadoop`.");
 
     public static final ConfigOption<String> URI =
             key("catalog.properties.uri")

@@ -25,7 +25,9 @@ import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.streaming.api.connector.sink2.SupportsPreWriteTopology;
+import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
+import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
+import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.io.IOException;
@@ -35,7 +37,8 @@ import java.util.Map;
 /** A {@link Sink} implementation for Apache Iceberg. */
 public class IcebergSink
         implements Sink<Event>,
-                SupportsPreWriteTopology<Event>,
+                WithPreWriteTopology<Event>,
+                WithPreCommitTopology<Event, WriteResultWrapper>,
                 TwoPhaseCommittingSink<Event, WriteResultWrapper> {
 
     protected final Map<String, String> catalogOptions;
@@ -85,5 +88,18 @@ public class IcebergSink
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
                 zoneId);
+    }
+
+    @Override
+    public DataStream<CommittableMessage<WriteResultWrapper>> addPreCommitTopology(
+            DataStream<CommittableMessage<WriteResultWrapper>> committables) {
+        // Refer to
+        // https://github.com/apache/iceberg/blob/1d9fefeb9680d782dc128f242604903e71c32f97/flink/v1.19/flink/src/main/java/org/apache/iceberg/flink/sink/IcebergSink.java#L106-L119.
+        return committables.global();
+    }
+
+    @Override
+    public SimpleVersionedSerializer getWriteResultSerializer() {
+        return new WriteResultWrapperSerializer();
     }
 }

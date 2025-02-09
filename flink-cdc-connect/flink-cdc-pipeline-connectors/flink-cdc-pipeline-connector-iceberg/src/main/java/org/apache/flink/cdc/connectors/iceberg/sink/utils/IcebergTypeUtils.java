@@ -17,15 +17,25 @@
 
 package org.apache.flink.cdc.connectors.iceberg.sink.utils;
 
+import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSink;
 
 import org.apache.iceberg.types.Type;
+import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.DateTimeUtil;
+import org.apache.iceberg.util.DecimalUtil;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
+
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
 
 /** Util class for {@link IcebergDataSink}. */
 public class IcebergTypeUtils {
@@ -93,5 +103,104 @@ public class IcebergTypeUtils {
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
+    }
+
+    /** Create a {@link RecordData.FieldGetter} for the given {@link DataType}. */
+    public static RecordData.FieldGetter createFieldGetter(
+            DataType fieldType, int fieldPos, ZoneId zoneId) {
+        final RecordData.FieldGetter fieldGetter;
+        // ordered by type root definition
+        switch (fieldType.getTypeRoot()) {
+            case CHAR:
+            case VARCHAR:
+                fieldGetter =
+                        row ->
+                                org.apache.flink.table.data.StringData.fromString(
+                                        row.getString(fieldPos).toString());
+                break;
+            case BOOLEAN:
+                fieldGetter = row -> row.getBoolean(fieldPos);
+                break;
+            case BINARY:
+            case VARBINARY:
+                fieldGetter = row -> row.getBinary(fieldPos);
+                break;
+            case DECIMAL:
+                final int decimalPrecision = DataTypeChecks.getPrecision(fieldType);
+                final int decimalScale = DataTypeChecks.getScale(fieldType);
+                fieldGetter =
+                        row -> {
+                            DecimalData decimalData =
+                                    row.getDecimal(fieldPos, decimalPrecision, decimalScale);
+                            return DecimalUtil.toReusedFixLengthBytes(
+                                    decimalPrecision,
+                                    decimalScale,
+                                    decimalData.toBigDecimal(),
+                                    new byte[TypeUtil.decimalRequiredBytes(decimalPrecision)]);
+                        };
+                break;
+            case TINYINT:
+                fieldGetter = row -> row.getByte(fieldPos);
+                break;
+            case SMALLINT:
+                fieldGetter = row -> row.getShort(fieldPos);
+                break;
+            case BIGINT:
+                fieldGetter = row -> row.getLong(fieldPos);
+                break;
+            case FLOAT:
+                fieldGetter = row -> row.getFloat(fieldPos);
+                break;
+            case DOUBLE:
+                fieldGetter = row -> row.getDouble(fieldPos);
+                break;
+            case INTEGER:
+                fieldGetter = row -> row.getInt(fieldPos);
+                break;
+            case DATE:
+            case TIME_WITHOUT_TIME_ZONE:
+                // Time in RowData is in milliseconds (Integer), while iceberg's time is
+                // microseconds
+                // (Long).
+                fieldGetter = row -> ((long) row.getInt(fieldPos)) * 1_000;
+                break;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                fieldGetter =
+                        (row) -> {
+                            LocalDateTime localDateTime =
+                                    row.getTimestamp(
+                                                    fieldPos,
+                                                    DataTypeChecks.getPrecision(fieldType))
+                                            .toLocalDateTime();
+                            return DateTimeUtil.microsFromTimestamp(localDateTime);
+                        };
+                break;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+            case TIMESTAMP_WITH_TIME_ZONE:
+                fieldGetter =
+                        row ->
+                                DateTimeUtil.microsFromInstant(
+                                        row.getLocalZonedTimestampData(
+                                                        fieldPos,
+                                                        DataTypeChecks.getPrecision(fieldType))
+                                                .toInstant());
+                break;
+            case ROW:
+                final int rowFieldCount = getFieldCount(fieldType);
+                fieldGetter = row -> row.getRow(fieldPos, rowFieldCount);
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "don't support type of " + fieldType.getTypeRoot());
+        }
+        if (!fieldType.isNullable()) {
+            return fieldGetter;
+        }
+        return row -> {
+            if (row.isNullAt(fieldPos)) {
+                return null;
+            }
+            return fieldGetter.getFieldOrNull(row);
+        };
     }
 }
