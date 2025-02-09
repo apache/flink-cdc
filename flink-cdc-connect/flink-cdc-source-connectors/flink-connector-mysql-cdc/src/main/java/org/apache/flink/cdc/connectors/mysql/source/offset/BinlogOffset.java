@@ -226,6 +226,10 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         long targetServerId = that.getServerId();
 
         if (serverId != targetServerId) {
+            // serverId of lowWaterMark and highWaterMark is always 0.
+            if (serverId == 0 || targetServerId == 0) {
+                return 0;
+            }
             // These are from different servers, and their binlog coordinates are not related. So
             // the only thing we can do
             // is compare timestamps, and we have to assume that the server timestamps can be
