@@ -71,6 +71,7 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
                     tableMap.getOrDefault(writeResultWrapper.getTableId(), new ArrayList<>());
             writeResult.add(writeResultWrapper.getWriteResult());
             tableMap.put(writeResultWrapper.getTableId(), writeResult);
+            LOGGER.info(writeResultWrapper.buildDescription());
         }
         for (Map.Entry<TableId, List<WriteResult>> entry : tableMap.entrySet()) {
             TableId tableId = entry.getKey();

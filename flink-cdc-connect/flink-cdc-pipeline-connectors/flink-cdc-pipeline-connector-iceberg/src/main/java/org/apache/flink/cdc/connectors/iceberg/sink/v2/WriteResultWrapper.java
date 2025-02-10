@@ -19,6 +19,8 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.cdc.common.event.TableId;
 
+import org.apache.iceberg.DataFile;
+import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.io.WriteResult;
 
 import java.io.Serializable;
@@ -41,5 +43,27 @@ public class WriteResultWrapper implements Serializable {
 
     public TableId getTableId() {
         return tableId;
+    }
+
+    /** Build a simple description for the write result. */
+    public String buildDescription() {
+        long addCount = 0;
+        if (writeResult.dataFiles() != null) {
+            for (DataFile dataFile : writeResult.dataFiles()) {
+                addCount += dataFile.recordCount();
+            }
+        }
+        long deleteCount = 0;
+        if (writeResult.deleteFiles() != null) {
+            for (DeleteFile dataFile : writeResult.deleteFiles()) {
+                deleteCount += dataFile.recordCount();
+            }
+        }
+        return "WriteResult of "
+                + tableId
+                + ", AddCount: "
+                + addCount
+                + ", DeleteCount: "
+                + deleteCount;
     }
 }

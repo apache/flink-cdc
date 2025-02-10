@@ -25,11 +25,13 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.io.CloseableIterable;
+import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
 import org.junit.After;
 import org.junit.Before;
@@ -56,7 +58,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Iceberg pipeline job. */
@@ -157,6 +161,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                                 + "  type: iceberg\n"
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.type: hadoop\n"
+                                + "  catalog.properties.clients: 20\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
@@ -176,25 +181,25 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                 database,
                 "products",
                 Arrays.asList(
-                        "Record(101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null)",
-                        "Record(102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null)",
-                        "Record(103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null)",
-                        "Record(104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null)",
-                        "Record(105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null)",
-                        "Record(106, Six, Ferris, 9.813, null, null, null)",
-                        "Record(107, Seven, Grace, 2.117, null, null, null)",
-                        "Record(108, Eight, Hesse, 6.819, null, null, null)",
-                        "Record(109, Nine, IINA, 5.223, null, null, null)"));
+                        "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
+                        "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
+                        "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
+                        "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
+                        "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
+                        "106, Six, Ferris, 9.813, null, null, null",
+                        "107, Seven, Grace, 2.117, null, null, null",
+                        "108, Eight, Hesse, 6.819, null, null, null",
+                        "109, Nine, IINA, 5.223, null, null, null"));
 
         validateSinkResult(
                 warehouse,
                 database,
                 "customers",
                 Arrays.asList(
-                        "Record(101, user_1, Shanghai, 123567891234)",
-                        "Record(102, user_2, Shanghai, 123567891234)",
-                        "Record(103, user_3, Shanghai, 123567891234)",
-                        "Record(104, user_4, Shanghai, 123567891234)"));
+                        "101, user_1, Shanghai, 123567891234",
+                        "102, user_2, Shanghai, 123567891234",
+                        "103, user_3, Shanghai, 123567891234",
+                        "104, user_4, Shanghai, 123567891234"));
 
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -229,18 +234,20 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         List<String> recordsInSnapshotPhase =
                 new ArrayList<>(
                         Arrays.asList(
-                                "Record(102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(108, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(109, Nine, IINA, 5.223, null, null, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(110, Ten, Jukebox, 0.2, null, null, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(111, Eleven, Kryo, 5.18, null, null, null, null, null, null, null, null, null, null, null, null)",
-                                "Record(112, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null)"));
+                                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null",
+                                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null",
+                                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null",
+                                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null",
+                                "106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "108, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "109, Nine, IINA, 5.223, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "110, Ten, Jukebox, 0.2, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "111, Eleven, Kryo, 5.18, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "112, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null"));
         recordsInSnapshotPhase.addAll(recordsInIncrementalPhase);
+        recordsInSnapshotPhase =
+                recordsInSnapshotPhase.stream().sorted().collect(Collectors.toList());
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
     }
 
@@ -274,8 +281,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                                 sqlFields));
                 int id = addColumnRepeat * 1000 + j + 113;
                 result.add(
-                        String.format(
-                                "Record(%s, finally, null, 2.14, null, null%s)", id, resultFields));
+                        String.format("%s, finally, null, 2.14, null, null%s", id, resultFields));
             }
             stat.executeBatch();
         }
@@ -290,8 +296,8 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                 int id = modifyColumnRepeat * 1000 + j + 10113;
                 result.add(
                         String.format(
-                                "Record(%s, finally, null, 2.14, null, null%s",
-                                id, ", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)"));
+                                "%s, finally, null, 2.14, null, null%s",
+                                id, ", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1"));
             }
             stat.executeBatch();
             stat.execute(
@@ -303,8 +309,8 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         return result;
     }
 
-    private List<String> fetchIcebergTableRows(String warehouse, String database, String table)
-            throws Exception {
+    private List<String> fetchIcebergTableRows(
+            String warehouse, String databaseName, String tableName) throws Exception {
         Map<String, String> catalogOptions = new HashMap<>();
         catalogOptions.put("type", "hadoop");
         catalogOptions.put("warehouse", warehouse);
@@ -312,14 +318,20 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         Catalog catalog =
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
-        CloseableIterable<Record> records =
-                IcebergGenerics.read(catalog.loadTable(TableIdentifier.of(database, table)))
-                        .build();
-        List<String> result = new ArrayList<>();
+        List<String> results = new ArrayList<>();
+        Table table = catalog.loadTable(TableIdentifier.of(databaseName, tableName));
+        org.apache.iceberg.Schema schema = table.schema();
+        CloseableIterable<Record> records = IcebergGenerics.read(table).project(schema).build();
         for (Record record : records) {
-            result.add(record.toString());
+            List<String> fieldValues = new ArrayList<>();
+            for (Types.NestedField field : schema.columns()) {
+                String fieldValue = Objects.toString(record.getField(field.name()), "null");
+                fieldValues.add(fieldValue);
+            }
+            String joinedString = String.join(", ", fieldValues);
+            results.add(joinedString);
         }
-        return result;
+        return results;
     }
 
     private void validateSinkResult(
@@ -331,7 +343,10 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         while (System.currentTimeMillis() < deadline) {
             try {
                 results = fetchIcebergTableRows(warehouse, database, table);
-                Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
+                results = results.stream().sorted().collect(Collectors.toList());
+                for (int i = 0; i < results.size(); i++) {
+                    Assertions.assertThat(results.get(i)).isEqualTo(expected.get(i));
+                }
                 LOG.info(
                         "Successfully verified {} records in {} seconds.",
                         expected.size(),

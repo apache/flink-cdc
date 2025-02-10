@@ -38,7 +38,8 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.flink.sink.RowDataTaskWriterFactory;
 import org.apache.iceberg.io.TaskWriter;
-import org.apache.iceberg.io.WriteResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.time.ZoneId;
@@ -50,6 +51,8 @@ import java.util.Map;
 
 /** A {@link SinkWriter} for Apache Iceberg. */
 public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWrapper> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(IcebergWriter.class);
 
     public static final String DEFAULT_FILE_FORMAT = "parquet";
 
@@ -87,8 +90,10 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
 
     @Override
     public Collection<WriteResultWrapper> prepareCommit() throws IOException, InterruptedException {
-        List<WriteResultWrapper> list = new ArrayList<>(temporaryWriteResult);
+        List<WriteResultWrapper> list = new ArrayList<>();
+        list.addAll(temporaryWriteResult);
         list.addAll(getWriteResult());
+        temporaryWriteResult.clear();
         return list;
     }
 
@@ -134,14 +139,17 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
 
     @Override
     public void flush(boolean flush) throws IOException {
-        temporaryWriteResult = getWriteResult();
+        // Notice: flush method may be called many times during one checkpoint.
+        temporaryWriteResult.addAll(getWriteResult());
     }
 
     private List<WriteResultWrapper> getWriteResult() throws IOException {
         List<WriteResultWrapper> writeResults = new ArrayList<>();
         for (Map.Entry<TableId, TaskWriter<RowData>> entry : writerMap.entrySet()) {
-            WriteResult writeResult = entry.getValue().complete();
-            writeResults.add(new WriteResultWrapper(writeResult, entry.getKey()));
+            WriteResultWrapper writeResultWrapper =
+                    new WriteResultWrapper(entry.getValue().complete(), entry.getKey());
+            writeResults.add(writeResultWrapper);
+            LOGGER.info(writeResultWrapper.buildDescription());
         }
         writerMap.clear();
         writerFactoryMap.clear();
