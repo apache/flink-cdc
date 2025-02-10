@@ -19,7 +19,7 @@ package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.cli.CliFrontendOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.client.deployment.executors.LocalExecutor;
+import org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment;
 import org.apache.flink.core.fs.Path;
 
 import org.apache.commons.cli.CommandLine;
@@ -73,9 +73,9 @@ public class ConfigurationUtils {
 
     public static String getDeploymentMode(CommandLine commandLine) {
         if (commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER)) {
-            return LocalExecutor.NAME;
+            return ComposeDeployment.LOCAL.getName();
         }
-        return commandLine.getOptionValue(TARGET, LocalExecutor.NAME);
+        return commandLine.getOptionValue(TARGET, ComposeDeployment.YARN_SESSION.getName());
     }
 
     public static Class<?> getClaimModeClass() {

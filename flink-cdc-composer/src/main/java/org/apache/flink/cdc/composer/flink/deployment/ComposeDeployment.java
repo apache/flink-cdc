@@ -17,11 +17,40 @@
 
 package org.apache.flink.cdc.composer.flink.deployment;
 
+import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
+
 /** Create deployment methods corresponding to different goals. */
-public class ComposeDeployment {
-    public static final String KUBERNETES_APPLICATION = "kubernetes-application";
-    public static final String YARN_APPLICATION = "yarn-application";
-    public static final String YARN_SESSION = "yarn-session";
-    public static final String LOCAL = "local";
-    public static final String REMOTE = "remote";
+public enum ComposeDeployment {
+    YARN_SESSION("yarn-session"),
+    YARN_APPLICATION("yarn-application"),
+    LOCAL("local"),
+    REMOTE("remote"),
+    KUBERNETES_APPLICATION("kubernetes-application");
+
+    private final String name;
+
+    ComposeDeployment(final String name) {
+        this.name = checkNotNull(name);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public static ComposeDeployment getFromName(final String deploymentTarget) {
+        if (deploymentTarget == null) {
+            return null;
+        }
+
+        if (YARN_SESSION.name.equalsIgnoreCase(deploymentTarget)) {
+            return YARN_SESSION;
+        } else if (YARN_APPLICATION.name.equalsIgnoreCase(deploymentTarget)) {
+            return YARN_APPLICATION;
+        } else if (KUBERNETES_APPLICATION.name.equalsIgnoreCase(deploymentTarget)) {
+            return KUBERNETES_APPLICATION;
+        } else if (LOCAL.name.equalsIgnoreCase(deploymentTarget)) {
+            return LOCAL;
+        }
+        return null;
+    }
 }

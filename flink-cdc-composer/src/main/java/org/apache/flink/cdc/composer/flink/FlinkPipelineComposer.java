@@ -67,7 +67,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
         additionalJars.forEach(
                 jarPath -> {
                     try {
-                        FlinkEnvironmentUtils.addJar(env, jarPath.toUri().toURL());
+                        FlinkEnvironmentUtils.addJar(
+                                env,
+                                jarPath.makeQualified(jarPath.getFileSystem()).toUri().toURL());
                     } catch (Exception e) {
                         throw new RuntimeException(
                                 String.format(

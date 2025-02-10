@@ -235,7 +235,7 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         Map<String, String> env = new HashMap<>();
         env.put("FLINK_HOME", flinkHome.toString());
         env.put("FLINK_CONF_DIR", flinkHome.resolve("conf").toString());
-        addFlinkConf(flinkHome.resolve("conf").resolve("flink-conf.yaml"));
+        addFlinkConf(flinkHome.resolve("conf").resolve("config.yaml"));
         Path flinkcdcHome =
                 TestUtils.getResource("flink-cdc-\\d+(\\.\\d+)*(-SNAPSHOT)?$", "flink-cdc-dist");
         env.put("FLINK_CDC_HOME", flinkcdcHome.toString());
@@ -252,7 +252,7 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         configToAppend.put("slot.request.timeout", "120000");
         try {
             if (!Files.exists(flinkConf)) {
-                throw new FileNotFoundException("flink-conf.yaml not found at " + flinkConf);
+                throw new FileNotFoundException("conf.yaml not found at " + flinkConf);
             }
             List<String> lines = new ArrayList<>(Files.readAllLines(flinkConf));
             for (Map.Entry<String, String> entry : configToAppend.entrySet()) {
@@ -264,7 +264,7 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
                     StandardOpenOption.WRITE,
                     StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to append configuration to flink-conf.yaml", e);
+            throw new RuntimeException("Failed to append configuration to config.yaml", e);
         }
     }
 

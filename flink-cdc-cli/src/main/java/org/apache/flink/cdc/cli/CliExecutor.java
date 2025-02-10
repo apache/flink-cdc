@@ -27,6 +27,7 @@ import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
+import org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment;
 import org.apache.flink.cdc.composer.flink.deployment.K8SApplicationDeploymentExecutor;
 import org.apache.flink.cdc.composer.flink.deployment.YarnApplicationDeploymentExecutor;
 import org.apache.flink.core.fs.Path;
@@ -74,7 +75,8 @@ public class CliExecutor {
 
     public PipelineExecution.ExecutionInfo run() throws Exception {
         // Create Submit Executor to deployment flink cdc job Or Run Flink CDC Job
-        String deploymentTarget = ConfigurationUtils.getDeploymentMode(commandLine);
+        String deploymentTargetStr = ConfigurationUtils.getDeploymentMode(commandLine);
+        ComposeDeployment deploymentTarget = ComposeDeployment.getFromName(deploymentTargetStr);
         switch (deploymentTarget) {
             case KUBERNETES_APPLICATION:
                 return deployWithApplicationComposer(new K8SApplicationDeploymentExecutor());
@@ -87,7 +89,8 @@ public class CliExecutor {
                 return deployWithRemoteExecutor();
             default:
                 throw new IllegalArgumentException(
-                        String.format("Deployment target %s is not supported", deploymentTarget));
+                        String.format(
+                                "Deployment target %s is not supported", deploymentTargetStr));
         }
     }
 

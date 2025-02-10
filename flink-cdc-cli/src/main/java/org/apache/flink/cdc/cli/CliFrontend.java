@@ -20,7 +20,10 @@ package org.apache.flink.cdc.cli;
 import org.apache.flink.cdc.cli.utils.ConfigurationUtils;
 import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
@@ -41,8 +44,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.cli.CliFrontendOptions.FLINK_CONFIG;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_ALLOW_NON_RESTORED_OPTION;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_CLAIM_MODE;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_PATH_OPTION;
@@ -93,6 +98,9 @@ public class CliFrontend {
         Path flinkHome = getFlinkHome(commandLine);
         Configuration flinkConfig = FlinkEnvironmentUtils.loadFlinkConfiguration(flinkHome);
 
+        // To override the Flink configuration
+        overrideFlinkConfiguration(flinkConfig, commandLine);
+
         // Savepoint
         SavepointRestoreSettings savepointSettings = createSavepointRestoreSettings(commandLine);
 
@@ -114,6 +122,25 @@ public class CliFrontend {
                 additionalJars,
                 savepointSettings,
                 flinkHome);
+    }
+
+    private static void overrideFlinkConfiguration(
+            Configuration flinkConfig, CommandLine commandLine) {
+        Properties properties = commandLine.getOptionProperties(FLINK_CONFIG.getOpt());
+        LOG.info("Dynamic flink config items found: {}", properties);
+        for (String key : properties.stringPropertyNames()) {
+            String value = properties.getProperty(key);
+            if (StringUtils.isNullOrWhitespaceOnly(key)
+                    || StringUtils.isNullOrWhitespaceOnly(value)) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                key, value));
+            }
+            ConfigOption<String> configOption =
+                    ConfigOptions.key(key.trim()).stringType().defaultValue(value.trim());
+            flinkConfig.set(configOption, value.trim());
+        }
     }
 
     private static SavepointRestoreSettings createSavepointRestoreSettings(
