@@ -2185,7 +2185,7 @@ class FlinkPipelineTransformITCase {
     }
 
     @Test
-    void testFloorCeilAndRoundFunctionWithLiterals() throws Exception {
+    void testFloorCeilAndRoundFunction() throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -2248,7 +2248,14 @@ class FlinkPipelineTransformITCase {
                                                 + "ROUND(bigint_col, 2)   AS round_bigint,"
                                                 + "ROUND(float_col, 2)    AS round_float,"
                                                 + "ROUND(double_col, 2)   AS round_double,"
-                                                + "ROUND(decimal_col, 2)  AS round_decimal",
+                                                + "ROUND(decimal_col, 2)  AS round_decimal,"
+                                                + "ROUND(tinyint_col, 0)  AS round_0_tinyint,"
+                                                + "ROUND(smallint_col, 0) AS round_0_smallint,"
+                                                + "ROUND(int_col, 0)      AS round_0_int,"
+                                                + "ROUND(bigint_col, 0)   AS round_0_bigint,"
+                                                + "ROUND(float_col, 0)    AS round_0_float,"
+                                                + "ROUND(double_col, 0)   AS round_0_double,"
+                                                + "ROUND(decimal_col, 0)  AS round_0_decimal",
                                         null,
                                         "id",
                                         null,
@@ -2267,16 +2274,16 @@ class FlinkPipelineTransformITCase {
 
         assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`tinyint_col` TINYINT,`smallint_col` SMALLINT,`int_col` INT,`bigint_col` BIGINT,`float_col` FLOAT,`double_col` DOUBLE,`decimal_col` DECIMAL(10, 3),`ceil_tinyint` TINYINT,`ceil_smallint` SMALLINT,`ceil_int` INT,`ceil_bigint` BIGINT,`ceil_float` FLOAT,`ceil_double` DOUBLE,`ceil_decimal` DECIMAL(10, 0),`ceiling_tinyint` TINYINT,`ceiling_smallint` SMALLINT,`ceiling_int` INT,`ceiling_bigint` BIGINT,`ceiling_float` FLOAT,`ceiling_double` DOUBLE,`ceiling_decimal` DECIMAL(10, 0),`floor_tinyint` TINYINT,`floor_smallint` SMALLINT,`floor_int` INT,`floor_bigint` BIGINT,`floor_float` FLOAT,`floor_double` DOUBLE,`floor_decimal` DECIMAL(10, 0),`round_tinyint` TINYINT,`round_smallint` SMALLINT,`round_int` INT,`round_bigint` BIGINT,`round_float` FLOAT,`round_double` DOUBLE,`round_decimal` DECIMAL(10, 2)}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 1, 1, 1, 1, 1.1, 1.1, 1.100, 1, 1, 1, 1, 2.0, 2.0, 2, 1, 1, 1, 1, 2.0, 2.0, 2, 1, 1, 1, 1, 1.0, 1.0, 1, 1, 1, 1, 1, 1.1, 1.1, 1.10], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[4, 4, 4, 4, 4, 4.44, 4.44, 4.440, 4, 4, 4, 4, 5.0, 5.0, 5, 4, 4, 4, 4, 5.0, 5.0, 5, 4, 4, 4, 4, 4.0, 4.0, 4, 4, 4, 4, 4, 4.44, 4.44, 4.44], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[5, 5, 5, 5, 5, 5.555, 5.555, 5.555, 5, 5, 5, 5, 6.0, 6.0, 6, 5, 5, 5, 5, 6.0, 6.0, 6, 5, 5, 5, 5, 5.0, 5.0, 5, 5, 5, 5, 5, 5.56, 5.56, 5.56], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[9, 9, 9, 9, 9, 1.0E7, 9999999.999, 9999999.999, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000, 9, 9, 9, 9, 1.0E7, 9999999.0, 9999999, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000.00], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`tinyint_col` TINYINT,`smallint_col` SMALLINT,`int_col` INT,`bigint_col` BIGINT,`float_col` FLOAT,`double_col` DOUBLE,`decimal_col` DECIMAL(10, 3),`ceil_tinyint` TINYINT,`ceil_smallint` SMALLINT,`ceil_int` INT,`ceil_bigint` BIGINT,`ceil_float` FLOAT,`ceil_double` DOUBLE,`ceil_decimal` DECIMAL(10, 0),`ceiling_tinyint` TINYINT,`ceiling_smallint` SMALLINT,`ceiling_int` INT,`ceiling_bigint` BIGINT,`ceiling_float` FLOAT,`ceiling_double` DOUBLE,`ceiling_decimal` DECIMAL(10, 0),`floor_tinyint` TINYINT,`floor_smallint` SMALLINT,`floor_int` INT,`floor_bigint` BIGINT,`floor_float` FLOAT,`floor_double` DOUBLE,`floor_decimal` DECIMAL(10, 0),`round_tinyint` TINYINT,`round_smallint` SMALLINT,`round_int` INT,`round_bigint` BIGINT,`round_float` FLOAT,`round_double` DOUBLE,`round_decimal` DECIMAL(10, 2),`round_0_tinyint` TINYINT,`round_0_smallint` SMALLINT,`round_0_int` INT,`round_0_bigint` BIGINT,`round_0_float` FLOAT,`round_0_double` DOUBLE,`round_0_decimal` DECIMAL(8, 0)}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 1, 1, 1, 1, 1.1, 1.1, 1.100, 1, 1, 1, 1, 2.0, 2.0, 2, 1, 1, 1, 1, 2.0, 2.0, 2, 1, 1, 1, 1, 1.0, 1.0, 1, 1, 1, 1, 1, 1.1, 1.1, 1.10, 1, 1, 1, 1, 1.0, 1.0, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[4, 4, 4, 4, 4, 4.44, 4.44, 4.440, 4, 4, 4, 4, 5.0, 5.0, 5, 4, 4, 4, 4, 5.0, 5.0, 5, 4, 4, 4, 4, 4.0, 4.0, 4, 4, 4, 4, 4, 4.44, 4.44, 4.44, 4, 4, 4, 4, 4.0, 4.0, 4], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[5, 5, 5, 5, 5, 5.555, 5.555, 5.555, 5, 5, 5, 5, 6.0, 6.0, 6, 5, 5, 5, 5, 6.0, 6.0, 6, 5, 5, 5, 5, 5.0, 5.0, 5, 5, 5, 5, 5, 5.56, 5.56, 5.56, 5, 5, 5, 5, 6.0, 6.0, 6], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[9, 9, 9, 9, 9, 1.0E7, 9999999.999, 9999999.999, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000, 9, 9, 9, 9, 1.0E7, 9999999.0, 9999999, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000.00, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
     @Test
-    void testAbsFunctionWithLiterals() throws Exception {
+    void testAbsFunction() throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
