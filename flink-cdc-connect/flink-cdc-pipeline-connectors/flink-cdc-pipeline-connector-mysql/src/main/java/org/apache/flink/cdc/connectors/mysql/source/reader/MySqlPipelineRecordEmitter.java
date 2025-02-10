@@ -22,10 +22,10 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlFieldDefinition;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
-import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
@@ -74,7 +74,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
-            MySqlSourceReaderMetrics sourceReaderMetrics,
+            SourceReaderMetrics sourceReaderMetrics,
             MySqlSourceConfig sourceConfig) {
         super(
                 debeziumDeserializationSchema,
