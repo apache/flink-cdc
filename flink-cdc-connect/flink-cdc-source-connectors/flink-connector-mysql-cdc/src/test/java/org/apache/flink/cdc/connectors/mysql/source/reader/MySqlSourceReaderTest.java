@@ -22,6 +22,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.source.ReaderOutput;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
@@ -49,7 +50,7 @@ import org.apache.flink.connector.base.source.reader.synchronization.FutureCompl
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderOutput;
 import org.apache.flink.core.io.InputStatus;
-import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.metrics.groups.SourceReaderMetricGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
@@ -71,7 +72,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Method;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -559,10 +559,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             throws Exception {
         final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
                 new FutureCompletingBlockingQueue<>();
-        // make  SourceReaderContext#metricGroup compatible between Flink 1.13 and Flink 1.14
-        final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
-        metricGroupMethod.setAccessible(true);
-        final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
+        final SourceReaderMetricGroup metricGroup = readerContext.metricGroup();
         final RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> recordEmitter =
                 limit > 0
                         ? new MysqlLimitedRecordEmitter(
@@ -572,7 +569,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                                 limit)
                         : new MySqlRecordEmitter<>(
                                 new ForwardDeserializeSchema(),
-                                new MySqlSourceReaderMetrics(metricGroup),
+                                new SourceReaderMetrics(metricGroup),
                                 configuration.isIncludeSchemaChanges());
         final MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);

@@ -18,14 +18,14 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderOutput;
-import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
+import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.util.Collector;
 
 import io.debezium.config.Configuration;
@@ -100,8 +100,7 @@ public class MySqlRecordEmitterTest {
                         return TypeInformation.of(Void.class);
                     }
                 },
-                new MySqlSourceReaderMetrics(
-                        UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
+                new SourceReaderMetrics(UnregisteredMetricsGroup.createSourceReaderMetricGroup()),
                 false);
     }
 

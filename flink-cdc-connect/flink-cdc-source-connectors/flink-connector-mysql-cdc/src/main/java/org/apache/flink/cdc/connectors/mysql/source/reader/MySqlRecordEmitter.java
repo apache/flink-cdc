@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
-import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
@@ -50,13 +50,13 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             new FlinkJsonTableChangeSerializer();
 
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
-    private final MySqlSourceReaderMetrics sourceReaderMetrics;
+    private final SourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
-            MySqlSourceReaderMetrics sourceReaderMetrics,
+            SourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
@@ -104,6 +104,7 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
+            sourceReaderMetrics.addNumRecordsInErrors(1L);
         }
     }
 
@@ -115,6 +116,9 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     }
 
     private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
+        sourceReaderMetrics.markRecord();
+        sourceReaderMetrics.updateRecordCounters(element);
+
         outputCollector.output = output;
         outputCollector.currentMessageTimestamp = RecordUtils.getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
