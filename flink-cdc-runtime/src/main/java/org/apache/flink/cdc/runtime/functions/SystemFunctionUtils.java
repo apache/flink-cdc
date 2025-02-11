@@ -518,168 +518,214 @@ public class SystemFunctionUtils {
     }
 
     /** SQL <code>ABS</code> operator applied to byte values. */
-    public static byte abs(byte b0) {
-        return (byte) Math.abs(b0);
+    public static Byte abs(Byte value) {
+        if (value == null) {
+            return null;
+        }
+        return (byte) Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to short values. */
-    public static short abs(short b0) {
-        return (short) Math.abs(b0);
+    public static Short abs(Short value) {
+        if (value == null) {
+            return null;
+        }
+        return (short) Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to int values. */
-    public static int abs(int b0) {
-        return Math.abs(b0);
+    public static Integer abs(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to long values. */
-    public static long abs(long b0) {
-        return Math.abs(b0);
+    public static Long abs(Long value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to float values. */
-    public static float abs(float b0) {
-        return Math.abs(b0);
+    public static Float abs(Float value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to double values. */
-    public static double abs(double b0) {
-        return Math.abs(b0);
-    }
-
-    public static double floor(double b0) {
-        return Math.floor(b0);
-    }
-
-    public static float floor(float b0) {
-        return (float) Math.floor(b0);
-    }
-
-    /** SQL <code>FLOOR</code> operator applied to int values. */
-    public static int floor(int b0, int b1) {
-        int r = b0 % b1;
-        if (r < 0) {
-            r += b1;
+    public static Double abs(Double value) {
+        if (value == null) {
+            return null;
         }
-        return b0 - r;
+        return Math.abs(value);
     }
 
-    /** SQL <code>FLOOR</code> operator applied to long values. */
-    public static long floor(long b0, long b1) {
-        long r = b0 % b1;
-        if (r < 0) {
-            r += b1;
+    /** SQL <code>ABS</code> operator applied to decimal values. */
+    public static DecimalData abs(DecimalData value) {
+        if (value == null) {
+            return null;
         }
-        return b0 - r;
+        return DecimalData.fromBigDecimal(
+                BigDecimal.valueOf(Math.abs(value.toBigDecimal().doubleValue())),
+                value.precision(),
+                value.scale());
     }
 
-    public static double ceil(double b0) {
-        return Math.ceil(b0);
+    public static Byte floor(Byte value) {
+        return value;
     }
 
-    public static float ceil(float b0) {
-        return (float) Math.ceil(b0);
+    public static Short floor(Short value) {
+        return value;
     }
 
-    /** SQL <code>CEIL</code> operator applied to int values. */
-    public static int ceil(int b0, int b1) {
-        int r = b0 % b1;
-        if (r > 0) {
-            r -= b1;
+    public static Integer floor(Integer value) {
+        return value;
+    }
+
+    public static Long floor(Long value) {
+        return value;
+    }
+
+    public static Double floor(Double value) {
+        if (value == null) {
+            return null;
         }
-        return b0 - r;
+        return Math.floor(value);
     }
 
-    /** SQL <code>CEIL</code> operator applied to long values. */
-    public static long ceil(long b0, long b1) {
-        return floor(b0 + b1 - 1, b1);
+    public static Float floor(Float value) {
+        if (value == null) {
+            return null;
+        }
+        return (float) Math.floor(value);
+    }
+
+    public static DecimalData floor(DecimalData value) {
+        if (value == null) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(
+                BigDecimal.valueOf(Math.floor(value.toBigDecimal().doubleValue())),
+                value.precision(),
+                0);
+    }
+
+    public static Byte ceil(Byte value) {
+        return value;
+    }
+
+    public static Short ceil(Short value) {
+        return value;
+    }
+
+    public static Integer ceil(Integer value) {
+        return value;
+    }
+
+    public static Long ceil(Long value) {
+        return value;
+    }
+
+    public static Double ceil(Double value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.ceil(value);
+    }
+
+    public static Float ceil(Float value) {
+        if (value == null) {
+            return null;
+        }
+        return (float) Math.ceil(value);
+    }
+
+    public static DecimalData ceil(DecimalData value) {
+        if (value == null) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(
+                BigDecimal.valueOf(Math.ceil(value.toBigDecimal().doubleValue())),
+                value.precision(),
+                0);
     }
 
     // SQL ROUND
     /** SQL <code>ROUND</code> operator applied to byte values. */
-    public static byte round(byte b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to byte values. */
-    public static byte round(byte b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).byteValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to short values. */
-    public static short round(short b0) {
-        return round(b0, 0);
+    public static Byte round(Byte value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).byteValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to short values. */
-    public static short round(short b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).shortValue();
+    public static Short round(Short value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).shortValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to int values. */
-    public static int round(int b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to int values. */
-    public static int round(int b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).intValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to long values. */
-    public static long round(long b0) {
-        return round(b0, 0);
+    public static Integer round(Integer value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).intValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to long values. */
-    public static long round(long b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).longValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
-    public static BigDecimal round(BigDecimal b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
-    public static DecimalData round(DecimalData b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
-    public static BigDecimal round(BigDecimal b0, int b1) {
-        return b0.movePointRight(b1).setScale(0, RoundingMode.HALF_UP).movePointLeft(b1);
+    public static Long round(Long value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).longValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to DecimalData values. */
-    public static DecimalData round(DecimalData b0, int b1) {
+    public static DecimalData round(DecimalData value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
         return DecimalData.fromBigDecimal(
-                b0.toBigDecimal()
-                        .movePointRight(b1)
+                value.toBigDecimal()
+                        .movePointRight(pointOffset)
                         .setScale(0, RoundingMode.HALF_UP)
-                        .movePointLeft(b1),
-                b0.precision(),
-                b0.scale());
+                        .movePointLeft(pointOffset),
+                value.precision(),
+                pointOffset);
     }
 
     /** SQL <code>ROUND</code> operator applied to float values. */
-    public static float round(float b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to float values. */
-    public static float round(float b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).floatValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to double values. */
-    public static double round(double b0) {
-        return round(b0, 0);
+    public static Float round(Float value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(new BigDecimal(value.toString()), pointOffset).floatValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to double values. */
-    public static double round(double b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).doubleValue();
+    public static Double round(Double value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).doubleValue();
+    }
+
+    private static BigDecimal round(BigDecimal value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return value.movePointRight(pointOffset)
+                .setScale(0, RoundingMode.HALF_UP)
+                .movePointLeft(pointOffset);
     }
 
     public static String uuid() {

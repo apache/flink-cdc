@@ -228,6 +228,7 @@ public class TransformParserTest {
         testFilterExpression("id not like '^[a-zA-Z]'", "notLike(id, \"^[a-zA-Z]\")");
         testFilterExpression("abs(2)", "abs(2)");
         testFilterExpression("ceil(2)", "ceil(2)");
+        testFilterExpression("ceiling(2)", "ceil(2)");
         testFilterExpression("floor(2)", "floor(2)");
         testFilterExpression("round(2,2)", "round(2, 2)");
         testFilterExpression("uuid()", "uuid()");
@@ -630,6 +631,8 @@ public class TransformParserTest {
                 "typeof(abs(2))", "__instanceOfTypeOfFunctionClass.eval(abs(2))");
         testFilterExpressionWithUdf(
                 "typeof(ceil(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
+        testFilterExpressionWithUdf(
+                "typeof(ceiling(2))", "__instanceOfTypeOfFunctionClass.eval(ceil(2))");
         testFilterExpressionWithUdf(
                 "typeof(floor(2))", "__instanceOfTypeOfFunctionClass.eval(floor(2))");
         testFilterExpressionWithUdf(
