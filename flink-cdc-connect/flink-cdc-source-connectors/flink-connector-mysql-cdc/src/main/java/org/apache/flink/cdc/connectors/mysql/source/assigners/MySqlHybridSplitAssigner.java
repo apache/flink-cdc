@@ -111,7 +111,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     @Override
     public void open() {
-        this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
+        this.enumeratorMetrics = snapshotSplitAssigner.getEnumeratorMetrics();
 
         if (isBinlogSplitAssigned) {
             enumeratorMetrics.enterStreamReading();
@@ -120,8 +120,6 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
         }
 
         snapshotSplitAssigner.open();
-        // init enumerator metrics
-        snapshotSplitAssigner.initEnumeratorMetrics(enumeratorMetrics);
     }
 
     @Override

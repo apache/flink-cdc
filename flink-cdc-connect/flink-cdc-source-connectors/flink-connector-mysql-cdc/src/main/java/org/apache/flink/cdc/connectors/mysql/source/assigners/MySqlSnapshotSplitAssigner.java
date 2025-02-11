@@ -187,6 +187,11 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
         this.enumeratorContext = enumeratorContext;
         this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
+        this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
+    }
+
+    public SourceEnumeratorMetrics getEnumeratorMetrics() {
+        return enumeratorMetrics;
     }
 
     @Override
@@ -195,6 +200,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         chunkSplitter.open();
         discoveryCaptureTables();
         captureNewlyAddedTables();
+        initEnumeratorMetrics();
         startAsynchronouslySplit();
     }
 
@@ -302,10 +308,11 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         }
     }
 
-    /** This should be invoked after this class's open method. */
-    public void initEnumeratorMetrics(SourceEnumeratorMetrics enumeratorMetrics) {
-        this.enumeratorMetrics = enumeratorMetrics;
-
+    /**
+     * This should be invoked before this class's startAsynchronouslySplit method to avoid
+     * enumeratorMetrics NPE.
+     */
+    private void initEnumeratorMetrics() {
         this.enumeratorMetrics.enterSnapshotPhase();
         this.enumeratorMetrics.registerMetrics(
                 alreadyProcessedTables::size, assignedSplits::size, remainingSplits::size);
