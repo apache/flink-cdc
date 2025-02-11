@@ -24,47 +24,44 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.ZoneId;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 /**
  * Unit test for {@link
  * org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner}.
  */
-public class MySqlBinlogSplitAssignerTest {
+class MySqlBinlogSplitAssignerTest {
 
     @Test
-    public void testStartFromEarliest() throws IOException {
+    void testStartFromEarliest() throws IOException {
         checkAssignedBinlogOffset(StartupOptions.earliest(), BinlogOffset.ofEarliest());
     }
 
     @Test
-    public void testStartFromLatestOffset() throws IOException {
+    void testStartFromLatestOffset() throws IOException {
         checkAssignedBinlogOffset(StartupOptions.latest(), BinlogOffset.ofLatest());
     }
 
     @Test
-    public void testStartFromTimestamp() throws IOException {
+    void testStartFromTimestamp() throws IOException {
         checkAssignedBinlogOffset(
                 StartupOptions.timestamp(15213000L), BinlogOffset.ofTimestampSec(15213L));
     }
 
     @Test
-    public void testStartFromBinlogFile() throws IOException {
+    void testStartFromBinlogFile() throws IOException {
         checkAssignedBinlogOffset(
                 StartupOptions.specificOffset("foo-file", 15213),
                 BinlogOffset.ofBinlogFilePosition("foo-file", 15213L));
     }
 
     @Test
-    public void testStartFromGtidSet() throws IOException {
+    void testStartFromGtidSet() throws IOException {
         checkAssignedBinlogOffset(
                 StartupOptions.specificOffset("foo-gtid"), BinlogOffset.ofGtidSet("foo-gtid"));
     }
@@ -75,13 +72,13 @@ public class MySqlBinlogSplitAssignerTest {
         MySqlBinlogSplitAssigner assigner = new MySqlBinlogSplitAssigner(getConfig(startupOptions));
         // Get splits from assigner
         Optional<MySqlSplit> optionalSplit = assigner.getNext();
-        assertTrue(optionalSplit.isPresent());
+        Assertions.assertThat(optionalSplit).isPresent();
         MySqlBinlogSplit split = optionalSplit.get().asBinlogSplit();
         // Check binlog offset
-        assertEquals(expectedOffset, split.getStartingOffset());
-        assertEquals(BinlogOffset.ofNonStopping(), split.getEndingOffset());
+        Assertions.assertThat(split.getStartingOffset()).isEqualTo(expectedOffset);
+        Assertions.assertThat(split.getEndingOffset()).isEqualTo(BinlogOffset.ofNonStopping());
         // There should be only one split to assign
-        assertFalse(assigner.getNext().isPresent());
+        Assertions.assertThat(assigner.getNext()).isNotPresent();
         assigner.close();
     }
 

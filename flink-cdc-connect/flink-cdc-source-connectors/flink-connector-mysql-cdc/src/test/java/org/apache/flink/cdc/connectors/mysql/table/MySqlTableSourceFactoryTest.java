@@ -31,9 +31,9 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -57,14 +57,9 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.USE_LEGACY_JSON_FORMAT;
-import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
-public class MySqlTableSourceFactoryTest {
+class MySqlTableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -97,7 +92,7 @@ public class MySqlTableSourceFactoryTest {
     private static final Properties PROPERTIES = new Properties();
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -132,11 +127,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSource() {
+    void testEnableParallelReadSource() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
@@ -180,11 +175,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSourceWithSingleServerId() {
+    void testEnableParallelReadSourceWithSingleServerId() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123");
@@ -224,11 +219,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testEnableParallelReadSourceLatestOffset() {
+    void testEnableParallelReadSourceLatestOffset() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.incremental.snapshot.enabled", "true");
         properties.put("server-id", "123-126");
@@ -266,11 +261,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("port", "3307");
         options.put("server-id", "4321");
@@ -325,19 +320,20 @@ public class MySqlTableSourceFactoryTest {
                         true,
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         true);
-        assertEquals(expectedSource, actualSource);
-        assertTrue(actualSource instanceof MySqlTableSource);
+        Assertions.assertThat(actualSource)
+                .isEqualTo(expectedSource)
+                .isInstanceOf(MySqlTableSource.class);
         MySqlTableSource actualMySqlTableSource = (MySqlTableSource) actualSource;
         Properties parellelProperties = new Properties();
         parellelProperties.put("test", "test");
-        assertEquals(
-                parellelProperties,
-                actualMySqlTableSource.getParallelDbzProperties(
-                        actualMySqlTableSource.getDbzProperties()));
+        Assertions.assertThat(
+                        actualMySqlTableSource.getParallelDbzProperties(
+                                actualMySqlTableSource.getDbzProperties()))
+                .isEqualTo(parellelProperties);
     }
 
     @Test
-    public void testStartupFromSpecificOffset() {
+    void testStartupFromSpecificOffset() {
         final String offsetFile = "mysql-bin.000003";
         final int offsetPos = 100203;
 
@@ -381,11 +377,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromInitial() {
+    void testStartupFromInitial() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "initial");
 
@@ -421,11 +417,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromEarliestOffset() {
+    void testStartupFromEarliestOffset() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "earliest-offset");
         createTableSource(properties);
@@ -462,11 +458,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromSpecificTimestamp() {
+    void testStartupFromSpecificTimestamp() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "timestamp");
         properties.put("scan.startup.timestamp-millis", "0");
@@ -504,11 +500,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testStartupFromLatestOffset() {
+    void testStartupFromLatestOffset() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.startup.mode", "latest-offset");
 
@@ -544,11 +540,11 @@ public class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         USE_LEGACY_JSON_FORMAT.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
+    void testMetadataColumns() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -592,217 +588,163 @@ public class MySqlTableSourceFactoryTest {
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testValidation() {
+    void testValidation() {
         // validate illegal port
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("port", "123b");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "Could not parse value '123b' for key 'port'.")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("port", "123b");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining("Could not parse value '123b' for key 'port'.");
 
         // validate illegal server id
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("server-id", "123b");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "The value of option 'server-id' is invalid: '123b'")
-                            .isPresent());
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t, "The server id 123b is not a valid numeric.")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("server-id", "123b");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining("The value of option 'server-id' is invalid: '123b'")
+                .hasStackTraceContaining("The server id 123b is not a valid numeric.");
 
         // validate illegal connect.timeout
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connect.timeout", "240ms");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The value of option 'connect.timeout' cannot be less than PT0.25S, but actual is PT0.24S")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("connect.timeout", "240ms");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'connect.timeout' cannot be less than PT0.25S, but actual is PT0.24S");
 
         // validate illegal split size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("scan.incremental.snapshot.chunk.size", "1");
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("scan.incremental.snapshot.chunk.size", "1");
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1"));
-        }
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'scan.incremental.snapshot.chunk.size' must larger than 1, but is 1");
 
         // validate illegal fetch size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("scan.snapshot.fetch.size", "1");
 
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1"));
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("scan.snapshot.fetch.size", "1");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'scan.snapshot.fetch.size' must larger than 1, but is 1");
 
         // validate illegal split meta group size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("chunk-meta.group.size", "1");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'chunk-meta.group.size' must larger than 1, but is 1"));
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("chunk-meta.group.size", "1");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'chunk-meta.group.size' must larger than 1, but is 1");
 
         // validate illegal split meta group size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("split-key.even-distribution.factor.upper-bound", "0.8");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8"));
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("split-key.even-distribution.factor.upper-bound", "0.8");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'chunk-key.even-distribution.factor.upper-bound' must larger than or equals 1.0, but is 0.8");
 
         // validate illegal connection pool size
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connection.pool.size", "1");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'connection.pool.size' must larger than 1, but is 1"));
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("connection.pool.size", "1");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'connection.pool.size' must larger than 1, but is 1");
 
         // validate illegal connect max retry times
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("connect.max-retries", "0");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertThat(
-                    t,
-                    containsMessage(
-                            "The value of option 'connect.max-retries' must larger than 0, but is 0"));
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("connect.max-retries", "0");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "The value of option 'connect.max-retries' must larger than 0, but is 0");
 
         // validate missing required
         Factory factory = new MySqlTableSourceFactory();
         for (ConfigOption<?> requiredOption : factory.requiredOptions()) {
             Map<String, String> properties = getAllOptions();
             properties.remove(requiredOption.key());
-
-            try {
-                createTableSource(properties);
-                fail("exception expected");
-            } catch (Throwable t) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
-                                        t,
-                                        "Missing required options are:\n\n" + requiredOption.key())
-                                .isPresent());
-            }
+            Assertions.assertThatThrownBy(() -> createTableSource(properties))
+                    .hasStackTraceContaining(
+                            "Missing required options are:\n\n" + requiredOption.key());
         }
 
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("unknown", "abc");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
 
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.startup.mode", "abc");
-
-            createTableSource(properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            String msg =
-                    "Invalid value for option 'scan.startup.mode'. Supported values are "
-                            + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
-                            + "but was: abc";
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.startup.mode", "abc");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "Invalid value for option 'scan.startup.mode'. Supported values are "
+                                + "[initial, snapshot, latest-offset, earliest-offset, specific-offset, timestamp], "
+                                + "but was: abc");
 
         // validate invalid database-name
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("database-name", "*_invalid_db");
-        } catch (Throwable t) {
-            String msg =
-                    String.format(
-                            "The database-name '%s' is not a valid regular expression",
-                            "*_invalid_db");
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("database-name", "*_invalid_db");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        String.format(
+                                "The database-name '%s' is not a valid regular expression",
+                                "*_invalid_db"));
+
         // validate invalid table-name
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("table-name", "*_invalid_table");
-        } catch (Throwable t) {
-            String msg =
-                    String.format(
-                            "The table-name '%s' is not a valid regular expression",
-                            "*_invalid_table");
-            assertTrue(ExceptionUtils.findThrowableWithMessage(t, msg).isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("table-name", "*_invalid_table");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        String.format(
+                                "The table-name '%s' is not a valid regular expression",
+                                "*_invalid_table"));
     }
 
     private Map<String, String> getAllOptions() {

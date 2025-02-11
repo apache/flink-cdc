@@ -21,7 +21,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.event.TableId;
 
 /** A test for the {@link TableIdSerializer}. */
-public class TableIdSerializerTest extends SerializerTestBase<TableId> {
+class TableIdSerializerTest extends SerializerTestBase<TableId> {
     @Override
     protected TypeSerializer<TableId> createSerializer() {
         return TableIdSerializer.INSTANCE;
