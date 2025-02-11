@@ -1,18 +1,28 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.cdc.connectors.iceberg.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
-import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergRecordEventSerializer;
-import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergRecordSerializer;
-import org.apache.flink.table.catalog.Catalog;
-
-import org.apache.commons.collections.map.HashedMap;
-import org.apache.iceberg.flink.FlinkCatalogFactory;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.OptionUtils;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -24,6 +34,7 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_CATALOG_PROPERTIES;
 import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.PREFIX_TABLE_PROPERTIES;
 
+/** A {@link DataSinkFactory} for Apache Iceberg. */
 public class IcebergDataSinkFactory implements DataSinkFactory {
 
     public static final String IDENTIFIER = "iceberg";
@@ -34,6 +45,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
 
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
+        OptionUtils.printOptions(IDENTIFIER, allOptions);
+
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
         allOptions.forEach(
@@ -47,17 +60,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                                 value);
                     }
                 });
-        FlinkCatalogFactory factory = new FlinkCatalogFactory();
-        try {
-            Catalog catalog =
-                    factory.createCatalog(
-                            catalogOptions.getOrDefault("default-database", "default"),
-                            catalogOptions);
-            Preconditions.checkNotNull(
-                    catalog.listDatabases(), "catalog option of Paimon is invalid.");
-        } catch (Exception e) {
-            throw new RuntimeException("failed to create or use paimon catalog", e);
-        }
+        catalogOptions.put("cache-enabled", "false");
         ZoneId zoneId = ZoneId.systemDefault();
         if (!Objects.equals(
                 context.getPipelineConfiguration().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
@@ -67,21 +70,11 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                             context.getPipelineConfiguration()
                                     .get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         }
-        String commitUser =
-                context.getFactoryConfiguration().get(IcebergDataSinkOptions.COMMIT_USER);
-        IcebergRecordSerializer<Event> serializer =
-                new IcebergRecordEventSerializer(new HashedMap(), zoneId);
         String schemaOperatorUid =
                 context.getPipelineConfiguration()
                         .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
         return new IcebergDataSink(
-                catalogOptions,
-                tableOptions,
-                commitUser,
-                new HashMap<>(),
-                serializer,
-                zoneId,
-                schemaOperatorUid);
+                catalogOptions, tableOptions, new HashMap<>(), zoneId, schemaOperatorUid);
     }
 
     @Override
@@ -92,16 +85,15 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(IcebergDataSinkOptions.METASTORE);
         return options;
     }
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(IcebergDataSinkOptions.TYPE);
         options.add(IcebergDataSinkOptions.WAREHOUSE);
         options.add(IcebergDataSinkOptions.URI);
-        options.add(IcebergDataSinkOptions.COMMIT_USER);
         options.add(IcebergDataSinkOptions.PARTITION_KEY);
         return options;
     }

@@ -1,19 +1,35 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.cdc.connectors.iceberg.sink;
 
-import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergEventSinkV2;
-import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergRecordSerializer;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergSink;
 
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
+/** A {@link DataSink} for Apache Iceberg. */
 public class IcebergDataSink implements DataSink, Serializable {
 
     // options for creating Iceberg catalog.
@@ -22,11 +38,7 @@ public class IcebergDataSink implements DataSink, Serializable {
     // options for creating Iceberg table.
     private final Map<String, String> tableOptions;
 
-    private final String commitUser;
-
     private final Map<TableId, List<String>> partitionMaps;
-
-    private final IcebergRecordSerializer<Event> serializer;
 
     private final ZoneId zoneId;
 
@@ -35,25 +47,19 @@ public class IcebergDataSink implements DataSink, Serializable {
     public IcebergDataSink(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
-            String commitUser,
             Map<TableId, List<String>> partitionMaps,
-            IcebergRecordSerializer<Event> serializer,
             ZoneId zoneId,
             String schemaOperatorUid) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
-        this.commitUser = commitUser;
         this.partitionMaps = partitionMaps;
-        this.serializer = serializer;
         this.zoneId = zoneId;
         this.schemaOperatorUid = schemaOperatorUid;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        IcebergEventSinkV2 icebergEventSink =
-                new IcebergEventSinkV2(
-                        tableOptions, commitUser, serializer, schemaOperatorUid, zoneId);
+        IcebergSink icebergEventSink = new IcebergSink(catalogOptions, schemaOperatorUid, zoneId);
         return FlinkSinkProvider.of(icebergEventSink);
     }
 
