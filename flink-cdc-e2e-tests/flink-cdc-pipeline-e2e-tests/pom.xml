@@ -32,6 +32,8 @@ limitations under the License.
         <flink-1.20>1.20.0</flink-1.20>
         <flink-major-1.19>1.19</flink-major-1.19>
         <flink-major-1.20>1.20</flink-major-1.20>
+        <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
+        <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <starrocks.connector.version>1.2.10_flink-${flink.major.version}</starrocks.connector.version>
         <paimon.version>0.9.0</paimon.version>
@@ -269,6 +271,36 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-mysql</artifactId>
                             <version>${project.version}</version>
                             <destFileName>mysql-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.19}</version>
+                            <destFileName>jdbc-connector_1.19.1.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-connector-jdbc</artifactId>
+                            <version>${jdbc.version-1.20}</version>
+                            <destFileName>jdbc-connector_1.20.0.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.zaxxer</groupId>
+                            <artifactId>HikariCP</artifactId>
+                            <version>4.0.3</version>
+                            <destFileName>HikariCP.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

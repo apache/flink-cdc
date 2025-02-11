@@ -52,6 +52,7 @@ env:
 
   MODULES_PIPELINE_CONNECTORS: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-jdbc,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
