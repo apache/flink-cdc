@@ -766,7 +766,7 @@ class FlinkPipelineTransformITCase {
                                         + "CAST(id AS INT) % 3 AS col5, ABS(id - 17) AS col6, "
                                         + "CEIL(CAST(id AS DOUBLE) / 1.7) AS col7, "
                                         + "FLOOR(CAST(id AS DOUBLE) / 1.7) AS col8, "
-                                        + "ROUND(CAST(id AS DOUBLE) / 1.7) AS col9, "
+                                        + "ROUND(CAST(id AS DOUBLE) / 1.7, 0) AS col9, "
                                         + "CHAR_LENGTH(UUID()) AS col10",
                                 null,
                                 null,
