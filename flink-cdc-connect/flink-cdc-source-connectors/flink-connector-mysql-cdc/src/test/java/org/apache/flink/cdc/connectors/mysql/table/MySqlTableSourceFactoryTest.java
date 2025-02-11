@@ -854,6 +854,7 @@ public class MySqlTableSourceFactoryTest {
                         null,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
