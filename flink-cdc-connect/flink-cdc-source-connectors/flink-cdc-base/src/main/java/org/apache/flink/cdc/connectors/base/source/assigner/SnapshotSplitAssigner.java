@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.base.source.assigner;
 
+import org.apache.flink.api.connector.source.SourceSplit;
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
@@ -104,7 +106,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             List<TableId> remainingTables,
             boolean isTableIdCaseSensitive,
             DataSourceDialect<C> dialect,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this(
                 sourceConfig,
                 currentParallelism,
@@ -120,7 +123,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 dialect,
                 offsetFactory,
                 new ConcurrentHashMap<>(),
-                ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+                ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
+                enumeratorContext);
     }
 
     public SnapshotSplitAssigner(
@@ -128,7 +132,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             int currentParallelism,
             SnapshotPendingSplitsState checkpoint,
             DataSourceDialect<C> dialect,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this(
                 sourceConfig,
                 currentParallelism,
@@ -144,7 +149,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 dialect,
                 offsetFactory,
                 new ConcurrentHashMap<>(),
-                checkpoint.getChunkSplitterState());
+                checkpoint.getChunkSplitterState(),
+                enumeratorContext);
     }
 
     private SnapshotSplitAssigner(
@@ -162,7 +168,8 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
             Map<String, Long> splitFinishedCheckpointIds,
-            ChunkSplitterState chunkSplitterState) {
+            ChunkSplitterState chunkSplitterState,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
         this.currentParallelism = currentParallelism;
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -188,6 +195,11 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.offsetFactory = offsetFactory;
         this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
         chunkSplitter = createChunkSplitter(sourceConfig, dialect, chunkSplitterState);
+        this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
+    }
+
+    public SourceEnumeratorMetrics getEnumeratorMetrics() {
+        return enumeratorMetrics;
     }
 
     @Override
@@ -195,6 +207,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         chunkSplitter.open();
         discoveryCaptureTables();
         captureNewlyAddedTables();
+        initEnumeratorMetrics();
         startAsynchronouslySplit();
     }
 
@@ -295,10 +308,11 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         }
     }
 
-    /** This should be invoked after this class's open method. */
-    public void initEnumeratorMetrics(SourceEnumeratorMetrics enumeratorMetrics) {
-        this.enumeratorMetrics = enumeratorMetrics;
-
+    /**
+     * This should be invoked before this class's startAsynchronouslySplit method to avoid
+     * enumeratorMetrics NPE.
+     */
+    private void initEnumeratorMetrics() {
         this.enumeratorMetrics.enterSnapshotPhase();
         this.enumeratorMetrics.registerMetrics(
                 alreadyProcessedTables::size, assignedSplits::size, remainingSplits::size);

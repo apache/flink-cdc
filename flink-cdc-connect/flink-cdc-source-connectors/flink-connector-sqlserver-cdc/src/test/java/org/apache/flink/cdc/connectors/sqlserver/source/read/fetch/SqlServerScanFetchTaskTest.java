@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.source.read.fetch;
 
+import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.SnapshotSplitAssigner;
@@ -24,7 +25,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.apache.flink.cdc.connectors.base.source.reader.external.IncrementalSourceScanFetcher;
@@ -37,7 +37,6 @@ import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnFactory;
 import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerScanFetchTask;
 import org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch.SqlServerSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.RecordsFormatter;
-import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
@@ -333,10 +332,8 @@ public class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                         discoverTables,
                         sourceDialect.isDataCollectionIdCaseSensitive(sourceConfig),
                         sourceDialect,
-                        offsetFactory);
-        snapshotSplitAssigner.initEnumeratorMetrics(
-                new SourceEnumeratorMetrics(
-                        UnregisteredMetricsGroup.createSplitEnumeratorMetricGroup()));
+                        offsetFactory,
+                        new MockSplitEnumeratorContext<>(1));
         snapshotSplitAssigner.open();
         List<SnapshotSplit> snapshotSplitList = new ArrayList<>();
         Optional<SourceSplitBase> split = snapshotSplitAssigner.getNext();
