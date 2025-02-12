@@ -140,12 +140,11 @@ limitations under the License.
         </dependency>
 
         <dependency>
-            <groupId>org.awaitility</groupId>
-            <artifactId>awaitility</artifactId>
-            <version>${version.awaitility}</version>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-test-utils</artifactId>
+            <version>${flink.version}</version>
             <scope>test</scope>
         </dependency>
-
 
     </dependencies>
 
