@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.polardbx;
 
 import org.apache.flink.cdc.common.utils.TestCaseUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.lang3.StringUtils;
@@ -59,7 +59,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing Database Polardbx which supported the mysql protocol. */
-public abstract class PolardbxSourceTestBase extends AbstractTestBase {
+public abstract class PolardbxSourceTestBase extends AbstractTestBaseJUnit4 {
     private static final Logger LOG = LoggerFactory.getLogger(PolardbxSourceTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 

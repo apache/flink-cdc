@@ -67,8 +67,8 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.19.1</flink.version>
-        <flink.major.version>1.19</flink.major.version>
+        <flink.version>1.20.0</flink.version>
+        <flink.major.version>1.20</flink.major.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>

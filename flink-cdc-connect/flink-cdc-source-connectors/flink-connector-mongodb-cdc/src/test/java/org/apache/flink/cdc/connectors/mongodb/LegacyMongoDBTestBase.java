@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mongodb;
 
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -41,7 +41,7 @@ import static org.apache.flink.cdc.connectors.mongodb.LegacyMongoDBContainer.MON
  * Basic class for testing MongoDB source, this contains a MongoDB container which enables change
  * streams.
  */
-public class LegacyMongoDBTestBase extends AbstractTestBase {
+public class LegacyMongoDBTestBase extends AbstractTestBaseJUnit4 {
 
     private static final Logger LOG = LoggerFactory.getLogger(LegacyMongoDBTestBase.class);
 
