@@ -79,6 +79,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
     private final boolean skipSnapshotBackfill;
+    private final boolean assignEndingChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -112,7 +113,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean assignEndingChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -137,6 +139,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     @Override
@@ -185,6 +188,7 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                             .chunkKeyColumn(chunkKeyColumn)
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
+                            .assignEndingChunkFirst(assignEndingChunkFirst)
                             .build();
             return SourceProvider.of(sqlServerChangeEventSource);
         } else {
@@ -245,7 +249,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                         distributionFactorLower,
                         chunkKeyColumn,
                         closeIdleReaders,
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        assignEndingChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

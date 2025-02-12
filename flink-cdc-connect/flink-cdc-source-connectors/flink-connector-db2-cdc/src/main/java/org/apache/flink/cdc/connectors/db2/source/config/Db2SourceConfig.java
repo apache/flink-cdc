@@ -56,7 +56,8 @@ public class Db2SourceConfig extends JdbcSourceConfig {
             int connectMaxRetries,
             int connectionPoolSize,
             String chunkKeyColumn,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean assignEndingChunkFirst) {
         super(
                 startupOptions,
                 databaseList,
@@ -82,7 +83,8 @@ public class Db2SourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                false);
+                false,
+                assignEndingChunkFirst);
     }
 
     @Override

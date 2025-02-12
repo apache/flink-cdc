@@ -54,8 +54,8 @@ public class MongoDBSourceConfig implements SourceConfig {
     private final boolean enableFullDocPrePostImage;
     private final boolean disableCursorTimeout;
     private final boolean skipSnapshotBackfill;
-
     private final boolean isScanNewlyAddedTableEnabled;
+    private final boolean assignEndingChunkFirst;
 
     MongoDBSourceConfig(
             String scheme,
@@ -78,7 +78,8 @@ public class MongoDBSourceConfig implements SourceConfig {
             boolean enableFullDocPrePostImage,
             boolean disableCursorTimeout,
             boolean skipSnapshotBackfill,
-            boolean isScanNewlyAddedTableEnabled) {
+            boolean isScanNewlyAddedTableEnabled,
+            boolean assignEndingChunkFirst) {
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
         this.username = username;
@@ -101,6 +102,7 @@ public class MongoDBSourceConfig implements SourceConfig {
         this.disableCursorTimeout = disableCursorTimeout;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     public String getScheme() {
@@ -199,6 +201,10 @@ public class MongoDBSourceConfig implements SourceConfig {
 
     public boolean isScanNewlyAddedTableEnabled() {
         return isScanNewlyAddedTableEnabled;
+    }
+
+    public boolean isAssignEndingChunkFirst() {
+        return assignEndingChunkFirst;
     }
 
     @Override

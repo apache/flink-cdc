@@ -41,6 +41,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
@@ -260,15 +261,20 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         // optional option
         options.put(TREAT_TINYINT1_AS_BOOLEAN_ENABLED.key(), "false");
         options.put(PARSE_ONLINE_SCHEMA_CHANGES.key(), "true");
+        options.put(SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.key(), "true");
 
         Factory.Context context = new MockContext(Configuration.fromMap(options));
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
         assertThat(factory.optionalOptions())
-                .contains(TREAT_TINYINT1_AS_BOOLEAN_ENABLED, PARSE_ONLINE_SCHEMA_CHANGES);
+                .contains(
+                        TREAT_TINYINT1_AS_BOOLEAN_ENABLED,
+                        PARSE_ONLINE_SCHEMA_CHANGES,
+                        SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
 
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
         assertThat(dataSource.getSourceConfig().isTreatTinyInt1AsBoolean()).isFalse();
         assertThat(dataSource.getSourceConfig().isParseOnLineSchemaChanges()).isTrue();
+        assertThat(dataSource.getSourceConfig().isAssignEndingChunkFirst()).isTrue();
     }
 
     @Test

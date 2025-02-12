@@ -66,7 +66,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             @Nullable String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            int lsnCommitCheckpointsDelay) {
+            int lsnCommitCheckpointsDelay,
+            boolean assignEndingChunkFirst) {
         super(
                 startupOptions,
                 databaseList,
@@ -92,7 +93,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                assignEndingChunkFirst);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
     }
