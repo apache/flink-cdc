@@ -714,6 +714,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         .password(customDatabase.getPassword())
                         .deserializer(new StringDebeziumDeserializationSchema())
                         .serverId(getServerId())
+                        .serverTimeZone("UTC")
                         .build();
         DataStreamSource<String> stream =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
