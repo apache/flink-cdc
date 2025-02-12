@@ -60,20 +60,33 @@ public class ValuesDataSource implements DataSource {
     /** index for {@link EventIteratorReader} to fail when reading. */
     private final int failAtPos;
 
+    /** Batch source only provide create table event and data change event (Insert). */
+    private final boolean isBatchSource;
+
     public ValuesDataSource(ValuesDataSourceHelper.EventSetId eventSetId) {
         this.eventSetId = eventSetId;
         this.failAtPos = Integer.MAX_VALUE;
+        this.isBatchSource = false;
     }
 
     public ValuesDataSource(ValuesDataSourceHelper.EventSetId eventSetId, int failAtPos) {
         this.eventSetId = eventSetId;
         this.failAtPos = failAtPos;
+        this.isBatchSource = false;
+    }
+
+    public ValuesDataSource(
+            ValuesDataSourceHelper.EventSetId eventSetId, int failAtPos, boolean isBatchSource) {
+        this.eventSetId = eventSetId;
+        this.failAtPos = failAtPos;
+        this.isBatchSource = isBatchSource;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
         ValuesDataSourceHelper.setSourceEvents(eventSetId);
-        return FlinkSourceProvider.of(new ValuesSource(failAtPos, eventSetId, false));
+        return FlinkSourceProvider.of(
+                new ValuesSource(failAtPos, eventSetId, false, isBatchSource));
     }
 
     @Override
@@ -102,13 +115,17 @@ public class ValuesDataSource implements DataSource {
         /** True this source is in snapshot stage, otherwise is in incremental stage. */
         private final boolean isInSnapshotPhase;
 
+        private final boolean isBatchSource;
+
         public ValuesSource(
                 int failAtPos,
                 ValuesDataSourceHelper.EventSetId eventSetId,
-                boolean isInSnapshotPhase) {
+                boolean isInSnapshotPhase,
+                boolean isBatchSource) {
             this.failAtPos = failAtPos;
             this.eventSetId = eventSetId;
             this.isInSnapshotPhase = isInSnapshotPhase;
+            this.isBatchSource = isBatchSource;
         }
 
         @Override
@@ -121,15 +138,17 @@ public class ValuesDataSource implements DataSource {
                 SplitEnumeratorContext<EventIteratorSplit> enumContext) {
             ValuesDataSourceHelper.setSourceEvents(eventSetId);
             Collection<EventIteratorSplit> eventIteratorSplits = new ArrayList<>();
-            List<List<Event>> eventWithSplits = ValuesDataSourceHelper.getSourceEvents();
+            List<List<Event>> eventWithSplits =
+                    ValuesDataSourceHelper.getSourceEvents(isBatchSource);
             // make the last EventIteratorSplit of eventWithSplits to be an incremental
             // EventIteratorSplit.
             if (isInSnapshotPhase) {
                 for (int i = 0; i < eventWithSplits.size() - 1; i++) {
-                    eventIteratorSplits.add(new EventIteratorSplit(i, 0));
+                    eventIteratorSplits.add(new EventIteratorSplit(i, 0, isBatchSource));
                 }
             } else {
-                eventIteratorSplits.add(new EventIteratorSplit(eventWithSplits.size() - 1, 0));
+                eventIteratorSplits.add(
+                        new EventIteratorSplit(eventWithSplits.size() - 1, 0, isBatchSource));
             }
             return new IteratorSourceEnumerator<>(enumContext, eventIteratorSplits);
         }
@@ -163,13 +182,15 @@ public class ValuesDataSource implements DataSource {
                 DataOutputViewStreamWrapper view, EventIteratorSplit split) throws IOException {
             view.writeInt(split.splitId);
             view.writeInt(split.pos);
+            view.writeBoolean(split.isBatchSource);
         }
 
         private static EventIteratorSplit deserializeEventIteratorSplit(
                 DataInputViewStreamWrapper view) throws IOException {
             int splitId = view.readInt();
             int pos = view.readInt();
-            return new EventIteratorSplit(splitId, pos);
+            boolean isBatchMode = view.readBoolean();
+            return new EventIteratorSplit(splitId, pos, isBatchMode);
         }
 
         /** A serializer for {@link EventIteratorSplit}, use in {@link ValuesSource}. */
@@ -320,10 +341,22 @@ public class ValuesDataSource implements DataSource {
 
         private int pos;
 
+        private boolean isBatchSource;
+
         public EventIteratorSplit(int splitId, int pos) {
             this.splitId = splitId;
             this.pos = pos;
+            this.isBatchSource = false;
             List<Event> eventOfSplit = ValuesDataSourceHelper.getSourceEvents().get(splitId);
+            events = eventOfSplit.subList(pos, eventOfSplit.size());
+        }
+
+        public EventIteratorSplit(int splitId, int pos, boolean isBatchSource) {
+            this.splitId = splitId;
+            this.pos = pos;
+            this.isBatchSource = isBatchSource;
+            List<Event> eventOfSplit =
+                    ValuesDataSourceHelper.getSourceEvents(isBatchSource).get(splitId);
             events = eventOfSplit.subList(pos, eventOfSplit.size());
         }
 

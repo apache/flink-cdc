@@ -20,9 +20,11 @@ package org.apache.flink.cdc.common.factories;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.table.api.ValidationException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -151,6 +153,7 @@ public class FactoryHelper {
         private final Configuration factoryConfiguration;
         private final ClassLoader classLoader;
         private final Configuration pipelineConfiguration;
+        private final List<RouteRule> routeRules;
 
         public DefaultContext(
                 Configuration factoryConfiguration,
@@ -158,6 +161,18 @@ public class FactoryHelper {
                 ClassLoader classLoader) {
             this.factoryConfiguration = factoryConfiguration;
             this.pipelineConfiguration = pipelineConfiguration;
+            this.routeRules = new ArrayList<>();
+            this.classLoader = classLoader;
+        }
+
+        public DefaultContext(
+                Configuration factoryConfiguration,
+                Configuration pipelineConfiguration,
+                List<RouteRule> routeRules,
+                ClassLoader classLoader) {
+            this.factoryConfiguration = factoryConfiguration;
+            this.pipelineConfiguration = pipelineConfiguration;
+            this.routeRules = routeRules;
             this.classLoader = classLoader;
         }
 
