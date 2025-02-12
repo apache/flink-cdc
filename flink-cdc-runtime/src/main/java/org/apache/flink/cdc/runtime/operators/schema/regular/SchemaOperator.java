@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 
@@ -243,31 +242,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private SchemaChangeResponse requestSchemaChange(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent)
-            throws InterruptedException, TimeoutException {
-        long deadline = System.currentTimeMillis() + rpcTimeout.toMillis();
-        while (true) {
-            SchemaChangeResponse response =
-                    sendRequestToCoordinator(
-                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
-            if (System.currentTimeMillis() < deadline) {
-                if (response.isRegistryBusy()) {
-                    LOG.info(
-                            "{}> Schema Registry is busy now, waiting for next request...",
-                            subTaskId);
-                    Thread.sleep(1000);
-                } else if (response.isWaitingForFlush()) {
-                    LOG.info(
-                            "{}> Schema change event has not collected enough flush success events from writers, waiting...",
-                            subTaskId);
-                    Thread.sleep(1000);
-                } else {
-                    return response;
-                }
-            } else {
-                throw new TimeoutException("Timeout when requesting schema change.");
-            }
-        }
+            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+        return sendRequestToCoordinator(
+                new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
     }
 
     private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>
