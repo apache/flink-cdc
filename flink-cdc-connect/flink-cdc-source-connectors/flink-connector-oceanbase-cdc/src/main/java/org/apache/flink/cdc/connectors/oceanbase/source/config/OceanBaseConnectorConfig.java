@@ -41,34 +41,69 @@ public class OceanBaseConnectorConfig extends RelationalDatabaseConnectorConfig 
                     Arrays.asList(
                             "information_schema", "mysql", "oceanbase", "LBACSYS", "ORAAUDITOR"));
 
-    private final String compatibleMode;
-    private final String serverTimeZone;
+    private final OceanBaseSourceConfig sourceConfig;
 
-    public OceanBaseConnectorConfig(
-            String compatibleMode, String serverTimeZone, Properties properties) {
+    public OceanBaseConnectorConfig(OceanBaseSourceConfig sourceConfig) {
         super(
-                Configuration.from(properties),
+                Configuration.from(sourceConfig.getDbzProperties()),
                 LOGICAL_NAME,
                 Tables.TableFilter.fromPredicate(
                         tableId ->
-                                "mysql".equalsIgnoreCase(compatibleMode)
+                                "mysql".equalsIgnoreCase(sourceConfig.getCompatibleMode())
                                         ? !BUILT_IN_DB_NAMES.contains(tableId.catalog())
                                         : !BUILT_IN_DB_NAMES.contains(tableId.schema())),
                 TableId::identifier,
                 DEFAULT_SNAPSHOT_FETCH_SIZE,
-                "mysql".equalsIgnoreCase(compatibleMode)
+                "mysql".equalsIgnoreCase(sourceConfig.getCompatibleMode())
                         ? ColumnFilterMode.CATALOG
                         : ColumnFilterMode.SCHEMA);
-        this.compatibleMode = compatibleMode;
-        this.serverTimeZone = serverTimeZone;
+        this.sourceConfig = sourceConfig;
     }
 
-    public String getCompatibleMode() {
-        return compatibleMode;
+    @Deprecated
+    public OceanBaseConnectorConfig(
+            String compatibleMode,
+            String serverTimeZone,
+            String tenantName,
+            Properties properties) {
+        this(
+                new OceanBaseSourceConfig(
+                        compatibleMode,
+                        tenantName,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        0,
+                        0,
+                        0,
+                        0,
+                        false,
+                        false,
+                        properties,
+                        null,
+                        null,
+                        null,
+                        0,
+                        null,
+                        null,
+                        0,
+                        serverTimeZone,
+                        null,
+                        0,
+                        0,
+                        null,
+                        false,
+                        false));
     }
 
-    public String getServerTimeZone() {
-        return serverTimeZone;
+    public OceanBaseSourceConfig getSourceConfig() {
+        return sourceConfig;
     }
 
     @Override
