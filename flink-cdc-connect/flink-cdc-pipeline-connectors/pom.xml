@@ -37,6 +37,7 @@ limitations under the License.
         <module>flink-cdc-pipeline-connector-elasticsearch</module>
         <module>flink-cdc-pipeline-connector-oceanbase</module>
         <module>flink-cdc-pipeline-connector-maxcompute</module>
+        <module>flink-cdc-pipeline-connector-iceberg</module>
     </modules>
 
     <dependencies>
