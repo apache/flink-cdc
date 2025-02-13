@@ -90,6 +90,10 @@ public class IcebergMetadataApplierTest {
                                         DataTypes.STRING(),
                                         "column for descriptions",
                                         "not important")
+                                .physicalColumn("bool_column", DataTypes.BOOLEAN(), "column for bool", "false")
+                                .physicalColumn("float_column", DataTypes.FLOAT(), "column for float", "1.0")
+                                .physicalColumn("double_column", DataTypes.DOUBLE(), "column for double", "1.0")
+                                .physicalColumn("decimal_column", DataTypes.DECIMAL(10, 2), "column for decimal", "1.0")
                                 .primaryKey("id")
                                 .partitionKey("id", "name")
                                 .build());
@@ -114,7 +118,32 @@ public class IcebergMetadataApplierTest {
                                         true,
                                         "description",
                                         Types.StringType.get(),
-                                        "column for descriptions")),
+                                        "column for descriptions"),
+                                Types.NestedField.of(
+                                        5,
+                                        true,
+                                        "bool_column",
+                                        Types.BooleanType.get(),
+                                        "column for bool"),
+                                Types.NestedField.of(
+                                        6,
+                                        true,
+                                        "float_column",
+                                        Types.FloatType.get(),
+                                        "column for float"),
+                                Types.NestedField.of(
+                                        7,
+                                        true,
+                                        "double_column",
+                                        Types.DoubleType.get(),
+                                        "column for double"),
+                                Types.NestedField.of(
+                                        8,
+                                        true,
+                                        "decimal_column",
+                                        Types.DecimalType.of(10, 2),
+                                        "column for decimal")
+                        ),
                         new HashSet<>(Arrays.asList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
@@ -154,6 +183,31 @@ public class IcebergMetadataApplierTest {
                                 Types.NestedField.of(
                                         5,
                                         true,
+                                        "bool_column",
+                                        Types.BooleanType.get(),
+                                        "column for bool"),
+                                Types.NestedField.of(
+                                        6,
+                                        true,
+                                        "float_column",
+                                        Types.FloatType.get(),
+                                        "column for float"),
+                                Types.NestedField.of(
+                                        7,
+                                        true,
+                                        "double_column",
+                                        Types.DoubleType.get(),
+                                        "column for double"),
+                                Types.NestedField.of(
+                                        8,
+                                        true,
+                                        "decimal_column",
+                                        Types.DecimalType.of(10, 2),
+                                        "column for decimal"
+                                ),
+                                Types.NestedField.of(
+                                        9,
+                                        true,
                                         "newIntColumn",
                                         Types.IntegerType.get(),
                                         "comment for newIntColumn")),
@@ -181,6 +235,31 @@ public class IcebergMetadataApplierTest {
                                         3, true, "age", Types.IntegerType.get(), "column for age"),
                                 Types.NestedField.of(
                                         5,
+                                        true,
+                                        "bool_column",
+                                        Types.BooleanType.get(),
+                                        "column for bool"),
+                                Types.NestedField.of(
+                                        6,
+                                        true,
+                                        "float_column",
+                                        Types.FloatType.get(),
+                                        "column for float"),
+                                Types.NestedField.of(
+                                        7,
+                                        true,
+                                        "double_column",
+                                        Types.DoubleType.get(),
+                                        "column for double"),
+                                Types.NestedField.of(
+                                        8,
+                                        true,
+                                        "decimal_column",
+                                        Types.DecimalType.of(10, 2),
+                                        "column for decimal"
+                                ),
+                                Types.NestedField.of(
+                                        9,
                                         true,
                                         "newIntColumn",
                                         Types.IntegerType.get(),
@@ -210,6 +289,31 @@ public class IcebergMetadataApplierTest {
                                 Types.NestedField.of(
                                         5,
                                         true,
+                                        "bool_column",
+                                        Types.BooleanType.get(),
+                                        "column for bool"),
+                                Types.NestedField.of(
+                                        6,
+                                        true,
+                                        "float_column",
+                                        Types.FloatType.get(),
+                                        "column for float"),
+                                Types.NestedField.of(
+                                        7,
+                                        true,
+                                        "double_column",
+                                        Types.DoubleType.get(),
+                                        "column for double"),
+                                Types.NestedField.of(
+                                        8,
+                                        true,
+                                        "decimal_column",
+                                        Types.DecimalType.of(10, 2),
+                                        "column for decimal"
+                                ),
+                                Types.NestedField.of(
+                                        9,
+                                        true,
                                         "renamedIntColumn",
                                         Types.IntegerType.get(),
                                         "comment for newIntColumn")),
@@ -238,6 +342,31 @@ public class IcebergMetadataApplierTest {
                                         3, true, "age", Types.IntegerType.get(), "column for age"),
                                 Types.NestedField.of(
                                         5,
+                                        true,
+                                        "bool_column",
+                                        Types.BooleanType.get(),
+                                        "column for bool"),
+                                Types.NestedField.of(
+                                        6,
+                                        true,
+                                        "float_column",
+                                        Types.FloatType.get(),
+                                        "column for float"),
+                                Types.NestedField.of(
+                                        7,
+                                        true,
+                                        "double_column",
+                                        Types.DoubleType.get(),
+                                        "column for double"),
+                                Types.NestedField.of(
+                                        8,
+                                        true,
+                                        "decimal_column",
+                                        Types.DecimalType.of(10, 2),
+                                        "column for decimal"
+                                ),
+                                Types.NestedField.of(
+                                        9,
                                         true,
                                         "renamedIntColumn",
                                         Types.LongType.get(),

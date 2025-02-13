@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -49,10 +50,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +106,11 @@ public class IcebergWriterTest {
                                         DataTypes.STRING(),
                                         "column for descriptions",
                                         "not important")
+                                .physicalColumn("bool_column", DataTypes.BOOLEAN(), "column for bool", "false")
+                                .physicalColumn("float_column", DataTypes.FLOAT(), "column for float", "1.0")
+                                .physicalColumn("double_column", DataTypes.DOUBLE(), "column for double", "1.0")
+                                .physicalColumn("decimal_column", DataTypes.DECIMAL(10, 2), "column for decimal", "1.0")
+                                .physicalColumn("date_column", DataTypes.DATE(), "column for date", "12345")
                                 .primaryKey("id")
                                 .partitionKey("id", "name")
                                 .build());
@@ -116,7 +125,12 @@ public class IcebergWriterTest {
                             1L,
                             BinaryStringData.fromString("Mark"),
                             10,
-                            BinaryStringData.fromString("test")
+                            BinaryStringData.fromString("test"),
+                                true,
+                                1.0f,
+                                1.0d,
+                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                                9
                         });
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, recordData);
         icebergWriter.write(dataChangeEvent, null);
@@ -126,7 +140,12 @@ public class IcebergWriterTest {
                             2L,
                             BinaryStringData.fromString("Bob"),
                             10,
-                            BinaryStringData.fromString("test")
+                            BinaryStringData.fromString("test"),
+                                true,
+                                1.0f,
+                                1.0d,
+                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                                9
                         });
         DataChangeEvent dataChangeEvent2 = DataChangeEvent.insertEvent(tableId, recordData2);
         icebergWriter.write(dataChangeEvent2, null);
@@ -137,7 +156,7 @@ public class IcebergWriterTest {
         icebergCommitter.commit(collection);
         List<String> result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
-                .containsExactlyInAnyOrder("1, Mark, 10, test", "2, Bob, 10, test");
+                .containsExactlyInAnyOrder("1, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10", "2, Bob, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10");
 
         // Add column.
         RecordData recordData3 =
@@ -146,7 +165,11 @@ public class IcebergWriterTest {
                             3L,
                             BinaryStringData.fromString("Bob"),
                             10,
-                            BinaryStringData.fromString("test")
+                            BinaryStringData.fromString("test"),
+                                true,
+                                1.0f,
+                                1.0d,
+                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),9
                         });
         DataChangeEvent dataChangeEvent3 = DataChangeEvent.insertEvent(tableId, recordData3);
         icebergWriter.write(dataChangeEvent3, null);
@@ -156,7 +179,11 @@ public class IcebergWriterTest {
                             4L,
                             BinaryStringData.fromString("Bob"),
                             10,
-                            BinaryStringData.fromString("test")
+                            BinaryStringData.fromString("test"),
+                                true,
+                                1.0f,
+                                1.0d,
+                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),9
                         });
         DataChangeEvent dataChangeEvent4 = DataChangeEvent.insertEvent(tableId, recordData4);
         icebergWriter.write(dataChangeEvent4, null);
@@ -186,6 +213,11 @@ public class IcebergWriterTest {
                             BinaryStringData.fromString("Mark"),
                             10,
                             BinaryStringData.fromString("test"),
+                                true,
+                                1.0f,
+                                1.0d,
+                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                                9,
                             BinaryStringData.fromString("newStringColumn"),
                         });
         DataChangeEvent dataChangeEvent5 = DataChangeEvent.insertEvent(tableId, recordData5);
@@ -197,11 +229,11 @@ public class IcebergWriterTest {
         result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
-                        "1, Mark, 10, test, null",
-                        "2, Bob, 10, test, null",
-                        "3, Bob, 10, test, null",
-                        "4, Bob, 10, test, null",
-                        "5, Mark, 10, test, newStringColumn");
+                        "1, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10, null",
+                        "2, Bob, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10, null",
+                        "3, Bob, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10, null",
+                        "4, Bob, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10, null",
+                        "5, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10, newStringColumn");
     }
 
     private static class MockCommitRequestImpl<CommT> extends CommitRequestImpl<CommT> {
