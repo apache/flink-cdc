@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.IcebergTypeUtils;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.RowKind;
@@ -36,7 +37,7 @@ public class TableSchemaWrapper {
 
     public TableSchemaWrapper(Schema schema, ZoneId zoneId) {
         this.schema = schema;
-        this.fieldGetters = IcebergWriterHelper.createFieldGetters(schema, zoneId);
+        this.fieldGetters = IcebergTypeUtils.createFieldGetters(schema, zoneId);
     }
 
     public Schema getSchema() {
