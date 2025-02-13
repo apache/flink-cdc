@@ -213,7 +213,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
     private boolean isBackfillRequired(MySqlBinlogSplit backfillBinlogSplit) {
         return !statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill()
-                && backfillBinlogSplit
+                || backfillBinlogSplit
                         .getEndingOffset()
                         .isAfter(backfillBinlogSplit.getStartingOffset());
     }

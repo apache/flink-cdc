@@ -837,6 +837,7 @@ public class MySqlStreamingChangeEventSource
                 Operation.CREATE,
                 WriteRowsEventData.class,
                 x -> taskContext.getSchema().getTableId(x.getTableId()),
+                x -> taskContext.getSchema().getExcludeTableId(x.getTableId()),
                 WriteRowsEventData::getRows,
                 (tableId, row) ->
                         eventDispatcher.dispatchDataChangeEvent(
@@ -868,6 +869,7 @@ public class MySqlStreamingChangeEventSource
                 Operation.UPDATE,
                 UpdateRowsEventData.class,
                 x -> taskContext.getSchema().getTableId(x.getTableId()),
+                x -> taskContext.getSchema().getExcludeTableId(x.getTableId()),
                 UpdateRowsEventData::getRows,
                 (tableId, row) ->
                         eventDispatcher.dispatchDataChangeEvent(
@@ -899,6 +901,7 @@ public class MySqlStreamingChangeEventSource
                 Operation.DELETE,
                 DeleteRowsEventData.class,
                 x -> taskContext.getSchema().getTableId(x.getTableId()),
+                x -> taskContext.getSchema().getExcludeTableId(x.getTableId()),
                 DeleteRowsEventData::getRows,
                 (tableId, row) ->
                         eventDispatcher.dispatchDataChangeEvent(
@@ -919,7 +922,8 @@ public class MySqlStreamingChangeEventSource
             Event event,
             Operation operation,
             Class<T> eventDataClass,
-            TableIdProvider<T> tableIdProvider,
+            TableIdProvider<T> includeTableIdProvider,
+            TableIdProvider<T> excludeTableIdProvider,
             RowsProvider<T, U> rowsProvider,
             BinlogChangeEmitter<U> changeEmitter)
             throws InterruptedException {
@@ -933,7 +937,7 @@ public class MySqlStreamingChangeEventSource
             return;
         }
         final T data = unwrapData(event);
-        final TableId tableId = tableIdProvider.getTableId(data);
+        final TableId tableId = includeTableIdProvider.getTableId(data);
         final List<U> rows = rowsProvider.getRows(data);
         String changeType = operation.name();
 
@@ -967,6 +971,12 @@ public class MySqlStreamingChangeEventSource
             }
         } else {
             informAboutUnknownTableIfRequired(partition, offsetContext, event, tableId, operation);
+
+            TableId excludeTableId = excludeTableIdProvider.getTableId(data);
+            if (excludeTableId != null) {
+                // Even for unmonitored tables, the offset should be updated to avoid reading a large amount of binlog.
+                offsetContext.event(excludeTableId, eventTimestamp);
+            }
         }
         startingRowNumber = 0;
     }
