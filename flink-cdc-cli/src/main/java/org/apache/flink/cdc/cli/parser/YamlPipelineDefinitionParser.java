@@ -238,7 +238,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
             ((ObjectNode) sinkNode).remove(EXCLUDE_SCHEMA_EVOLUTION_TYPES);
         }
 
-        Map<String, String> sinkMap = mapper.convertValue(sinkNode, new TypeReference<>() {});
+        Map<String, String> sinkMap =
+                mapper.convertValue(sinkNode, new TypeReference<Map<String, String>>() {});
 
         // "type" field is required
         String type =
