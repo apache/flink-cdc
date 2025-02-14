@@ -20,6 +20,7 @@ package org.apache.flink.cdc.cli.utils;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.curator5.com.google.common.io.Resources;
 
@@ -27,8 +28,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -74,7 +73,7 @@ class ConfigurationUtilsTest {
     @ValueSource(strings = {"flink-home/conf/config.yaml", "flink-home/conf/flink-conf.yaml"})
     void loadConfigFile(String resourcePath) throws Exception {
         URL resource = Resources.getResource(resourcePath);
-        Path path = Paths.get(resource.toURI());
+        Path path = new Path(resource.toURI());
         Configuration configuration =
                 ConfigurationUtils.loadConfigFile(path, resourcePath.endsWith("flink-conf.yaml"));
         Map<String, String> configMap = configuration.toMap();
