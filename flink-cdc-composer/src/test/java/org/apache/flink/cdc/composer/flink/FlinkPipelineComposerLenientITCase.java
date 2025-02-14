@@ -136,9 +136,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -194,9 +194,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -253,9 +253,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -322,6 +322,7 @@ class FlinkPipelineComposerLenientITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, MAX_PARALLELISM);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -376,9 +377,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -437,9 +438,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -507,9 +508,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -562,9 +563,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         routeDef,
@@ -635,9 +636,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         routeDef,
@@ -832,9 +833,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         routeDef,
@@ -1040,9 +1041,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         routeDef,
@@ -1104,9 +1105,9 @@ class FlinkPipelineComposerLenientITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.singletonList(
