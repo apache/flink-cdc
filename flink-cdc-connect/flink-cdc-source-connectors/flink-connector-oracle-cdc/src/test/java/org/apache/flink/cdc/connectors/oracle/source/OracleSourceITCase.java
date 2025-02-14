@@ -34,6 +34,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.ExceptionUtils;
@@ -48,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,6 +61,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.triggerFailover;
+import static org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.waitForSinkSize;
 import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
@@ -404,6 +407,96 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                             chunkColumn, "ID", "customer.DEBEZIUM.CUSTOMERS"))
                             .isPresent());
         }
+    }
+
+    @Test
+    public void testTableWithSpecificOffset() throws Exception {
+        createAndInitialize("customer.sql");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        env.setParallelism(1);
+        env.enableCheckpointing(5000L);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+
+        long currentScn = 0L;
+        try (Connection connection = getJdbcConnectionAsDBA();
+                Statement statement = connection.createStatement()) {
+
+            // get current scn
+            ResultSet rs = statement.executeQuery("SELECT CURRENT_SCN FROM V$DATABASE");
+            while (rs.next()) {
+                currentScn = rs.getLong("CURRENT_SCN");
+            }
+            LOG.info("Current Scn is {}", currentScn);
+        }
+
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            // mock incremental data
+            statement.execute(
+                    String.format(
+                            "INSERT INTO %s.%s VALUES (9999, 'user_offset', 'Shanghai', '123567891234')",
+                            ORACLE_SCHEMA, "CUSTOMERS"));
+            LOG.info("mock incremental data success");
+        }
+
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " ID INT NOT NULL,"
+                                + " NAME STRING,"
+                                + " ADDRESS STRING,"
+                                + " PHONE_NUMBER STRING,"
+                                + " primary key (ID) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'oracle-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = 'CUSTOMERS',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'debezium.log.mining.strategy' = 'online_catalog',"
+                                + " 'debezium.database.history.store.only.captured.tables.ddl' = 'true',"
+                                + " 'scan.startup.mode' = 'specific-offset',"
+                                + " 'scan.startup.specific-offset.scn' = '%s'"
+                                + ")",
+                        ORACLE_CONTAINER.getHost(),
+                        ORACLE_CONTAINER.getOraclePort(),
+                        ORACLE_CONTAINER.getUsername(),
+                        ORACLE_CONTAINER.getPassword(),
+                        ORACLE_DATABASE,
+                        ORACLE_SCHEMA,
+                        currentScn);
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " ID INT NOT NULL,"
+                        + " NAME STRING,"
+                        + " ADDRESS STRING,"
+                        + " PHONE_NUMBER STRING,"
+                        + " primary key (ID) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false',"
+                        + " 'sink-expected-messages-num' = '1'"
+                        + ")";
+
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+        // async submit job
+        TableResult result =
+                tEnv.executeSql(
+                        "INSERT INTO sink SELECT ID,NAME, ADDRESS,PHONE_NUMBER FROM customers");
+        waitForSinkSize("sink", 1);
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+
+        String[] expected = new String[] {"+I[9999, user_offset, Shanghai, 123567891234]"};
+        assertEqualsInAnyOrder(Arrays.asList(expected), actual);
+        result.getJobClient().get().cancel().get();
     }
 
     private List<String> testBackfillWhenWritingEvents(
