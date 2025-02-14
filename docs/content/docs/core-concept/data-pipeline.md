@@ -43,6 +43,10 @@ the following parts are optional:
 We could use following yaml file to define a concise Data Pipeline describing synchronize all tables under MySQL app_db database to Doris :
 
 ```yaml
+   pipeline:
+     name: Sync MySQL Database to Doris
+     parallelism: 2
+
    source:
      type: mysql
      hostname: localhost
@@ -56,28 +60,6 @@ We could use following yaml file to define a concise Data Pipeline describing sy
      fenodes: 127.0.0.1:8030
      username: root
      password: ""
-
-   transform:
-     - source-table: adb.web_order01
-       projection: \*, UPPER(product_name) as product_name
-       filter: id > 10 AND order_id > 100
-       description: project fields and filter
-     - source-table: adb.web_order02
-       projection: \*, UPPER(product_name) as product_name
-       filter: id > 20 AND order_id > 200
-       description: project fields and filter
-
-   route:
-     - source-table: app_db.orders
-       sink-table: ods_db.ods_orders
-     - source-table: app_db.shipments
-       sink-table: ods_db.ods_shipments
-     - source-table: app_db.products
-       sink-table: ods_db.ods_products
-
-   pipeline:
-     name: Sync MySQL Database to Doris
-     parallelism: 2
 ```
 
 ## With optional
@@ -127,10 +109,17 @@ We could use following yaml file to define a complicated Data Pipeline describin
 ```
 
 # Pipeline Configurations
-The following config options of Data Pipeline level are supported:
 
-| parameter       | meaning                                                                                 | optional/required |
-|-----------------|-----------------------------------------------------------------------------------------|-------------------|
-| name            | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
-| parallelism     | The global parallelism of the pipeline. Defaults to 1.                                  | optional          |
-| local-time-zone | The local time zone defines current session time zone id.                               | optional          |
+The following config options of Data Pipeline level are supported. 
+Note that whilst the parameters are each individually optional, at least one of them must be specified. That is to say, The `pipeline` section is mandatory and cannot be empty.
+
+
+| parameter                     | meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | optional/required |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
+| `name`                        | The name of the pipeline, which will be submitted to the Flink cluster as the job name.                                                                                                                                                                                                                                                                                                                                                                                                                                       | optional          |
+| `parallelism`                 | The global parallelism of the pipeline. Defaults to 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | optional          |
+| `local-time-zone`             | The local time zone defines current session time zone id.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | optional          |
+| `schema.change.behavior`      | How to handle [changes in schema]({{< ref "docs/core-concept/schema-evolution/" >}}). One of: [`exception`]({{< ref "docs/core-concept/schema-evolution/" >}}#exception-mode), [`evolve`]({{< ref "docs/core-concept/schema-evolution/" >}}#evolve-mode), [`try_evolve`]({{< ref "docs/core-concept/schema-evolution/" >}}#tryevolve-mode), [`lenient`]({{< ref "docs/core-concept/schema-evolution/" >}}#lenient-mode) (default) or [`ignore`]({{< ref "docs/core-concept/schema-evolution/" >}}#ignore-mode). | optional          |
+| `schema.operator.uid`         | The unique ID for schema operator. This ID will be used for inter-operator communications and must be unique across operators.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | optional          |
+| `schema-operator.rpc-timeout` | The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | optional          |
+
