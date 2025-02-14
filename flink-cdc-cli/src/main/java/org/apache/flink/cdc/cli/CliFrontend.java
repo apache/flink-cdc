@@ -134,11 +134,11 @@ public class CliFrontend {
         // --use-mini-cluster
         Properties commandLineProperties = commandLine.getOptionProperties(FLINK_CONFIG.getOpt());
         // Use "remote" as the default target
-        flinkConfig.set(
-                DeploymentOptions.TARGET, commandLine.getOptionValue(TARGET, RemoteExecutor.NAME));
-        if (commandLine.hasOption(USE_MINI_CLUSTER)) {
-            flinkConfig.set(DeploymentOptions.TARGET, LocalExecutor.NAME);
-        }
+        String target =
+                commandLine.hasOption(USE_MINI_CLUSTER)
+                        ? LocalExecutor.NAME
+                        : commandLine.getOptionValue(TARGET, RemoteExecutor.NAME);
+        flinkConfig.set(DeploymentOptions.TARGET, target);
         LOG.info("Dynamic flink config items found from command-line: {}", commandLineProperties);
         commandLineProperties
                 .stringPropertyNames()
