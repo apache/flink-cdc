@@ -105,6 +105,13 @@ public class SystemFunctionUtils {
                 timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));
     }
 
+    public static String dateFormat(LocalZonedTimestampData timestamp, String format) {
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getEpochMillisecond(),
+                format,
+                TimeZone.getTimeZone(ZoneId.systemDefault()));
+    }
+
     public static int toDate(String str, String timezone) {
         return toDate(str, "yyyy-MM-dd", timezone);
     }
