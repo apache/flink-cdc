@@ -106,8 +106,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     public PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig)
             throws Exception {
         FileSystem fileSystem = FileSystem.get(pipelineDefPath.toUri());
-        FSDataInputStream inStream = fileSystem.open(pipelineDefPath);
-        return parse(mapper.readTree(inStream), globalPipelineConfig);
+        FSDataInputStream pipelineInStream = fileSystem.open(pipelineDefPath);
+        return parse(mapper.readTree(pipelineInStream), globalPipelineConfig);
     }
 
     @Override

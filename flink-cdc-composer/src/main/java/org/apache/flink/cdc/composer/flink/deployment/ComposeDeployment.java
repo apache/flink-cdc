@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.composer.flink.deployment;
 
+import java.util.Arrays;
+
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** Create deployment methods corresponding to different goals. */
@@ -37,20 +39,10 @@ public enum ComposeDeployment {
         return name;
     }
 
-    public static ComposeDeployment getFromName(final String deploymentTarget) {
-        if (deploymentTarget == null) {
-            return null;
-        }
-
-        if (YARN_SESSION.name.equalsIgnoreCase(deploymentTarget)) {
-            return YARN_SESSION;
-        } else if (YARN_APPLICATION.name.equalsIgnoreCase(deploymentTarget)) {
-            return YARN_APPLICATION;
-        } else if (KUBERNETES_APPLICATION.name.equalsIgnoreCase(deploymentTarget)) {
-            return KUBERNETES_APPLICATION;
-        } else if (LOCAL.name.equalsIgnoreCase(deploymentTarget)) {
-            return LOCAL;
-        }
-        return null;
+    public static ComposeDeployment getDeploymentFromName(final String deploymentTarget) {
+        return Arrays.stream(ComposeDeployment.values())
+                .filter(d -> d.name.equalsIgnoreCase(deploymentTarget))
+                .findFirst()
+                .get();
     }
 }

@@ -35,7 +35,6 @@ import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
-import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -58,12 +57,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
     public static FlinkPipelineComposer ofRemoteCluster(
             org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
-        org.apache.flink.configuration.Configuration effectiveConfiguration =
-                new org.apache.flink.configuration.Configuration();
-        // Use "remote" as the default target
-        effectiveConfiguration.set(DeploymentOptions.TARGET, "remote");
-        effectiveConfiguration.addAll(flinkConfig);
-        StreamExecutionEnvironment env = new StreamExecutionEnvironment(effectiveConfiguration);
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment(flinkConfig);
         additionalJars.forEach(
                 jarPath -> {
                     try {

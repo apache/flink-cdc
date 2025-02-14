@@ -24,13 +24,11 @@ import org.apache.flink.client.deployment.application.ApplicationConfiguration;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.client.program.ClusterClientProvider;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.configuration.PipelineOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.kubernetes.KubernetesClusterClientFactory;
 import org.apache.flink.kubernetes.KubernetesClusterDescriptor;
 import org.apache.flink.kubernetes.configuration.KubernetesConfigOptions;
-import org.apache.flink.kubernetes.configuration.KubernetesDeploymentTarget;
 
 import org.apache.commons.cli.CommandLine;
 import org.slf4j.Logger;
@@ -52,7 +50,6 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
             List<Path> additionalJars,
             Path flinkHome) {
         LOG.info("Submitting application in 'Flink K8S Application Mode'.");
-        flinkConfig.set(DeploymentOptions.TARGET, KubernetesDeploymentTarget.APPLICATION.getName());
         List<String> jars = new ArrayList<>();
         if (flinkConfig.get(PipelineOptions.JARS) == null) {
             // must be added cdc dist jar by default docker container path
