@@ -53,13 +53,20 @@ public class AlterColumnTypeEventSerializerTest extends SerializerTestBase<Alter
         Map<String, DataType> oldMap = new HashMap<>();
         oldMap.put("col1", DataTypes.TIME());
         oldMap.put("col2", DataTypes.BYTES());
+
+        Map<String, String> comments = new HashMap<>();
+        comments.put("col1", "col1 comment");
+        comments.put("col2", "col2 comment");
+
         return new AlterColumnTypeEvent[] {
             new AlterColumnTypeEvent(TableId.tableId("table"), map),
             new AlterColumnTypeEvent(TableId.tableId("schema", "table"), map),
             new AlterColumnTypeEvent(TableId.tableId("namespace", "schema", "table"), map),
             new AlterColumnTypeEvent(TableId.tableId("table"), map, oldMap),
             new AlterColumnTypeEvent(TableId.tableId("schema", "table"), map, oldMap),
-            new AlterColumnTypeEvent(TableId.tableId("namespace", "schema", "table"), map, oldMap)
+            new AlterColumnTypeEvent(TableId.tableId("namespace", "schema", "table"), map, oldMap),
+            new AlterColumnTypeEvent(
+                    TableId.tableId("namespace", "schema", "table"), map, oldMap, comments)
         };
     }
 }
