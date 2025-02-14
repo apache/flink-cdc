@@ -111,7 +111,7 @@ public class JdbcChunkUtils {
         List<Column> primaryKeys = table.primaryKeyColumns();
         if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
             throw new ValidationException(
-                    "To use incremental snapshots, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
+                    "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         }
 
         List<Column> searchColumns = table.columns();
