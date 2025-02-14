@@ -101,16 +101,17 @@ public class CliFrontend {
 
         // Load Flink environment
         Path flinkHome = getFlinkHome(commandLine);
-        Configuration flinkConfig = FlinkEnvironmentUtils.loadFlinkConfiguration(flinkHome);
+        Configuration configuration = FlinkEnvironmentUtils.loadFlinkConfiguration(flinkHome);
 
         // To override the Flink configuration
-        overrideFlinkConfiguration(flinkConfig, commandLine);
+        overrideFlinkConfiguration(configuration, commandLine);
+
+        org.apache.flink.configuration.Configuration flinkConfig =
+                org.apache.flink.configuration.Configuration.fromMap(configuration.toMap());
 
         // Savepoint
         SavepointRestoreSettings savepointSettings = createSavepointRestoreSettings(commandLine);
-        SavepointRestoreSettings.toConfiguration(
-                savepointSettings,
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()));
+        SavepointRestoreSettings.toConfiguration(savepointSettings, flinkConfig);
 
         // Additional JARs
         List<Path> additionalJars =
@@ -133,6 +134,15 @@ public class CliFrontend {
 
     private static void overrideFlinkConfiguration(
             Configuration flinkConfig, CommandLine commandLine) {
+
+        String target =
+                commandLine.hasOption(USE_MINI_CLUSTER)
+                        ? LOCAL.getName()
+                        : commandLine.getOptionValue(TARGET, REMOTE.getName());
+        flinkConfig.set(
+                ConfigOptions.key(DeploymentOptions.TARGET.key()).stringType().defaultValue(target),
+                target);
+
         Properties properties = commandLine.getOptionProperties(FLINK_CONFIG.getOpt());
         LOG.info("Dynamic flink config items found: {}", properties);
         for (String key : properties.stringPropertyNames()) {
@@ -147,16 +157,6 @@ public class CliFrontend {
             ConfigOption<String> configOption =
                     ConfigOptions.key(key.trim()).stringType().defaultValue(value.trim());
             flinkConfig.set(configOption, value.trim());
-        }
-
-        flinkConfig.set(
-                ConfigOptions.key(DeploymentOptions.TARGET.key()).stringType().noDefaultValue(),
-                commandLine.getOptionValue(TARGET, REMOTE.getName()));
-
-        if (commandLine.hasOption(USE_MINI_CLUSTER)) {
-            flinkConfig.set(
-                    ConfigOptions.key(DeploymentOptions.TARGET.key()).stringType().noDefaultValue(),
-                    LOCAL.getName());
         }
     }
 

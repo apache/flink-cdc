@@ -53,14 +53,13 @@ public class CliExecutor {
     public CliExecutor(
             CommandLine commandLine,
             Path pipelineDefPath,
-            Configuration flinkConfig,
+            org.apache.flink.configuration.Configuration flinkConfig,
             Configuration globalPipelineConfig,
             List<Path> additionalJars,
             Path flinkHome) {
         this.commandLine = commandLine;
         this.pipelineDefPath = pipelineDefPath;
-        this.flinkConfig =
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
+        this.flinkConfig = flinkConfig;
         this.globalPipelineConfig = globalPipelineConfig;
         this.additionalJars = additionalJars;
         this.flinkHome = flinkHome;
