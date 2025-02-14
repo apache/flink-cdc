@@ -33,8 +33,11 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+
+import static org.apache.flink.cdc.common.utils.SchemaUtils.validateMetaSchemaCompatibility;
 
 /** A test for the {@link org.apache.flink.cdc.common.utils.SchemaUtils}. */
 public class SchemaUtilsTest {
@@ -483,5 +486,71 @@ public class SchemaUtilsTest {
                                                 .option("Key2", "Value2")
                                                 .build()))
                 .isExactlyInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void testMetaSchemaCompatibility() {
+        Assertions.assertThatCode(
+                        () ->
+                                validateMetaSchemaCompatibility(
+                                        of(
+                                                Schema.newBuilder()
+                                                        .physicalColumn("col1", DataTypes.STRING())
+                                                        .physicalColumn("col2", DataTypes.STRING())
+                                                        .build(),
+                                                Schema.newBuilder()
+                                                        .physicalColumn("col1", DataTypes.STRING())
+                                                        .physicalColumn("col2", DataTypes.STRING())
+                                                        .build())))
+                .as("test same schema")
+                .doesNotThrowAnyException();
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                validateMetaSchemaCompatibility(
+                                        of(
+                                                Schema.newBuilder()
+                                                        .physicalColumn("col1", DataTypes.STRING())
+                                                        .physicalColumn("col2", DataTypes.STRING())
+                                                        .primaryKey("col1")
+                                                        .build(),
+                                                Schema.newBuilder()
+                                                        .physicalColumn("col1", DataTypes.STRING())
+                                                        .physicalColumn("col2", DataTypes.STRING())
+                                                        .primaryKey("col2")
+                                                        .build())))
+                .rootCause()
+                .isExactlyInstanceOf(SchemaUtils.SchemaValidationException.class)
+                .as("test primary key conflict")
+                .hasMessage(
+                        "Unable to merge schema columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=() "
+                                + "and columns={`col1` STRING,`col2` STRING}, primaryKeys=col2, options=() with different primary keys.");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                validateMetaSchemaCompatibility(
+                                        of(
+                                                Schema.newBuilder()
+                                                        .physicalColumn("col1", DataTypes.STRING())
+                                                        .physicalColumn("col2", DataTypes.STRING())
+                                                        .partitionKey("col1")
+                                                        .build(),
+                                                Schema.newBuilder()
+                                                        .physicalColumn("col1", DataTypes.STRING())
+                                                        .physicalColumn("col2", DataTypes.STRING())
+                                                        .partitionKey("col2")
+                                                        .build())))
+                .rootCause()
+                .isExactlyInstanceOf(SchemaUtils.SchemaValidationException.class)
+                .as("test partition key conflict")
+                .hasMessage(
+                        "Unable to merge schema columns={`col1` STRING,`col2` STRING}, primaryKeys=, partitionKeys=col1, options=() "
+                                + "and columns={`col1` STRING,`col2` STRING}, primaryKeys=, partitionKeys=col2, options=() with different partition keys.");
+    }
+
+    private static LinkedHashSet<Schema> of(Schema... args) {
+        LinkedHashSet<Schema> schemas = new LinkedHashSet<>(args.length);
+        schemas.addAll(Arrays.asList(args));
+        return schemas;
     }
 }
