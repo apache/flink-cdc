@@ -371,6 +371,27 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testAssignSnapshotSplitsWithUnevenlySplitKey() {
+        List<String> expected =
+                Arrays.asList(
+                        "varchar_value_test null [GbGGGGG]",
+                        "varchar_value_test [GbGGGGG] [GGcGGGG]",
+                        "varchar_value_test [GGcGGGG] [GGGdGGG]",
+                        "varchar_value_test [GGGdGGG] [GGGGeGG]",
+                        "varchar_value_test [GGGGeGG] [GGGGGfG]",
+                        "varchar_value_test [GGGGGfG] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        2,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {"varchar_value_test"},
+                        "id");
+        assertEquals(expected, splits);
+    }
+
+    @Test
     public void testAssignMaxSplitSize() {
         List<String> expected = Collections.singletonList("customers_even_dist null null");
         List<String> splits =

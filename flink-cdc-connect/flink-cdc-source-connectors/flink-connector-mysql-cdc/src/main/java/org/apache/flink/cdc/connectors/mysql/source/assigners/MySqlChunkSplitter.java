@@ -172,7 +172,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         ? "null"
                         : chunkStartVal.toString());
         // we start from [null, min + chunk_size) and avoid [null, min)
-        Object chunkEnd =
+        Object[] nextComparableChunk =
                 nextChunkEnd(
                         jdbcConnection,
                         nextChunkStart == ChunkSplitterState.ChunkBound.START_BOUND
@@ -184,7 +184,10 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         chunkSize);
         // may sleep a while to avoid DDOS on MySQL server
         maySleep(nextChunkId, tableId);
-        if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
+        Object chunkEnd = nextComparableChunk[0];
+        int compare = (int) nextComparableChunk[1];
+        if (chunkEnd != null
+                && (ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) == 0 || compare == 0)) {
             nextChunkStart = ChunkSplitterState.ChunkBound.middleOf(chunkEnd);
             return createSnapshotSplit(
                     jdbcConnection,
@@ -321,7 +324,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         return splits;
     }
 
-    private Object nextChunkEnd(
+    private Object[] nextChunkEnd(
             JdbcConnection jdbc,
             Object previousChunkEnd,
             TableId tableId,
@@ -330,14 +333,14 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             int chunkSize)
             throws SQLException {
         // chunk end might be null when max values are removed
-        Object chunkEnd =
+        Object[] nextComparableChunk =
                 StatementUtils.queryNextChunkMax(
-                        jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+                        jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd, max);
+        Object chunkEnd = nextComparableChunk[0];
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
-            chunkEnd = StatementUtils.queryMin(jdbc, tableId, splitColumnName, chunkEnd);
-
+            //
             // queryMin will return null when the chunkEnd is the max value,
             // this will happen when the mysql table ignores the capitalization.
             // see more detail at the test MySqlConnectorITCase#testReadingWithMultiMaxValue.
@@ -346,15 +349,17 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             // this method will return 'E' and will not return null.
             // When this method is invoked next time, queryMin will return null here.
             // So we need return null when we reach the max value here.
-            if (chunkEnd == null) {
-                return null;
-            }
+            nextComparableChunk =
+                    StatementUtils.queryMin(jdbc, tableId, splitColumnName, chunkEnd, max);
         }
-        if (ObjectUtils.compare(chunkEnd, max) >= 0) {
-            return null;
-        } else {
-            return chunkEnd;
+        if (nextComparableChunk[1] == null) {
+            nextComparableChunk[1] = 2;
         }
+        nextComparableChunk[1] = Integer.valueOf(nextComparableChunk[1].toString());
+        if (((int) nextComparableChunk[1]) == 1) {
+            nextComparableChunk[0] = null;
+        }
+        return nextComparableChunk;
     }
 
     private MySqlSnapshotSplit createSnapshotSplit(
