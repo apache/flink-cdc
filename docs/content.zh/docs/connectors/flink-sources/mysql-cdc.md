@@ -249,6 +249,13 @@ Flink SQL> SELECT * FROM orders;
           <td>表快照的块大小（行数），读取表的快照时，捕获的表被拆分为多个块。</td>
     </tr>
     <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否在快照读取阶段跳过后backfill日志。如果跳过后backfill日志，那么快照阶段出现的变更将不会在快照阶段被捕获，而是会在后续的流处理阶段被读取。注意：跳过后backfill日志可能仅能保证至少一次语义(at-least-once)，这可能导致数据被重复消费。例如，变更日志可能已经在快照阶段在快照中生效，在后续的流处理阶段可能会再次被读取。</td>
+    </tr>
+    <tr>
           <td>scan.snapshot.fetch.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">1024</td>
