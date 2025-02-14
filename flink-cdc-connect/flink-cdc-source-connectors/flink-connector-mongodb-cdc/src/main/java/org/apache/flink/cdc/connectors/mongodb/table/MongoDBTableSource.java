@@ -72,6 +72,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String collection;
     private final StartupOptions startupOptions;
     private final Integer initialSnapshottingQueueSize;
+    private final Integer initialSnapshottingMaxThreads;
+    private final String initialSnapshottingPipeline;
     private final Integer batchSize;
     private final Integer pollMaxBatchSize;
     private final Integer pollAwaitTimeMillis;
@@ -108,6 +110,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String connectionOptions,
             StartupOptions startupOptions,
             @Nullable Integer initialSnapshottingQueueSize,
+            @Nullable Integer initialSnapshottingMaxThreads,
+            @Nullable String initialSnapshottingPipeline,
             @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
@@ -132,6 +136,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.connectionOptions = connectionOptions;
         this.startupOptions = checkNotNull(startupOptions);
         this.initialSnapshottingQueueSize = initialSnapshottingQueueSize;
+        this.initialSnapshottingMaxThreads = initialSnapshottingMaxThreads;
+        this.initialSnapshottingPipeline = initialSnapshottingPipeline;
         this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
@@ -239,6 +245,10 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
             Optional.ofNullable(initialSnapshottingQueueSize)
                     .ifPresent(builder::initialSnapshottingQueueSize);
+            Optional.ofNullable(initialSnapshottingMaxThreads)
+                    .ifPresent(builder::initialSnapshottingMaxThreads);
+            Optional.ofNullable(initialSnapshottingPipeline)
+                    .ifPresent(builder::initialSnapshottingPipeline);
             Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
             Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
             Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
@@ -294,6 +304,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         connectionOptions,
                         startupOptions,
                         initialSnapshottingQueueSize,
+                        initialSnapshottingMaxThreads,
+                        initialSnapshottingPipeline,
                         batchSize,
                         pollMaxBatchSize,
                         pollAwaitTimeMillis,
@@ -332,6 +344,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(connectionOptions, that.connectionOptions)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(initialSnapshottingQueueSize, that.initialSnapshottingQueueSize)
+                && Objects.equals(initialSnapshottingMaxThreads, that.initialSnapshottingMaxThreads)
+                && Objects.equals(initialSnapshottingPipeline, that.initialSnapshottingPipeline)
                 && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
@@ -363,6 +377,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 connectionOptions,
                 startupOptions,
                 initialSnapshottingQueueSize,
+                initialSnapshottingMaxThreads,
+                initialSnapshottingPipeline,
                 batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
