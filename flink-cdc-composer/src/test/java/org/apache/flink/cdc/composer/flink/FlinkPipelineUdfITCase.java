@@ -109,7 +109,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testTransformWithUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -180,7 +182,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testFilterWithUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -249,7 +253,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testOverloadedUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -320,7 +326,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testUdfLifecycle(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -393,7 +401,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testTypeHintedUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -464,7 +474,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testComplicatedUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -554,7 +566,9 @@ public class FlinkPipelineUdfITCase {
     @MethodSource("testParams")
     void testTransformWithFlinkUdf(ValuesDataSink.SinkApi sinkApi, String language)
             throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -624,7 +638,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testFilterWithFlinkUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -692,7 +708,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testOverloadedFlinkUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -762,7 +780,9 @@ public class FlinkPipelineUdfITCase {
     @ParameterizedTest
     @MethodSource("testParams")
     void testComplicatedFlinkUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -842,7 +862,9 @@ public class FlinkPipelineUdfITCase {
     @MethodSource("testParams")
     @Disabled("For manual test as there is a limit for quota.")
     void testTransformWithModel(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -913,7 +935,9 @@ public class FlinkPipelineUdfITCase {
     @MethodSource("testParams")
     void testComplicatedUdfReturnTypes(ValuesDataSink.SinkApi sinkApi, String language)
             throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
