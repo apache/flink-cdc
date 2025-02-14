@@ -153,7 +153,7 @@ public class CliFrontend {
                         YamlPipelineDefinitionParser.getFlinkConfigFromPipelineDef(
                                 pipelineDefPath));
         LOG.info(
-                "Dynamic flink config items found from flink pipeline.yaml: {}",
+                "Dynamic flink config items found from pipeline.yaml: {}",
                 flinkConfigFromPipelineDef);
         flinkConfig.addAll(flinkConfigFromPipelineDef);
 
@@ -176,7 +176,6 @@ public class CliFrontend {
         ConfigOption<String> configOption =
                 ConfigOptions.key(trimmedKey).stringType().defaultValue(trimmedValue);
         flinkConfig.set(configOption, trimmedValue);
-        LOG.info("Dynamic flink config items found {}={}", trimmedKey, trimmedValue);
     }
 
     private static SavepointRestoreSettings createSavepointRestoreSettings(
