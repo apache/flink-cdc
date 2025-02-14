@@ -40,10 +40,12 @@ under the License.
    cd flink-1.19.1
    ```
 
-2. 通过在 conf/flink-conf.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
+2. 通过在 conf/config.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
 
    ```yaml
-   execution.checkpointing.interval: 3000
+   execution:
+     checkpointing:
+       interval: 3s
    ```
 
 3. 使用下面的命令启动 Flink 集群。

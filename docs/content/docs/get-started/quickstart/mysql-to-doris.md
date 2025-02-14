@@ -42,10 +42,12 @@ Prepare a Linux or MacOS computer with Docker installed.
    cd flink-1.19.1
    ```
 
-2. Enable checkpointing by appending the following parameters to the conf/flink-conf.yaml configuration file to perform a checkpoint every 3 seconds.
+2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
 
    ```yaml
-   execution.checkpointing.interval: 3000
+   execution:
+     checkpointing:
+       interval: 3s
    ```
 
 3. Start the Flink cluster using the following command.
