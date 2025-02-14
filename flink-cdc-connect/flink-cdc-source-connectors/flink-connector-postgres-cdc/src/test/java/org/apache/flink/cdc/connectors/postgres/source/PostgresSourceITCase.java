@@ -261,7 +261,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         ExceptionUtils.findThrowableWithMessage(
                                         e,
                                         String.format(
-                                                "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
+                                                "Incremental snapshot for tables requires chunk key column, but table %s doesn't have primary key or 'scan.incremental.snapshot.chunk.key-column' is not set",
                                                 SCHEMA_NAME + ".customers_no_pk"))
                                 .isPresent());
             }
@@ -644,30 +644,22 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    public void testTableWithChunkColumnOfNoPrimaryKey() {
+    public void testTableWithChunkColumnOfNoPrimaryKey() throws Exception {
         if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
         String chunkColumn = "name";
-        try {
-            testPostgresParallelSource(
-                    1,
-                    scanStartupMode,
-                    PostgresTestUtils.FailoverType.NONE,
-                    PostgresTestUtils.FailoverPhase.NEVER,
-                    new String[] {"customers"},
-                    RestartStrategies.noRestart(),
-                    Collections.singletonMap(
-                            "scan.incremental.snapshot.chunk.key-column", chunkColumn));
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                            chunkColumn, "id", "customer.customers"))
-                            .isPresent());
-        }
+        testPostgresParallelSource(
+                1,
+                scanStartupMode,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"customers"},
+                RestartStrategies.noRestart(),
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.chunk.key-column", chunkColumn));
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     @Test
