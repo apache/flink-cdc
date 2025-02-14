@@ -37,6 +37,9 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Map;
 
+import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.RESTORE_MODE;
+import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
+import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -101,11 +104,11 @@ class CliFrontendTest {
                         "-cm",
                         "no_claim",
                         "-n");
-        assertThat(executor.getSavepointSettings().getRestorePath())
+        assertThat(executor.getFlinkConfig().get(SAVEPOINT_PATH))
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getSavepointSettings().getRestoreMode())
-                .isEqualTo(RestoreMode.NO_CLAIM);
-        assertThat(executor.getSavepointSettings().allowNonRestoredState()).isTrue();
+        // flink configuration in the pipeline.yaml precedence over the command
+        assertThat(executor.getFlinkConfig().get(RESTORE_MODE)).isEqualTo(RestoreMode.CLAIM);
+        assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
     }
 
     @Test
@@ -169,8 +172,11 @@ class CliFrontendTest {
         assertThat(configMap)
                 .containsEntry("execution.target", "yarn-session")
                 .containsEntry("rest.bind-port", "42689")
-                .containsEntry("yarn.application.id", "application_1714009558476_3563")
-                .containsEntry("rest.bind-address", "10.1.140.140");
+                // flink configuration in the pipeline.yaml precedence over the command
+                .containsEntry("yarn.application.id", "application_1714009558476_9999")
+                .containsEntry("rest.bind-address", "10.1.140.140")
+                // flink configuration from pipeline.yml
+                .containsEntry("yarn.tags", "flink-cdc-job");
     }
 
     @Test
