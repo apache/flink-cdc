@@ -412,7 +412,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.")
+                                    "To use incremental snapshots, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.")
                             .isPresent());
         }
     }

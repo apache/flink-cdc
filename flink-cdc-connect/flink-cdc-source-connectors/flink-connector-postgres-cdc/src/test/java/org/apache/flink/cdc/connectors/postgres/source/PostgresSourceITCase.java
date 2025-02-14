@@ -260,9 +260,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 assertTrue(
                         ExceptionUtils.findThrowableWithMessage(
                                         e,
-                                        String.format(
-                                                "Incremental snapshot for tables requires chunk key column, but table %s doesn't have primary key or 'scan.incremental.snapshot.chunk.key-column' is not set",
-                                                SCHEMA_NAME + ".customers_no_pk"))
+                                        "To use incremental snapshots, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.")
                                 .isPresent());
             }
         } else {
