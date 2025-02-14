@@ -17,19 +17,13 @@
 
 package org.apache.flink.cdc.cli.utils;
 
-import org.apache.flink.cdc.cli.CliFrontendOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment;
 import org.apache.flink.core.fs.Path;
-
-import org.apache.commons.cli.CommandLine;
 
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.apache.flink.cdc.cli.CliFrontendOptions.TARGET;
 
 /** Utilities for handling {@link Configuration}. */
 public class ConfigurationUtils {
@@ -69,13 +63,6 @@ public class ConfigurationUtils {
                 });
 
         return flattenedMap;
-    }
-
-    public static String getDeploymentMode(CommandLine commandLine) {
-        if (commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER)) {
-            return ComposeDeployment.LOCAL.getName();
-        }
-        return commandLine.getOptionValue(TARGET, ComposeDeployment.YARN_SESSION.getName());
     }
 
     public static Class<?> getClaimModeClass() {

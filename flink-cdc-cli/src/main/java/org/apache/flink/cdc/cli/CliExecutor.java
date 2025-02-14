@@ -19,7 +19,6 @@ package org.apache.flink.cdc.cli;
 
 import org.apache.flink.cdc.cli.parser.PipelineDefinitionParser;
 import org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser;
-import org.apache.flink.cdc.cli.utils.ConfigurationUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.PipelineComposer;
@@ -30,31 +29,26 @@ import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 import org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment;
 import org.apache.flink.cdc.composer.flink.deployment.K8SApplicationDeploymentExecutor;
 import org.apache.flink.cdc.composer.flink.deployment.YarnApplicationDeploymentExecutor;
+import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import org.apache.commons.cli.CommandLine;
 
 import java.util.List;
 
-import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.KUBERNETES_APPLICATION;
-import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.LOCAL;
 import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.REMOTE;
-import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.YARN_APPLICATION;
-import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.YARN_SESSION;
 
 /** Executor for doing the composing and submitting logic for {@link CliFrontend}. */
 public class CliExecutor {
 
     private final Path pipelineDefPath;
-    private final Configuration flinkConfig;
+    private final org.apache.flink.configuration.Configuration flinkConfig;
     private final Configuration globalPipelineConfig;
     private final List<Path> additionalJars;
     private final Path flinkHome;
     private final CommandLine commandLine;
     private PipelineComposer composer = null;
-    private final SavepointRestoreSettings savepointSettings;
 
     public CliExecutor(
             CommandLine commandLine,
@@ -62,31 +56,32 @@ public class CliExecutor {
             Configuration flinkConfig,
             Configuration globalPipelineConfig,
             List<Path> additionalJars,
-            SavepointRestoreSettings savepointSettings,
             Path flinkHome) {
         this.commandLine = commandLine;
         this.pipelineDefPath = pipelineDefPath;
-        this.flinkConfig = flinkConfig;
+        this.flinkConfig =
+                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
         this.globalPipelineConfig = globalPipelineConfig;
         this.additionalJars = additionalJars;
-        this.savepointSettings = savepointSettings;
         this.flinkHome = flinkHome;
     }
 
     public PipelineExecution.ExecutionInfo run() throws Exception {
         // Create Submit Executor to deployment flink cdc job Or Run Flink CDC Job
-        String deploymentTargetStr = ConfigurationUtils.getDeploymentMode(commandLine);
-        ComposeDeployment deploymentTarget = ComposeDeployment.getFromName(deploymentTargetStr);
+        String deploymentTargetStr = getDeploymentTarget();
+        ComposeDeployment deploymentTarget =
+                ComposeDeployment.getDeploymentFromName(getDeploymentTarget());
         switch (deploymentTarget) {
             case KUBERNETES_APPLICATION:
                 return deployWithApplicationComposer(new K8SApplicationDeploymentExecutor());
             case YARN_APPLICATION:
                 return deployWithApplicationComposer(new YarnApplicationDeploymentExecutor());
             case LOCAL:
-                return deployWithLocalExecutor();
+                return deployWithComposer(FlinkPipelineComposer.ofMiniCluster());
             case REMOTE:
             case YARN_SESSION:
-                return deployWithRemoteExecutor();
+                return deployWithComposer(
+                        FlinkPipelineComposer.ofRemoteCluster(flinkConfig, additionalJars));
             default:
                 throw new IllegalArgumentException(
                         String.format(
@@ -96,26 +91,10 @@ public class CliExecutor {
 
     private PipelineExecution.ExecutionInfo deployWithApplicationComposer(
             PipelineDeploymentExecutor composeExecutor) throws Exception {
-        return composeExecutor.deploy(
-                commandLine,
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()),
-                additionalJars,
-                flinkHome);
+        return composeExecutor.deploy(commandLine, flinkConfig, additionalJars, flinkHome);
     }
 
-    private PipelineExecution.ExecutionInfo deployWithLocalExecutor() throws Exception {
-        return executePipeline(FlinkPipelineComposer.ofMiniCluster());
-    }
-
-    private PipelineExecution.ExecutionInfo deployWithRemoteExecutor() throws Exception {
-        org.apache.flink.configuration.Configuration configuration =
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
-        SavepointRestoreSettings.toConfiguration(savepointSettings, configuration);
-        return executePipeline(
-                FlinkPipelineComposer.ofRemoteCluster(configuration, additionalJars));
-    }
-
-    private PipelineExecution.ExecutionInfo executePipeline(PipelineComposer composer)
+    private PipelineExecution.ExecutionInfo deployWithComposer(PipelineComposer composer)
             throws Exception {
         PipelineDefinitionParser pipelineDefinitionParser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef =
@@ -126,15 +105,13 @@ public class CliExecutor {
 
     @VisibleForTesting
     public PipelineExecution.ExecutionInfo deployWithNoOpComposer() throws Exception {
-        return executePipeline(this.composer);
+        return deployWithComposer(this.composer);
     }
 
     // The main class for running application mode
     public static void main(String[] args) throws Exception {
         PipelineDefinitionParser pipelineDefinitionParser = new YamlPipelineDefinitionParser();
-        org.apache.flink.core.fs.Path pipelineDefPath = new org.apache.flink.core.fs.Path(args[0]);
-        PipelineDef pipelineDef =
-                pipelineDefinitionParser.parse(pipelineDefPath, new Configuration());
+        PipelineDef pipelineDef = pipelineDefinitionParser.parse(args[0], new Configuration());
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         FlinkPipelineComposer flinkPipelineComposer =
                 FlinkPipelineComposer.ofApplicationCluster(env);
@@ -148,7 +125,7 @@ public class CliExecutor {
     }
 
     @VisibleForTesting
-    public Configuration getFlinkConfig() {
+    public org.apache.flink.configuration.Configuration getFlinkConfig() {
         return flinkConfig;
     }
 
@@ -162,12 +139,7 @@ public class CliExecutor {
         return additionalJars;
     }
 
-    @VisibleForTesting
     public String getDeploymentTarget() {
-        return commandLine.getOptionValue("target");
-    }
-
-    public SavepointRestoreSettings getSavepointSettings() {
-        return savepointSettings;
+        return flinkConfig.get(DeploymentOptions.TARGET);
     }
 }

@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.PipelineExecution;
+import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
@@ -51,6 +52,10 @@ import static org.apache.flink.cdc.cli.CliFrontendOptions.FLINK_CONFIG;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_ALLOW_NON_RESTORED_OPTION;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_CLAIM_MODE;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_PATH_OPTION;
+import static org.apache.flink.cdc.cli.CliFrontendOptions.TARGET;
+import static org.apache.flink.cdc.cli.CliFrontendOptions.USE_MINI_CLUSTER;
+import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.LOCAL;
+import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.REMOTE;
 
 /** The frontend entrypoint for the command-line interface of Flink CDC. */
 public class CliFrontend {
@@ -103,6 +108,9 @@ public class CliFrontend {
 
         // Savepoint
         SavepointRestoreSettings savepointSettings = createSavepointRestoreSettings(commandLine);
+        SavepointRestoreSettings.toConfiguration(
+                savepointSettings,
+                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap()));
 
         // Additional JARs
         List<Path> additionalJars =
@@ -120,7 +128,6 @@ public class CliFrontend {
                 flinkConfig,
                 globalPipelineConfig,
                 additionalJars,
-                savepointSettings,
                 flinkHome);
     }
 
@@ -140,6 +147,16 @@ public class CliFrontend {
             ConfigOption<String> configOption =
                     ConfigOptions.key(key.trim()).stringType().defaultValue(value.trim());
             flinkConfig.set(configOption, value.trim());
+        }
+
+        flinkConfig.set(
+                ConfigOptions.key(DeploymentOptions.TARGET.key()).stringType().noDefaultValue(),
+                commandLine.getOptionValue(TARGET, REMOTE.getName()));
+
+        if (commandLine.hasOption(USE_MINI_CLUSTER)) {
+            flinkConfig.set(
+                    ConfigOptions.key(DeploymentOptions.TARGET.key()).stringType().noDefaultValue(),
+                    LOCAL.getName());
         }
     }
 

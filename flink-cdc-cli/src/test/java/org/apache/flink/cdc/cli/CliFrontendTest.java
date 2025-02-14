@@ -38,6 +38,9 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Map;
 
+import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.RESTORE_MODE;
+import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
+import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -102,11 +105,10 @@ class CliFrontendTest {
                         "-cm",
                         "no_claim",
                         "-n");
-        assertThat(executor.getSavepointSettings().getRestorePath())
+        assertThat(executor.getFlinkConfig().get(SAVEPOINT_PATH))
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getSavepointSettings().getRestoreMode())
-                .isEqualTo(RestoreMode.NO_CLAIM);
-        assertThat(executor.getSavepointSettings().allowNonRestoredState()).isTrue();
+        assertThat(executor.getFlinkConfig().get(RESTORE_MODE)).isEqualTo(RestoreMode.NO_CLAIM);
+        assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
     }
 
     @Test

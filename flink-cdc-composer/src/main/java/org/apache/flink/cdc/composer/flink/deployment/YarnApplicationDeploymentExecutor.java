@@ -24,17 +24,19 @@ import org.apache.flink.client.deployment.application.ApplicationConfiguration;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.client.program.ClusterClientProvider;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileStatus;
+import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.yarn.YarnClusterClientFactory;
 import org.apache.flink.yarn.YarnClusterDescriptor;
 import org.apache.flink.yarn.configuration.YarnConfigOptions;
-import org.apache.flink.yarn.configuration.YarnDeploymentTarget;
 import org.apache.flink.yarn.configuration.YarnLogConfigUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
@@ -64,7 +66,6 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
             Path flinkHome)
             throws Exception {
         LOG.info("Submitting application in 'Flink Yarn Application Mode'.");
-        flinkConfig.set(DeploymentOptions.TARGET, YarnDeploymentTarget.APPLICATION.getName());
         if (flinkConfig.get(PipelineOptions.JARS) == null) {
             flinkConfig.set(
                     PipelineOptions.JARS, Collections.singletonList(getFlinkCDCDistJarFromEnv()));
@@ -73,7 +74,15 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
                 YarnConfigOptions.SHIP_FILES,
                 additionalJars.stream().map(Path::toString).collect(Collectors.toList()));
 
-        flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
+        ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+
+        Path pipelinePath = new Path(commandLine.getArgList().get(0));
+        FileSystem fileSystem = FileSystem.get(pipelinePath.toUri());
+        FSDataInputStream pipelineInStream = fileSystem.open(pipelinePath);
+
+        flinkConfig.set(
+                ApplicationConfiguration.APPLICATION_ARGS,
+                Collections.singletonList(mapper.readTree(pipelineInStream).asText().toString()));
         YarnLogConfigUtil.setLogConfigFileInConfig(
                 flinkConfig, Joiner.on(File.separator).join(flinkHome, "conf"));
 
