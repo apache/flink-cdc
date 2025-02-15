@@ -32,6 +32,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.TestTable;
 import org.apache.flink.cdc.connectors.mysql.testutils.TestTableSchemas;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -49,6 +50,7 @@ import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
 import org.apache.flink.table.api.DataTypes;
+import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.Column;
@@ -66,17 +68,29 @@ import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.assertj.core.api.Assertions;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -88,6 +102,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Random;
 import java.util.UUID;
@@ -117,6 +132,9 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
+
+    private final UniqueDatabase fullTypesDatabase =
+            new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
 
     /** Initial changelogs in string of table "customers" in database "customer". */
     private final List<String> initialChanges =
@@ -1255,6 +1273,215 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         @Override
         public TypeInformation<RowData> getProducedType() {
             return deserializeSchema.getProducedType();
+        }
+    }
+
+    @Test
+    public void testFullTypesWithRowDataFormat() throws Exception {
+        fullTypesDatabase.createAndInitialize();
+        TestTable fullTypesTable =
+                new TestTable(fullTypesDatabase, "full_types", TestTableSchemas.FULL_TYPES);
+
+        // Create Flink execution environment
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(1000);
+
+        // Build source
+        MySqlSource<RowData> sourceFunction =
+                MySqlSource.<RowData>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        // monitor all tables under column_type_test database
+                        .databaseList(fullTypesDatabase.getDatabaseName())
+                        .tableList(fullTypesDatabase.qualifiedTableName("full_types"))
+                        .username(fullTypesDatabase.getUsername())
+                        .password(fullTypesDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .startupOptions(StartupOptions.initial())
+                        .deserializer(fullTypesTable.getDeserializer())
+                        .build();
+        DataStreamSource<RowData> source =
+                env.fromSource(
+                        sourceFunction, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
+
+        // add collector
+        TypeSerializer<RowData> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectSinkOperatorFactory<RowData> factory =
+                new CollectSinkOperatorFactory<>(serializer, accumulatorName);
+        CollectSinkOperator<RowData> operator =
+                (CollectSinkOperator<RowData>) factory.getOperator();
+        CollectResultIterator<RowData> iterator =
+                new CollectResultIterator<>(
+                        operator.getOperatorIdFuture(),
+                        serializer,
+                        accumulatorName,
+                        env.getCheckpointConfig(),
+                        10000L);
+        CollectStreamSink<RowData> sink = new CollectStreamSink<>(source, factory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        JobClient jobClient = env.executeAsync();
+        iterator.setJobClient(jobClient);
+
+        // check the snapshot result
+        List<String> expectedSnapshotData =
+                Collections.singletonList(
+                        "+I[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102, 123.102, 123.103, 123.104, 404.4443, 404.4444, 404.4445, 123.4567, 123.4568, 123.4569, 346, 34567892.1, false, true, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22Z, [101, 26, -19, 8, 57, 15, 72, -109, -78, -15, 54, -110, 62, 123, 116, 0], [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, a,b, {\"key1\": \"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0}, {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0}, {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0}]");
+        List<String> actualSnapshotData =
+                fetchRowData(iterator, expectedSnapshotData.size(), fullTypesTable::stringify);
+        assertEqualsInAnyOrder(expectedSnapshotData, actualSnapshotData);
+
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+
+        // check the binlog result
+        List<String> expectedBinLogData =
+                Arrays.asList(
+                        "-U[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102, 123.102, 123.103, 123.104, 404.4443, 404.4444, 404.4445, 123.4567, 123.4568, 123.4569, 346, 34567892.1, false, true, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:00:22Z, [101, 26, -19, 8, 57, 15, 72, -109, -78, -15, 54, -110, 62, 123, 116, 0], [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, a,b, {\"key1\":\"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0}, {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0}, {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0}]",
+                        "+U[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295, 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102, 123.102, 123.103, 123.104, 404.4443, 404.4444, 404.4445, 123.4567, 123.4568, 123.4569, 346, 34567892.1, false, true, true, 2020-07-17, 18:00:22, 2020-07-17T18:00:22.123, 2020-07-17T18:00:22.123456, 2020-07-17T18:33:22Z, [101, 26, -19, 8, 57, 15, 72, -109, -78, -15, 54, -110, 62, 123, 116, 0], [4, 4, 4, 4, 4, 4, 4, 4], text, [16], [16], [16], [16], 2021, red, a,b, {\"key1\":\"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0}, {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0}, {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0}, {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0}, {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0}]");
+        List<String> actualBinlogData =
+                fetchRowData(iterator, expectedBinLogData.size(), fullTypesTable::stringify);
+        assertEqualsInAnyOrder(expectedBinLogData, actualBinlogData);
+        jobClient.cancel().get();
+    }
+
+    @Test
+    public void testFullTypesWithJsonFormatIncludeSchema() throws Exception {
+        testFullTypesWithJsonFormat(true);
+    }
+
+    @Test
+    public void testFullTypesWithJsonFormatExcludeSchema() throws Exception {
+        testFullTypesWithJsonFormat(false);
+    }
+
+    @Test
+    public void testFullTypesWithJsonFormatWithNumericDecimal() throws Exception {
+        Map<String, Object> customConverterConfigs = new HashMap<>();
+        customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
+        testFullTypesWithJsonFormat(
+                false,
+                customConverterConfigs,
+                "file/debezium-data-schema-exclude-with-numeric-decimal.json");
+    }
+
+    private void testFullTypesWithJsonFormat(Boolean includeSchema) throws Exception {
+        String expectedFile =
+                includeSchema
+                        ? "file/debezium-data-schema-include.json"
+                        : "file/debezium-data-schema-exclude.json";
+        testFullTypesWithJsonFormat(includeSchema, null, expectedFile);
+    }
+
+    private void testFullTypesWithJsonFormat(
+            Boolean includeSchema, Map<String, Object> customConverterConfigs, String expectedFile)
+            throws Exception {
+        fullTypesDatabase.createAndInitialize();
+        JsonDebeziumDeserializationSchema schema =
+                customConverterConfigs == null
+                        ? new JsonDebeziumDeserializationSchema(includeSchema)
+                        : new JsonDebeziumDeserializationSchema(
+                                includeSchema, customConverterConfigs);
+
+        // Build source
+        MySqlSource<String> sourceFunction =
+                MySqlSource.<String>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        // monitor all tables under column_type_test database
+                        .databaseList(fullTypesDatabase.getDatabaseName())
+                        .tableList(fullTypesDatabase.qualifiedTableName("full_types"))
+                        .username(fullTypesDatabase.getUsername())
+                        .password(fullTypesDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .deserializer(schema)
+                        .build();
+
+        // Create Flink execution environment
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.enableCheckpointing(1000);
+        StreamTableEnvironment tEnv =
+                StreamTableEnvironment.create(
+                        env, EnvironmentSettings.newInstance().inStreamingMode().build());
+
+        final JsonNode expected =
+                new ObjectMapper().readValue(readLines(expectedFile), JsonNode.class);
+        JsonNode expectSnapshot = expected.get("expected_snapshot");
+
+        DataStreamSource<String> source =
+                env.fromSource(
+                        sourceFunction, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
+        tEnv.createTemporaryView("full_types", source);
+        TableResult result = tEnv.executeSql("SELECT * FROM full_types");
+
+        // check the snapshot result
+        CloseableIterator<Row> snapshot = result.collect();
+        waitForSnapshotStarted(snapshot);
+
+        assertJsonEquals(extractJsonBody(snapshot.next()), expectSnapshot);
+        try (Connection connection = fullTypesDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE full_types SET timestamp_c = '2020-07-17 18:33:22' WHERE id=1;");
+        }
+
+        // check the binlog result
+        CloseableIterator<Row> binlog = result.collect();
+        JsonNode expectBinlog = expected.get("expected_binlog");
+        assertJsonEquals(extractJsonBody(binlog.next()), expectBinlog);
+        result.getJobClient().get().cancel().get();
+    }
+
+    private static List<Object> fetchRowsWithoutRowKindMarker(Iterator<Row> iter, int size) {
+        List<Object> rows = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            Row row = iter.next();
+            // ignore rowKind marker
+            rows.add(row.getField(0));
+            size--;
+        }
+        return rows;
+    }
+
+    private static byte[] readLines(String resource) throws IOException, URISyntaxException {
+        Path path =
+                Paths.get(
+                        Objects.requireNonNull(
+                                        MySqlSourceITCase.class
+                                                .getClassLoader()
+                                                .getResource(resource))
+                                .toURI());
+        return Files.readAllBytes(path);
+    }
+
+    private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
+        while (!iterator.hasNext()) {
+            Thread.sleep(100);
+        }
+    }
+
+    private static void assertJsonEquals(JsonNode actual, JsonNode expect) throws Exception {
+        if (actual.get("payload") != null && expect.get("payload") != null) {
+            actual = actual.get("payload");
+            expect = expect.get("payload");
+        }
+        Assertions.assertThat(actual.get("after")).isEqualTo(expect.get("after"));
+        Assertions.assertThat(actual.get("before")).isEqualTo(expect.get("before"));
+        Assertions.assertThat(actual.get("op")).isEqualTo(expect.get("op"));
+    }
+
+    private static JsonNode extractJsonBody(Row row) {
+        try {
+            String body = row.toString();
+            return new ObjectMapper()
+                    .readValue(body.substring(3, body.length() - 1), JsonNode.class);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Invalid JSON format.", e);
         }
     }
 }
