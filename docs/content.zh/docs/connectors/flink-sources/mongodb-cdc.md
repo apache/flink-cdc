@@ -488,6 +488,82 @@ public class MongoDBIncrementalSourceExample {
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
 
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 MongoDB，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
+
+### 完整的 Changelog
+
+MongoDB 6.0 以及更高的版本支持发送变更流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
+
+- 前镜像是指被替换、更新或删除之前的文档。对于插入操作没有前镜像。
+
+- 后镜像是指被替换、更新或删除之后的文档。对于删除操作没有后镜像。
+
+MongoDB CDC 能够使用前镜像和后镜像来生成完整的变更日志流，包括插入、更新前、更新后和删除的数据行，从而避免了额外的 `ChangelogNormalize` 下游节点。
+
+为了启用此功能，你需要满足以下条件：
+
+- MongoDB 的版本必须为 6.0 或更高版本。
+- 启用 `preAndPostImages` 功能。
+
+```javascript
+db.runCommand({
+  setClusterParameter: {
+    changeStreamOptions: {
+      preAndPostImages: {
+        expireAfterSeconds: 'off' // replace with custom image expiration time
+      }
+    }
+  }
+})
+```
+
+- 为希望监控的 collection 启用 `changeStreamPreAndPostImages` 功能：
+```javascript
+db.runCommand({
+  collMod: "<< collection name >>", 
+  changeStreamPreAndPostImages: {
+    enabled: true 
+  } 
+})
+```
+
+在 DataStream 中开启 MongoDB CDC 的 `scan.full-changelog` 功能：
+
+```java
+MongoDBSource.builder()
+    .scanFullChangelog(true)
+    ...
+    .build()
+```
+
+或者使用 Flink SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.full-changelog' = 'true',
+    ...
+)
+```
+
 数据类型映射
 ----------------
 [BSON](https://docs.mongodb.com/manual/reference/bson-types/) **二进制 JSON**的缩写是一种类似 JSON 格式的二进制编码序列，用于在 MongoDB 中存储文档和进行远程过程调用。

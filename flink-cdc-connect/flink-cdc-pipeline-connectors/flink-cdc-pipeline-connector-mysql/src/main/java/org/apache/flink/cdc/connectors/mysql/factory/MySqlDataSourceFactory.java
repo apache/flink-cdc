@@ -336,6 +336,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(INCLUDE_COMMENTS_ENABLED);
         options.add(USE_LEGACY_JSON_FORMAT);
         options.add(TREAT_TINYINT1_AS_BOOLEAN_ENABLED);
+        options.add(PARSE_ONLINE_SCHEMA_CHANGES);
         return options;
     }
 

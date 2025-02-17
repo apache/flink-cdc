@@ -98,6 +98,22 @@ public class ElasticsearchDataSinkOptions {
                     .noDefaultValue()
                     .withDescription("The password for Elasticsearch authentication.");
 
+    /** The sharding for Elasticsearch index, default sink table name is test_table_${suffix}. */
+    public static final ConfigOption<String> SHARDING_SUFFIX_KEY =
+            ConfigOptions.key("sharding.suffix.key")
+                    .stringType()
+                    .defaultValue("")
+                    .withDescription(
+                            "Sharding suffix key for each table, allow setting sharding suffix key for multiTables.Default sink table name is test_table${suffix_key}.Default sharding column is first partition column.Tables are separated by ';'.Table and column are separated by '$'.For example, we can set sharding.suffix.key by 'table1$col1;table2$col2'");
+
+    /** The sharding for Elasticsearch index, default sink table name is test_table_${suffix}. */
+    public static final ConfigOption<String> SHARDING_SUFFIX_SEPARATOR =
+            ConfigOptions.key("sharding.suffix.separator")
+                    .stringType()
+                    .defaultValue("_")
+                    .withDescription(
+                            "Separator for sharding suffix in table names, allow defining the separator between table name and sharding suffix. Default value is '_'. For example, if set to '-', the default table name would be test_table-${suffix}");
+
     private ElasticsearchDataSinkOptions() {
         // This class should not be instantiated
     }

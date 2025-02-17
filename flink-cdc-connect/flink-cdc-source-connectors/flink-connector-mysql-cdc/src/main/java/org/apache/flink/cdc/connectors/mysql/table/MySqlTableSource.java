@@ -357,7 +357,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
-                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill);
+                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill)
+                && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
+                && useLegacyJsonFormat == that.useLegacyJsonFormat;
     }
 
     @Override
@@ -390,7 +392,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 jdbcProperties,
                 heartbeatInterval,
                 chunkKeyColumn,
-                skipSnapshotBackFill);
+                skipSnapshotBackFill,
+                parseOnlineSchemaChanges,
+                useLegacyJsonFormat);
     }
 
     @Override

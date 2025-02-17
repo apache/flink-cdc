@@ -37,7 +37,7 @@ def put_mystery_data(mystery)
 end
 
 def ensure_mystery_data(mystery)
-  throw StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
+  raise StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
 end
 
 def extract_job_id(output)
@@ -120,15 +120,14 @@ end
 version_list = case ARGV[0]
                when '1.19.1' then %w[3.2.0 3.2.1 3.3.0 3.4-SNAPSHOT]
                when '1.20.0' then %w[3.2.1 3.3.0 3.4-SNAPSHOT]
-               else []
+               else throw "Unknown Flink target version: #{ARGV[0]}."
                end
 
-version_result = Hash.new('❓')
 @failures = []
 
 new_version = version_list.last
 
-version_list.each_with_index do |old_version, old_index|
+version_list.each do |old_version|
   puts "-> Testing migrating from #{old_version} to latest snapshot."
   puts 'Restarting cluster...'
   `#{FLINK_HOME}/bin/stop-cluster.sh`
@@ -137,7 +136,6 @@ version_list.each_with_index do |old_version, old_index|
   puts 'Started cluster.'
 
   result = test_migration old_version, new_version
-  version_result[old_version + new_version] = result ? '✅' : '❌'
   @failures << "#{old_version} => #{new_version}" unless result
 end
 
