@@ -88,7 +88,7 @@ public final class RowType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new RowType(
                 isNullable, fields.stream().map(DataField::copy).collect(Collectors.toList()));
     }

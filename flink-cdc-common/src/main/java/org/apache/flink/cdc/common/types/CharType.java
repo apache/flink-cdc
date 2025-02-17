@@ -64,7 +64,7 @@ public class CharType extends DataType {
         this(DEFAULT_LENGTH);
     }
 
-    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link #copy(boolean)}. */
+    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link DataType#copy(boolean)}. */
     private CharType(int length, boolean isNullable) {
         super(isNullable, DataTypeRoot.CHAR);
         this.length = length;
@@ -88,7 +88,7 @@ public class CharType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new CharType(length, isNullable);
     }
 
