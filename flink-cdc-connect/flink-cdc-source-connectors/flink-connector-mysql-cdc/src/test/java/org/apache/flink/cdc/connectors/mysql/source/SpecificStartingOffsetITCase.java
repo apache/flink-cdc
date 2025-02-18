@@ -512,6 +512,11 @@ public class SpecificStartingOffsetITCase {
     }
 
     private static String buildMySqlConfigWithTimezone(File resourceDirectory, String timezone) {
+        // JVM timezone is in "GMT+XX:XX" or "GMT-XX:XX" format
+        // while MySQL configuration file requires "+XX:XX" or "-XX:XX"
+        if (timezone.startsWith("GMT")) {
+            timezone = timezone.substring(3);
+        }
         try {
             TemporaryFolder tempFolder = new TemporaryFolder(resourceDirectory);
             tempFolder.create();

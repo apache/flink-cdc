@@ -239,6 +239,11 @@ public class MySqlTimezoneITCase {
     }
 
     private String buildMySqlConfigWithTimezone(String timezone) {
+        // JVM timezone is in "GMT+XX:XX" or "GMT-XX:XX" format
+        // while MySQL configuration file requires "+XX:XX" or "-XX:XX"
+        if (timezone.startsWith("GMT")) {
+            timezone = timezone.substring(3);
+        }
         try {
             File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
             Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));
