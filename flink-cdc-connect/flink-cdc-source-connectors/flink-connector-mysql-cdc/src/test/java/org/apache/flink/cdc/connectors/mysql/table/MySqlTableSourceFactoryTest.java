@@ -748,7 +748,7 @@ class MySqlTableSourceFactoryTest {
     }
 
     @Test
-    public void testEnablingExperimentalOptions() {
+    void testEnablingExperimentalOptions() {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.parse.online.schema.changes.enabled", "true");
         properties.put("use.legacy.json.format", "true");
@@ -785,7 +785,7 @@ class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllOptions() {
