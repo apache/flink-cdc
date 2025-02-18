@@ -67,10 +67,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_PASSWORD;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_USER;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.fetchResults;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.getServerId;
 import static org.junit.Assert.assertEquals;
 
 /**

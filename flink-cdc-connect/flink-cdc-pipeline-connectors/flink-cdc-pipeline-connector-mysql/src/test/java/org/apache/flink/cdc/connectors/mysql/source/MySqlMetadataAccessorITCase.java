@@ -26,8 +26,8 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -57,15 +57,15 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
             new UniqueDatabase(
                     MYSQL_CONTAINER,
                     "column_type_test",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
+                    MySqlSourceTestUtils.TEST_USER,
+                    MySqlSourceTestUtils.TEST_PASSWORD);
 
     private final UniqueDatabase fullTypesMySql8Database =
             new UniqueDatabase(
                     MYSQL8_CONTAINER,
                     "column_type_test_mysql8",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
+                    MySqlSourceTestUtils.TEST_USER,
+                    MySqlSourceTestUtils.TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
