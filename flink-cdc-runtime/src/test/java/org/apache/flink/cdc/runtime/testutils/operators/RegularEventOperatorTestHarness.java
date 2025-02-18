@@ -67,10 +67,8 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 
 /**
@@ -242,31 +240,6 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 schemaRegistry
                         .handleCoordinationRequest(new SchemaChangeRequest(tableId, event, 0))
                         .get());
-    }
-
-    public SchemaChangeResponse requestSchemaChangeResult(TableId tableId, SchemaChangeEvent event)
-            throws ExecutionException, InterruptedException, TimeoutException {
-        long rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
-        long deadline = System.currentTimeMillis() + rpcTimeOutInMillis;
-        while (true) {
-            LOG.info("request schema change result");
-            SchemaChangeResponse response = requestSchemaChangeEvent(tableId, event);
-            if (System.currentTimeMillis() < deadline) {
-                if (response.isRegistryBusy()) {
-                    LOG.info("{}> Schema Registry is busy now, waiting for next request...", 0);
-                    Thread.sleep(1000);
-                } else if (response.isWaitingForFlush()) {
-                    LOG.info(
-                            "{}> Schema change event has not collected enough flush success events from writers, waiting...",
-                            0);
-                    Thread.sleep(1000);
-                } else {
-                    return response;
-                }
-            } else {
-                throw new TimeoutException("Timeout when requesting schema change.");
-            }
-        }
     }
 
     public Schema getLatestOriginalSchema(TableId tableId) throws Exception {

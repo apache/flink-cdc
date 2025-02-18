@@ -51,20 +51,12 @@ public class SchemaChangeResponse implements CoordinationResponse {
         return new SchemaChangeResponse(ResponseCode.SUCCESS, schemaChangeEvents, evolvedSchemas);
     }
 
-    public static SchemaChangeResponse busy() {
-        return new SchemaChangeResponse(ResponseCode.BUSY);
-    }
-
     public static SchemaChangeResponse duplicate() {
         return new SchemaChangeResponse(ResponseCode.DUPLICATE);
     }
 
     public static SchemaChangeResponse ignored() {
         return new SchemaChangeResponse(ResponseCode.IGNORED);
-    }
-
-    public static SchemaChangeResponse waitingForFlush() {
-        return new SchemaChangeResponse(ResponseCode.WAITING_FOR_FLUSH);
     }
 
     private SchemaChangeResponse(ResponseCode responseCode) {
@@ -84,20 +76,12 @@ public class SchemaChangeResponse implements CoordinationResponse {
         return ResponseCode.SUCCESS.equals(responseCode);
     }
 
-    public boolean isRegistryBusy() {
-        return ResponseCode.BUSY.equals(responseCode);
-    }
-
     public boolean isDuplicate() {
         return ResponseCode.DUPLICATE.equals(responseCode);
     }
 
     public boolean isIgnored() {
         return ResponseCode.IGNORED.equals(responseCode);
-    }
-
-    public boolean isWaitingForFlush() {
-        return ResponseCode.WAITING_FOR_FLUSH.equals(responseCode);
     }
 
     public List<SchemaChangeEvent> getAppliedSchemaChangeEvents() {
@@ -142,8 +126,6 @@ public class SchemaChangeResponse implements CoordinationResponse {
      * <p>- Accepted: Requested schema change request has been accepted exclusively. Any other
      * schema change requests will be blocked.
      *
-     * <p>- Busy: Schema registry is currently busy processing another schema change request.
-     *
      * <p>- Duplicate: This schema change request has been submitted before, possibly by another
      * paralleled subTask.
      *
@@ -152,9 +134,7 @@ public class SchemaChangeResponse implements CoordinationResponse {
      */
     public enum ResponseCode {
         SUCCESS,
-        BUSY,
         DUPLICATE,
-        IGNORED,
-        WAITING_FOR_FLUSH
+        IGNORED
     }
 }
