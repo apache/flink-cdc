@@ -71,6 +71,7 @@ import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -103,6 +104,7 @@ import java.util.stream.Stream;
 import static java.lang.String.format;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link MySqlSource}. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
@@ -886,7 +888,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @SuppressWarnings("unchecked")
     @Test
-    public void testSourceMetrics() throws Exception {
+    void testSourceMetrics() throws Exception {
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -925,30 +927,27 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         Map<String, Metric> metrics = metricReporter.getMetricsByGroup(group);
 
         // numRecordsOut
-        assertEquals(
-                numSnapshotRecordsExpected,
-                group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
+        assertThat(group.getIOMetricGroup().getNumRecordsOutCounter().getCount())
+                .isEqualTo(numSnapshotRecordsExpected);
 
         // currentEmitEventTimeLag should be UNDEFINED during snapshot phase
-        assertTrue(metrics.containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG));
+        assertThat(metrics).containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
         Gauge<Long> currentEmitEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
-        assertEquals(
-                InternalSourceReaderMetricGroup.UNDEFINED,
-                (long) currentEmitEventTimeLag.getValue());
+        assertThat(currentEmitEventTimeLag.getValue())
+                .isEqualTo(InternalSourceReaderMetricGroup.UNDEFINED);
 
         // currentFetchEventTimeLag should be UNDEFINED during snapshot phase
-        assertTrue(metrics.containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG));
+        assertThat(metrics).containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
         Gauge<Long> currentFetchEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
-        assertEquals(
-                MySqlSourceReaderMetrics.UNDEFINED, (long) currentFetchEventTimeLag.getValue());
+        assertThat(currentFetchEventTimeLag.getValue())
+                .isEqualTo(MySqlSourceReaderMetrics.UNDEFINED);
 
         // sourceIdleTime should be positive (we can't know the exact value)
-        assertTrue(metrics.containsKey(MetricNames.SOURCE_IDLE_TIME));
+        assertThat(metrics).containsKey(MetricNames.SOURCE_IDLE_TIME);
         Gauge<Long> sourceIdleTime = (Gauge<Long>) metrics.get(MetricNames.SOURCE_IDLE_TIME);
-        assertTrue(sourceIdleTime.getValue() > 0);
-        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        assertThat(sourceIdleTime.getValue()).isGreaterThan(0).isLessThan(TIMEOUT.toMillis());
 
         // --------------------------------- Binlog phase -----------------------------
         makeFirstPartBinlogEvents(getConnection(), customDatabase.qualifiedTableName("customers"));
@@ -962,21 +961,21 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
         // Check metrics
         // numRecordsOut
-        assertEquals(
-                numSnapshotRecordsExpected + numBinlogRecordsExpected,
-                group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
+        assertThat(group.getIOMetricGroup().getNumRecordsOutCounter().getCount())
+                .isEqualTo(numSnapshotRecordsExpected + numBinlogRecordsExpected);
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        assertTrue(currentEmitEventTimeLag.getValue() > 0);
-        assertTrue(currentEmitEventTimeLag.getValue() < TIMEOUT.toMillis());
+        assertThat(currentEmitEventTimeLag.getValue())
+                .isGreaterThan(0)
+                .isLessThan(TIMEOUT.toMillis());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        assertTrue(currentFetchEventTimeLag.getValue() > 0);
-        assertTrue(currentFetchEventTimeLag.getValue() < TIMEOUT.toMillis());
+        assertThat(currentFetchEventTimeLag.getValue())
+                .isGreaterThan(0)
+                .isLessThan(TIMEOUT.toMillis());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        assertTrue(sourceIdleTime.getValue() > 0);
-        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        assertThat(sourceIdleTime.getValue()).isGreaterThan(0).isLessThan(TIMEOUT.toMillis());
 
         jobClient.cancel().get();
         iterator.close();
