@@ -292,6 +292,10 @@ public class PostgresSourceBuilder<T> {
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }
 
+    public PostgresSourceConfigFactory getConfigFactory() {
+        return configFactory;
+    }
+
     /** The Postgres source based on the incremental snapshot framework. */
     @Experimental
     public static class PostgresIncrementalSource<T> extends JdbcIncrementalSource<T> {
