@@ -411,9 +411,7 @@ public class SchemaCoordinator extends SchemaRegistry {
 
         // And returns all successfully applied schema change events to SchemaOperator.
         responseFuture.complete(
-                wrap(
-                        SchemaChangeResponse.success(
-                                appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
+                wrap(new SchemaChangeResponse(appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
 
         pendingRequests.remove(sourceSubTaskId);
         LOG.info(
