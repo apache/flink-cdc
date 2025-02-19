@@ -940,6 +940,40 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn("notes", DataTypes.STRING())
                                     .primaryKey("id", "name")
                                     .build()));
+
+            // Test create table DDL with like syntax
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable4` LIKE `%s`.`newlyAddedTable3`",
+                            inventoryDatabase.getDatabaseName(),
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable4"),
+                            Schema.newBuilder()
+                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                                    .physicalColumn("name", DataTypes.VARCHAR(17).notNull())
+                                    .physicalColumn("notes", DataTypes.STRING())
+                                    .primaryKey("id", "name")
+                                    .build()));
+
+            // Test create table DDL with as syntax, Primary key information will not be retained
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable5` AS SELECT * FROM `%s`.`newlyAddedTable3`",
+                            inventoryDatabase.getDatabaseName(),
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable5"),
+                            Schema.newBuilder()
+                                    .physicalColumn(
+                                            "id", DataTypes.DECIMAL(20, 0).notNull(), null, "0")
+                                    .physicalColumn("name", DataTypes.VARCHAR(17).notNull())
+                                    .physicalColumn("notes", DataTypes.STRING())
+                                    .build()));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertEqualsInAnyOrder(
