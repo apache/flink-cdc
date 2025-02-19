@@ -2967,8 +2967,9 @@ public class PostTransformOperatorTest {
         testExpressionConditionTransform("'123' not like '^[a-zA-Z]'");
         testExpressionConditionTransform("abs(2) = 2");
         testExpressionConditionTransform("ceil(2.4) = 3.0");
+        testExpressionConditionTransform("ceiling(2.4) = 3.0");
         testExpressionConditionTransform("floor(2.5) = 2.0");
-        testExpressionConditionTransform("round(3.1415926,2) = 3.14");
+        testExpressionConditionTransform("round(3.1415926, 2) = 3.14");
         testExpressionConditionTransform("IF(2>0,1,0) = 1");
         testExpressionConditionTransform("COALESCE(null,1,2) = 1");
         testExpressionConditionTransform("1 + 1 = 2");
