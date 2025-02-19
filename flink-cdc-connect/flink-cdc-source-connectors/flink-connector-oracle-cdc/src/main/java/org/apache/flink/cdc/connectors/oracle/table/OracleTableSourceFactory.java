@@ -30,7 +30,9 @@ import org.apache.flink.table.factories.DynamicTableSourceFactory;
 import org.apache.flink.table.factories.FactoryUtil;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECTION_POOL_SIZE;
@@ -69,7 +71,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     public DynamicTableSource createDynamicTableSource(Context context) {
         final FactoryUtil.TableFactoryHelper helper =
                 FactoryUtil.createTableFactoryHelper(this, context);
-        helper.validateExcept(DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX);
+        helper.validateExcept(
+                DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX,
+                SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS_PREFIX);
 
         final ReadableConfig config = helper.getOptions();
         String url = config.get(URL);
@@ -90,7 +94,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         String tableName = config.get(TABLE_NAME);
         String schemaName = config.get(SCHEMA_NAME);
         int port = config.get(PORT);
-        StartupOptions startupOptions = getStartupOptions(config);
+
+        StartupOptions startupOptions =
+                getStartupOptions(config, context.getCatalogTable().getOptions());
         ResolvedSchema physicalSchema = context.getCatalogTable().getResolvedSchema();
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
@@ -190,8 +196,12 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_SNAPSHOT = "snapshot";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS = "specific-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS_PREFIX =
+            "scan.startup.specific-offset.";
 
-    private static StartupOptions getStartupOptions(ReadableConfig config) {
+    private static StartupOptions getStartupOptions(
+            ReadableConfig config, Map<String, String> options) {
         String modeString = config.get(SCAN_STARTUP_MODE);
 
         switch (modeString.toLowerCase()) {
@@ -201,7 +211,9 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 return StartupOptions.snapshot();
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
-
+            case SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS:
+                Map<String, String> offsetMap = getSpecificOffsetMap(options);
+                return StartupOptions.specificOffset(offsetMap);
             default:
                 throw new ValidationException(
                         String.format(
@@ -212,6 +224,20 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
                                 modeString));
         }
+    }
+
+    private static Map<String, String> getSpecificOffsetMap(Map<String, String> options) {
+        Map<String, String> offset = new HashMap<>();
+        for (Map.Entry<String, String> entry : options.entrySet()) {
+            if (entry.getKey().startsWith(SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS_PREFIX)) {
+                String subKey =
+                        entry.getKey()
+                                .substring(
+                                        SCAN_STARTUP_MODE_VALUE_SPECIFIC_OFFSETS_PREFIX.length());
+                offset.put(subKey, entry.getValue());
+            }
+        }
+        return offset;
     }
 
     /** Checks the value of given integer option is valid. */
