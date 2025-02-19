@@ -151,6 +151,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -222,6 +223,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -291,6 +293,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -362,6 +365,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -435,6 +439,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -499,6 +504,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -595,6 +601,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -665,6 +672,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -733,6 +741,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -797,6 +806,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -877,6 +887,7 @@ public class FlinkPipelineUdfITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),

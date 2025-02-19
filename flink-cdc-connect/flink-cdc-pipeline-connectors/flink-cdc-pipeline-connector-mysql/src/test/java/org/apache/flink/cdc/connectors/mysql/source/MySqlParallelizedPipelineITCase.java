@@ -142,6 +142,7 @@ public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
