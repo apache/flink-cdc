@@ -463,12 +463,20 @@ public class PaimonMetadataApplierTest {
                                 "col7_after", org.apache.flink.cdc.common.types.DataTypes.STRING()),
                         "col2"));
 
+        addedColumns.add(
+                AddColumnEvent.before(
+                        Column.physicalColumn(
+                                "col4_first_before",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING()),
+                        "col1"));
+
         addColumnEvent = new AddColumnEvent(TableId.parse("test.table1"), addedColumns);
         metadataApplier.applySchemaChange(addColumnEvent);
 
         tableSchema =
                 new RowType(
                         Arrays.asList(
+                                new DataField(7, "col4_first_before", DataTypes.STRING()),
                                 new DataField(3, "col4_first", DataTypes.STRING()),
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(5, "col6_before", DataTypes.STRING()),

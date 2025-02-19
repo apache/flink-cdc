@@ -270,11 +270,12 @@ public class PaimonMetadataApplier implements MetadataApplier {
         Table table = catalog.getTable(new Identifier(schemaName, tableName));
         List<String> columnNames = table.rowType().getFieldNames();
         int index = checkColumnPosition(existedColumnName, columnNames);
-        SchemaChange.Move after =
-                SchemaChange.Move.after(
-                        columnWithPosition.getAddColumn().getName(), columnNames.get(index - 1));
-
-        return SchemaChangeProvider.add(columnWithPosition, after);
+        String columnName = columnWithPosition.getAddColumn().getName();
+        return SchemaChangeProvider.add(
+                columnWithPosition,
+                (index == 0)
+                        ? SchemaChange.Move.first(columnName)
+                        : SchemaChange.Move.after(columnName, columnNames.get(index - 1)));
     }
 
     private int checkColumnPosition(String existedColumnName, List<String> columnNames) {
