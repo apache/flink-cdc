@@ -389,6 +389,18 @@ Flink SQL> SELECT * FROM orders;
         这是一项实验性功能。
       </td>
     </tr>
+    <tr>
+      <td>use.legacy.json.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。 <br>
+          这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
+          如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
+          Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
+          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -422,6 +434,11 @@ Flink SQL> SELECT * FROM orders;
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>当前记录表在数据库中更新的时间。 <br>如果从表的快照而不是 binlog 读取记录，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录的 changelog 的类型。注意: 下游的 SQL 算子可能会因为添加了 'row_kind' 列而导致数据回撤失败。如果源算子选择输出 'row_kind' 列，则下游的 SQL 算子可能会因为无法比较 'row_kind' 列而失败。建议仅在简单的同步作业中使用此元数据列。<br>'+I' 代表着 INSERT 数据，'-D' 代表着 DELETE 数据，'-U' 代表着 UPDATE_BEFORE 数据以及 '+U' 代表着 UPDATE_AFTER 数据。</td>
+    </tr>
   </tbody>
 </table>
 
@@ -431,6 +448,7 @@ CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
     table_name STRING METADATA  FROM 'table_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
     order_id INT,
     order_date TIMESTAMP(0),
     customer_name STRING,
@@ -455,6 +473,7 @@ CREATE TABLE products (
     db_name STRING METADATA FROM 'database_name' VIRTUAL,
     table_name STRING METADATA  FROM 'table_name' VIRTUAL,
     operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation     STRING METADATA FROM 'row_kind' VIRTUAL,
     order_id INT,
     order_date TIMESTAMP(0),
     customer_name STRING,
