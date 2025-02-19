@@ -63,7 +63,7 @@ public final class ArrayType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, elementType.asSerializableString());
     }
 

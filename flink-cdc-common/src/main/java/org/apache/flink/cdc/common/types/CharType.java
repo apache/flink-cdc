@@ -93,7 +93,7 @@ public class CharType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         if (length == EMPTY_LITERAL_LENGTH) {
             throw new IllegalArgumentException(
                     "Zero-length character strings have no serializable string representation.");
@@ -103,7 +103,8 @@ public class CharType extends DataType {
 
     @Override
     public String asSummaryString() {
-        return withNullability(FORMAT, length);
+        return withNullability(FORMAT, length)
+                + (getRawDataType() == null ? "" : " " + getRawDataType());
     }
 
     @Override

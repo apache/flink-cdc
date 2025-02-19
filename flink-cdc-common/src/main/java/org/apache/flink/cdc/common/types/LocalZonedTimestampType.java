@@ -87,13 +87,14 @@ public final class LocalZonedTimestampType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, precision);
     }
 
     @Override
     public String asSummaryString() {
-        return withNullability(SUMMARY_FORMAT, precision);
+        return withNullability(SUMMARY_FORMAT, precision)
+                + (getRawDataType() == null ? "" : " " + getRawDataType());
     }
 
     @Override

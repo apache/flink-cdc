@@ -91,13 +91,8 @@ public final class ZonedTimestampType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, precision);
-    }
-
-    @Override
-    public String asSummaryString() {
-        return asSerializableString();
     }
 
     @Override

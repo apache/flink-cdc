@@ -132,12 +132,21 @@ public abstract class DataType implements Serializable {
     }
 
     /**
-     * Returns a string that fully serializes this instance. The serialized string can be used for
-     * transmitting or persisting a type.
+     * Returns a string that fully serializes this instance except for the raw type.
      *
      * @return detailed string for transmission or persistence
      */
-    public abstract String asSerializableString();
+    protected abstract String asSerializableString();
+
+    /**
+     * Returns a string that fully serializes this instance, including the raw type. The serialized
+     * string can be used for transmitting or persisting a type.
+     *
+     * @return detailed string for transmission or persistence
+     */
+    public String asSerializableStringWithRawDataType() {
+        return asSerializableString() + (rawDataType == null ? "" : " " + rawDataType);
+    }
 
     /**
      * Returns a string that summarizes this type for printing to a console. An implementation might
@@ -148,7 +157,7 @@ public abstract class DataType implements Serializable {
      * @return summary string of this type for debugging purposes
      */
     public String asSummaryString() {
-        return asSerializableString();
+        return asSerializableStringWithRawDataType();
     }
 
     public abstract List<DataType> getChildren();

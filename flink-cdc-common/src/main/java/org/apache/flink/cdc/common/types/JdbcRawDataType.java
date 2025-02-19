@@ -75,4 +75,19 @@ public class JdbcRawDataType implements RawDataType {
     public int hashCode() {
         return Objects.hash(jdbcType, typeName, length, scale);
     }
+
+    @Override
+    public String toString() {
+        return "JdbcRawDataType{"
+                + "jdbcType="
+                + jdbcType
+                + ", typeName='"
+                + typeName
+                + '\''
+                + ", length="
+                + length
+                + ", scale="
+                + scale
+                + '}';
+    }
 }

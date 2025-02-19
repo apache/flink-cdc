@@ -47,7 +47,7 @@ public final class BigIntType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT);
     }
 

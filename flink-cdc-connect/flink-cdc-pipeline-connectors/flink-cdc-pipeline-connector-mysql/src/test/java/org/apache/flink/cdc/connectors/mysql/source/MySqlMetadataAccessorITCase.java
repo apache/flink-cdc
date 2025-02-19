@@ -20,9 +20,6 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
-import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -44,6 +41,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.getTestTableSchema;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -125,249 +123,28 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     public void testMysql57AccessTimeTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
-        String[] tables = new String[] {"time_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database, true);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "time_types"));
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.INT(),
-                                            DataTypes.DATE(),
-                                            DataTypes.TIME(0),
-                                            DataTypes.TIME(3),
-                                            DataTypes.TIME(6),
-                                            DataTypes.TIMESTAMP(0),
-                                            DataTypes.TIMESTAMP(3),
-                                            DataTypes.TIMESTAMP(6),
-                                            DataTypes.TIMESTAMP_LTZ(0),
-                                            DataTypes.TIMESTAMP_LTZ(0)
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "year_c",
-                                            "date_c",
-                                            "time_c",
-                                            "time_3_c",
-                                            "time_6_c",
-                                            "datetime_c",
-                                            "datetime3_c",
-                                            "datetime6_c",
-                                            "timestamp_c",
-                                            "timestamp_def_c"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
+        testAccessSchema(fullTypesMySql57Database, "time_types");
     }
 
     @Test
     public void testMysql8AccessTimeTypesSchema() {
         fullTypesMySql8Database.createAndInitialize();
 
-        String[] tables = new String[] {"time_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database, true);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql8Database.getDatabaseName(), "time_types"));
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.INT(),
-                                            DataTypes.DATE(),
-                                            DataTypes.TIME(0),
-                                            DataTypes.TIME(3),
-                                            DataTypes.TIME(6),
-                                            DataTypes.TIMESTAMP(0),
-                                            DataTypes.TIMESTAMP(3),
-                                            DataTypes.TIMESTAMP(6),
-                                            DataTypes.TIMESTAMP_LTZ(0),
-                                            DataTypes.TIMESTAMP_LTZ(3),
-                                            DataTypes.TIMESTAMP_LTZ(6),
-                                            DataTypes.TIMESTAMP_LTZ(0)
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "year_c",
-                                            "date_c",
-                                            "time_c",
-                                            "time_3_c",
-                                            "time_6_c",
-                                            "datetime_c",
-                                            "datetime3_c",
-                                            "datetime6_c",
-                                            "timestamp_c",
-                                            "timestamp3_c",
-                                            "timestamp6_c",
-                                            "timestamp_def_c"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
+        testAccessSchema(fullTypesMySql8Database, "time_types");
     }
 
     @Test
     public void testMysql57PrecisionTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
-        String[] tables = new String[] {"precision_types"};
-
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database, true);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(
-                                fullTypesMySql57Database.getDatabaseName(), "precision_types"));
-
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.DECIMAL(6, 2),
-                                            DataTypes.DECIMAL(9, 4),
-                                            DataTypes.DECIMAL(20, 4),
-                                            DataTypes.TIME(0),
-                                            DataTypes.TIME(3),
-                                            DataTypes.TIME(6),
-                                            DataTypes.TIMESTAMP(0),
-                                            DataTypes.TIMESTAMP(3),
-                                            DataTypes.TIMESTAMP(6),
-                                            DataTypes.TIMESTAMP_LTZ(0),
-                                            DataTypes.TIMESTAMP_LTZ(3),
-                                            DataTypes.TIMESTAMP_LTZ(6),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE()
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "decimal_c0",
-                                            "decimal_c1",
-                                            "decimal_c2",
-                                            "time_c",
-                                            "time_3_c",
-                                            "time_6_c",
-                                            "datetime_c",
-                                            "datetime3_c",
-                                            "datetime6_c",
-                                            "timestamp_c",
-                                            "timestamp3_c",
-                                            "timestamp6_c",
-                                            "float_c0",
-                                            "float_c1",
-                                            "float_c2",
-                                            "real_c0",
-                                            "real_c1",
-                                            "real_c2",
-                                            "double_c0",
-                                            "double_c1",
-                                            "double_c2",
-                                            "double_precision_c0",
-                                            "double_precision_c1",
-                                            "double_precision_c2"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
+        testAccessSchema(fullTypesMySql57Database, "precision_types");
     }
 
     @Test
     public void testMysql8PrecisionTypesSchema() {
         fullTypesMySql8Database.createAndInitialize();
 
-        String[] tables = new String[] {"precision_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database, false);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(
-                                fullTypesMySql8Database.getDatabaseName(), "precision_types"));
-
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.DECIMAL(6, 2),
-                                            DataTypes.DECIMAL(9, 4),
-                                            DataTypes.DECIMAL(20, 4),
-                                            DataTypes.TIME(0),
-                                            DataTypes.TIME(3),
-                                            DataTypes.TIME(6),
-                                            DataTypes.TIMESTAMP(0),
-                                            DataTypes.TIMESTAMP(3),
-                                            DataTypes.TIMESTAMP(6),
-                                            DataTypes.TIMESTAMP_LTZ(0),
-                                            DataTypes.TIMESTAMP_LTZ(3),
-                                            DataTypes.TIMESTAMP_LTZ(6),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE()
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "decimal_c0",
-                                            "decimal_c1",
-                                            "decimal_c2",
-                                            "time_c",
-                                            "time_3_c",
-                                            "time_6_c",
-                                            "datetime_c",
-                                            "datetime3_c",
-                                            "datetime6_c",
-                                            "timestamp_c",
-                                            "timestamp3_c",
-                                            "timestamp6_c",
-                                            "float_c0",
-                                            "float_c1",
-                                            "float_c2",
-                                            "real_c0",
-                                            "real_c1",
-                                            "real_c2",
-                                            "double_c0",
-                                            "double_c1",
-                                            "double_c2",
-                                            "double_precision_c0",
-                                            "double_precision_c1",
-                                            "double_precision_c2"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
+        testAccessSchema(fullTypesMySql8Database, "precision_types");
     }
 
     private void testAccessDatabaseAndTable(UniqueDatabase database) {
@@ -394,136 +171,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     private void testAccessCommonTypesSchema(UniqueDatabase database, boolean tinyint1IsBit) {
         database.createAndInitialize();
 
-        String[] tables = new String[] {"common_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, database, tinyint1IsBit);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(database.getDatabaseName(), "common_types"));
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.TINYINT(),
-                                            DataTypes.SMALLINT(),
-                                            DataTypes.SMALLINT(),
-                                            DataTypes.SMALLINT(),
-                                            DataTypes.INT(),
-                                            DataTypes.INT(),
-                                            DataTypes.INT(),
-                                            DataTypes.INT(),
-                                            DataTypes.INT(),
-                                            DataTypes.INT(),
-                                            DataTypes.BIGINT(),
-                                            DataTypes.BIGINT(),
-                                            DataTypes.INT(),
-                                            DataTypes.BIGINT(),
-                                            DataTypes.DECIMAL(20, 0),
-                                            DataTypes.DECIMAL(20, 0),
-                                            DataTypes.VARCHAR(255),
-                                            DataTypes.CHAR(3),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.FLOAT(),
-                                            DataTypes.FLOAT(),
-                                            DataTypes.FLOAT(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DOUBLE(),
-                                            DataTypes.DECIMAL(8, 4),
-                                            DataTypes.DECIMAL(8, 4),
-                                            DataTypes.DECIMAL(8, 4),
-                                            DataTypes.DECIMAL(6, 0),
-                                            // Decimal precision larger than 38 will be treated as
-                                            // string.
-                                            DataTypes.STRING(),
-                                            DataTypes.BOOLEAN(),
-                                            DataTypes.BINARY(1),
-                                            tinyint1IsBit
-                                                    ? DataTypes.BOOLEAN()
-                                                    : DataTypes.TINYINT(),
-                                            tinyint1IsBit
-                                                    ? DataTypes.BOOLEAN()
-                                                    : DataTypes.TINYINT(),
-                                            DataTypes.BINARY(16),
-                                            DataTypes.BINARY(8),
-                                            DataTypes.STRING(),
-                                            DataTypes.BYTES(),
-                                            DataTypes.BYTES(),
-                                            DataTypes.BYTES(),
-                                            DataTypes.BYTES(),
-                                            DataTypes.INT(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING()
-                                        },
-                                        new String[] {
-                                            "id",
-                                            "tiny_c",
-                                            "tiny_un_c",
-                                            "tiny_un_z_c",
-                                            "small_c",
-                                            "small_un_c",
-                                            "small_un_z_c",
-                                            "medium_c",
-                                            "medium_un_c",
-                                            "medium_un_z_c",
-                                            "int_c",
-                                            "int_un_c",
-                                            "int_un_z_c",
-                                            "int11_c",
-                                            "big_c",
-                                            "big_un_c",
-                                            "big_un_z_c",
-                                            "varchar_c",
-                                            "char_c",
-                                            "real_c",
-                                            "float_c",
-                                            "float_un_c",
-                                            "float_un_z_c",
-                                            "double_c",
-                                            "double_un_c",
-                                            "double_un_z_c",
-                                            "decimal_c",
-                                            "decimal_un_c",
-                                            "decimal_un_z_c",
-                                            "numeric_c",
-                                            "big_decimal_c",
-                                            "bit1_c",
-                                            "bit3_c",
-                                            "tiny1_c",
-                                            "boolean_c",
-                                            "file_uuid",
-                                            "bit_c",
-                                            "text_c",
-                                            "tiny_blob_c",
-                                            "blob_c",
-                                            "medium_blob_c",
-                                            "long_blob_c",
-                                            "year_c",
-                                            "enum_c",
-                                            "json_c",
-                                            "point_c",
-                                            "geometry_c",
-                                            "linestring_c",
-                                            "polygon_c",
-                                            "multipoint_c",
-                                            "multiline_c",
-                                            "multipolygon_c",
-                                            "geometrycollection_c"
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
+        testAccessSchema(database, "common_types", tinyint1IsBit);
     }
 
     private MySqlMetadataAccessor getMetadataAccessor(
@@ -536,59 +184,31 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     public void testMysql57AccessJsonTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
-        String[] tables = new String[] {"json_types"};
-        MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database, true);
-
-        Schema actualSchema =
-                metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
-        Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.INT()
-                                        },
-                                        new String[] {
-                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
-                                        }))
-                        .build();
-        assertThat(actualSchema).isEqualTo(expectedSchema);
+        testAccessSchema(fullTypesMySql57Database, "json_types");
     }
 
     @Test
     public void testMysql8AccessJsonTypesSchema() {
-        fullTypesMySql57Database.createAndInitialize();
+        fullTypesMySql8Database.createAndInitialize();
 
-        String[] tables = new String[] {"json_types"};
+        testAccessSchema(fullTypesMySql8Database, "json_types");
+    }
+
+    private void testAccessSchema(UniqueDatabase database, String tableName) {
+        testAccessSchema(database, tableName, true);
+    }
+
+    private void testAccessSchema(
+            UniqueDatabase database, String tableName, boolean tinyint1IsBit) {
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database, true);
+                getMetadataAccessor(new String[] {tableName}, database, tinyint1IsBit);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
-                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+                        TableId.tableId(database.getDatabaseName(), tableName));
+
         Schema expectedSchema =
-                Schema.newBuilder()
-                        .primaryKey("id")
-                        .fromRowDataType(
-                                RowType.of(
-                                        new DataType[] {
-                                            DataTypes.DECIMAL(20, 0).notNull(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.STRING(),
-                                            DataTypes.INT()
-                                        },
-                                        new String[] {
-                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
-                                        }))
-                        .build();
+                getTestTableSchema(tableName, tinyint1IsBit, database == fullTypesMySql8Database);
         assertThat(actualSchema).isEqualTo(expectedSchema);
     }
 

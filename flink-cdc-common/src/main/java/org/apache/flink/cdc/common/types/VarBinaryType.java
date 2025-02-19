@@ -70,7 +70,7 @@ public final class VarBinaryType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         if (length == MAX_LENGTH) {
             return withNullability(MAX_FORMAT);
         }

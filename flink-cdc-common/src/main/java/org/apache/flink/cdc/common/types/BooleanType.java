@@ -44,7 +44,7 @@ public class BooleanType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT);
     }
 

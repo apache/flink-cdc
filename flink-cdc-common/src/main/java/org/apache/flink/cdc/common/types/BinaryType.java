@@ -94,7 +94,7 @@ public final class BinaryType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         if (length == EMPTY_LITERAL_LENGTH) {
             throw new IllegalArgumentException(
                     "Zero-length binary strings have no serializable string representation.");
@@ -104,7 +104,8 @@ public final class BinaryType extends DataType {
 
     @Override
     public String asSummaryString() {
-        return withNullability(FORMAT, length);
+        return withNullability(FORMAT, length)
+                + (getRawDataType() == null ? "" : " " + getRawDataType());
     }
 
     @Override

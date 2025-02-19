@@ -77,7 +77,7 @@ public final class TimeType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, precision);
     }
 
