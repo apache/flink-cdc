@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 /** A test for the {@link RenameTableEventSerializer}. */
-public class DropTableEventSerializerTest extends SerializerTestBase<DropTableEvent> {
+class DropTableEventSerializerTest extends SerializerTestBase<DropTableEvent> {
     @Override
     protected TypeSerializer<DropTableEvent> createSerializer() {
         return DropTableEventSerializer.INSTANCE;

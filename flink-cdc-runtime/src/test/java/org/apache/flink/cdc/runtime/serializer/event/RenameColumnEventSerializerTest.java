@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** A test for the {@link RenameColumnEventSerializer}. */
-public class RenameColumnEventSerializerTest extends SerializerTestBase<RenameColumnEvent> {
+class RenameColumnEventSerializerTest extends SerializerTestBase<RenameColumnEvent> {
     @Override
     protected TypeSerializer<RenameColumnEvent> createSerializer() {
         return RenameColumnEventSerializer.INSTANCE;

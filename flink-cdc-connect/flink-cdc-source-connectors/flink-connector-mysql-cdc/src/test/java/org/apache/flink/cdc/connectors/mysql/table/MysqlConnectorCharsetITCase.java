@@ -27,11 +27,11 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -40,10 +40,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Stream;
 
 /** Test supporting different column charsets for MySQL Table source. */
-@RunWith(Parameterized.class)
-public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
+class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
@@ -58,289 +58,261 @@ public class MysqlConnectorCharsetITCase extends MySqlSourceTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private final String testName;
-    private final String[] snapshotExpected;
-    private final String[] binlogExpected;
-
-    public MysqlConnectorCharsetITCase(
-            String testName, String[] snapshotExpected, String[] binlogExpected) {
-        this.testName = testName;
-        this.snapshotExpected = snapshotExpected;
-        this.binlogExpected = binlogExpected;
+    private static Stream<Arguments> parameters() {
+        return Stream.of(
+                Arguments.of(
+                        "ucs2_test",
+                        new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
+                        new String[] {
+                            "-D[1, 测试数据]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 另一个测试数据]",
+                            "+I[11, 测试数据]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 另一个测试数据]"
+                        }),
+                Arguments.of(
+                        "utf8_test",
+                        new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
+                        new String[] {
+                            "-D[1, 测试数据]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 另一个测试数据]",
+                            "+I[11, 测试数据]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 另一个测试数据]"
+                        }),
+                Arguments.of(
+                        "ascii_test",
+                        new String[] {
+                            "+I[1, ascii test!?]", "+I[2, Craig Marshall]", "+I[3, {test}]"
+                        },
+                        new String[] {
+                            "-D[1, ascii test!?]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, {test}]",
+                            "+I[11, ascii test!?]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, {test}]"
+                        }),
+                Arguments.of(
+                        "sjis_test",
+                        new String[] {"+I[1, ひびぴ]", "+I[2, Craig Marshall]", "+I[3, フブプ]"},
+                        new String[] {
+                            "-D[1, ひびぴ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, フブプ]",
+                            "+I[11, ひびぴ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, フブプ]"
+                        }),
+                Arguments.of(
+                        "gbk_test",
+                        new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
+                        new String[] {
+                            "-D[1, 测试数据]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 另一个测试数据]",
+                            "+I[11, 测试数据]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 另一个测试数据]"
+                        }),
+                Arguments.of(
+                        "cp932_test",
+                        new String[] {"+I[1, ひびぴ]", "+I[2, Craig Marshall]", "+I[3, フブプ]"},
+                        new String[] {
+                            "-D[1, ひびぴ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, フブプ]",
+                            "+I[11, ひびぴ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, フブプ]"
+                        }),
+                Arguments.of(
+                        "gb2312_test",
+                        new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
+                        new String[] {
+                            "-D[1, 测试数据]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 另一个测试数据]",
+                            "+I[11, 测试数据]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 另一个测试数据]"
+                        }),
+                Arguments.of(
+                        "ujis_test",
+                        new String[] {"+I[1, ひびぴ]", "+I[2, Craig Marshall]", "+I[3, フブプ]"},
+                        new String[] {
+                            "-D[1, ひびぴ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, フブプ]",
+                            "+I[11, ひびぴ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, フブプ]"
+                        }),
+                Arguments.of(
+                        "euckr_test",
+                        new String[] {"+I[1, 죠주쥬]", "+I[2, Craig Marshall]", "+I[3, 한국어]"},
+                        new String[] {
+                            "-D[1, 죠주쥬]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 한국어]",
+                            "+I[11, 죠주쥬]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 한국어]"
+                        }),
+                Arguments.of(
+                        "latin1_test",
+                        new String[] {"+I[1, ÀÆÉ]", "+I[2, Craig Marshall]", "+I[3, Üæû]"},
+                        new String[] {
+                            "-D[1, ÀÆÉ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, Üæû]",
+                            "+I[11, ÀÆÉ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, Üæû]"
+                        }),
+                Arguments.of(
+                        "latin2_test",
+                        new String[] {"+I[1, ÓÔŐÖ]", "+I[2, Craig Marshall]", "+I[3, ŠŞŤŹ]"},
+                        new String[] {
+                            "-D[1, ÓÔŐÖ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, ŠŞŤŹ]",
+                            "+I[11, ÓÔŐÖ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, ŠŞŤŹ]"
+                        }),
+                Arguments.of(
+                        "greek_test",
+                        new String[] {"+I[1, αβγδε]", "+I[2, Craig Marshall]", "+I[3, θικλ]"},
+                        new String[] {
+                            "-D[1, αβγδε]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, θικλ]",
+                            "+I[11, αβγδε]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, θικλ]"
+                        }),
+                Arguments.of(
+                        "hebrew_test",
+                        new String[] {"+I[1, בבקשה]", "+I[2, Craig Marshall]", "+I[3, שרפה]"},
+                        new String[] {
+                            "-D[1, בבקשה]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, שרפה]",
+                            "+I[11, בבקשה]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, שרפה]"
+                        }),
+                Arguments.of(
+                        "cp866_test",
+                        new String[] {"+I[1, твой]", "+I[2, Craig Marshall]", "+I[3, любой]"},
+                        new String[] {
+                            "-D[1, твой]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, любой]",
+                            "+I[11, твой]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, любой]"
+                        }),
+                Arguments.of(
+                        "tis620_test",
+                        new String[] {"+I[1, ภาษาไทย]", "+I[2, Craig Marshall]", "+I[3, ฆงจฉ]"},
+                        new String[] {
+                            "-D[1, ภาษาไทย]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, ฆงจฉ]",
+                            "+I[11, ภาษาไทย]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, ฆงจฉ]"
+                        }),
+                Arguments.of(
+                        "cp1250_test",
+                        new String[] {"+I[1, ÓÔŐÖ]", "+I[2, Craig Marshall]", "+I[3, ŠŞŤŹ]"},
+                        new String[] {
+                            "-D[1, ÓÔŐÖ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, ŠŞŤŹ]",
+                            "+I[11, ÓÔŐÖ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, ŠŞŤŹ]"
+                        }),
+                Arguments.of(
+                        "cp1251_test",
+                        new String[] {"+I[1, твой]", "+I[2, Craig Marshall]", "+I[3, любой]"},
+                        new String[] {
+                            "-D[1, твой]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, любой]",
+                            "+I[11, твой]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, любой]"
+                        }),
+                Arguments.of(
+                        "cp1257_test",
+                        new String[] {
+                            "+I[1, piedzimst brīvi]",
+                            "+I[2, Craig Marshall]",
+                            "+I[3, apveltīti ar saprātu]"
+                        },
+                        new String[] {
+                            "-D[1, piedzimst brīvi]", "-D[2, Craig Marshall]",
+                                    "-D[3, apveltīti ar saprātu]",
+                            "+I[11, piedzimst brīvi]", "+I[12, Craig Marshall]",
+                                    "+I[13, apveltīti ar saprātu]"
+                        }),
+                Arguments.of(
+                        "macroman_test",
+                        new String[] {"+I[1, ÀÆÉ]", "+I[2, Craig Marshall]", "+I[3, Üæû]"},
+                        new String[] {
+                            "-D[1, ÀÆÉ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, Üæû]",
+                            "+I[11, ÀÆÉ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, Üæû]"
+                        }),
+                Arguments.of(
+                        "macce_test",
+                        new String[] {"+I[1, ÓÔŐÖ]", "+I[2, Craig Marshall]", "+I[3, ŮÚŰÜ]"},
+                        new String[] {
+                            "-D[1, ÓÔŐÖ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, ŮÚŰÜ]",
+                            "+I[11, ÓÔŐÖ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, ŮÚŰÜ]"
+                        }),
+                Arguments.of(
+                        "big5_test",
+                        new String[] {"+I[1, 大五]", "+I[2, Craig Marshall]", "+I[3, 丹店]"},
+                        new String[] {
+                            "-D[1, 大五]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 丹店]",
+                            "+I[11, 大五]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 丹店]"
+                        }));
     }
 
-    @Parameterized.Parameters(name = "Test column charset: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {
-            new Object[] {
-                "ucs2_test",
-                new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
-                new String[] {
-                    "-D[1, 测试数据]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 另一个测试数据]",
-                    "+I[11, 测试数据]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 另一个测试数据]"
-                }
-            },
-            new Object[] {
-                "utf8_test",
-                new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
-                new String[] {
-                    "-D[1, 测试数据]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 另一个测试数据]",
-                    "+I[11, 测试数据]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 另一个测试数据]"
-                }
-            },
-            new Object[] {
-                "ascii_test",
-                new String[] {"+I[1, ascii test!?]", "+I[2, Craig Marshall]", "+I[3, {test}]"},
-                new String[] {
-                    "-D[1, ascii test!?]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, {test}]",
-                    "+I[11, ascii test!?]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, {test}]"
-                }
-            },
-            new Object[] {
-                "sjis_test",
-                new String[] {"+I[1, ひびぴ]", "+I[2, Craig Marshall]", "+I[3, フブプ]"},
-                new String[] {
-                    "-D[1, ひびぴ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, フブプ]",
-                    "+I[11, ひびぴ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, フブプ]"
-                }
-            },
-            new Object[] {
-                "gbk_test",
-                new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
-                new String[] {
-                    "-D[1, 测试数据]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 另一个测试数据]",
-                    "+I[11, 测试数据]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 另一个测试数据]"
-                }
-            },
-            new Object[] {
-                "cp932_test",
-                new String[] {"+I[1, ひびぴ]", "+I[2, Craig Marshall]", "+I[3, フブプ]"},
-                new String[] {
-                    "-D[1, ひびぴ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, フブプ]",
-                    "+I[11, ひびぴ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, フブプ]"
-                }
-            },
-            new Object[] {
-                "gb2312_test",
-                new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
-                new String[] {
-                    "-D[1, 测试数据]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 另一个测试数据]",
-                    "+I[11, 测试数据]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 另一个测试数据]"
-                }
-            },
-            new Object[] {
-                "ujis_test",
-                new String[] {"+I[1, ひびぴ]", "+I[2, Craig Marshall]", "+I[3, フブプ]"},
-                new String[] {
-                    "-D[1, ひびぴ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, フブプ]",
-                    "+I[11, ひびぴ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, フブプ]"
-                }
-            },
-            new Object[] {
-                "euckr_test",
-                new String[] {"+I[1, 죠주쥬]", "+I[2, Craig Marshall]", "+I[3, 한국어]"},
-                new String[] {
-                    "-D[1, 죠주쥬]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 한국어]",
-                    "+I[11, 죠주쥬]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 한국어]"
-                }
-            },
-            new Object[] {
-                "latin1_test",
-                new String[] {"+I[1, ÀÆÉ]", "+I[2, Craig Marshall]", "+I[3, Üæû]"},
-                new String[] {
-                    "-D[1, ÀÆÉ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, Üæû]",
-                    "+I[11, ÀÆÉ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, Üæû]"
-                }
-            },
-            new Object[] {
-                "latin2_test",
-                new String[] {"+I[1, ÓÔŐÖ]", "+I[2, Craig Marshall]", "+I[3, ŠŞŤŹ]"},
-                new String[] {
-                    "-D[1, ÓÔŐÖ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, ŠŞŤŹ]",
-                    "+I[11, ÓÔŐÖ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, ŠŞŤŹ]"
-                }
-            },
-            new Object[] {
-                "greek_test",
-                new String[] {"+I[1, αβγδε]", "+I[2, Craig Marshall]", "+I[3, θικλ]"},
-                new String[] {
-                    "-D[1, αβγδε]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, θικλ]",
-                    "+I[11, αβγδε]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, θικλ]"
-                }
-            },
-            new Object[] {
-                "hebrew_test",
-                new String[] {"+I[1, בבקשה]", "+I[2, Craig Marshall]", "+I[3, שרפה]"},
-                new String[] {
-                    "-D[1, בבקשה]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, שרפה]",
-                    "+I[11, בבקשה]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, שרפה]"
-                }
-            },
-            new Object[] {
-                "cp866_test",
-                new String[] {"+I[1, твой]", "+I[2, Craig Marshall]", "+I[3, любой]"},
-                new String[] {
-                    "-D[1, твой]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, любой]",
-                    "+I[11, твой]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, любой]"
-                }
-            },
-            new Object[] {
-                "tis620_test",
-                new String[] {"+I[1, ภาษาไทย]", "+I[2, Craig Marshall]", "+I[3, ฆงจฉ]"},
-                new String[] {
-                    "-D[1, ภาษาไทย]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, ฆงจฉ]",
-                    "+I[11, ภาษาไทย]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, ฆงจฉ]"
-                }
-            },
-            new Object[] {
-                "cp1250_test",
-                new String[] {"+I[1, ÓÔŐÖ]", "+I[2, Craig Marshall]", "+I[3, ŠŞŤŹ]"},
-                new String[] {
-                    "-D[1, ÓÔŐÖ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, ŠŞŤŹ]",
-                    "+I[11, ÓÔŐÖ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, ŠŞŤŹ]"
-                }
-            },
-            new Object[] {
-                "cp1251_test",
-                new String[] {"+I[1, твой]", "+I[2, Craig Marshall]", "+I[3, любой]"},
-                new String[] {
-                    "-D[1, твой]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, любой]",
-                    "+I[11, твой]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, любой]"
-                }
-            },
-            new Object[] {
-                "cp1257_test",
-                new String[] {
-                    "+I[1, piedzimst brīvi]", "+I[2, Craig Marshall]", "+I[3, apveltīti ar saprātu]"
-                },
-                new String[] {
-                    "-D[1, piedzimst brīvi]", "-D[2, Craig Marshall]",
-                            "-D[3, apveltīti ar saprātu]",
-                    "+I[11, piedzimst brīvi]", "+I[12, Craig Marshall]",
-                            "+I[13, apveltīti ar saprātu]"
-                }
-            },
-            new Object[] {
-                "macroman_test",
-                new String[] {"+I[1, ÀÆÉ]", "+I[2, Craig Marshall]", "+I[3, Üæû]"},
-                new String[] {
-                    "-D[1, ÀÆÉ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, Üæû]",
-                    "+I[11, ÀÆÉ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, Üæû]"
-                }
-            },
-            new Object[] {
-                "macce_test",
-                new String[] {"+I[1, ÓÔŐÖ]", "+I[2, Craig Marshall]", "+I[3, ŮÚŰÜ]"},
-                new String[] {
-                    "-D[1, ÓÔŐÖ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, ŮÚŰÜ]",
-                    "+I[11, ÓÔŐÖ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, ŮÚŰÜ]"
-                }
-            },
-            new Object[] {
-                "big5_test",
-                new String[] {"+I[1, 大五]", "+I[2, Craig Marshall]", "+I[3, 丹店]"},
-                new String[] {
-                    "-D[1, 大五]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 丹店]",
-                    "+I[11, 大五]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 丹店]"
-                }
-            }
-        };
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         charsetTestDatabase.createAndInitialize();
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
     }
 
-    @Test
-    public void testCharset() throws Exception {
+    @ParameterizedTest
+    @MethodSource("parameters")
+    void testCharset(String testName, String[] snapshotExpected, String[] binlogExpected)
+            throws Exception {
         String sourceDDL =
                 String.format(
                         "CREATE TABLE %s (\n"

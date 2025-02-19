@@ -59,7 +59,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /** Integration test for UDFs. */
-public class FlinkPipelineUdfITCase {
+class FlinkPipelineUdfITCase {
     private static final int MAX_PARALLELISM = 4;
 
     // Always use parent-first classloader for CDC classes.
