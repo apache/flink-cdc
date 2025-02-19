@@ -157,7 +157,7 @@ public abstract class DataType implements Serializable {
 
     @Override
     public String toString() {
-        return asSummaryString();
+        return asSummaryString() + (rawDataType == null ? "" : " " + rawDataType);
     }
 
     @Override

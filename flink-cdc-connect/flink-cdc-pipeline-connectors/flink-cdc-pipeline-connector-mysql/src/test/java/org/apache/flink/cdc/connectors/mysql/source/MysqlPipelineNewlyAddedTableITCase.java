@@ -30,8 +30,6 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
@@ -98,10 +96,22 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUti
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.fetchResults;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.getServerId;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBigintUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeVarchar;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests to cover various newly added tables during capture process in pipeline mode. */
 public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
+
+    private static final Schema ADDRESS_SCHEMA =
+            Schema.newBuilder()
+                    .primaryKey("id")
+                    .physicalColumn("id", typeBigintUnsigned(false))
+                    .physicalColumn("country", typeVarchar(false, 255))
+                    .physicalColumn("city", typeVarchar(false, 255))
+                    .physicalColumn("detail_address", typeVarchar(true, 1024))
+                    .build();
+
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
@@ -415,27 +425,11 @@ public class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     private CreateTableEvent getCreateTableEvent(TableId tableId) {
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.BIGINT().notNull())
-                        .physicalColumn("country", DataTypes.VARCHAR(255).notNull())
-                        .physicalColumn("city", DataTypes.VARCHAR(255).notNull())
-                        .physicalColumn("detail_address", DataTypes.VARCHAR(1024))
-                        .primaryKey(Collections.singletonList("id"))
-                        .build();
-        return new CreateTableEvent(tableId, schema);
+        return new CreateTableEvent(tableId, ADDRESS_SCHEMA);
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {
-        RowType rowType =
-                RowType.of(
-                        new DataType[] {
-                            DataTypes.BIGINT().notNull(),
-                            DataTypes.VARCHAR(255).notNull(),
-                            DataTypes.VARCHAR(255).notNull(),
-                            DataTypes.VARCHAR(1024)
-                        },
-                        new String[] {"id", "country", "city", "detail_address"});
+        RowType rowType = (RowType) ADDRESS_SCHEMA.toRowDataType();
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
         String cityName = tableId.getTableName().split("_")[1];
         return Arrays.asList(

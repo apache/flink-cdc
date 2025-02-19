@@ -32,7 +32,6 @@ import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -71,6 +70,9 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUti
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.fetchResults;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.getServerId;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDouble;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeInt;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeVarchar;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -98,6 +100,15 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
             DockerClientFactory.instance().client().versionCmd().exec().getArch().equals("amd64")
                     ? "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
                     : "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
+
+    private static final Schema CUSTOMER_SCHEMA =
+            Schema.newBuilder()
+                    .primaryKey("id")
+                    .physicalColumn("id", typeInt(false))
+                    .physicalColumn("name", typeVarchar(false, 255))
+                    .physicalColumn("address", typeVarchar(true, 1024))
+                    .physicalColumn("phone_number", typeVarchar(true, 512))
+                    .build();
 
     @BeforeClass
     public static void beforeClass() {
@@ -190,14 +201,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
         Thread.sleep(5_000);
 
         List<Event> expected = new ArrayList<>();
-        Schema schemaV1 =
-                Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .primaryKey(Collections.singletonList("id"))
-                        .build();
+        Schema schemaV1 = CUSTOMER_SCHEMA;
         expected.add(new CreateTableEvent(tableId, schemaV1));
         expected.addAll(getSnapshotExpected(tableId, schemaV1));
         List<Event> actual = fetchResults(events, expected.size());
@@ -233,12 +237,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
         Schema schemaV2 =
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .physicalColumn("ext", DataTypes.INT())
-                        .primaryKey(Collections.singletonList("id"))
+                        .fromRowDataType(CUSTOMER_SCHEMA.toRowDataType())
+                        .physicalColumn("ext", typeInt(true))
                         .build();
 
         assertEquals(
@@ -247,7 +247,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                 tableId,
                                 Collections.singletonList(
                                         new AddColumnEvent.ColumnWithPosition(
-                                                new PhysicalColumn("ext", DataTypes.INT(), null)))),
+                                                new PhysicalColumn("ext", typeInt(true), null)))),
                         DataChangeEvent.insertEvent(
                                 tableId,
                                 generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17))),
@@ -277,18 +277,14 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
         Schema schemaV3 =
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .physicalColumn("ext", DataTypes.DOUBLE())
-                        .primaryKey(Collections.singletonList("id"))
+                        .fromRowDataType(CUSTOMER_SCHEMA.toRowDataType())
+                        .physicalColumn("ext", typeDouble(true))
                         .build();
 
         assertEquals(
                 Arrays.asList(
                         new AlterColumnTypeEvent(
-                                tableId, Collections.singletonMap("ext", DataTypes.DOUBLE())),
+                                tableId, Collections.singletonMap("ext", typeDouble(true))),
                         DataChangeEvent.insertEvent(
                                 tableId,
                                 generate(
@@ -322,21 +318,17 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                             customerDatabase.getDatabaseName()));
         }
 
-        Schema schemaV4 =
-                Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .primaryKey(Collections.singletonList("id"))
-                        .build();
-
         assertEquals(
                 Arrays.asList(
                         new DropColumnEvent(tableId, Collections.singletonList("ext")),
                         DataChangeEvent.insertEvent(
                                 tableId,
-                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234"))),
+                                generate(
+                                        CUSTOMER_SCHEMA,
+                                        10002,
+                                        "Cicada",
+                                        "Urumqi",
+                                        "123567891234"))),
                 fetchResults(events, 2));
     }
 
@@ -372,14 +364,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
         Thread.sleep(5_000);
 
         List<Event> expected = new ArrayList<>();
-        Schema schemaV1 =
-                Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .primaryKey(Collections.singletonList("id"))
-                        .build();
+        Schema schemaV1 = CUSTOMER_SCHEMA;
         expected.add(new CreateTableEvent(tableId, schemaV1));
         expected.addAll(getSnapshotExpected(tableId, schemaV1));
         List<Event> actual = fetchResults(events, expected.size());
@@ -417,12 +402,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
         Schema schemaV2 =
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .physicalColumn("ext", DataTypes.INT())
-                        .primaryKey(Collections.singletonList("id"))
+                        .fromRowDataType(CUSTOMER_SCHEMA.toRowDataType())
+                        .physicalColumn("ext", typeInt(true))
                         .build();
 
         assertEquals(
@@ -431,7 +412,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                 tableId,
                                 Collections.singletonList(
                                         new AddColumnEvent.ColumnWithPosition(
-                                                new PhysicalColumn("ext", DataTypes.INT(), null)))),
+                                                new PhysicalColumn("ext", typeInt(true), null)))),
                         DataChangeEvent.insertEvent(
                                 tableId,
                                 generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17))),
@@ -463,18 +444,14 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
 
         Schema schemaV3 =
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .physicalColumn("ext", DataTypes.DOUBLE())
-                        .primaryKey(Collections.singletonList("id"))
+                        .fromRowDataType(CUSTOMER_SCHEMA.toRowDataType())
+                        .physicalColumn("ext", typeDouble(true))
                         .build();
 
         assertEquals(
                 Arrays.asList(
                         new AlterColumnTypeEvent(
-                                tableId, Collections.singletonMap("ext", DataTypes.DOUBLE())),
+                                tableId, Collections.singletonMap("ext", typeDouble(true))),
                         DataChangeEvent.insertEvent(
                                 tableId,
                                 generate(
@@ -510,21 +487,17 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                             customerDatabase.getDatabaseName()));
         }
 
-        Schema schemaV4 =
-                Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("address", DataTypes.VARCHAR(1024))
-                        .physicalColumn("phone_number", DataTypes.VARCHAR(512))
-                        .primaryKey(Collections.singletonList("id"))
-                        .build();
-
         assertEquals(
                 Arrays.asList(
                         new DropColumnEvent(tableId, Collections.singletonList("ext")),
                         DataChangeEvent.insertEvent(
                                 tableId,
-                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234"))),
+                                generate(
+                                        CUSTOMER_SCHEMA,
+                                        10002,
+                                        "Cicada",
+                                        "Urumqi",
+                                        "123567891234"))),
                 fetchResults(events, 2));
     }
 
