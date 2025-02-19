@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.oceanbase.sink;
+package org.apache.flink.cdc.connectors.oceanbase.factory;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
-import org.apache.flink.cdc.connectors.oceanbase.factory.OceanBaseDataSinkFactory;
+import org.apache.flink.cdc.connectors.oceanbase.sink.OceanBaseDataSink;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -32,7 +32,7 @@ import java.util.Optional;
 
 import static org.junit.Assert.assertTrue;
 
-/** Tests for {@link org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory}. */
+/** Tests for {@link OceanBaseDataSinkFactory}. */
 public class OceanBaseDataSinkFactoryTest {
 
     @Test

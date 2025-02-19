@@ -119,7 +119,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     @Test
     public void testTableList() throws Exception {
         inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
-        inventoryDatabase.createAndInitialize("mysql");
+        inventoryDatabase.createAndInitialize();
         waitForTableInitialization();
 
         String sourceDDL =
@@ -225,7 +225,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     @Test
     public void testMetadataColumns() throws Exception {
         inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
-        inventoryDatabase.createAndInitialize("mysql");
+        inventoryDatabase.createAndInitialize();
         waitForTableInitialization();
 
         String sourceDDL =
@@ -312,7 +312,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
 
         columnTypesDatabase = new UniqueDatabase(OB_SERVER, "column_type_test");
-        columnTypesDatabase.createAndInitialize("mysql");
+        columnTypesDatabase.createAndInitialize();
         waitForTableInitialization();
 
         String sourceDDL =
@@ -504,7 +504,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
 
         columnTypesDatabase = new UniqueDatabase(OB_SERVER, "column_type_test");
-        columnTypesDatabase.createAndInitialize("mysql");
+        columnTypesDatabase.createAndInitialize();
         waitForTableInitialization();
 
         String sourceDDL =
@@ -576,7 +576,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     @Test
     public void testSnapshotOnly() throws Exception {
         inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
-        inventoryDatabase.createAndInitialize("mysql");
+        inventoryDatabase.createAndInitialize();
         waitForTableInitialization();
 
         String sourceDDL =

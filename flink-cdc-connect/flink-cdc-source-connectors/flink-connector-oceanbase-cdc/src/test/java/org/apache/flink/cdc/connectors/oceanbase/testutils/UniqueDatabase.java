@@ -53,16 +53,29 @@ public class UniqueDatabase {
 
     private final OceanBaseContainer container;
     private final String databaseName;
+    private final String templateDir;
     private final String templateName;
 
     public UniqueDatabase(OceanBaseContainer container, String databaseName) {
-        this(container, databaseName, Integer.toUnsignedString(new Random().nextInt(), 36));
+        this(container, databaseName, "ddl/mysql");
+    }
+
+    public UniqueDatabase(OceanBaseContainer container, String databaseName, String templateDir) {
+        this(
+                container,
+                databaseName,
+                templateDir,
+                Integer.toUnsignedString(new Random().nextInt(), 36));
     }
 
     private UniqueDatabase(
-            OceanBaseContainer container, String databaseName, final String identifier) {
+            OceanBaseContainer container,
+            String databaseName,
+            String templateDir,
+            final String identifier) {
         this.container = container;
         this.databaseName = databaseName + "_" + identifier;
+        this.templateDir = templateDir;
         this.templateName = databaseName;
     }
 
@@ -92,11 +105,7 @@ public class UniqueDatabase {
     }
 
     public void createAndInitialize() {
-        createAndInitializeWithDdlFile(String.format("ddl/%s.sql", templateName));
-    }
-
-    public void createAndInitialize(String variant) {
-        createAndInitializeWithDdlFile(String.format("ddl/%s/%s.sql", variant, templateName));
+        createAndInitializeWithDdlFile(String.format("%s/%s.sql", templateDir, templateName));
     }
 
     /** Creates the database and populates it with initialization SQL script. */
