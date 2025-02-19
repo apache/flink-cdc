@@ -352,7 +352,7 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.</td>
     </tr>
     <tr>
           <td>chunk-key.even-distribution.factor.lower-bound</td>
@@ -467,7 +467,7 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) PostgreSQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) PostgreSQL CDC Source doesn't need to acquire global read lock before snapshot reading
 
-During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by primary key of table,
+During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
 and then PostgreSQL CDC Source assigns the chunks to multiple readers to read the data of snapshot chunk.
 
 ### Exactly-Once Processing
@@ -590,6 +590,17 @@ Metrics can help understand the progress of assignments, and the following are t
 Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
 2. For PostgreSQL, the group name will be like `test_database.test_schema.test_table`.
+
+### Tables Without primary keys
+
+Starting from version 3.4-SNAPSHOT, Postgres CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+
+There are two places that need to be taken care of.
+
+1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
+2. The processing semantics of a Postgres CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
+* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
 
 ## Data Type Mapping
 
