@@ -117,7 +117,7 @@ under the License.
                     <div class="divider w-1/2 opacity-50"></div>
                 </div>
                 <p class="text-sm my-0 text-center md:text-left">
-                    Flink CDC will soon support data transform operations of ETL, including column projection, computed column, filter expression and classical scalar functions.
+                    Flink CDC supports data transform operations of ETL, including column projection, computed column, filter expression and classical scalar functions.
                 </p>
             </div>
             <div class="w-full md:w-1/3 px-8 py-6 flex flex-col flex-grow flex-shrink">
