@@ -46,7 +46,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** Test for {@link OceanBaseTableSource} created by {@link OceanBaseTableSourceFactory}. */
-public class OceanBaseTableFactoryTest {
+public class LegacyOceanBaseTableFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -81,7 +81,7 @@ public class OceanBaseTableFactoryTest {
     private static final String DATABASE_NAME = "db[0-9]";
     private static final String TABLE_NAME = "table[0-9]";
     private static final String TABLE_LIST = "db.table";
-    private static final String SERVER_TIME_ZONE = "+00:00";
+    private static final String SERVER_TIME_ZONE = "UTC";
     private static final String CONNECT_TIMEOUT = "30s";
     private static final String HOSTNAME = "127.0.0.1";
     private static final Integer PORT = 2881;
@@ -247,6 +247,7 @@ public class OceanBaseTableFactoryTest {
         options.put("tenant-name", TENANT_NAME);
         options.put("logproxy.host", LOG_PROXY_HOST);
         options.put("logproxy.port", String.valueOf(LOG_PROXY_PORT));
+        options.put("scan.incremental.snapshot.enabled", String.valueOf(false));
         return options;
     }
 
@@ -263,7 +264,7 @@ public class OceanBaseTableFactoryTest {
                                 options),
                         schema),
                 new Configuration(),
-                OceanBaseTableFactoryTest.class.getClassLoader(),
+                LegacyOceanBaseTableFactoryTest.class.getClassLoader(),
                 false);
     }
 }

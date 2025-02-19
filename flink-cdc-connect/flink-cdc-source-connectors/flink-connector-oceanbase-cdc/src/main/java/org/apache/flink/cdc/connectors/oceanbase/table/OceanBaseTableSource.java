@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.oceanbase.table;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseSource;
+import org.apache.flink.cdc.connectors.oceanbase.source.OceanBaseSourceBuilder;
 import org.apache.flink.cdc.connectors.oceanbase.source.converter.OceanBaseDeserializationConverterFactory;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
@@ -29,6 +30,7 @@ import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
+import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -76,6 +78,17 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     private final String workingMode;
     private final Properties obcdcProperties;
     private final Properties debeziumProperties;
+    private final boolean enableParallelRead;
+    private final int splitSize;
+    private final int splitMetaGroupSize;
+    private final int fetchSize;
+    private final int connectMaxRetries;
+    private final int connectionPoolSize;
+    private final double distributionFactorUpper;
+    private final double distributionFactorLower;
+    private final String chunkKeyColumn;
+    private final boolean closeIdlerReaders;
+    private final boolean scanNewlyAddedTableEnabled;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -87,6 +100,7 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
 
+    @Deprecated
     public OceanBaseTableSource(
             ResolvedSchema physicalSchema,
             StartupOptions startupOptions,
@@ -137,6 +151,91 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
         this.obcdcProperties = obcdcProperties;
         this.debeziumProperties = debeziumProperties;
 
+        this.enableParallelRead = false;
+        this.splitSize = 0;
+        this.splitMetaGroupSize = 0;
+        this.fetchSize = 0;
+        this.connectMaxRetries = 0;
+        this.connectionPoolSize = 0;
+        this.distributionFactorUpper = 0;
+        this.distributionFactorLower = 0;
+        this.chunkKeyColumn = null;
+        this.closeIdlerReaders = false;
+        this.scanNewlyAddedTableEnabled = false;
+
+        this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.metadataKeys = Collections.emptyList();
+    }
+
+    public OceanBaseTableSource(
+            ResolvedSchema physicalSchema,
+            StartupOptions startupOptions,
+            String username,
+            String password,
+            String tenantName,
+            String databaseName,
+            String tableName,
+            String serverTimeZone,
+            Duration connectTimeout,
+            String hostname,
+            int port,
+            String compatibleMode,
+            String jdbcDriver,
+            String logProxyHost,
+            Integer logProxyPort,
+            String rsList,
+            String configUrl,
+            String workingMode,
+            Properties obcdcProperties,
+            Properties debeziumProperties,
+            int splitSize,
+            int splitMetaGroupSize,
+            int fetchSize,
+            int connectMaxRetries,
+            int connectionPoolSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            String chunkKeyColumn,
+            boolean closeIdlerReaders,
+            boolean scanNewlyAddedTableEnabled) {
+        this.physicalSchema = physicalSchema;
+        this.startupOptions = checkNotNull(startupOptions);
+        this.username = checkNotNull(username);
+        this.password = checkNotNull(password);
+        this.tenantName = tenantName;
+        this.databaseName = databaseName;
+        this.tableName = tableName;
+        this.serverTimeZone = serverTimeZone;
+        this.connectTimeout = connectTimeout;
+        this.hostname = checkNotNull(hostname);
+        this.port = port;
+        this.compatibleMode = compatibleMode;
+        this.jdbcDriver = jdbcDriver;
+        this.logProxyHost = logProxyHost;
+        this.logProxyPort = logProxyPort;
+        this.rsList = rsList;
+        this.configUrl = configUrl;
+        this.workingMode = workingMode;
+        this.obcdcProperties = obcdcProperties;
+        this.debeziumProperties = debeziumProperties;
+
+        this.tableList = null;
+        this.jdbcProperties = null;
+        this.logProxyClientId = null;
+        this.startupTimestamp = null;
+
+        this.enableParallelRead = true;
+        this.splitSize = splitSize;
+        this.splitMetaGroupSize = splitMetaGroupSize;
+        this.fetchSize = fetchSize;
+        this.connectMaxRetries = connectMaxRetries;
+        this.connectionPoolSize = connectionPoolSize;
+        this.distributionFactorUpper = distributionFactorUpper;
+        this.distributionFactorLower = distributionFactorLower;
+        this.chunkKeyColumn = chunkKeyColumn;
+        this.closeIdlerReaders = closeIdlerReaders;
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
     }
@@ -165,6 +264,42 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                         .setUserDefinedConverterFactory(
                                 OceanBaseDeserializationConverterFactory.instance())
                         .build();
+
+        if (enableParallelRead) {
+            OceanBaseSourceBuilder.OceanBaseIncrementalSource<RowData> incrementalSource =
+                    OceanBaseSourceBuilder.OceanBaseIncrementalSource.<RowData>builder()
+                            .startupOptions(startupOptions)
+                            .hostname(hostname)
+                            .port(port)
+                            .compatibleMode(compatibleMode)
+                            .driverClassName(jdbcDriver)
+                            .tenantName(tenantName)
+                            .databaseList(databaseName)
+                            .tableList(databaseName + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .logProxyHost(logProxyHost)
+                            .logProxyPort(logProxyPort)
+                            .rsList(rsList)
+                            .configUrl(configUrl)
+                            .workingMode(workingMode)
+                            .obcdcProperties(obcdcProperties)
+                            .debeziumProperties(debeziumProperties)
+                            .serverTimeZone(serverTimeZone)
+                            .connectTimeout(connectTimeout)
+                            .connectionPoolSize(connectionPoolSize)
+                            .connectMaxRetries(connectMaxRetries)
+                            .chunkKeyColumn(chunkKeyColumn)
+                            .splitSize(splitSize)
+                            .fetchSize(fetchSize)
+                            .splitMetaGroupSize(splitMetaGroupSize)
+                            .distributionFactorUpper(distributionFactorUpper)
+                            .distributionFactorLower(distributionFactorLower)
+                            .closeIdleReaders(closeIdlerReaders)
+                            .deserializer(deserializer)
+                            .build();
+            return SourceProvider.of(incrementalSource);
+        }
 
         OceanBaseSource.Builder<RowData> builder =
                 OceanBaseSource.<RowData>builder()
@@ -227,6 +362,43 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
 
     @Override
     public DynamicTableSource copy() {
+        if (enableParallelRead) {
+            OceanBaseTableSource source =
+                    new OceanBaseTableSource(
+                            physicalSchema,
+                            startupOptions,
+                            username,
+                            password,
+                            tenantName,
+                            databaseName,
+                            tableName,
+                            serverTimeZone,
+                            connectTimeout,
+                            hostname,
+                            port,
+                            compatibleMode,
+                            jdbcDriver,
+                            logProxyHost,
+                            logProxyPort,
+                            rsList,
+                            configUrl,
+                            workingMode,
+                            obcdcProperties,
+                            debeziumProperties,
+                            splitSize,
+                            splitMetaGroupSize,
+                            fetchSize,
+                            connectMaxRetries,
+                            connectionPoolSize,
+                            distributionFactorUpper,
+                            distributionFactorLower,
+                            chunkKeyColumn,
+                            closeIdlerReaders,
+                            scanNewlyAddedTableEnabled);
+            source.metadataKeys = metadataKeys;
+            source.producedDataType = producedDataType;
+            return source;
+        }
         OceanBaseTableSource source =
                 new OceanBaseTableSource(
                         physicalSchema,
@@ -291,6 +463,17 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(this.workingMode, that.workingMode)
                 && Objects.equals(this.obcdcProperties, that.obcdcProperties)
                 && Objects.equals(this.debeziumProperties, that.debeziumProperties)
+                && Objects.equals(this.enableParallelRead, that.enableParallelRead)
+                && Objects.equals(this.splitSize, that.splitSize)
+                && Objects.equals(this.splitMetaGroupSize, that.splitMetaGroupSize)
+                && Objects.equals(this.fetchSize, that.fetchSize)
+                && Objects.equals(this.connectMaxRetries, that.connectMaxRetries)
+                && Objects.equals(this.connectionPoolSize, that.connectionPoolSize)
+                && Objects.equals(this.distributionFactorUpper, that.distributionFactorUpper)
+                && Objects.equals(this.distributionFactorLower, that.distributionFactorLower)
+                && Objects.equals(this.chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(this.closeIdlerReaders, that.closeIdlerReaders)
+                && Objects.equals(this.scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
                 && Objects.equals(this.producedDataType, that.producedDataType)
                 && Objects.equals(this.metadataKeys, that.metadataKeys);
     }
@@ -322,6 +505,17 @@ public class OceanBaseTableSource implements ScanTableSource, SupportsReadingMet
                 workingMode,
                 obcdcProperties,
                 debeziumProperties,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                chunkKeyColumn,
+                closeIdlerReaders,
+                scanNewlyAddedTableEnabled,
                 producedDataType,
                 metadataKeys);
     }

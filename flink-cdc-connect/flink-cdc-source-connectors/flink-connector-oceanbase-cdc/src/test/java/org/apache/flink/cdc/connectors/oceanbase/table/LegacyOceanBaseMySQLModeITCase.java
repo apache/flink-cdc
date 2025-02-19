@@ -48,7 +48,7 @@ import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.creat
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
 
 /** Integration tests for OceanBase MySQL mode table source. */
-public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
+public class LegacyOceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -95,6 +95,13 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
             columnTypesDatabase.dropDatabase();
             columnTypesDatabase = null;
         }
+    }
+
+    @Override
+    protected String commonOptionsString() {
+        return super.commonOptionsString()
+                + " , "
+                + " 'scan.incremental.snapshot.enabled' = 'false'";
     }
 
     @Override
