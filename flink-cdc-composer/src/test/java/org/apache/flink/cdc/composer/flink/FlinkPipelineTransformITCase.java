@@ -766,7 +766,7 @@ class FlinkPipelineTransformITCase {
                                         + "CAST(id AS INT) % 3 AS col5, ABS(id - 17) AS col6, "
                                         + "CEIL(CAST(id AS DOUBLE) / 1.7) AS col7, "
                                         + "FLOOR(CAST(id AS DOUBLE) / 1.7) AS col8, "
-                                        + "ROUND(CAST(id AS DOUBLE) / 1.7) AS col9, "
+                                        + "ROUND(CAST(id AS DOUBLE) / 1.7, 0) AS col9, "
                                         + "CHAR_LENGTH(UUID()) AS col10",
                                 null,
                                 null,
@@ -2182,6 +2182,291 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[11th, 14, Neko, 2147483647, 2147483648, -2147483648, -2147483649, 1234567890123456789], after=[11th, 14, Nein, 2147483647, 2147483648, -2147483648, -2147483649, 1234567890123456789], op=UPDATE, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[12th, 15, Oops, 2147483647, 2147483648, -2147483648, -2147483649, 1234567890123456789], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[12th, 15, Oops, 2147483647, 2147483648, -2147483648, -2147483649, 1234567890123456789], after=[], op=DELETE, meta=()}");
+    }
+
+    @Test
+    void testFloorCeilAndRoundFunction() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId tableId = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        List<Event> events = generateFloorCeilAndRoundEvents(tableId);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "\\.*.\\.*.\\.*",
+                                        "*, "
+                                                + "CEIL(tinyint_col)   AS ceil_tinyint,"
+                                                + "CEIL(smallint_col)  AS ceil_smallint,"
+                                                + "CEIL(int_col)       AS ceil_int,"
+                                                + "CEIL(bigint_col)    AS ceil_bigint,"
+                                                + "CEIL(float_col)     AS ceil_float,"
+                                                + "CEIL(double_col)    AS ceil_double,"
+                                                + "CEIL(decimal_col)   AS ceil_decimal,"
+                                                + "CEILING(tinyint_col)   AS ceiling_tinyint,"
+                                                + "CEILING(smallint_col)  AS ceiling_smallint,"
+                                                + "CEILING(int_col)       AS ceiling_int,"
+                                                + "CEILING(bigint_col)    AS ceiling_bigint,"
+                                                + "CEILING(float_col)     AS ceiling_float,"
+                                                + "CEILING(double_col)    AS ceiling_double,"
+                                                + "CEILING(decimal_col)   AS ceiling_decimal,"
+                                                + "FLOOR(tinyint_col)  AS floor_tinyint,"
+                                                + "FLOOR(smallint_col) AS floor_smallint,"
+                                                + "FLOOR(int_col)      AS floor_int,"
+                                                + "FLOOR(bigint_col)   AS floor_bigint,"
+                                                + "FLOOR(float_col)    AS floor_float,"
+                                                + "FLOOR(double_col)   AS floor_double,"
+                                                + "FLOOR(decimal_col)  AS floor_decimal,"
+                                                + "ROUND(tinyint_col, 2)  AS round_tinyint,"
+                                                + "ROUND(smallint_col, 2) AS round_smallint,"
+                                                + "ROUND(int_col, 2)      AS round_int,"
+                                                + "ROUND(bigint_col, 2)   AS round_bigint,"
+                                                + "ROUND(float_col, 2)    AS round_float,"
+                                                + "ROUND(double_col, 2)   AS round_double,"
+                                                + "ROUND(decimal_col, 2)  AS round_decimal,"
+                                                + "ROUND(tinyint_col, 0)  AS round_0_tinyint,"
+                                                + "ROUND(smallint_col, 0) AS round_0_smallint,"
+                                                + "ROUND(int_col, 0)      AS round_0_int,"
+                                                + "ROUND(bigint_col, 0)   AS round_0_bigint,"
+                                                + "ROUND(float_col, 0)    AS round_0_float,"
+                                                + "ROUND(double_col, 0)   AS round_0_double,"
+                                                + "ROUND(decimal_col, 0)  AS round_0_decimal",
+                                        null,
+                                        "id",
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`tinyint_col` TINYINT,`smallint_col` SMALLINT,`int_col` INT,`bigint_col` BIGINT,`float_col` FLOAT,`double_col` DOUBLE,`decimal_col` DECIMAL(10, 3),`ceil_tinyint` TINYINT,`ceil_smallint` SMALLINT,`ceil_int` INT,`ceil_bigint` BIGINT,`ceil_float` FLOAT,`ceil_double` DOUBLE,`ceil_decimal` DECIMAL(10, 0),`ceiling_tinyint` TINYINT,`ceiling_smallint` SMALLINT,`ceiling_int` INT,`ceiling_bigint` BIGINT,`ceiling_float` FLOAT,`ceiling_double` DOUBLE,`ceiling_decimal` DECIMAL(10, 0),`floor_tinyint` TINYINT,`floor_smallint` SMALLINT,`floor_int` INT,`floor_bigint` BIGINT,`floor_float` FLOAT,`floor_double` DOUBLE,`floor_decimal` DECIMAL(10, 0),`round_tinyint` TINYINT,`round_smallint` SMALLINT,`round_int` INT,`round_bigint` BIGINT,`round_float` FLOAT,`round_double` DOUBLE,`round_decimal` DECIMAL(10, 2),`round_0_tinyint` TINYINT,`round_0_smallint` SMALLINT,`round_0_int` INT,`round_0_bigint` BIGINT,`round_0_float` FLOAT,`round_0_double` DOUBLE,`round_0_decimal` DECIMAL(8, 0)}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 1, 1, 1, 1, 1.1, 1.1, 1.100, 1, 1, 1, 1, 2.0, 2.0, 2, 1, 1, 1, 1, 2.0, 2.0, 2, 1, 1, 1, 1, 1.0, 1.0, 1, 1, 1, 1, 1, 1.1, 1.1, 1.10, 1, 1, 1, 1, 1.0, 1.0, 1], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[4, 4, 4, 4, 4, 4.44, 4.44, 4.440, 4, 4, 4, 4, 5.0, 5.0, 5, 4, 4, 4, 4, 5.0, 5.0, 5, 4, 4, 4, 4, 4.0, 4.0, 4, 4, 4, 4, 4, 4.44, 4.44, 4.44, 4, 4, 4, 4, 4.0, 4.0, 4], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[5, 5, 5, 5, 5, 5.555, 5.555, 5.555, 5, 5, 5, 5, 6.0, 6.0, 6, 5, 5, 5, 5, 6.0, 6.0, 6, 5, 5, 5, 5, 5.0, 5.0, 5, 5, 5, 5, 5, 5.56, 5.56, 5.56, 5, 5, 5, 5, 6.0, 6.0, 6], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[9, 9, 9, 9, 9, 1.0E7, 9999999.999, 9999999.999, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000, 9, 9, 9, 9, 1.0E7, 9999999.0, 9999999, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000.00, 9, 9, 9, 9, 1.0E7, 1.0E7, 10000000], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+    }
+
+    @Test
+    void testAbsFunction() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId tableId = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        List<Event> events = generateAbsEvents(tableId);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "\\.*.\\.*.\\.*",
+                                        "*, "
+                                                + "ABS(tinyint_col)   AS abs_tinyint,"
+                                                + "ABS(smallint_col)  AS abs_smallint,"
+                                                + "ABS(int_col)       AS abs_int,"
+                                                + "ABS(bigint_col)    AS abs_bigint,"
+                                                + "ABS(float_col)     AS abs_float,"
+                                                + "ABS(double_col)    AS abs_double,"
+                                                + "ABS(decimal_col)   AS abs_decimal",
+                                        null,
+                                        "id",
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`tinyint_col` TINYINT,`smallint_col` SMALLINT,`int_col` INT,`bigint_col` BIGINT,`float_col` FLOAT,`double_col` DOUBLE,`decimal_col` DECIMAL(10, 2),`abs_tinyint` TINYINT,`abs_smallint` SMALLINT,`abs_int` INT,`abs_bigint` BIGINT,`abs_float` FLOAT,`abs_double` DOUBLE,`abs_decimal` DECIMAL(10, 2)}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, 1, 1, 1, 1, 1.1, 1.1, 1.10, 1, 1, 1, 1, 1.1, 1.1, 1.10], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[-4, -4, -4, -4, -4, -4.44, -4.44, -4.44, 4, 4, 4, 4, 4.44, 4.44, 4.44], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[-9, -9, -9, -9, -9, -1.0E8, -9.999999999E7, -99999999.99, 9, 9, 9, 9, 1.0E8, 9.999999999E7, 99999999.99], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+    }
+
+    private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {
+        List<Event> events = new ArrayList<>();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("tinyint_col", DataTypes.TINYINT())
+                        .physicalColumn("smallint_col", DataTypes.SMALLINT())
+                        .physicalColumn("int_col", DataTypes.INT())
+                        .physicalColumn("bigint_col", DataTypes.BIGINT())
+                        .physicalColumn("float_col", DataTypes.FLOAT())
+                        .physicalColumn("double_col", DataTypes.DOUBLE())
+                        .physicalColumn("decimal_col", DataTypes.DECIMAL(10, 3))
+                        .primaryKey("id")
+                        .build();
+
+        events.add(new CreateTableEvent(tableId, schema));
+
+        Stream.of(
+                        generate(
+                                schema,
+                                1,
+                                (byte) 1,
+                                (short) 1,
+                                1,
+                                1L,
+                                1.1f,
+                                1.1d,
+                                DecimalData.fromBigDecimal(new BigDecimal("1.1"), 10, 3)),
+                        generate(
+                                schema,
+                                4,
+                                (byte) 4,
+                                (short) 4,
+                                4,
+                                4L,
+                                4.44f,
+                                4.44d,
+                                DecimalData.fromBigDecimal(new BigDecimal("4.44"), 10, 3)),
+                        generate(
+                                schema,
+                                5,
+                                (byte) 5,
+                                (short) 5,
+                                5,
+                                5L,
+                                5.555f,
+                                5.555d,
+                                DecimalData.fromBigDecimal(new BigDecimal("5.555"), 10, 3)),
+                        generate(
+                                schema,
+                                9,
+                                (byte) 9,
+                                (short) 9,
+                                9,
+                                9L,
+                                9999999.999f,
+                                9999999.999d,
+                                DecimalData.fromBigDecimal(new BigDecimal("9999999.999"), 10, 3)),
+                        generate(schema, 0, null, null, null, null, null, null, null))
+                .map(rec -> DataChangeEvent.insertEvent(tableId, rec))
+                .forEach(events::add);
+        return events;
+    }
+
+    private List<Event> generateAbsEvents(TableId tableId) {
+        List<Event> events = new ArrayList<>();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("tinyint_col", DataTypes.TINYINT())
+                        .physicalColumn("smallint_col", DataTypes.SMALLINT())
+                        .physicalColumn("int_col", DataTypes.INT())
+                        .physicalColumn("bigint_col", DataTypes.BIGINT())
+                        .physicalColumn("float_col", DataTypes.FLOAT())
+                        .physicalColumn("double_col", DataTypes.DOUBLE())
+                        .physicalColumn("decimal_col", DataTypes.DECIMAL(10, 2))
+                        .primaryKey("id")
+                        .build();
+
+        events.add(new CreateTableEvent(tableId, schema));
+
+        Stream.of(
+                        generate(
+                                schema,
+                                1,
+                                (byte) 1,
+                                (short) 1,
+                                1,
+                                1L,
+                                1.1f,
+                                1.1d,
+                                DecimalData.fromBigDecimal(new BigDecimal("1.1"), 10, 2)),
+                        generate(
+                                schema,
+                                -4,
+                                (byte) -4,
+                                (short) -4,
+                                -4,
+                                -4L,
+                                -4.44f,
+                                -4.44d,
+                                DecimalData.fromBigDecimal(new BigDecimal("-4.44"), 10, 2)),
+                        generate(
+                                schema,
+                                -9,
+                                (byte) -9,
+                                (short) -9,
+                                -9,
+                                -9L,
+                                -99999999.99f,
+                                -99999999.99d,
+                                DecimalData.fromBigDecimal(new BigDecimal("-99999999.99"), 10, 2)),
+                        generate(schema, 0, null, null, null, null, null, null, null))
+                .map(rec -> DataChangeEvent.insertEvent(tableId, rec))
+                .forEach(events::add);
+        return events;
     }
 
     private List<Event> generateSchemaEvolutionEvents(TableId tableId) {
