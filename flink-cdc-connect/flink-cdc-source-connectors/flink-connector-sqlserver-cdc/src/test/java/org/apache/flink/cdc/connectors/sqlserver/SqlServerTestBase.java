@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.sqlserver;
 
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
@@ -49,7 +49,7 @@ import java.util.stream.Stream;
 import static org.junit.Assert.assertNotNull;
 
 /** Utility class for sqlserver tests. */
-public class SqlServerTestBase extends AbstractTestBase {
+public class SqlServerTestBase extends AbstractTestBaseJUnit4 {
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 

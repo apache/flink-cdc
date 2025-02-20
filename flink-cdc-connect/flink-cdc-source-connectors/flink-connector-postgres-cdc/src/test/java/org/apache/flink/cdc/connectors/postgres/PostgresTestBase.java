@@ -21,7 +21,7 @@ import org.apache.flink.cdc.connectors.postgres.source.PostgresConnectionPoolFac
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 import org.apache.flink.types.Row;
 
 import io.debezium.config.Configuration;
@@ -63,7 +63,7 @@ import static org.junit.Assert.assertTrue;
  * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables wal
  * log.
  */
-public abstract class PostgresTestBase extends AbstractTestBase {
+public abstract class PostgresTestBase extends AbstractTestBaseJUnit4 {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
     public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     public static final String DEFAULT_DB = "postgres";

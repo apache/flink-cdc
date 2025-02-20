@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.vitess;
 
 import org.apache.flink.cdc.connectors.vitess.container.VitessContainer;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
@@ -43,7 +43,7 @@ import java.util.stream.Stream;
 import static org.junit.Assert.assertNotNull;
 
 /** Basic class for testing Vitess source, this contains a Vitess container. */
-public abstract class VitessTestBase extends AbstractTestBase {
+public abstract class VitessTestBase extends AbstractTestBaseJUnit4 {
 
     private static final Logger LOG = LoggerFactory.getLogger(VitessTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
