@@ -96,7 +96,7 @@ jobs:
       fail-fast: false
       matrix:
         java-version: ${{ fromJSON(inputs.java-version) }}
-        flink-version: [ '1.19.1', '1.20.0' ]
+        flink-version: [ '1.19.2', '1.20.1' ]
 
     steps:
       - uses: actions/checkout@v4
