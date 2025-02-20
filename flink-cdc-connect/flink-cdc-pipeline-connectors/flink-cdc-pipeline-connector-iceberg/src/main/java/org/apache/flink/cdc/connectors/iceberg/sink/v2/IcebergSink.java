@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.CommitterInitContext;
 import org.apache.flink.api.connector.sink2.Sink;
@@ -26,6 +27,8 @@ import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
+import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
+import org.apache.flink.streaming.api.connector.sink2.SupportsPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -39,7 +42,8 @@ public class IcebergSink
         implements Sink<Event>,
                 WithPreWriteTopology<Event>,
                 WithPreCommitTopology<Event, WriteResultWrapper>,
-                TwoPhaseCommittingSink<Event, WriteResultWrapper> {
+                TwoPhaseCommittingSink<Event, WriteResultWrapper>,
+                SupportsPostCommitTopology<WriteResultWrapper> {
 
     protected final Map<String, String> catalogOptions;
 
@@ -101,5 +105,18 @@ public class IcebergSink
     @Override
     public SimpleVersionedSerializer getWriteResultSerializer() {
         return new WriteResultWrapperSerializer();
+    }
+
+    @Override
+    public void addPostCommitTopology(
+            DataStream<CommittableMessage<WriteResultWrapper>> committables) {
+        TypeInformation<CommittableMessage<WriteResultWrapper>> typeInformation =
+                CommittableMessageTypeInfo.of(this::getCommittableSerializer);
+        committables
+                .transform(
+                        "iceberg-small-files-commiter",
+                        typeInformation,
+                        new PostCommitOperator(catalogOptions))
+                .setParallelism(committables.getParallelism());
     }
 }
