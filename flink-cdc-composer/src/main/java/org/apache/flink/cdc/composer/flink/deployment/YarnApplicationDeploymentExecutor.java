@@ -82,7 +82,7 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
 
         flinkConfig.set(
                 ApplicationConfiguration.APPLICATION_ARGS,
-                Collections.singletonList(mapper.readTree(pipelineInStream).asText().toString()));
+                Collections.singletonList(mapper.readTree(pipelineInStream).toString()));
         YarnLogConfigUtil.setLogConfigFileInConfig(
                 flinkConfig, Joiner.on(File.separator).join(flinkHome, "conf"));
 

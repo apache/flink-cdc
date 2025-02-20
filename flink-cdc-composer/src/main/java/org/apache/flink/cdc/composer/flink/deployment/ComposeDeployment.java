@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink.deployment;
 
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
@@ -39,10 +40,23 @@ public enum ComposeDeployment {
         return name;
     }
 
-    public static ComposeDeployment getDeploymentFromName(final String deploymentTarget) {
+    public static ComposeDeployment getDeploymentFromName(final String deploymentTargetStr) {
         return Arrays.stream(ComposeDeployment.values())
-                .filter(d -> d.name.equalsIgnoreCase(deploymentTarget))
+                .filter(d -> d.name.equalsIgnoreCase(deploymentTargetStr))
                 .findFirst()
-                .get();
+                .orElseThrow(
+                        () ->
+                                new IllegalArgumentException(
+                                        "Unknown deployment target \""
+                                                + deploymentTargetStr
+                                                + "\"."
+                                                + " The available options are: "
+                                                + options()));
+    }
+
+    private static String options() {
+        return Arrays.stream(ComposeDeployment.values())
+                .map(ComposeDeployment::getName)
+                .collect(Collectors.joining(","));
     }
 }
