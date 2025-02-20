@@ -300,6 +300,12 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
             stat.execute(
                     "INSERT INTO products VALUES (default,'evangelion','Eva',2.1728, null, null, null);"); // 114
 
+            // Test Batch AddColumnEvent
+            stat.execute(
+                    "ALTER TABLE products ADD COLUMN (batch_new_col1 INT,batch_new_col2 INT);");
+            stat.execute(
+                    "ALTER TABLE products ADD COLUMN batch_new_col3 INT,ADD COLUMN batch_new_col4 INT after batch_new_col3;");
+
             // Test TruncateTableEvent
             stat.execute("TRUNCATE TABLE products;");
 
@@ -330,6 +336,9 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.products, before=[], after=[113, dynazenon, SSSS, 2.1728, null, null, null, 2147483649], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.products, droppedColumnNames=[new_column]}",
                 "DataChangeEvent{tableId=%s.products, before=[], after=[114, evangelion, Eva, 2.1728, null, null, null], op=INSERT, meta=()}",
+                "AddColumnEvent{tableId=%s.products, addedColumns=[ColumnWithPosition{column=`batch_new_col1` INT, position=LAST, existedColumnName=null}, ColumnWithPosition{column=`batch_new_col2` INT, position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=%s.products, addedColumns=[ColumnWithPosition{column=`batch_new_col3` INT, position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=%s.products, addedColumns=[ColumnWithPosition{column=`batch_new_col4` INT, position=AFTER, existedColumnName=batch_new_col3}]}",
                 "TruncateTableEvent{tableId=%s.products}",
                 "DropTableEvent{tableId=%s.products}");
     }
