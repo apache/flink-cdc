@@ -441,6 +441,13 @@ public class PaimonMetadataApplierTest {
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
 
         addedColumns.clear();
+
+        addedColumns.add(
+                AddColumnEvent.before(
+                        Column.physicalColumn(
+                                "col4_first_before",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING()),
+                        "col1"));
         addedColumns.add(
                 AddColumnEvent.first(
                         Column.physicalColumn(
@@ -463,27 +470,20 @@ public class PaimonMetadataApplierTest {
                                 "col7_after", org.apache.flink.cdc.common.types.DataTypes.STRING()),
                         "col2"));
 
-        addedColumns.add(
-                AddColumnEvent.before(
-                        Column.physicalColumn(
-                                "col4_first_before",
-                                org.apache.flink.cdc.common.types.DataTypes.STRING()),
-                        "col1"));
-
         addColumnEvent = new AddColumnEvent(TableId.parse("test.table1"), addedColumns);
         metadataApplier.applySchemaChange(addColumnEvent);
 
         tableSchema =
                 new RowType(
                         Arrays.asList(
-                                new DataField(7, "col4_first_before", DataTypes.STRING()),
-                                new DataField(3, "col4_first", DataTypes.STRING()),
+                                new DataField(4, "col4_first", DataTypes.STRING()),
+                                new DataField(3, "col4_first_before", DataTypes.STRING()),
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
-                                new DataField(5, "col6_before", DataTypes.STRING()),
+                                new DataField(6, "col6_before", DataTypes.STRING()),
                                 new DataField(1, "col2", DataTypes.INT()),
-                                new DataField(6, "col7_after", DataTypes.STRING()),
+                                new DataField(7, "col7_after", DataTypes.STRING()),
                                 new DataField(2, "col3", DataTypes.STRING()),
-                                new DataField(4, "col5_last", DataTypes.STRING())));
+                                new DataField(5, "col5_last", DataTypes.STRING())));
 
         Assertions.assertEquals(
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
