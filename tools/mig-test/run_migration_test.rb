@@ -118,8 +118,8 @@ def test_migration(from_version, to_version)
 end
 
 version_list = case ARGV[0]
-               when '1.19.1' then %w[3.2.0 3.2.1 3.3.0 3.4-SNAPSHOT]
-               when '1.20.0' then %w[3.2.1 3.3.0 3.4-SNAPSHOT]
+               when '1.19.2' then %w[3.2.0 3.2.1 3.3.0 3.4-SNAPSHOT]
+               when '1.20.1' then %w[3.2.1 3.3.0 3.4-SNAPSHOT]
                else throw "Unknown Flink target version: #{ARGV[0]}."
                end
 
