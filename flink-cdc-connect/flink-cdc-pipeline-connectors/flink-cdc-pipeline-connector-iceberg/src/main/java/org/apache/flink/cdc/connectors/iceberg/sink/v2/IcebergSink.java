@@ -103,20 +103,28 @@ public class IcebergSink
     }
 
     @Override
-    public SimpleVersionedSerializer getWriteResultSerializer() {
+    public SimpleVersionedSerializer<WriteResultWrapper> getWriteResultSerializer() {
         return new WriteResultWrapperSerializer();
     }
 
     @Override
     public void addPostCommitTopology(
-            DataStream<CommittableMessage<WriteResultWrapper>> committables) {
+            DataStream<CommittableMessage<WriteResultWrapper>> committableMessageDataStream) {
+
         TypeInformation<CommittableMessage<WriteResultWrapper>> typeInformation =
                 CommittableMessageTypeInfo.of(this::getCommittableSerializer);
-        committables
+        // shuffle with different table id
+        DataStream<CommittableMessage<WriteResultWrapper>> keyedStream =
+                FlinkStreamPartitioner.partition(
+                        committableMessageDataStream,
+                        new MultiTableCommittableChannelComputer(),
+                        committableMessageDataStream.getParallelism());
+        // small file compaction
+        keyedStream
                 .transform(
                         "iceberg-small-files-commiter",
                         typeInformation,
                         new PostCommitOperator(catalogOptions))
-                .setParallelism(committables.getParallelism());
+                .setParallelism(committableMessageDataStream.getParallelism());
     }
 }
