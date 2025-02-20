@@ -33,7 +33,8 @@ limitations under the License.
         <flink-major-1.19>1.19</flink-major-1.19>
         <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
-        <starrocks.connector.version>1.2.10_flink-${flink.major.version}</starrocks.connector.version>
+        <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
+        <starrocks.connector.version>1.2.10_flink-${flink-major-1.19}</starrocks.connector.version>
         <paimon.version>0.9.0</paimon.version>
     </properties>
 

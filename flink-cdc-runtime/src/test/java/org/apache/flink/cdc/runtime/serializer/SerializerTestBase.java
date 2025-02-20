@@ -50,9 +50,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -486,7 +486,9 @@ public abstract class SerializerTestBase<T> {
     // --------------------------------------------------------------------------------------------
 
     private void deepEquals(String message, T should, T is) {
-        assertThat(message, is, CustomEqualityMatcher.deeplyEquals(should).withChecker(checker));
+        assertThat(is)
+                .as(message)
+                .matches(CustomEqualityMatcher.deeplyEquals(should).withChecker(checker));
     }
 
     // --------------------------------------------------------------------------------------------
@@ -580,11 +582,12 @@ public abstract class SerializerTestBase<T> {
                         T serdeTestItem = serializer.deserialize(dataInputDeserializer);
                         T copySerdeTestItem = serializer.copy(serdeTestItem);
                         dataOutputSerializer.clear();
-
-                        assertThat(
-                                "Serialization/Deserialization cycle resulted in an object that are not equal to the original.",
-                                copySerdeTestItem,
-                                CustomEqualityMatcher.deeplyEquals(testItem).withChecker(checker));
+                        assertThat(copySerdeTestItem)
+                                .as(
+                                        "Serialization/Deserialization cycle resulted in an object that are not equal to the original.")
+                                .matches(
+                                        CustomEqualityMatcher.deeplyEquals(testItem)
+                                                .withChecker(checker));
 
                         // try to enforce some upper bound to the test time
                         if (System.nanoTime() >= endTimeNanos) {
