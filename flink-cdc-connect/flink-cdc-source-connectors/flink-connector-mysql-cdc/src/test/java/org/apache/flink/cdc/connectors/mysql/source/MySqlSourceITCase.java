@@ -956,7 +956,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'scan.incremental.snapshot.assign-ending-chunk-first.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.unbounded-chunk-first.enabled' = '%s',"
                                 + " 'server-id' = '%s'"
                                 + " %s"
                                 + ")",

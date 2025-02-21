@@ -239,12 +239,12 @@ Connector Options
             By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
     </tr>
     <tr>
-      <td>scan.incremental.snapshot.assign-ending-chunk-first.enabled</td>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to assign the ending chunk first during snapshot reading phase.<br>
+        Whether to assign the unbounded chunk first during snapshot reading phase.<br>
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
         Experimental option, defaults to false.
       </td>
