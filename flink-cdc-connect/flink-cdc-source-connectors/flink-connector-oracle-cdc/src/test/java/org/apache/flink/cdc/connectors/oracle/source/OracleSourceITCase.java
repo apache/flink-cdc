@@ -36,7 +36,6 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConfiguration;
@@ -63,7 +62,6 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link OracleSourceBuilder.OracleIncrementalSource}. */
 public class OracleSourceITCase extends OracleSourceTestBase {
@@ -384,26 +382,18 @@ public class OracleSourceITCase extends OracleSourceTestBase {
     }
 
     @Test
-    public void testTableWithChunkColumnOfNoPrimaryKey() {
+    public void testTableWithChunkColumnOfNoPrimaryKey() throws Exception {
         String chunkColumn = "NAME";
-        try {
-            testOracleParallelSource(
-                    1,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
-                    new String[] {"CUSTOMERS"},
-                    false,
-                    RestartStrategies.noRestart(),
-                    chunkColumn);
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                            chunkColumn, "ID", "customer.DEBEZIUM.CUSTOMERS"))
-                            .isPresent());
-        }
+        testOracleParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"CUSTOMERS"},
+                false,
+                RestartStrategies.noRestart(),
+                chunkColumn);
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     private List<String> testBackfillWhenWritingEvents(
