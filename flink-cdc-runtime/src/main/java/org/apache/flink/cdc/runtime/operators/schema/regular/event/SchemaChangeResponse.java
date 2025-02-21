@@ -24,7 +24,6 @@ import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaCoordinator;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,60 +43,11 @@ public class SchemaChangeResponse implements CoordinationResponse {
 
     private final Map<TableId, Schema> evolvedSchemas;
 
-    private final ResponseCode responseCode;
-
-    public static SchemaChangeResponse success(
-            List<SchemaChangeEvent> schemaChangeEvents, Map<TableId, Schema> evolvedSchemas) {
-        return new SchemaChangeResponse(ResponseCode.SUCCESS, schemaChangeEvents, evolvedSchemas);
-    }
-
-    public static SchemaChangeResponse busy() {
-        return new SchemaChangeResponse(ResponseCode.BUSY);
-    }
-
-    public static SchemaChangeResponse duplicate() {
-        return new SchemaChangeResponse(ResponseCode.DUPLICATE);
-    }
-
-    public static SchemaChangeResponse ignored() {
-        return new SchemaChangeResponse(ResponseCode.IGNORED);
-    }
-
-    public static SchemaChangeResponse waitingForFlush() {
-        return new SchemaChangeResponse(ResponseCode.WAITING_FOR_FLUSH);
-    }
-
-    private SchemaChangeResponse(ResponseCode responseCode) {
-        this(responseCode, Collections.emptyList(), Collections.emptyMap());
-    }
-
-    private SchemaChangeResponse(
-            ResponseCode responseCode,
+    public SchemaChangeResponse(
             List<SchemaChangeEvent> appliedSchemaChangeEvents,
             Map<TableId, Schema> evolvedSchemas) {
-        this.responseCode = responseCode;
         this.appliedSchemaChangeEvents = appliedSchemaChangeEvents;
         this.evolvedSchemas = evolvedSchemas;
-    }
-
-    public boolean isSuccess() {
-        return ResponseCode.SUCCESS.equals(responseCode);
-    }
-
-    public boolean isRegistryBusy() {
-        return ResponseCode.BUSY.equals(responseCode);
-    }
-
-    public boolean isDuplicate() {
-        return ResponseCode.DUPLICATE.equals(responseCode);
-    }
-
-    public boolean isIgnored() {
-        return ResponseCode.IGNORED.equals(responseCode);
-    }
-
-    public boolean isWaitingForFlush() {
-        return ResponseCode.WAITING_FOR_FLUSH.equals(responseCode);
     }
 
     public List<SchemaChangeEvent> getAppliedSchemaChangeEvents() {
@@ -118,43 +68,21 @@ public class SchemaChangeResponse implements CoordinationResponse {
         }
         SchemaChangeResponse response = (SchemaChangeResponse) o;
         return Objects.equals(appliedSchemaChangeEvents, response.appliedSchemaChangeEvents)
-                && responseCode == response.responseCode;
+                && Objects.equals(evolvedSchemas, response.evolvedSchemas);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(appliedSchemaChangeEvents, responseCode);
+        return Objects.hash(appliedSchemaChangeEvents, evolvedSchemas);
     }
 
     @Override
     public String toString() {
         return "SchemaChangeResponse{"
-                + "schemaChangeEvents="
+                + "appliedSchemaChangeEvents="
                 + appliedSchemaChangeEvents
-                + ", responseCode="
-                + responseCode
+                + ", evolvedSchemas="
+                + evolvedSchemas
                 + '}';
-    }
-
-    /**
-     * Schema Change Response status code.
-     *
-     * <p>- Accepted: Requested schema change request has been accepted exclusively. Any other
-     * schema change requests will be blocked.
-     *
-     * <p>- Busy: Schema registry is currently busy processing another schema change request.
-     *
-     * <p>- Duplicate: This schema change request has been submitted before, possibly by another
-     * paralleled subTask.
-     *
-     * <p>- Ignored: This schema change request has been assessed, but no actual evolution is
-     * required. Possibly caused by LENIENT mode or merging table strategies.
-     */
-    public enum ResponseCode {
-        SUCCESS,
-        BUSY,
-        DUPLICATE,
-        IGNORED,
-        WAITING_FOR_FLUSH
     }
 }

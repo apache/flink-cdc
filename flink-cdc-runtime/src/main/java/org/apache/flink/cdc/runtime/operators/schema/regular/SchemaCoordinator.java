@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.schema.regular;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -62,6 +63,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.wrap;
@@ -73,16 +75,13 @@ public class SchemaCoordinator extends SchemaRegistry {
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
 
-    /**
-     * Atomic flag indicating if current RequestHandler could accept more schema changes for now.
-     */
-    private transient RequestStatus schemaChangeStatus;
-
     /** Sink writers which have sent flush success events for the request. */
     private transient ConcurrentHashMap<Integer, Set<Integer>> flushedSinkWriters;
 
-    /** Currently handling request's completable future. */
-    private transient CompletableFuture<CoordinationResponse> pendingResponseFuture;
+    /** Currently handling requests' completable future. */
+    private transient Map<
+                    Integer, Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>>
+            pendingRequests;
 
     // Static fields
     public SchemaCoordinator(
@@ -108,7 +107,7 @@ public class SchemaCoordinator extends SchemaRegistry {
     public void start() throws Exception {
         super.start();
         this.flushedSinkWriters = new ConcurrentHashMap<>();
-        this.schemaChangeStatus = RequestStatus.IDLE;
+        this.pendingRequests = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -185,7 +184,7 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     @Override
-    protected void handleFlushSuccessEvent(FlushSuccessEvent event) {
+    protected void handleFlushSuccessEvent(FlushSuccessEvent event) throws TimeoutException {
         int sinkSubtask = event.getSinkSubTaskId();
         int sourceSubtask = event.getSourceSubTaskId();
         LOG.info(
@@ -200,16 +199,25 @@ public class SchemaCoordinator extends SchemaRegistry {
                 "Currently flushed sink writers for source task {} are: {}",
                 sourceSubtask,
                 flushedSinkWriters.get(sourceSubtask));
+
+        if (flushedSinkWriters.get(sourceSubtask).size() >= currentParallelism) {
+            LOG.info(
+                    "Source SubTask {} have collected enough flush success event. Will start evolving schema changes...",
+                    sourceSubtask);
+            flushedSinkWriters.remove(sourceSubtask);
+            startSchemaChangesEvolve(sourceSubtask);
+        }
     }
 
     @Override
     protected void handleUnrecoverableError(String taskDescription, Throwable t) {
         super.handleUnrecoverableError(taskDescription, t);
 
-        // There's a pending future, release it exceptionally before quitting
-        if (pendingResponseFuture != null) {
-            pendingResponseFuture.completeExceptionally(t);
-        }
+        // For each pending future, release it exceptionally before quitting
+        pendingRequests.forEach(
+                (index, tuple) -> {
+                    tuple.f1.completeExceptionally(t);
+                });
     }
 
     /**
@@ -219,73 +227,14 @@ public class SchemaCoordinator extends SchemaRegistry {
      */
     public void handleSchemaChangeRequest(
             SchemaChangeRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
-
-        // We use subTaskId to identify each schema change request
-        int subTaskId = request.getSubTaskId();
-
-        if (schemaChangeStatus == RequestStatus.IDLE) {
-            if (activeSinkWriters.size() < currentParallelism) {
-                LOG.info(
-                        "Not all active sink writers have been registered. Current {}, expected {}.",
-                        activeSinkWriters.size(),
-                        currentParallelism);
-                responseFuture.complete(wrap(SchemaChangeResponse.waitingForFlush()));
-                return;
-            }
-
-            if (!activeSinkWriters.equals(flushedSinkWriters.get(subTaskId))) {
-                LOG.info(
-                        "Not all active sink writers have completed flush. Flushed writers: {}, expected: {}.",
-                        flushedSinkWriters.get(subTaskId),
-                        activeSinkWriters);
-                responseFuture.complete(wrap(SchemaChangeResponse.waitingForFlush()));
-                return;
-            }
-
-            LOG.info(
-                    "All sink writers have flushed for subTaskId {}. Switching to APPLYING state and starting schema evolution...",
-                    subTaskId);
-            flushedSinkWriters.remove(subTaskId);
-            schemaChangeStatus = RequestStatus.APPLYING;
-            pendingResponseFuture = responseFuture;
-            startSchemaChangesEvolve(request, responseFuture);
-        } else {
-            responseFuture.complete(wrap(SchemaChangeResponse.busy()));
-        }
+        pendingRequests.put(request.getSubTaskId(), Tuple2.of(request, responseFuture));
     }
 
-    private void startSchemaChangesEvolve(
-            SchemaChangeRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
-        SchemaChangeEvent originalEvent = request.getSchemaChangeEvent();
-        TableId originalTableId = originalEvent.tableId();
-        Schema currentUpstreamSchema =
-                schemaManager.getLatestOriginalSchema(originalTableId).orElse(null);
-
-        List<SchemaChangeEvent> deducedSchemaChangeEvents = new ArrayList<>();
-
-        // For redundant schema change events (possibly coming from duplicate emitted
-        // CreateTableEvents in snapshot stage), we just skip them.
-        if (!SchemaUtils.isSchemaChangeEventRedundant(currentUpstreamSchema, originalEvent)) {
-            schemaManager.applyOriginalSchemaChange(originalEvent);
-            deducedSchemaChangeEvents.addAll(deduceEvolvedSchemaChanges(originalEvent));
-        } else {
-            LOG.info(
-                    "Schema change event {} is redundant for current schema {}, just skip it.",
-                    originalEvent,
-                    currentUpstreamSchema);
-        }
-
-        LOG.info(
-                "All sink subtask have flushed for table {}. Start to apply schema change request: \n\t{}\nthat extracts to:\n\t{}",
-                request.getTableId().toString(),
-                request,
-                deducedSchemaChangeEvents.stream()
-                        .map(SchemaChangeEvent::toString)
-                        .collect(Collectors.joining("\n\t")));
+    private void startSchemaChangesEvolve(int sourceSubTaskId) {
         schemaChangeThreadPool.submit(
                 () -> {
                     try {
-                        applySchemaChange(originalEvent, deducedSchemaChangeEvents);
+                        applySchemaChange(sourceSubTaskId);
                     } catch (Throwable t) {
                         failJob(
                                 "Schema change applying task",
@@ -379,8 +328,54 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     /** Applies the schema change to the external system. */
-    private void applySchemaChange(
-            SchemaChangeEvent originalEvent, List<SchemaChangeEvent> deducedSchemaChangeEvents) {
+    private void applySchemaChange(int sourceSubTaskId) {
+        try {
+            loopUntil(
+                    () -> pendingRequests.containsKey(sourceSubTaskId),
+                    () ->
+                            LOG.info(
+                                    "SchemaOperator {} has not submitted schema change request yet. Waiting...",
+                                    sourceSubTaskId),
+                    rpcTimeout,
+                    Duration.ofMillis(100));
+        } catch (TimeoutException e) {
+            throw new RuntimeException(
+                    "Timeout waiting for schema change request from SchemaOperator.", e);
+        }
+
+        Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>> requestBody =
+                pendingRequests.get(sourceSubTaskId);
+        SchemaChangeRequest request = requestBody.f0;
+        CompletableFuture<CoordinationResponse> responseFuture = requestBody.f1;
+
+        SchemaChangeEvent originalEvent = request.getSchemaChangeEvent();
+
+        TableId originalTableId = originalEvent.tableId();
+        Schema currentUpstreamSchema =
+                schemaManager.getLatestOriginalSchema(originalTableId).orElse(null);
+
+        List<SchemaChangeEvent> deducedSchemaChangeEvents = new ArrayList<>();
+
+        // For redundant schema change events (possibly coming from duplicate emitted
+        // CreateTableEvents in snapshot stage), we just skip them.
+        if (!SchemaUtils.isSchemaChangeEventRedundant(currentUpstreamSchema, originalEvent)) {
+            schemaManager.applyOriginalSchemaChange(originalEvent);
+            deducedSchemaChangeEvents.addAll(deduceEvolvedSchemaChanges(originalEvent));
+        } else {
+            LOG.info(
+                    "Schema change event {} is redundant for current schema {}, just skip it.",
+                    originalEvent,
+                    currentUpstreamSchema);
+        }
+
+        LOG.info(
+                "All sink subtask have flushed for table {}. Start to apply schema change request: \n\t{}\nthat extracts to:\n\t{}",
+                request.getTableId().toString(),
+                request,
+                deducedSchemaChangeEvents.stream()
+                        .map(SchemaChangeEvent::toString)
+                        .collect(Collectors.joining("\n\t")));
+
         if (SchemaChangeBehavior.EXCEPTION.equals(behavior)) {
             if (deducedSchemaChangeEvents.stream()
                     .anyMatch(evt -> !(evt instanceof CreateTableEvent))) {
@@ -415,18 +410,14 @@ public class SchemaCoordinator extends SchemaRegistry {
         }
 
         // And returns all successfully applied schema change events to SchemaOperator.
-        pendingResponseFuture.complete(
-                wrap(
-                        SchemaChangeResponse.success(
-                                appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
-        pendingResponseFuture = null;
+        responseFuture.complete(
+                wrap(new SchemaChangeResponse(appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
 
-        Preconditions.checkState(
-                schemaChangeStatus == RequestStatus.APPLYING,
-                "Illegal schemaChangeStatus state: should be APPLYING before applySchemaChange finishes, not "
-                        + schemaChangeStatus);
-        schemaChangeStatus = RequestStatus.IDLE;
-        LOG.info("SchemaChangeStatus switched from APPLYING to IDLE.");
+        pendingRequests.remove(sourceSubTaskId);
+        LOG.info(
+                "Finished handling schema change request from {}. Pending requests: {}",
+                sourceSubTaskId,
+                pendingRequests);
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
