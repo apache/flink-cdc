@@ -31,6 +31,7 @@ import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
@@ -76,7 +77,7 @@ public class TableIdRouter {
         return routingCache.getUnchecked(sourceTableId);
     }
 
-    private List<TableId> calculateRoute(TableId sourceTableId) {
+    public List<TableId> calculateRoute(TableId sourceTableId) {
         List<TableId> routedTableIds =
                 routes.stream()
                         .filter(route -> route.f0.isMatch(sourceTableId))
@@ -94,5 +95,24 @@ public class TableIdRouter {
             return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
         }
         return TableId.parse(route.f1);
+    }
+
+    public List<Set<TableId>> groupSourceTablesByRouteRule(Set<TableId> tableIdSet) {
+        List<Set<TableId>> routedTableIds =
+                routes.stream()
+                        .map(
+                                route -> {
+                                    return tableIdSet.stream()
+                                            .filter(
+                                                    tableId -> {
+                                                        return route.f0.isMatch(tableId);
+                                                    })
+                                            .collect(Collectors.toSet());
+                                })
+                        .collect(Collectors.toList());
+        if (routedTableIds.isEmpty()) {
+            routedTableIds.add(tableIdSet);
+        }
+        return routedTableIds;
     }
 }

@@ -23,6 +23,7 @@ import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -286,6 +287,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                     .ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {
             output.collect(new StreamRecord<>(processDataChangeEvent(((DataChangeEvent) event))));
+        } else if (event instanceof CreateTableCompletedEvent) {
+            output.collect(new StreamRecord<>(event));
         }
     }
 
