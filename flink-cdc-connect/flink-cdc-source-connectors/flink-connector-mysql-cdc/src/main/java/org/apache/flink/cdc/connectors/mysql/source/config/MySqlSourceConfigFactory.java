@@ -73,6 +73,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean parseOnLineSchemaChanges = false;
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
+    private boolean assignEndingChunkFirst = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -314,6 +315,14 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to assign the ending chunk first during snapshot reading phase. Defaults to false.
+     */
+    public MySqlSourceConfigFactory assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -410,6 +419,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 skipSnapshotBackfill,
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
-                useLegacyJsonFormat);
+                useLegacyJsonFormat,
+                assignEndingChunkFirst);
     }
 }

@@ -55,6 +55,7 @@ import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CON
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
@@ -154,7 +155,8 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -200,7 +202,8 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         true,
                         true,
-                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -244,7 +247,8 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name");
@@ -298,7 +302,8 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -342,7 +347,8 @@ public class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue());
+                        SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 

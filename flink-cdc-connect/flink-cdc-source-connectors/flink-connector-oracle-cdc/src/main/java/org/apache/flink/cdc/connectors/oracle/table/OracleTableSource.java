@@ -80,6 +80,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final boolean closeIdleReaders;
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean assignEndingChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -115,7 +116,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
             boolean skipSnapshotBackfill,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled,
+            boolean assignEndingChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -142,6 +144,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.closeIdleReaders = closeIdleReaders;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     @Override
@@ -191,6 +194,7 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .chunkKeyColumn(chunkKeyColumn)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .assignEndingChunkFirst(assignEndingChunkFirst)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -257,7 +261,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         chunkKeyColumn,
                         closeIdleReaders,
                         skipSnapshotBackfill,
-                        scanNewlyAddedTableEnabled);
+                        scanNewlyAddedTableEnabled,
+                        assignEndingChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
