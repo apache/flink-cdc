@@ -28,7 +28,7 @@ import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.flink.deployment.ComposeDeploymentFactory;
-import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
+import org.apache.flink.configuration.DeploymentOptions;
 
 import org.apache.commons.cli.CommandLine;
 
@@ -39,45 +39,37 @@ import java.util.List;
 public class CliExecutor {
 
     private final Path pipelineDefPath;
-    private final Configuration flinkConfig;
+    private final org.apache.flink.configuration.Configuration flinkConfig;
     private final Configuration globalPipelineConfig;
-    private final boolean useMiniCluster;
     private final List<Path> additionalJars;
 
     private final CommandLine commandLine;
 
     private PipelineComposer composer = null;
 
-    private final SavepointRestoreSettings savepointSettings;
-
     public CliExecutor(
             CommandLine commandLine,
             Path pipelineDefPath,
-            Configuration flinkConfig,
+            org.apache.flink.configuration.Configuration flinkConfig,
             Configuration globalPipelineConfig,
-            boolean useMiniCluster,
-            List<Path> additionalJars,
-            SavepointRestoreSettings savepointSettings) {
+            List<Path> additionalJars) {
         this.commandLine = commandLine;
         this.pipelineDefPath = pipelineDefPath;
         this.flinkConfig = flinkConfig;
         this.globalPipelineConfig = globalPipelineConfig;
-        this.useMiniCluster = useMiniCluster;
         this.additionalJars = additionalJars;
-        this.savepointSettings = savepointSettings;
     }
 
     public PipelineExecution.ExecutionInfo run() throws Exception {
         // Create Submit Executor to deployment flink cdc job Or Run Flink CDC Job
-        boolean isDeploymentMode = ConfigurationUtils.isDeploymentMode(commandLine);
+        boolean isDeploymentMode = ConfigurationUtils.isDeploymentMode(getDeploymentTarget());
+        // isDeploymentMode is true only when the target is kubernetes-application
+        // TODO: In #3643, this code will be optimized to support yarn-application
         if (isDeploymentMode) {
             ComposeDeploymentFactory composeDeploymentFactory = new ComposeDeploymentFactory();
             PipelineDeploymentExecutor composeExecutor =
-                    composeDeploymentFactory.getFlinkComposeExecutor(commandLine);
-            org.apache.flink.configuration.Configuration configuration =
-                    org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
-            SavepointRestoreSettings.toConfiguration(savepointSettings, configuration);
-            return composeExecutor.deploy(commandLine, configuration, additionalJars);
+                    composeDeploymentFactory.getFlinkComposeExecutor(getDeploymentTarget());
+            return composeExecutor.deploy(commandLine, flinkConfig, additionalJars);
         } else {
             // Run CDC Job And Parse pipeline definition file
             PipelineDefinitionParser pipelineDefinitionParser = new YamlPipelineDefinitionParser();
@@ -92,10 +84,9 @@ public class CliExecutor {
         }
     }
 
-    private PipelineComposer getComposer() throws Exception {
+    private PipelineComposer getComposer() {
         if (composer == null) {
-            return FlinkEnvironmentUtils.createComposer(
-                    useMiniCluster, flinkConfig, additionalJars, savepointSettings);
+            return FlinkEnvironmentUtils.createComposer(flinkConfig, additionalJars);
         }
         return composer;
     }
@@ -106,7 +97,7 @@ public class CliExecutor {
     }
 
     @VisibleForTesting
-    public Configuration getFlinkConfig() {
+    public org.apache.flink.configuration.Configuration getFlinkConfig() {
         return flinkConfig;
     }
 
@@ -120,12 +111,7 @@ public class CliExecutor {
         return additionalJars;
     }
 
-    @VisibleForTesting
     public String getDeploymentTarget() {
-        return commandLine.getOptionValue("target");
-    }
-
-    public SavepointRestoreSettings getSavepointSettings() {
-        return savepointSettings;
+        return flinkConfig.get(DeploymentOptions.TARGET);
     }
 }
