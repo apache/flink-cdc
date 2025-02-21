@@ -34,7 +34,6 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
@@ -57,7 +56,6 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** IT tests for {@link SqlServerSourceBuilder.SqlServerIncrementalSource}. */
@@ -279,26 +277,18 @@ public class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    public void testTableWithChunkColumnOfNoPrimaryKey() {
+    public void testTableWithChunkColumnOfNoPrimaryKey() throws Exception {
         String chunkColumn = "name";
-        try {
-            testSqlServerParallelSource(
-                    1,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
-                    new String[] {"dbo.customers"},
-                    false,
-                    RestartStrategies.noRestart(),
-                    chunkColumn);
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                            chunkColumn, "id", "customer.dbo.customers"))
-                            .isPresent());
-        }
+        testSqlServerParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"dbo.customers"},
+                false,
+                RestartStrategies.noRestart(),
+                chunkColumn);
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     private List<String> testBackfillWhenWritingEvents(
