@@ -22,6 +22,8 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHook;
@@ -36,8 +38,10 @@ import org.apache.flink.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
@@ -90,6 +94,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -764,6 +769,129 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         assertTrue(sourceIdleTime.getValue() > 0);
         assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
 
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_SNAPSHOT_RECORDS));
+        assertEquals(
+                numSnapshotRecordsExpected,
+                ((Counter) metrics.get(SourceReaderMetrics.NUM_SNAPSHOT_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_INSERT_DML_RECORDS));
+        assertEquals(
+                0L, ((Counter) metrics.get(SourceReaderMetrics.NUM_INSERT_DML_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_UPDATE_DML_RECORDS));
+        assertEquals(
+                0L, ((Counter) metrics.get(SourceReaderMetrics.NUM_UPDATE_DML_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_DELETE_DML_RECORDS));
+        assertEquals(
+                0L, ((Counter) metrics.get(SourceReaderMetrics.NUM_DELETE_DML_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_DDL_RECORDS));
+        assertEquals(0L, ((Counter) metrics.get(SourceReaderMetrics.NUM_DDL_RECORDS)).getCount());
+
+        // check enumerator metrics
+        Set<MetricGroup> enumeratorGroups = metricReporter.findGroups("enumerator");
+        assertEquals(2, enumeratorGroups.size());
+        Map<String, Metric> enumeratorMetrics = new HashMap<>();
+        Map<String, Metric> enumeratorTableMetrics = new HashMap<>();
+        enumeratorGroups.forEach(
+                g -> {
+                    if (Arrays.stream(g.getScopeComponents())
+                            .anyMatch(scope -> scope.equals("namespace"))) {
+                        enumeratorTableMetrics.putAll(metricReporter.getMetricsByGroup(g));
+                    } else {
+                        enumeratorMetrics.putAll(metricReporter.getMetricsByGroup(g));
+                    }
+                });
+        assertTrue(enumeratorMetrics.containsKey(SourceEnumeratorMetrics.IS_SNAPSHOTTING));
+        assertTrue(enumeratorMetrics.containsKey(SourceEnumeratorMetrics.IS_STREAM_READING));
+        assertEquals(
+                0,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorMetrics.get(
+                                                SourceEnumeratorMetrics.IS_SNAPSHOTTING))
+                                .getValue());
+        assertEquals(
+                1,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorMetrics.get(
+                                                SourceEnumeratorMetrics.IS_STREAM_READING))
+                                .getValue());
+
+        assertTrue(enumeratorMetrics.containsKey(SourceEnumeratorMetrics.NUM_TABLES_SNAPSHOTTED));
+        assertTrue(enumeratorMetrics.containsKey(SourceEnumeratorMetrics.NUM_TABLES_REMAINING));
+        assertEquals(
+                1L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorMetrics.get(
+                                                SourceEnumeratorMetrics.NUM_TABLES_SNAPSHOTTED))
+                                .getValue());
+        assertEquals(
+                0L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorMetrics.get(
+                                                SourceEnumeratorMetrics.NUM_TABLES_REMAINING))
+                                .getValue());
+
+        assertTrue(
+                enumeratorMetrics.containsKey(
+                        SourceEnumeratorMetrics.NUM_SNAPSHOT_SPLITS_PROCESSED));
+        assertTrue(
+                enumeratorMetrics.containsKey(
+                        SourceEnumeratorMetrics.NUM_SNAPSHOT_SPLITS_REMAINING));
+        assertEquals(
+                1L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorMetrics.get(
+                                                SourceEnumeratorMetrics
+                                                        .NUM_SNAPSHOT_SPLITS_PROCESSED))
+                                .getValue());
+        assertEquals(
+                0L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorMetrics.get(
+                                                SourceEnumeratorMetrics
+                                                        .NUM_SNAPSHOT_SPLITS_REMAINING))
+                                .getValue());
+
+        assertTrue(enumeratorTableMetrics.containsKey(SourceEnumeratorMetrics.SNAPSHOT_START_TIME));
+        assertTrue(enumeratorTableMetrics.containsKey(SourceEnumeratorMetrics.SNAPSHOT_END_TIME));
+        assertTrue(
+                enumeratorTableMetrics.containsKey(
+                        SourceEnumeratorMetrics.NUM_SNAPSHOT_SPLITS_PROCESSED));
+        assertTrue(
+                enumeratorTableMetrics.containsKey(
+                        SourceEnumeratorMetrics.NUM_SNAPSHOT_SPLITS_REMAINING));
+        assertTrue(
+                enumeratorTableMetrics.containsKey(
+                        SourceEnumeratorMetrics.NUM_SNAPSHOT_SPLITS_FINISHED));
+        assertEquals(
+                1L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorTableMetrics.get(
+                                                SourceEnumeratorMetrics
+                                                        .NUM_SNAPSHOT_SPLITS_PROCESSED))
+                                .getValue());
+        assertEquals(
+                0L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorTableMetrics.get(
+                                                SourceEnumeratorMetrics
+                                                        .NUM_SNAPSHOT_SPLITS_FINISHED))
+                                .getValue());
+        assertEquals(
+                0L,
+                (int)
+                        ((Gauge<Integer>)
+                                        enumeratorTableMetrics.get(
+                                                SourceEnumeratorMetrics
+                                                        .NUM_SNAPSHOT_SPLITS_REMAINING))
+                                .getValue());
+
         // --------------------------------- Binlog phase -----------------------------
         makeFirstPartBinlogEvents(getConnection(), customDatabase.qualifiedTableName("customers"));
         // Wait until we receive 4 changes made above
@@ -791,6 +919,20 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
         assertTrue(sourceIdleTime.getValue() > 0);
         assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_SNAPSHOT_RECORDS));
+        assertEquals(
+                numSnapshotRecordsExpected,
+                ((Counter) metrics.get(SourceReaderMetrics.NUM_SNAPSHOT_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_INSERT_DML_RECORDS));
+        assertEquals(
+                1L, ((Counter) metrics.get(SourceReaderMetrics.NUM_INSERT_DML_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_UPDATE_DML_RECORDS));
+        assertEquals(
+                2L, ((Counter) metrics.get(SourceReaderMetrics.NUM_UPDATE_DML_RECORDS)).getCount());
+        assertTrue(metrics.containsKey(SourceReaderMetrics.NUM_DELETE_DML_RECORDS));
+        assertEquals(
+                1L, ((Counter) metrics.get(SourceReaderMetrics.NUM_DELETE_DML_RECORDS)).getCount());
 
         jobClient.cancel().get();
         iterator.close();

@@ -83,7 +83,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         remainingTables,
                         isTableIdCaseSensitive,
                         dialect,
-                        offsetFactory),
+                        offsetFactory,
+                        enumeratorContext),
                 false,
                 sourceConfig.getSplitMetaGroupSize(),
                 offsetFactory,
@@ -104,7 +105,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         currentParallelism,
                         checkpoint.getSnapshotPendingSplits(),
                         dialect,
-                        offsetFactory),
+                        offsetFactory,
+                        enumeratorContext),
                 checkpoint.isStreamSplitAssigned(),
                 sourceConfig.getSplitMetaGroupSize(),
                 offsetFactory,
@@ -128,7 +130,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     @Override
     public void open() {
-        this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
+        this.enumeratorMetrics = snapshotSplitAssigner.getEnumeratorMetrics();
 
         if (isStreamSplitAssigned) {
             enumeratorMetrics.enterStreamReading();
@@ -137,8 +139,6 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
         }
 
         snapshotSplitAssigner.open();
-        // init enumerator metrics
-        snapshotSplitAssigner.initEnumeratorMetrics(enumeratorMetrics);
     }
 
     @Override
