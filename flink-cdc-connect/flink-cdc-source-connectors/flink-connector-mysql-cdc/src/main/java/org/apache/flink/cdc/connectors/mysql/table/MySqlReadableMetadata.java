@@ -25,10 +25,19 @@ import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.debezium.connector.AbstractSourceInfo;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.apache.kafka.connect.storage.ConverterConfig;
+import org.apache.kafka.connect.storage.ConverterType;
+
+import java.util.HashMap;
 
 /** Defines the supported metadata columns for {@link MySqlTableSource}. */
 public enum MySqlReadableMetadata {
@@ -102,6 +111,45 @@ public enum MySqlReadableMetadata {
                 public Object read(SourceRecord record) {
                     throw new UnsupportedOperationException(
                             "Please call read(RowData rowData) method instead.");
+                }
+            }),
+
+    /** schema of the record that contain the row. */
+    SCHEMA(
+            "schema",
+            DataTypes.STRING().notNull(),
+            new RowDataMetadataConverter() {
+                private static final long serialVersionUID = 1L;
+                private transient JsonConverter jsonConverter;
+
+                @Override
+                public Object read(RowData rowData) {
+                    return StringData.fromString(rowData.getRowKind().shortString());
+                }
+
+                @Override
+                public Object read(SourceRecord record) {
+                    if (jsonConverter == null) {
+                        jsonConverter = new JsonConverter();
+                        final HashMap<String, Object> configs = new HashMap<>(2);
+                        configs.put(ConverterConfig.TYPE_CONFIG, ConverterType.VALUE.getName());
+                        jsonConverter.configure(configs);
+                    }
+                    ObjectNode valueSchema = jsonConverter.asJsonSchema(record.valueSchema());
+                    ObjectMapper mapper = new ObjectMapper();
+                    ObjectNode copyNode = valueSchema.deepCopy();
+
+                    ArrayNode fieldsArray = (ArrayNode) copyNode.get("fields");
+                    ArrayNode newFields = mapper.createArrayNode();
+                    for (JsonNode field : fieldsArray) {
+                        String fieldName = field.get("field").asText();
+                        if (fieldName.equals(Envelope.FieldName.BEFORE)
+                                || fieldName.equals(Envelope.FieldName.AFTER)) {
+                            newFields.add(field);
+                        }
+                    }
+                    copyNode.set("fields", newFields);
+                    return copyNode.toString();
                 }
             });
 
