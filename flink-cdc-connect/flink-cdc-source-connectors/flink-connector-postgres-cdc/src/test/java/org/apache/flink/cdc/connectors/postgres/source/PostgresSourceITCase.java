@@ -717,8 +717,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 physical("phone_number", STRING())),
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-        TestTable customerTable =
-                new TestTable(customDatabase, "customer", "customers", customersSchema);
+        TestTable customerTable = new TestTable("customer", "customers", customersSchema);
         String tableId = customerTable.getTableId();
 
         PostgresSourceBuilder.PostgresIncrementalSource source =

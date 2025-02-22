@@ -80,7 +80,6 @@ class PostgresSourceReaderTest {
         configFactory.setLsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay);
         final TestTable customerTable =
                 new TestTable(
-                        "pgdb",
                         "customer",
                         "customers",
                         ResolvedSchema.of(Column.physical("id", BIGINT())));

@@ -34,7 +34,6 @@ import java.util.List;
  */
 public class TestTable {
 
-    private final String databaseName;
     private final String tableName;
 
     private final String schemaName;
@@ -46,14 +45,7 @@ public class TestTable {
     private RowDataDebeziumDeserializeSchema deserializer;
     private RecordsFormatter recordsFormatter;
 
-    public TestTable(
-            UniqueDatabase database, String schemaName, String tableName, ResolvedSchema schema) {
-        this(database.getDatabaseName(), schemaName, tableName, schema);
-    }
-
-    public TestTable(
-            String databaseName, String schemaName, String tableName, ResolvedSchema schema) {
-        this.databaseName = databaseName;
+    public TestTable(String schemaName, String tableName, ResolvedSchema schema) {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.schema = schema;
