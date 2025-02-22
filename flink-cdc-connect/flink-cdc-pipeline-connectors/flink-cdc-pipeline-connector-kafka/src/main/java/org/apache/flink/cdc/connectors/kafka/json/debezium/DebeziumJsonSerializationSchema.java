@@ -27,10 +27,8 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
-import org.apache.flink.cdc.connectors.kafka.utils.JsonRowDataSerializationSchemaUtils;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
-import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.StringData;
@@ -41,8 +39,17 @@ import org.apache.flink.table.types.logical.RowType;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 import static java.lang.String.format;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumPayload.AFTER;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumPayload.BEFORE;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumPayload.OPERATION;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumPayload.SOURCE;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumSource.DATABASE;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumSource.TABLE;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumStruct.PAYLOAD;
+import static org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonStruct.DebeziumStruct.SCHEMA;
 import static org.apache.flink.table.types.utils.TypeConversions.fromLogicalToDataType;
 
 /**
@@ -64,6 +71,8 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
     private final Map<TableId, TableSchemaInfo> jsonSerializers;
 
     private transient GenericRowData reuseGenericRowData;
+
+    private transient GenericRowData payloadGenericRowData;
 
     private final TimestampFormat timestampFormat;
 
@@ -97,7 +106,9 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
 
     @Override
     public void open(InitializationContext context) {
-        reuseGenericRowData = new GenericRowData(4);
+        reuseGenericRowData = new GenericRowData(2);
+        payloadGenericRowData = new GenericRowData(4);
+        reuseGenericRowData.setField(PAYLOAD.getPosition(), payloadGenericRowData);
         this.context = context;
     }
 
@@ -117,8 +128,8 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
             }
             LogicalType rowType =
                     DataTypeUtils.toFlinkDataType(schema.toRowDataType()).getLogicalType();
-            JsonRowDataSerializationSchema jsonSerializer =
-                    JsonRowDataSerializationSchemaUtils.createSerializationSchema(
+            DebeziumJsonRowDataSerializationSchema jsonSerializer =
+                    new DebeziumJsonRowDataSerializationSchema(
                             createJsonRowType(fromLogicalToDataType(rowType)),
                             timestampFormat,
                             mapNullKeyMode,
@@ -138,63 +149,89 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
         }
 
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-        reuseGenericRowData.setField(
-                3,
-                GenericRowData.of(
-                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
-                        StringData.fromString(dataChangeEvent.tableId().getTableName())));
+        BiConsumer<DataChangeEvent, GenericRowData> converter;
         try {
             switch (dataChangeEvent.op()) {
                 case INSERT:
-                    reuseGenericRowData.setField(0, null);
-                    reuseGenericRowData.setField(
-                            1,
-                            jsonSerializers
-                                    .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.after(), false));
-                    reuseGenericRowData.setField(2, OP_INSERT);
-                    return jsonSerializers
-                            .get(dataChangeEvent.tableId())
-                            .getSerializationSchema()
-                            .serialize(reuseGenericRowData);
+                    converter = this::convertInsertEventToRowData;
+                    break;
                 case DELETE:
-                    reuseGenericRowData.setField(
-                            0,
-                            jsonSerializers
-                                    .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.before(), false));
-                    reuseGenericRowData.setField(1, null);
-                    reuseGenericRowData.setField(2, OP_DELETE);
-                    return jsonSerializers
-                            .get(dataChangeEvent.tableId())
-                            .getSerializationSchema()
-                            .serialize(reuseGenericRowData);
+                    converter = this::convertDeleteEventToRowData;
+                    break;
                 case UPDATE:
                 case REPLACE:
-                    reuseGenericRowData.setField(
-                            0,
-                            jsonSerializers
-                                    .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.before(), false));
-                    reuseGenericRowData.setField(
-                            1,
-                            jsonSerializers
-                                    .get(dataChangeEvent.tableId())
-                                    .getRowDataFromRecordData(dataChangeEvent.after(), false));
-                    reuseGenericRowData.setField(2, OP_UPDATE);
-                    return jsonSerializers
-                            .get(dataChangeEvent.tableId())
-                            .getSerializationSchema()
-                            .serialize(reuseGenericRowData);
+                    converter = this::convertUpdateEventToRowData;
+                    break;
                 default:
                     throw new UnsupportedOperationException(
                             format(
                                     "Unsupported operation '%s' for OperationType.",
                                     dataChangeEvent.op()));
             }
+            converter.accept(dataChangeEvent, payloadGenericRowData);
+
+            String schemaStr = dataChangeEvent.meta().getOrDefault("schema", null);
+            reuseGenericRowData.setField(SCHEMA.getPosition(), StringData.fromString(schemaStr));
+
+            return jsonSerializers
+                    .get(dataChangeEvent.tableId())
+                    .getSerializationSchema()
+                    .serialize(reuseGenericRowData);
         } catch (Throwable t) {
             throw new RuntimeException(format("Could not serialize event '%s'.", event), t);
         }
+    }
+
+    private void convertInsertEventToRowData(
+            DataChangeEvent dataChangeEvent, GenericRowData genericRowData) {
+        genericRowData.setField(BEFORE.getPosition(), null);
+        genericRowData.setField(
+                AFTER.getPosition(),
+                jsonSerializers
+                        .get(dataChangeEvent.tableId())
+                        .getRowDataFromRecordData(dataChangeEvent.after(), false));
+        genericRowData.setField(OPERATION.getPosition(), OP_INSERT);
+        genericRowData.setField(
+                SOURCE.getPosition(),
+                GenericRowData.of(
+                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
+                        StringData.fromString(dataChangeEvent.tableId().getTableName())));
+    }
+
+    private void convertDeleteEventToRowData(
+            DataChangeEvent dataChangeEvent, GenericRowData genericRowData) {
+        genericRowData.setField(
+                BEFORE.getPosition(),
+                jsonSerializers
+                        .get(dataChangeEvent.tableId())
+                        .getRowDataFromRecordData(dataChangeEvent.before(), false));
+        genericRowData.setField(AFTER.getPosition(), null);
+        genericRowData.setField(OPERATION.getPosition(), OP_DELETE);
+        genericRowData.setField(
+                SOURCE.getPosition(),
+                GenericRowData.of(
+                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
+                        StringData.fromString(dataChangeEvent.tableId().getTableName())));
+    }
+
+    private void convertUpdateEventToRowData(
+            DataChangeEvent dataChangeEvent, GenericRowData genericRowData) {
+        genericRowData.setField(
+                BEFORE.getPosition(),
+                jsonSerializers
+                        .get(dataChangeEvent.tableId())
+                        .getRowDataFromRecordData(dataChangeEvent.before(), false));
+        genericRowData.setField(
+                AFTER.getPosition(),
+                jsonSerializers
+                        .get(dataChangeEvent.tableId())
+                        .getRowDataFromRecordData(dataChangeEvent.after(), false));
+        genericRowData.setField(OPERATION.getPosition(), OP_UPDATE);
+        genericRowData.setField(
+                SOURCE.getPosition(),
+                GenericRowData.of(
+                        StringData.fromString(dataChangeEvent.tableId().getSchemaName()),
+                        StringData.fromString(dataChangeEvent.tableId().getTableName())));
     }
 
     /**
@@ -203,16 +240,22 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
      * docs</a> for more details.
      */
     private static RowType createJsonRowType(DataType databaseSchema) {
+        DataType payloadRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD(BEFORE.getFieldName(), databaseSchema),
+                        DataTypes.FIELD(AFTER.getFieldName(), databaseSchema),
+                        DataTypes.FIELD(OPERATION.getFieldName(), DataTypes.STRING()),
+                        DataTypes.FIELD(
+                                SOURCE.getFieldName(),
+                                DataTypes.ROW(
+                                        DataTypes.FIELD(
+                                                DATABASE.getFieldName(), DataTypes.STRING()),
+                                        DataTypes.FIELD(
+                                                TABLE.getFieldName(), DataTypes.STRING()))));
         return (RowType)
                 DataTypes.ROW(
-                                DataTypes.FIELD("before", databaseSchema),
-                                DataTypes.FIELD("after", databaseSchema),
-                                DataTypes.FIELD("op", DataTypes.STRING()),
-                                DataTypes.FIELD(
-                                        "source",
-                                        DataTypes.ROW(
-                                                DataTypes.FIELD("db", DataTypes.STRING()),
-                                                DataTypes.FIELD("table", DataTypes.STRING()))))
+                                DataTypes.FIELD(SCHEMA.getFieldName(), DataTypes.STRING()),
+                                DataTypes.FIELD(PAYLOAD.getFieldName(), payloadRowType))
                         .getLogicalType();
     }
 }

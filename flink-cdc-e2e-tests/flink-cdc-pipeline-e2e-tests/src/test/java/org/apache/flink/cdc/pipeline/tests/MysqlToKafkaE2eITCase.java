@@ -304,6 +304,82 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                 .containsExactlyInAnyOrderElementsOf(deserializeValues(collectedRecords));
     }
 
+    @Test
+    public void testSyncWholeDatabaseWithDebeziumJsonHasSchema() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  metadata.list: schema\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: kafka\n"
+                                + "  properties.bootstrap.servers: kafka:9092\n"
+                                + "  topic: %s\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        topic,
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
+        int expectedEventCount = 13;
+        waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
+        List<String> expectedRecords =
+                getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json-with-schema.txt");
+        assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        LOG.info("Begin incremental reading stage.");
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            stat.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+
+            // modify table schema
+            stat.execute("ALTER TABLE products ADD COLUMN new_col INT;");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2, null, null, null, 1);"); // 110
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18, null, null, null, 1);"); // 111
+            stat.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            stat.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            stat.execute("DELETE FROM products WHERE id=111;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        expectedEventCount = 20;
+        waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
+        assertThat(expectedRecords)
+                .containsExactlyInAnyOrderElementsOf(deserializeValues(collectedRecords));
+    }
+
     private void waitUntilSpecificEventCount(
             List<ConsumerRecord<byte[], byte[]>> actualEvent, int expectedCount) throws Exception {
         boolean result = false;
