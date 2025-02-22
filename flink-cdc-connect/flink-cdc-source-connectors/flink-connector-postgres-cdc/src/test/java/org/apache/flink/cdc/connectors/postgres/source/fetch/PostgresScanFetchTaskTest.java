@@ -62,7 +62,7 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
     private static final String schemaName = "customer";
-    private static final String tableName = "customers";
+    private static final String tableName = "Customers";
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -79,14 +79,14 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId.toSql() + " where id = 102",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
                     "INSERT INTO "
                             + tableId.toSql()
                             + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where id = 103",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 110",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 111",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 110",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 111",
                 };
 
         String[] expected =
@@ -146,8 +146,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] deleteDataSql =
                 new String[] {
-                    "DELETE FROM " + tableId.toSql() + " where id = 101",
-                    "DELETE FROM " + tableId.toSql() + " where id = 102",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 101",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
                 };
         String[] expected =
                 new String[] {
@@ -172,14 +172,14 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId.toSql() + " where id = 102",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
                     "INSERT INTO "
                             + tableId.toSql()
                             + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where id = 103",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 110",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 111",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 110",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 111",
                 };
 
         String[] expected =
@@ -209,14 +209,14 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
         TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId.toSql() + " where id = 102",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
                     "INSERT INTO "
                             + tableId.toSql()
                             + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where id = 103",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 110",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 111",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 110",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 111",
                 };
 
         String[] expected =
@@ -273,8 +273,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
 
             final DataType dataType =
                     DataTypes.ROW(
-                            DataTypes.FIELD("id", DataTypes.BIGINT()),
-                            DataTypes.FIELD("name", DataTypes.STRING()),
+                            DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                            DataTypes.FIELD("Name", DataTypes.STRING()),
                             DataTypes.FIELD("address", DataTypes.STRING()),
                             DataTypes.FIELD("phone_number", DataTypes.STRING()));
 
