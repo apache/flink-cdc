@@ -29,6 +29,7 @@ import org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTable;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTableId;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
+import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -55,6 +56,7 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,6 +65,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -77,6 +80,7 @@ import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
@@ -348,7 +352,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"customers"});
 
-        tableResult.getJobClient().get().cancel().get();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        optionalJobClient.get().cancel().get();
     }
 
     @Test
@@ -638,7 +644,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // second step: check the stream data
         checkStreamDataWithHook(tableResult, failoverType, failoverPhase, captureCustomerTables);
 
-        tableResult.getJobClient().get().cancel().get();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        optionalJobClient.get().cancel().get();
 
         // sleep 1000ms to wait until connections are closed.
         Thread.sleep(1000L);
@@ -721,7 +729,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         TestTableId tableId = new TestTableId("customer", "customers");
         TestTable table = new TestTable(customersSchema);
 
-        PostgresSourceBuilder.PostgresIncrementalSource source =
+        PostgresSourceBuilder.PostgresIncrementalSource<RowData> source =
                 PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                         .hostname(customDatabase.getHost())
                         .port(customDatabase.getDatabasePort())
@@ -749,11 +757,13 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 };
         SnapshotPhaseHook snapshotPhaseHook =
                 (sourceConfig, split) -> {
-                    PostgresDialect dialect =
-                            new PostgresDialect((PostgresSourceConfig) sourceConfig);
-                    try (PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
+                    try (PostgresDialect dialect =
+                                    new PostgresDialect((PostgresSourceConfig) sourceConfig);
+                            PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
                         postgresConnection.execute(statements);
                         postgresConnection.commit();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
                 };
 
@@ -860,7 +870,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
-                                + "%s"
+                                + " %s"
                                 + ")",
                         customDatabase.getHost(),
                         customDatabase.getDatabasePort(),
@@ -892,7 +902,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // second step: check the stream data
         checkStreamData(tableResult, failoverType, failoverPhase, captureCustomerTables);
 
-        tableResult.getJobClient().get().cancel().get();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        optionalJobClient.get().cancel().get();
 
         // sleep 1000ms to wait until connections are closed.
         Thread.sleep(1000L);
@@ -935,7 +947,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         }
 
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == PostgresTestUtils.FailoverPhase.SNAPSHOT && iterator.hasNext()) {
@@ -955,7 +969,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
         for (String tableName : captureCustomerTables) {
             makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
@@ -982,7 +998,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertFalse(hasNextData(iterator));
     }
 
     private void checkStreamDataWithHook(
@@ -993,7 +1009,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
         final AtomicLong savedCheckpointId = new AtomicLong(0);
         final CountDownLatch countDownLatch = new CountDownLatch(1);
@@ -1044,7 +1062,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertFalse(hasNextData(iterator));
     }
 
     private void checkStreamDataWithDDLDuringFailover(
@@ -1055,7 +1073,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
         for (String tableName : captureCustomerTables) {
             makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
@@ -1093,7 +1113,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertFalse(hasNextData(iterator));
     }
 
     private void sleepMs(long millis) {
