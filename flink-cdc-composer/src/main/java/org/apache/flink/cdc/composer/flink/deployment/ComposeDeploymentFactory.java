@@ -19,13 +19,10 @@ package org.apache.flink.cdc.composer.flink.deployment;
 
 import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 
-import org.apache.commons.cli.CommandLine;
-
 /** Create deployment methods corresponding to different goals. */
 public class ComposeDeploymentFactory {
 
-    public PipelineDeploymentExecutor getFlinkComposeExecutor(CommandLine commandLine) {
-        String target = commandLine.getOptionValue("target");
+    public PipelineDeploymentExecutor getFlinkComposeExecutor(String target) {
         if (target.equalsIgnoreCase("kubernetes-application")) {
             return new K8SApplicationDeploymentExecutor();
         }
