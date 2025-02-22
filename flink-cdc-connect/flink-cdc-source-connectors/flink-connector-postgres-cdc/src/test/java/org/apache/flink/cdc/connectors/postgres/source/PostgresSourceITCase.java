@@ -159,7 +159,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 scanStartupMode);
     }
 
@@ -170,7 +170,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 4,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 scanStartupMode);
     }
 
@@ -181,7 +181,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"},
+                new String[] {"Customers", "customers_1"},
                 scanStartupMode);
     }
 
@@ -192,7 +192,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 4,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"},
+                new String[] {"Customers", "customers_1"},
                 scanStartupMode);
     }
 
@@ -203,7 +203,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"},
+                new String[] {"Customers", "customers_1"},
                 scanStartupMode);
     }
 
@@ -213,7 +213,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"},
+                new String[] {"Customers", "customers_1"},
                 scanStartupMode);
     }
 
@@ -223,7 +223,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"},
+                new String[] {"Customers", "customers_1"},
                 scanStartupMode);
     }
 
@@ -233,7 +233,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"},
+                new String[] {"Customers", "customers_1"},
                 scanStartupMode);
     }
 
@@ -244,7 +244,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 scanStartupMode);
     }
 
@@ -255,7 +255,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 scanStartupMode);
     }
 
@@ -300,7 +300,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 DEFAULT_SCAN_STARTUP_MODE,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 RestartStrategies.fixedDelayRestart(1, 0),
                 Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
@@ -317,11 +317,11 @@ class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -343,7 +343,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                         customDatabase.getPassword(),
                         customDatabase.getDatabaseName(),
                         SCHEMA_NAME,
-                        "customers",
+                        "Customers",
                         scanStartupMode,
                         slotName);
         tEnv.executeSql(sourceDDL);
@@ -355,7 +355,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                     tableResult,
                     PostgresTestUtils.FailoverType.JM,
                     PostgresTestUtils.FailoverPhase.STREAM,
-                    new String[] {"customers"});
+                    new String[] {"Customers"});
         }
 
         // second step: check the stream data
@@ -363,7 +363,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 tableResult,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers"});
+                new String[] {"Customers"});
 
         Optional<JobClient> optionalJobClient = tableResult.getJobClient();
         assertThat(optionalJobClient).isPresent();
@@ -609,7 +609,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         int parallelism = 1;
         PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.JM;
         PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
-        String[] captureCustomerTables = new String[] {"customers"};
+        String[] captureCustomerTables = new String[] {"Customers"};
         RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
                 RestartStrategies.fixedDelayRestart(1, 0);
         boolean skipSnapshotBackfill = false;
@@ -623,11 +623,11 @@ class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc-mock',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -683,7 +683,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                     scanStartupMode,
                     PostgresTestUtils.FailoverType.NONE,
                     PostgresTestUtils.FailoverPhase.NEVER,
-                    new String[] {"customers"},
+                    new String[] {"Customers"},
                     RestartStrategies.noRestart(),
                     Collections.singletonMap(
                             "scan.incremental.snapshot.chunk.key-column", chunkColumn));
@@ -692,7 +692,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                     .hasStackTraceContaining(
                             String.format(
                                     "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                    chunkColumn, "id", "customer.customers"));
+                                    chunkColumn, "Id", "customer.Customers"));
         }
     }
 
@@ -717,7 +717,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 RestartStrategies.noRestart(),
                 options);
         try (PostgresConnection connection = getConnection()) {
@@ -731,7 +731,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         int parallelism = 1;
         PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.TM;
         PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
-        String[] captureCustomerTables = new String[] {"customers"};
+        String[] captureCustomerTables = new String[] {"Customers"};
         RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
                 RestartStrategies.fixedDelayRestart(1, 0);
         boolean skipSnapshotBackfill = false;
@@ -745,11 +745,11 @@ class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -809,13 +809,13 @@ class PostgresSourceITCase extends PostgresTestBase {
         ResolvedSchema customersSchema =
                 new ResolvedSchema(
                         Arrays.asList(
-                                physical("id", BIGINT().notNull()),
-                                physical("name", STRING()),
+                                physical("Id", BIGINT().notNull()),
+                                physical("Name", STRING()),
                                 physical("address", STRING()),
                                 physical("phone_number", STRING())),
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-        TestTableId tableId = new TestTableId("customer", "customers");
+        TestTableId tableId = new TestTableId("customer", "Customers");
         TestTable table = new TestTable(customersSchema);
 
         PostgresSourceBuilder.PostgresIncrementalSource<RowData> source =
@@ -841,8 +841,9 @@ class PostgresSourceITCase extends PostgresTestBase {
                             "INSERT INTO %s VALUES (15213, 'user_15213', 'Shanghai', '123567891234')",
                             tableId.toSql()),
                     String.format(
-                            "UPDATE %s SET address='Pittsburgh' WHERE id=2000", tableId.toSql()),
-                    String.format("DELETE FROM %s WHERE id=1019", tableId.toSql())
+                            "UPDATE %s SET address = 'Pittsburgh' WHERE \"Id\" = 2000",
+                            tableId.toSql()),
+                    String.format("DELETE FROM %s WHERE \"Id\" = 1019", tableId.toSql())
                 };
         SnapshotPhaseHook snapshotPhaseHook =
                 (sourceConfig, split) -> {
@@ -946,11 +947,11 @@ class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -1310,12 +1311,12 @@ class PostgresSourceITCase extends PostgresTestBase {
 
             // make stream events for the first split
             connection.execute(
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId.toSql() + " where id = 102",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
                     "INSERT INTO "
                             + tableId.toSql()
                             + " VALUES(102, 'user_2', 'Shanghai', '123567891234')",
-                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where id = 103");
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103");
             connection.commit();
         } finally {
             connection.close();
@@ -1333,7 +1334,7 @@ class PostgresSourceITCase extends PostgresTestBase {
 
             // make stream events for split-1
             connection.execute(
-                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 1010");
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 1010");
             connection.commit();
 
             // make stream events for the last split
