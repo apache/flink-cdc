@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTable;
+import org.apache.flink.cdc.connectors.postgres.testutils.TestTableId;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
@@ -717,8 +718,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 physical("phone_number", STRING())),
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-        TestTable customerTable = new TestTable("customer", "customers", customersSchema);
-        String tableId = customerTable.getTableId();
+        TestTableId tableId = new TestTableId("customer", "customers");
+        TestTable table = new TestTable(customersSchema);
 
         PostgresSourceBuilder.PostgresIncrementalSource source =
                 PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
@@ -728,11 +729,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         .password(customDatabase.getPassword())
                         .database(customDatabase.getDatabaseName())
                         .slotName(slotName)
-                        .tableList(tableId)
+                        .tableList(tableId.toString())
                         .startupOptions(startupOptions)
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .lsnCommitCheckpointsDelay(1)
-                        .deserializer(customerTable.getDeserializer())
+                        .deserializer(table.getDeserializer())
                         .build();
 
         // Do some database operations during hook in snapshot period.
@@ -741,9 +742,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 new String[] {
                     String.format(
                             "INSERT INTO %s VALUES (15213, 'user_15213', 'Shanghai', '123567891234')",
-                            tableId),
-                    String.format("UPDATE %s SET address='Pittsburgh' WHERE id=2000", tableId),
-                    String.format("DELETE FROM %s WHERE id=1019", tableId)
+                            tableId.toSql()),
+                    String.format(
+                            "UPDATE %s SET address='Pittsburgh' WHERE id=2000", tableId.toSql()),
+                    String.format("DELETE FROM %s WHERE id=1019", tableId.toSql())
                 };
         SnapshotPhaseHook snapshotPhaseHook =
                 (sourceConfig, split) -> {
@@ -772,7 +774,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
-            records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            records = fetchRowData(iterator, fetchSize, table::stringify);
             env.close();
         }
         return records;
@@ -955,10 +957,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
         CloseableIterator<Row> iterator = tableResult.collect();
         JobID jobId = tableResult.getJobClient().get().getJobID();
 
-        for (String tableId : captureCustomerTables) {
-            makeFirstPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -969,10 +969,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
-        for (String tableId : captureCustomerTables) {
-            makeSecondPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -1006,14 +1004,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         if (savedCheckpointId.get() == 0) {
                             savedCheckpointId.set(checkpointId);
 
-                            for (String tableId : captureCustomerTables) {
+                            for (String tableName : captureCustomerTables) {
                                 makeFirstPartStreamEvents(
-                                        getConnection(),
-                                        customDatabase.getDatabaseName()
-                                                + '.'
-                                                + SCHEMA_NAME
-                                                + '.'
-                                                + tableId);
+                                        getConnection(), new TestTableId(SCHEMA_NAME, tableName));
                             }
                             // wait for the stream reading
                             Thread.sleep(2000L);
@@ -1038,10 +1031,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
-        for (String tableId : captureCustomerTables) {
-            makeSecondPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -1066,10 +1057,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
         CloseableIterator<Row> iterator = tableResult.collect();
         JobID jobId = tableResult.getJobClient().get().getJobID();
 
-        for (String tableId : captureCustomerTables) {
-            makeFirstPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -1082,15 +1071,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     jobId,
                     miniClusterResource.getMiniCluster(),
                     () -> {
-                        for (String tableId : captureCustomerTables) {
+                        for (String tableName : captureCustomerTables) {
                             try {
                                 makeSecondPartStreamEvents(
-                                        getConnection(),
-                                        customDatabase.getDatabaseName()
-                                                + '.'
-                                                + SCHEMA_NAME
-                                                + '.'
-                                                + tableId);
+                                        getConnection(), new TestTableId(SCHEMA_NAME, tableName));
                             } catch (SQLException e) {
                                 throw new RuntimeException(e);
                             }
@@ -1154,17 +1138,19 @@ public class PostgresSourceITCase extends PostgresTestBase {
      * Make some changes on the specified customer table. Changelog in string could be accessed by
      * {@link #firstPartStreamEvents}.
      */
-    private void makeFirstPartStreamEvents(JdbcConnection connection, String tableId)
+    private void makeFirstPartStreamEvents(JdbcConnection connection, TestTableId tableId)
             throws SQLException {
         try {
             connection.setAutoCommit(false);
 
             // make stream events for the first split
             connection.execute(
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId.toSql() + " where id = 102",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(102, 'user_2', 'Shanghai', '123567891234')",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where id = 103");
             connection.commit();
         } finally {
             connection.close();
@@ -1175,19 +1161,20 @@ public class PostgresSourceITCase extends PostgresTestBase {
      * Make some other changes on the specified customer table. Changelog in string could be
      * accessed by {@link #secondPartStreamEvents}.
      */
-    private void makeSecondPartStreamEvents(JdbcConnection connection, String tableId)
+    private void makeSecondPartStreamEvents(JdbcConnection connection, TestTableId tableId)
             throws SQLException {
         try {
             connection.setAutoCommit(false);
 
             // make stream events for split-1
-            connection.execute("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
+            connection.execute(
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where id = 1010");
             connection.commit();
 
             // make stream events for the last split
             connection.execute(
                     "INSERT INTO "
-                            + tableId
+                            + tableId.toSql()
                             + " VALUES(2001, 'user_22','Shanghai','123567891234'),"
                             + " (2002, 'user_23','Shanghai','123567891234'),"
                             + "(2003, 'user_24','Shanghai','123567891234')");
