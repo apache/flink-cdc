@@ -76,7 +76,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[8]"
-      flink-version: "['1.19.1', '1.20.0']"
+      flink-version: "['1.19.2', '1.20.1']"
       module: pipeline_e2e
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
@@ -84,11 +84,11 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[8]"
-      flink-version: "['1.19.1', '1.20.0']"
+      flink-version: "['1.19.2', '1.20.1']"
       module: source_e2e
   migration_test:
     name: Migration Tests
     uses: ./.github/workflows/flink_cdc_migration_test_base.yml
     with:
       java-version: "[8]"
-      flink-version: "['1.19.1', '1.20.0']"
+      flink-version: "['1.19.2', '1.20.1']"
