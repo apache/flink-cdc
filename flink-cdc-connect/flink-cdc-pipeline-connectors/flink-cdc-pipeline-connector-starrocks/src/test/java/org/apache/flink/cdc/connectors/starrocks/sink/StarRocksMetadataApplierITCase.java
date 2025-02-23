@@ -459,7 +459,8 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 new SinkDef("starrocks", "Dummy StarRocks Sink", config),
                 stream,
                 starRocksSink,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                stream.getParallelism());
 
         env.execute("StarRocks Schema Evolution Test");
     }
