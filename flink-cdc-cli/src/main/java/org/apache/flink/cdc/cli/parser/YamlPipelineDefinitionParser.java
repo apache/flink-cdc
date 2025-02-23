@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.shade.utils.ConfigShadeUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.ModelDef;
@@ -114,7 +115,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
             throws Exception {
-
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
         List<UdfDef> udfDefs = new ArrayList<>();
@@ -134,6 +134,14 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
         SchemaChangeBehavior schemaChangeBehavior =
                 userPipelineConfig.get(PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
+
+        // Merge user config into global config
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.addAll(globalPipelineConfig);
+        pipelineConfig.addAll(userPipelineConfig);
+
+        // Decrypt configurations if specified
+        pipelineDefJsonNode = ConfigShadeUtils.decryptConfig(pipelineDefJsonNode, pipelineConfig);
 
         // Source is required
         SourceDef sourceDef =
@@ -164,11 +172,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         List<RouteDef> routeDefs = new ArrayList<>();
         Optional.ofNullable(pipelineDefJsonNode.get(ROUTE_KEY))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
-
-        // Merge user config into global config
-        Configuration pipelineConfig = new Configuration();
-        pipelineConfig.addAll(globalPipelineConfig);
-        pipelineConfig.addAll(userPipelineConfig);
 
         return new PipelineDef(
                 sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
