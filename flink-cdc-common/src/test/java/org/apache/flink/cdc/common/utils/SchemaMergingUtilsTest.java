@@ -67,6 +67,7 @@ import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.getLeastCommo
 import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.getSchemaDifference;
 import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.isDataTypeCompatible;
 import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.isSchemaCompatible;
+import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.validateTransformColumn;
 
 /** A test for the {@link SchemaMergingUtils}. */
 class SchemaMergingUtilsTest {
@@ -1114,6 +1115,27 @@ class SchemaMergingUtilsTest {
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         MAP));
+    }
+
+    @Test
+    void testTransformColumn() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                validateTransformColumn(
+                                        of("id", BIGINT, "name", VARCHAR(17)), of("id", BIGINT)))
+                .as("test different column counts compatibility")
+                .hasMessage(
+                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(17)}, primaryKeys=, options=() "
+                                + "and columns={`id` BIGINT}, primaryKeys=, options=() with different column counts.");
+
+        Assertions.assertThatThrownBy(
+                        () ->
+                                validateTransformColumn(
+                                        of("id", BIGINT, "name", VARCHAR(17)),
+                                        of("id", BIGINT, "age", INT)))
+                .as("test different column name compatibility")
+                .hasMessage(
+                        "Unable to merge column `name` VARCHAR(17) and `age` INT with different name.");
     }
 
     private static void assertTypeMergingVector(DataType incomingType, List<DataType> resultTypes) {

@@ -52,6 +52,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +72,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private transient List<PreTransformer> transforms;
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
+    private final LinkedHashMap<Selectors, SchemaMetadataTransform> schemaMetadataTransformersLink;
     private transient ListState<byte[]> state;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
     private List<UserDefinedFunctionDescriptor> udfDescriptors;
@@ -152,6 +154,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
+        this.schemaMetadataTransformersLink = new LinkedHashMap<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
 
         this.transformRules = transformRules;
@@ -191,6 +194,9 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                     new Tuple2<>(
                             selectors,
                             new SchemaMetadataTransform(primaryKeys, partitionKeys, tableOptions)));
+            schemaMetadataTransformersLink.put(
+                    selectors,
+                    new SchemaMetadataTransform(primaryKeys, partitionKeys, tableOptions));
         }
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.hasAsteriskMap = new ConcurrentHashMap<>();
@@ -362,18 +368,16 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        for (Tuple2<Selectors, SchemaMetadataTransform> transform : schemaMetadataTransformers) {
-            Selectors selectors = transform.f0;
-            if (selectors.isMatch(tableId)) {
-                createTableEvent =
-                        new CreateTableEvent(
-                                tableId,
-                                transformSchemaMetaData(
-                                        createTableEvent.getSchema(), transform.f1));
-            }
-        }
-
-        cachePreTransformProcessor(tableId, createTableEvent.getSchema());
+        Schema originalSchema = createTableEvent.getSchema();
+        LinkedHashSet<Schema> newSchemas =
+                schemaMetadataTransformers.stream()
+                        .filter(transform -> transform.f0.isMatch(tableId))
+                        .map(transform -> transformSchemaMetaData(originalSchema, transform.f1))
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+        SchemaUtils.validateMetaSchemaCompatibility(newSchemas);
+        Schema commonSchema = newSchemas.isEmpty() ? originalSchema : newSchemas.iterator().next();
+        createTableEvent = new CreateTableEvent(tableId, commonSchema);
+        cachePreTransformProcessor(tableId, commonSchema);
         if (preTransformProcessorMap.containsKey(tableId)) {
             return preTransformProcessorMap
                     .get(tableId)
