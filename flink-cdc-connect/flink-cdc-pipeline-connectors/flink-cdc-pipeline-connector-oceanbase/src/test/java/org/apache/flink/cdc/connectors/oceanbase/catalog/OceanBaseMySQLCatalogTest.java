@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Assertions;
 
 import java.util.List;
 
-/** Tests for {@link OceanBaseMySQLCatalogTest}. */
+/** Tests for {@link OceanBaseMySQLCatalog}. */
 public class OceanBaseMySQLCatalogTest {
 
     private static final ImmutableMap<String, String> configMap =

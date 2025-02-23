@@ -133,7 +133,7 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
                             .setColumnComment(column.getComment());
-            OceanBaseUtils.toOceanBaseDataType(column, false, builder);
+            OceanBaseUtils.toOceanBaseDataType(column, builder);
             addColumns.add(builder.build());
         }
 

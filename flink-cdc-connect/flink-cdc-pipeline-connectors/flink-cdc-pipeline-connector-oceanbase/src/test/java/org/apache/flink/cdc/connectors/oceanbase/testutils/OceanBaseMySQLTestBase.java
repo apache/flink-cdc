@@ -15,30 +15,58 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.oceanbase.utils;
+package org.apache.flink.cdc.connectors.oceanbase.testutils;
 
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogException;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseColumn;
-import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseMySQLCatalog;
 import org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseTable;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
+import org.apache.flink.util.TestLogger;
 
-import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
+import org.junit.ClassRule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Network;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** A {@link OceanBaseMySQLCatalog} only for test. */
-public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
-    public OceanBaseTestMySQLCatalog(OceanBaseConnectorOptions connectorOptions) {
-        super(connectorOptions);
-        super.open();
+import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForJdbc;
+
+/** Basic class for testing OceanBase sink. */
+public class OceanBaseMySQLTestBase extends TestLogger {
+
+    protected static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLTestBase.class);
+
+    protected static final int DEFAULT_PARALLELISM = 4;
+    protected static final String INTER_CONTAINER_OB_ALIAS = "oceanbase";
+
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
+
+    @ClassRule
+    public static final OceanBaseContainer OB_SERVER =
+            createOceanBaseContainerForJdbc()
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases(INTER_CONTAINER_OB_ALIAS);
+
+    public Connection getConnection() throws SQLException {
+        return OB_SERVER.createConnection("");
+    }
+
+    public void execute(String... sqls) throws SQLException {
+        try (Connection connection = getConnection();
+                Statement statement = connection.createStatement()) {
+            for (String sql : sqls) {
+                statement.execute(sql);
+            }
+        }
     }
 
     public Optional<OceanBaseTable> getTable(String databaseName, String tableName) {
@@ -57,7 +85,7 @@ public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
         OceanBaseTable.TableType tableType = OceanBaseTable.TableType.UNKNOWN;
         List<OceanBaseColumn> columns = new ArrayList<>();
         List<String> tableKeys = new ArrayList<>();
-        try (Connection connection = connectionProvider.getConnection()) {
+        try (Connection connection = getConnection()) {
             try (PreparedStatement statement = connection.prepareStatement(tableSchemaQuery)) {
                 statement.setObject(1, databaseName);
                 statement.setObject(2, tableName);
@@ -119,15 +147,5 @@ public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
                             .build();
         }
         return Optional.ofNullable(oceanBaseTable);
-    }
-
-    @Override
-    public List<String> executeSingleColumnStatement(String sql) throws SQLException {
-        return super.executeSingleColumnStatement(sql);
-    }
-
-    @Override
-    public void executeUpdateStatement(String sql) throws SQLException {
-        super.executeUpdateStatement(sql);
     }
 }
