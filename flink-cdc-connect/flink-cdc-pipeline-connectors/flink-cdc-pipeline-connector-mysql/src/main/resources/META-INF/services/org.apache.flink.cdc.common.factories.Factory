@@ -14,3 +14,4 @@
 # limitations under the License.
 
 org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory
+org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSinkFactory

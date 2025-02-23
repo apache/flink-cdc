@@ -31,8 +31,8 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.RecordDataTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -68,14 +68,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
             new UniqueDatabase(
                     MYSQL_CONTAINER,
                     "column_type_test",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
+                    MySqlSourceTestUtils.TEST_USER,
+                    MySqlSourceTestUtils.TEST_PASSWORD);
     private final UniqueDatabase fullTypesMySql8Database =
             new UniqueDatabase(
                     MYSQL8_CONTAINER,
                     "column_type_test_mysql8",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
+                    MySqlSourceTestUtils.TEST_USER,
+                    MySqlSourceTestUtils.TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -363,7 +363,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         // skip CreateTableEvent
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
 
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
@@ -375,7 +375,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                 .isEqualTo(expectedStreamRecord);
@@ -473,7 +473,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         // skip CreateTableEvent
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, COMMON_TYPES))
                 .isEqualTo(expectedSnapshot);
@@ -489,7 +489,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         Object[] expectedStreamRecord = expectedSnapshot;
 
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, COMMON_TYPES))
                 .isEqualTo(expectedStreamRecord);
@@ -521,7 +521,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         // skip CreateTableEvent
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, JSON_TYPES))
                 .isEqualTo(expectedSnapshot);
@@ -533,7 +533,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedStreamRecord = expectedSnapshot;
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
 
         expectedSnapshot[4] = null;
@@ -580,7 +580,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         // skip CreateTableEvents
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
 
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
@@ -593,7 +593,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                 .isEqualTo(expectedStreamRecord);
@@ -619,7 +619,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         .username(database.getUsername())
                         .password(database.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
-                        .serverId(MySqSourceTestUtils.getServerId(env.getParallelism()))
+                        .serverId(MySqlSourceTestUtils.getServerId(env.getParallelism()))
                         .useLegacyJsonFormat(useLegacyJsonFormat);
         return (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
     }
