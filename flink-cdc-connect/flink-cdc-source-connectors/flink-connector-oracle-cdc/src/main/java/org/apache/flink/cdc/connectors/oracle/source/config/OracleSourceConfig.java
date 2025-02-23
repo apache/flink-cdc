@@ -64,7 +64,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
             int connectionPoolSize,
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled,
+            boolean assignEndingChunkFirst) {
         super(
                 startupOptions,
                 databaseList,
@@ -90,7 +91,8 @@ public class OracleSourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                assignEndingChunkFirst);
         this.url = url;
     }
 

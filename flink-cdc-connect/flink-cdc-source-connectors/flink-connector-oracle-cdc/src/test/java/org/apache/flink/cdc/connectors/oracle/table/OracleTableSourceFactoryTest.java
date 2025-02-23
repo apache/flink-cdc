@@ -119,7 +119,9 @@ public class OracleTableSourceFactoryTest {
                         null,
                         JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
-                        JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
+                        JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -156,7 +158,9 @@ public class OracleTableSourceFactoryTest {
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
-                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -198,7 +202,9 @@ public class OracleTableSourceFactoryTest {
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
-                        true);
+                        true,
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -266,6 +272,7 @@ public class OracleTableSourceFactoryTest {
                         null,
                         true,
                         true,
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
@@ -304,7 +311,9 @@ public class OracleTableSourceFactoryTest {
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
-                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -342,7 +351,9 @@ public class OracleTableSourceFactoryTest {
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
-                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -384,7 +395,9 @@ public class OracleTableSourceFactoryTest {
                         null,
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
-                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue());
+                        SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                                .defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");
