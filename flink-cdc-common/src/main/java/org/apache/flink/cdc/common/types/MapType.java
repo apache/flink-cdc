@@ -61,7 +61,7 @@ public final class MapType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new MapType(isNullable, keyType.copy(), valueType.copy());
     }
 

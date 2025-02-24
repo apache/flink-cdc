@@ -37,10 +37,6 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
-import org.apache.flink.cdc.common.types.BinaryType;
-import org.apache.flink.cdc.common.types.CharType;
-import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
@@ -84,10 +80,45 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_PASSWORD;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_USER;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.fetchResults;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.getServerId;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBigDecimal;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBigint;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBigintUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBinary;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBit;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeBlob;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeChar;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDate;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDatetime;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDecimal;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDecimalUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDouble;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeDoubleUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeEnum;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeFloat;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeFloatUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeGeometry;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeInt;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeIntUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeJson;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeLongBlob;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeMediumBlob;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeMediumint;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeMediumintUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeReal;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeSmallint;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeSmallintUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeText;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeTime;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeTimestamp;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeTinyblob;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeTinyint;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeTinyintUnsigned;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeVarchar;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.typeYear;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link MySqlDataSource}. */
@@ -95,6 +126,52 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
 
     protected static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0);
+
+    private static final Schema PRODUCTS_SCHEMA =
+            Schema.newBuilder()
+                    .primaryKey("id")
+                    .physicalColumn("id", typeInt(false))
+                    .physicalColumn("name", typeVarchar(false, 255))
+                    .physicalColumn("description", typeVarchar(true, 512))
+                    .physicalColumn("weight", typeFloat(true))
+                    .build();
+
+    private static final Schema PRODUCTS_SCHEMA_AFTER_ALTER =
+            Schema.newBuilder()
+                    .primaryKey("id")
+                    .physicalColumn("id", typeInt(false))
+                    .physicalColumn("name", typeVarchar(false, 255))
+                    .physicalColumn("weight", typeFloat(true))
+                    .physicalColumn("col1", typeVarchar(true, 45))
+                    .physicalColumn("col2", typeVarchar(true, 55))
+                    .build();
+
+    private static final Schema CUSTOMERS_SCHEMA =
+            Schema.newBuilder()
+                    .primaryKey("id")
+                    .physicalColumn("id", typeInt(false))
+                    .physicalColumn("first_name", typeVarchar(false, 255))
+                    .physicalColumn("last_name", typeVarchar(false, 255))
+                    .physicalColumn("email", typeVarchar(false, 255))
+                    .build();
+
+    private static final Schema ORDERS_SCHEMA =
+            Schema.newBuilder()
+                    .primaryKey("order_number")
+                    .physicalColumn("order_number", typeInt(false))
+                    .physicalColumn("order_date", typeDate(false))
+                    .physicalColumn("purchaser", typeInt(false))
+                    .physicalColumn("quantity", typeInt(false))
+                    .physicalColumn("product_id", typeInt(false))
+                    .build();
+
+    private static final Schema MULTI_MAX_SCHEMA =
+            Schema.newBuilder()
+                    .primaryKey("order_id", "index")
+                    .physicalColumn("order_id", typeVarchar(false, 128))
+                    .physicalColumn("index", typeInt(false))
+                    .physicalColumn("desc", typeVarchar(false, 512))
+                    .build();
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
@@ -162,16 +239,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
             expectedBinlog.addAll(executeAlterAndProvideExpected(tableId, statement));
 
-            RowType rowType =
-                    RowType.of(
-                            new DataType[] {
-                                DataTypes.INT().notNull(),
-                                DataTypes.VARCHAR(255).notNull(),
-                                DataTypes.FLOAT(),
-                                DataTypes.VARCHAR(45),
-                                DataTypes.VARCHAR(55)
-                            },
-                            new String[] {"id", "name", "weight", "col1", "col2"});
+            RowType rowType = (RowType) PRODUCTS_SCHEMA_AFTER_ALTER.toRowDataType();
             BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
             // insert more data
             statement.execute(
@@ -334,16 +402,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             expectedBinlog.addAll(executeAlterAndProvideExpected(tableId, statement));
-            RowType rowType =
-                    RowType.of(
-                            new DataType[] {
-                                DataTypes.INT().notNull(),
-                                DataTypes.VARCHAR(255).notNull(),
-                                DataTypes.FLOAT(),
-                                DataTypes.VARCHAR(45),
-                                DataTypes.VARCHAR(55)
-                            },
-                            new String[] {"id", "name", "weight", "col1", "col2"});
+            RowType rowType = (RowType) PRODUCTS_SCHEMA_AFTER_ALTER.toRowDataType();
             BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
             // insert more data
             statement.execute(
@@ -489,10 +548,10 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Arrays.asList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols1", DataTypes.VARCHAR(45))),
+                                            Column.physicalColumn("cols1", typeVarchar(true, 45))),
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
-                                                    "cols2", DataTypes.VARCHAR(55))))));
+                                                    "cols2", typeVarchar(true, 55))))));
             statement.execute(
                     String.format(
                             "ALTER TABLE `%s`.`products` ADD COLUMN (`cols3` VARCHAR(45), `cols4` VARCHAR(55));",
@@ -502,10 +561,10 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Arrays.asList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols3", DataTypes.VARCHAR(45))),
+                                            Column.physicalColumn("cols3", typeVarchar(true, 45))),
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
-                                                    "cols4", DataTypes.VARCHAR(55))))));
+                                                    "cols4", typeVarchar(true, 55))))));
 
             statement.execute(
                     String.format(
@@ -516,7 +575,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols5", DataTypes.BOOLEAN())))));
+                                            Column.physicalColumn("cols5", typeBit(true, 1))))));
             statement.execute(
                     String.format(
                             "ALTER TABLE `%s`.`products` ADD COLUMN `cols6` BINARY(0) NULL;",
@@ -526,8 +585,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn(
-                                                    "cols6", BinaryType.ofEmptyLiteral())))));
+                                            Column.physicalColumn("cols6", typeBinary(true, 0))))));
             statement.execute(
                     String.format(
                             "ALTER TABLE `%s`.`products` ADD COLUMN `cols7` BINARY NULL;",
@@ -537,7 +595,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols7", DataTypes.BINARY(1))))));
+                                            Column.physicalColumn("cols7", typeBinary(true, 1))))));
             statement.execute(
                     String.format(
                             "ALTER TABLE `%s`.`products` ADD COLUMN `cols8` CHAR(0) NULL;",
@@ -547,8 +605,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn(
-                                                    "cols8", CharType.ofEmptyLiteral())))));
+                                            Column.physicalColumn("cols8", typeChar(true, 0))))));
             statement.execute(
                     String.format(
                             "ALTER TABLE `%s`.`products` ADD COLUMN `cols9` CHAR NULL;",
@@ -558,7 +615,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             tableId,
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("cols9", DataTypes.CHAR(1))))));
+                                            Column.physicalColumn("cols9", typeChar(true, 1))))));
 
             statement.execute(
                     String.format(
@@ -572,8 +629,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                             Column.physicalColumn(
                                                     "cols10",
                                                     tinyInt1isBit
-                                                            ? DataTypes.BOOLEAN()
-                                                            : DataTypes.TINYINT())))));
+                                                            ? typeBit(true, 1)
+                                                            : typeTinyint(true))))));
 
             // Drop orders table first to remove foreign key restraints
             statement.execute(
@@ -650,7 +707,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
-                                            Column.physicalColumn("newcol1", DataTypes.INT())))));
+                                            Column.physicalColumn("newcol1", typeInt(true))))));
 
             // Add a TINYINT(1) column
             statement.execute(
@@ -665,8 +722,8 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                             Column.physicalColumn(
                                                     "new_tinyint1_col1",
                                                     tinyInt1isBit
-                                                            ? DataTypes.BOOLEAN()
-                                                            : DataTypes.TINYINT())))));
+                                                            ? typeBit(true, 1)
+                                                            : typeTinyint(true))))));
 
             // Add a new BOOLEAN column
             statement.execute(
@@ -679,7 +736,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             Collections.singletonList(
                                     new AddColumnEvent.ColumnWithPosition(
                                             Column.physicalColumn(
-                                                    "new_bool_col1", DataTypes.BOOLEAN())))));
+                                                    "new_bool_col1", typeBit(true, 1))))));
 
             // Test MODIFY COLUMN DDL
             statement.execute(
@@ -690,7 +747,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             expected.add(
                     new AlterColumnTypeEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
-                            Collections.singletonMap("newcol1", DataTypes.DOUBLE())));
+                            Collections.singletonMap("newcol1", typeDouble(true))));
 
             statement.execute(
                     String.format(
@@ -700,7 +757,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             expected.add(
                     new AlterColumnTypeEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
-                            Collections.singletonMap("new_tinyint1_col1", DataTypes.INT())));
+                            Collections.singletonMap("new_tinyint1_col1", typeInt(true))));
 
             // Test CHANGE COLUMN DDL
             statement.execute(
@@ -711,7 +768,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             expected.add(
                     new AlterColumnTypeEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
-                            Collections.singletonMap("newcol1", DataTypes.INT())));
+                            Collections.singletonMap("newcol1", typeInt(true))));
 
             expected.add(
                     new RenameColumnEvent(
@@ -726,7 +783,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
             expected.add(
                     new AlterColumnTypeEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
-                            Collections.singletonMap("newcol2", DataTypes.DOUBLE())));
+                            Collections.singletonMap("newcol2", typeDouble(true))));
 
             expected.add(
                     new RenameColumnEvent(
@@ -834,76 +891,75 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             TableId.tableId(
                                     inventoryDatabase.getDatabaseName(), "newlyAddedTable1"),
                             Schema.newBuilder()
-                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
-                                    .physicalColumn("tiny_c", DataTypes.TINYINT())
-                                    .physicalColumn("tiny_un_c", DataTypes.SMALLINT())
-                                    .physicalColumn("tiny_un_z_c", DataTypes.SMALLINT())
-                                    .physicalColumn("small_c", DataTypes.SMALLINT())
-                                    .physicalColumn("small_un_c", DataTypes.INT())
-                                    .physicalColumn("small_un_z_c", DataTypes.INT())
-                                    .physicalColumn("medium_c", DataTypes.INT())
-                                    .physicalColumn("medium_un_c", DataTypes.INT())
-                                    .physicalColumn("medium_un_z_c", DataTypes.INT())
-                                    .physicalColumn("int_c", DataTypes.INT())
-                                    .physicalColumn("int_un_c", DataTypes.BIGINT())
-                                    .physicalColumn("int_un_z_c", DataTypes.BIGINT())
-                                    .physicalColumn("int11_c", DataTypes.INT())
-                                    .physicalColumn("big_c", DataTypes.BIGINT())
-                                    .physicalColumn("big_un_c", DataTypes.DECIMAL(20, 0))
-                                    .physicalColumn("big_un_z_c", DataTypes.DECIMAL(20, 0))
-                                    .physicalColumn("varchar_c", DataTypes.VARCHAR(255))
-                                    .physicalColumn("char_c", DataTypes.CHAR(3))
-                                    .physicalColumn("real_c", DataTypes.DOUBLE())
-                                    .physicalColumn("float_c", DataTypes.FLOAT())
-                                    .physicalColumn("float_un_c", DataTypes.FLOAT())
-                                    .physicalColumn("float_un_z_c", DataTypes.FLOAT())
-                                    .physicalColumn("double_c", DataTypes.DOUBLE())
-                                    .physicalColumn("double_un_c", DataTypes.DOUBLE())
-                                    .physicalColumn("double_un_z_c", DataTypes.DOUBLE())
-                                    .physicalColumn("decimal_c", DataTypes.DECIMAL(8, 4))
-                                    .physicalColumn("decimal_un_c", DataTypes.DECIMAL(8, 4))
-                                    .physicalColumn("decimal_un_z_c", DataTypes.DECIMAL(8, 4))
-                                    .physicalColumn("numeric_c", DataTypes.DECIMAL(6, 0))
-                                    .physicalColumn("big_decimal_c", DataTypes.STRING())
-                                    .physicalColumn("bit1_c", DataTypes.BOOLEAN())
-                                    .physicalColumn("bit3_c", DataTypes.BINARY(1))
+                                    .physicalColumn("id", typeBigintUnsigned(false))
+                                    .physicalColumn("tiny_c", typeTinyint(true))
+                                    .physicalColumn("tiny_un_c", typeTinyintUnsigned(true))
+                                    .physicalColumn("tiny_un_z_c", typeTinyintUnsigned(true))
+                                    .physicalColumn("small_c", typeSmallint(true))
+                                    .physicalColumn("small_un_c", typeSmallintUnsigned(true))
+                                    .physicalColumn("small_un_z_c", typeSmallintUnsigned(true))
+                                    .physicalColumn("medium_c", typeMediumint(true))
+                                    .physicalColumn("medium_un_c", typeMediumintUnsigned(true))
+                                    .physicalColumn("medium_un_z_c", typeMediumintUnsigned(true))
+                                    .physicalColumn("int_c", typeInt(true))
+                                    .physicalColumn("int_un_c", typeIntUnsigned(true))
+                                    .physicalColumn("int_un_z_c", typeIntUnsigned(true))
+                                    .physicalColumn("int11_c", typeInt(true))
+                                    .physicalColumn("big_c", typeBigint(true))
+                                    .physicalColumn("big_un_c", typeBigintUnsigned(true))
+                                    .physicalColumn("big_un_z_c", typeBigintUnsigned(true))
+                                    .physicalColumn("varchar_c", typeVarchar(true, 255))
+                                    .physicalColumn("char_c", typeChar(true, 3))
+                                    .physicalColumn("real_c", typeReal(true))
+                                    .physicalColumn("float_c", typeFloat(true))
+                                    .physicalColumn("float_un_c", typeFloatUnsigned(true))
+                                    .physicalColumn("float_un_z_c", typeFloatUnsigned(true))
+                                    .physicalColumn("double_c", typeDouble(true))
+                                    .physicalColumn("double_un_c", typeDoubleUnsigned(true))
+                                    .physicalColumn("double_un_z_c", typeDoubleUnsigned(true))
+                                    .physicalColumn("decimal_c", typeDouble(true, 8, 4))
+                                    .physicalColumn("decimal_un_c", typeDecimalUnsigned(true, 8, 4))
+                                    .physicalColumn(
+                                            "decimal_un_z_c", typeDecimalUnsigned(true, 8, 4))
+                                    .physicalColumn("numeric_c", typeDecimal(true, 6, 0))
+                                    .physicalColumn("big_decimal_c", typeBigDecimal(true, 65, 1))
+                                    .physicalColumn("bit1_c", typeBit(true, 1))
+                                    .physicalColumn("bit3_c", typeBit(true, 3))
                                     .physicalColumn(
                                             "tiny1_c",
-                                            tinyInt1isBit
-                                                    ? DataTypes.BOOLEAN()
-                                                    : DataTypes.TINYINT())
-                                    .physicalColumn("boolean_c", DataTypes.BOOLEAN())
-                                    .physicalColumn("file_uuid", DataTypes.BINARY(16))
-                                    .physicalColumn("bit_c", DataTypes.BINARY(8))
-                                    .physicalColumn("text_c", DataTypes.STRING())
-                                    .physicalColumn("tiny_blob_c", DataTypes.BYTES())
-                                    .physicalColumn("blob_c", DataTypes.BYTES())
-                                    .physicalColumn("medium_blob_c", DataTypes.BYTES())
-                                    .physicalColumn("long_blob_c", DataTypes.BYTES())
-                                    .physicalColumn("enum_c", DataTypes.STRING())
-                                    .physicalColumn("json_c", DataTypes.STRING())
-                                    .physicalColumn("point_c", DataTypes.STRING())
-                                    .physicalColumn("geometry_c", DataTypes.STRING())
-                                    .physicalColumn("linestring_c", DataTypes.STRING())
-                                    .physicalColumn("polygon_c", DataTypes.STRING())
-                                    .physicalColumn("multipoint_c", DataTypes.STRING())
-                                    .physicalColumn("multiline_c", DataTypes.STRING())
-                                    .physicalColumn("multipolygon_c", DataTypes.STRING())
-                                    .physicalColumn("geometrycollection_c", DataTypes.STRING())
-                                    .physicalColumn("year_c", DataTypes.INT())
-                                    .physicalColumn("date_c", DataTypes.DATE())
-                                    .physicalColumn("time_c", DataTypes.TIME(0))
-                                    .physicalColumn("time_3_c", DataTypes.TIME(3))
-                                    .physicalColumn("time_6_c", DataTypes.TIME(6))
-                                    .physicalColumn("datetime_c", DataTypes.TIMESTAMP(0))
-                                    .physicalColumn("datetime3_c", DataTypes.TIMESTAMP(3))
-                                    .physicalColumn("datetime6_c", DataTypes.TIMESTAMP(6))
-                                    .physicalColumn("decimal_c0", DataTypes.DECIMAL(6, 2))
-                                    .physicalColumn("decimal_c1", DataTypes.DECIMAL(9, 4))
-                                    .physicalColumn("decimal_c2", DataTypes.DECIMAL(20, 4))
-                                    .physicalColumn("timestamp_c", DataTypes.TIMESTAMP_LTZ(0))
-                                    .physicalColumn("timestamp3_c", DataTypes.TIMESTAMP_LTZ(3))
-                                    .physicalColumn("timestamp6_c", DataTypes.TIMESTAMP_LTZ(6))
+                                            tinyInt1isBit ? typeBit(true, 1) : typeTinyint(true))
+                                    .physicalColumn("boolean_c", typeBit(true, 1))
+                                    .physicalColumn("file_uuid", typeBinary(true, 16))
+                                    .physicalColumn("bit_c", typeBit(true, 64))
+                                    .physicalColumn("text_c", typeText(true))
+                                    .physicalColumn("tiny_blob_c", typeTinyblob(true))
+                                    .physicalColumn("blob_c", typeBlob(true))
+                                    .physicalColumn("medium_blob_c", typeMediumBlob(true))
+                                    .physicalColumn("long_blob_c", typeLongBlob(true))
+                                    .physicalColumn("enum_c", typeEnum(true, 5))
+                                    .physicalColumn("json_c", typeJson(true))
+                                    .physicalColumn("point_c", typeGeometry(true))
+                                    .physicalColumn("geometry_c", typeGeometry(true))
+                                    .physicalColumn("linestring_c", typeGeometry(true))
+                                    .physicalColumn("polygon_c", typeGeometry(true))
+                                    .physicalColumn("multipoint_c", typeGeometry(true))
+                                    .physicalColumn("multiline_c", typeGeometry(true))
+                                    .physicalColumn("multipolygon_c", typeGeometry(true))
+                                    .physicalColumn("geometrycollection_c", typeGeometry(true))
+                                    .physicalColumn("year_c", typeYear(true))
+                                    .physicalColumn("date_c", typeDate(true))
+                                    .physicalColumn("time_c", typeTime(true, 8))
+                                    .physicalColumn("time_3_c", typeTime(true, 12))
+                                    .physicalColumn("time_6_c", typeTime(true, 15))
+                                    .physicalColumn("datetime_c", typeDatetime(true, 19))
+                                    .physicalColumn("datetime3_c", typeDatetime(true, 23))
+                                    .physicalColumn("datetime6_c", typeDatetime(true, 26))
+                                    .physicalColumn("decimal_c0", typeDecimal(true, 6, 2))
+                                    .physicalColumn("decimal_c1", typeDecimal(true, 9, 4))
+                                    .physicalColumn("decimal_c2", typeDecimal(true, 20, 4))
+                                    .physicalColumn("timestamp_c", typeTimestamp(true, 19))
+                                    .physicalColumn("timestamp3_c", typeTimestamp(true, 23))
+                                    .physicalColumn("timestamp6_c", typeTimestamp(true, 26))
                                     .primaryKey("id")
                                     .build()));
 
@@ -917,7 +973,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             TableId.tableId(
                                     inventoryDatabase.getDatabaseName(), "newlyAddedTable2"),
                             Schema.newBuilder()
-                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
+                                    .physicalColumn("id", typeBigintUnsigned(false))
                                     .primaryKey("id")
                                     .build()));
 
@@ -935,9 +991,9 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                             TableId.tableId(
                                     inventoryDatabase.getDatabaseName(), "newlyAddedTable3"),
                             Schema.newBuilder()
-                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull())
-                                    .physicalColumn("name", DataTypes.VARCHAR(17).notNull())
-                                    .physicalColumn("notes", DataTypes.STRING())
+                                    .physicalColumn("id", typeBigintUnsigned(false))
+                                    .physicalColumn("name", typeVarchar(false, 17))
+                                    .physicalColumn("notes", typeText(true))
                                     .primaryKey("id", "name")
                                     .build()));
         }
@@ -1158,15 +1214,14 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                 new CreateTableEvent(
                         tableId,
                         Schema.newBuilder()
-                                .physicalColumn(
-                                        "id", DataTypes.INT().notNull(), "column comment of id")
+                                .physicalColumn("id", typeInt(false), "column comment of id")
                                 .physicalColumn(
                                         "name",
-                                        DataTypes.VARCHAR(255).notNull(),
+                                        typeVarchar(false, 255),
                                         "column comment of name",
                                         "flink")
                                 .physicalColumn(
-                                        "weight", DataTypes.FLOAT(), "column comment of weight")
+                                        "weight", typeFloat(true), "column comment of weight")
                                 .primaryKey(Collections.singletonList("id"))
                                 .comment("table comment of products")
                                 .build()),
@@ -1176,72 +1231,25 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                                 new AddColumnEvent.ColumnWithPosition(
                                         Column.physicalColumn(
                                                 "description",
-                                                DataTypes.VARCHAR(512),
+                                                typeVarchar(true, 512),
                                                 "column comment of description")))));
     }
 
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
-        return new CreateTableEvent(
-                tableId,
-                Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.INT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), null, "flink")
-                        .physicalColumn("description", DataTypes.VARCHAR(512))
-                        .physicalColumn("weight", DataTypes.FLOAT())
-                        .primaryKey(Collections.singletonList("id"))
-                        .build());
+        return new CreateTableEvent(tableId, PRODUCTS_SCHEMA);
     }
 
     private List<CreateTableEvent> getInventoryCreateAllTableEvents(String databaseName) {
         return Arrays.asList(
+                new CreateTableEvent(TableId.tableId(databaseName, "products"), PRODUCTS_SCHEMA),
+                new CreateTableEvent(TableId.tableId(databaseName, "customers"), CUSTOMERS_SCHEMA),
+                new CreateTableEvent(TableId.tableId(databaseName, "orders"), ORDERS_SCHEMA),
                 new CreateTableEvent(
-                        TableId.tableId(databaseName, "products"),
-                        Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT().notNull())
-                                .physicalColumn("name", DataTypes.VARCHAR(255).notNull(), "flink")
-                                .physicalColumn("description", DataTypes.VARCHAR(512))
-                                .physicalColumn("weight", DataTypes.FLOAT())
-                                .primaryKey(Collections.singletonList("id"))
-                                .build()),
-                new CreateTableEvent(
-                        TableId.tableId(databaseName, "customers"),
-                        Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT().notNull())
-                                .physicalColumn("first_name", DataTypes.VARCHAR(255).notNull())
-                                .physicalColumn("last_name", DataTypes.VARCHAR(255).notNull())
-                                .physicalColumn("email", DataTypes.VARCHAR(255).notNull())
-                                .primaryKey(Collections.singletonList("id"))
-                                .build()),
-                new CreateTableEvent(
-                        TableId.tableId(databaseName, "orders"),
-                        Schema.newBuilder()
-                                .physicalColumn("order_number", DataTypes.INT().notNull())
-                                .physicalColumn("order_date", DataTypes.DATE().notNull())
-                                .physicalColumn("purchaser", DataTypes.INT().notNull())
-                                .physicalColumn("quantity", DataTypes.INT().notNull())
-                                .physicalColumn("product_id", DataTypes.INT().notNull())
-                                .primaryKey(Collections.singletonList("order_number"))
-                                .build()),
-                new CreateTableEvent(
-                        TableId.tableId(databaseName, "multi_max_table"),
-                        Schema.newBuilder()
-                                .physicalColumn("order_id", DataTypes.VARCHAR(128).notNull())
-                                .physicalColumn("index", DataTypes.INT().notNull())
-                                .physicalColumn("desc", DataTypes.VARCHAR(512).notNull())
-                                .primaryKey(Arrays.asList("order_id", "index"))
-                                .build()));
+                        TableId.tableId(databaseName, "multi_max_table"), MULTI_MAX_SCHEMA));
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {
-        RowType rowType =
-                RowType.of(
-                        new DataType[] {
-                            DataTypes.INT().notNull(),
-                            DataTypes.VARCHAR(255).notNull(),
-                            DataTypes.VARCHAR(512),
-                            DataTypes.FLOAT()
-                        },
-                        new String[] {"id", "name", "description", "weight"});
+        RowType rowType = (RowType) PRODUCTS_SCHEMA.toRowDataType();
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
         List<Event> snapshotExpected = new ArrayList<>();
         snapshotExpected.add(
@@ -1361,7 +1369,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AlterColumnTypeEvent(
-                        tableId, Collections.singletonMap("description", DataTypes.VARCHAR(255))));
+                        tableId, Collections.singletonMap("description", typeVarchar(true, 255))));
         expected.add(
                 new RenameColumnEvent(tableId, Collections.singletonMap("description", "desc")));
 
@@ -1371,7 +1379,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AlterColumnTypeEvent(
-                        tableId, Collections.singletonMap("desc", DataTypes.VARCHAR(400))));
+                        tableId, Collections.singletonMap("desc", typeVarchar(true, 400))));
         expected.add(new RenameColumnEvent(tableId, Collections.singletonMap("desc", "desc2")));
 
         statement.execute(
@@ -1383,7 +1391,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         tableId,
                         Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("desc1", DataTypes.VARCHAR(45)),
+                                        Column.physicalColumn("desc1", typeVarchar(true, 45)),
                                         AddColumnEvent.ColumnPosition.AFTER,
                                         "weight"))));
 
@@ -1396,7 +1404,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         tableId,
                         Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("col1", DataTypes.VARCHAR(45)),
+                                        Column.physicalColumn("col1", typeVarchar(true, 45)),
                                         AddColumnEvent.ColumnPosition.AFTER,
                                         "weight"))));
         expected.add(
@@ -1404,7 +1412,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         tableId,
                         Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("col2", DataTypes.VARCHAR(55)),
+                                        Column.physicalColumn("col2", typeVarchar(true, 55)),
                                         AddColumnEvent.ColumnPosition.AFTER,
                                         "desc1"))));
 
@@ -1415,7 +1423,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
         expected.add(new DropColumnEvent(tableId, Collections.singletonList("desc2")));
         expected.add(
                 new AlterColumnTypeEvent(
-                        tableId, Collections.singletonMap("desc1", DataTypes.VARCHAR(65))));
+                        tableId, Collections.singletonMap("desc1", typeVarchar(true, 65))));
 
         // Only available in mysql 8.0
         statement.execute(
@@ -1430,7 +1438,7 @@ public class MySqlPipelineITCase extends MySqlSourceTestBase {
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AlterColumnTypeEvent(
-                        tableId, Collections.singletonMap("DESC3", DataTypes.VARCHAR(255))));
+                        tableId, Collections.singletonMap("DESC3", typeVarchar(true, 255))));
 
         statement.execute(
                 String.format(

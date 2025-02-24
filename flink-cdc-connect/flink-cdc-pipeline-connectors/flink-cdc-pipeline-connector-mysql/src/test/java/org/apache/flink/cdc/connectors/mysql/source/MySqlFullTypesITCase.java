@@ -27,12 +27,11 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
-import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.RecordDataTestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
@@ -57,6 +56,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static javax.xml.bind.DatatypeConverter.parseHexBinary;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlTypeUtils.getTestTableRowType;
 
 /** IT case for MySQL event source. */
 public class MySqlFullTypesITCase extends MySqlSourceTestBase {
@@ -68,14 +68,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
             new UniqueDatabase(
                     MYSQL_CONTAINER,
                     "column_type_test",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
+                    MySqlSourceTestUtils.TEST_USER,
+                    MySqlSourceTestUtils.TEST_PASSWORD);
     private final UniqueDatabase fullTypesMySql8Database =
             new UniqueDatabase(
                     MYSQL8_CONTAINER,
                     "column_type_test_mysql8",
-                    MySqSourceTestUtils.TEST_USER,
-                    MySqSourceTestUtils.TEST_PASSWORD);
+                    MySqlSourceTestUtils.TEST_USER,
+                    MySqlSourceTestUtils.TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -141,20 +141,6 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     @Test
     public void testMysql57TimeDataTypes() throws Throwable {
-        RowType recordType =
-                RowType.of(
-                        DataTypes.DECIMAL(20, 0).notNull(),
-                        DataTypes.INT(),
-                        DataTypes.DATE(),
-                        DataTypes.TIME(0),
-                        DataTypes.TIME(3),
-                        DataTypes.TIME(6),
-                        DataTypes.TIMESTAMP(0),
-                        DataTypes.TIMESTAMP(3),
-                        DataTypes.TIMESTAMP(6),
-                        DataTypes.TIMESTAMP_LTZ(0),
-                        DataTypes.TIMESTAMP_LTZ(0));
-
         Object[] expectedSnapshot =
                 new Object[] {
                     DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
@@ -188,28 +174,11 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     LocalZonedTimestampData.fromInstant(toInstant("2000-01-01 00:00:00"))
                 };
 
-        testTimeDataTypes(
-                fullTypesMySql57Database, recordType, expectedSnapshot, expectedStreamRecord);
+        testTimeDataTypes(fullTypesMySql57Database, expectedSnapshot, expectedStreamRecord);
     }
 
     @Test
     public void testMysql8TimeDataTypes() throws Throwable {
-        RowType recordType =
-                RowType.of(
-                        DataTypes.DECIMAL(20, 0).notNull(),
-                        DataTypes.INT(),
-                        DataTypes.DATE(),
-                        DataTypes.TIME(0),
-                        DataTypes.TIME(3),
-                        DataTypes.TIME(6),
-                        DataTypes.TIMESTAMP(0),
-                        DataTypes.TIMESTAMP(3),
-                        DataTypes.TIMESTAMP(6),
-                        DataTypes.TIMESTAMP_LTZ(0),
-                        DataTypes.TIMESTAMP_LTZ(3),
-                        DataTypes.TIMESTAMP_LTZ(6),
-                        DataTypes.TIMESTAMP_LTZ(0));
-
         Object[] expectedSnapshot =
                 new Object[] {
                     DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
@@ -247,8 +216,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     LocalZonedTimestampData.fromInstant(toInstant("2000-01-01 00:00:00"))
                 };
 
-        testTimeDataTypes(
-                fullTypesMySql8Database, recordType, expectedSnapshot, expectedStreamRecord);
+        testTimeDataTypes(fullTypesMySql8Database, expectedSnapshot, expectedStreamRecord);
     }
 
     @Test
@@ -263,32 +231,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
         RowType recordType =
-                RowType.of(
-                        DataTypes.DECIMAL(20, 0).notNull(),
-                        DataTypes.DECIMAL(6, 2),
-                        DataTypes.DECIMAL(9, 4),
-                        DataTypes.DECIMAL(20, 4),
-                        DataTypes.TIME(0),
-                        DataTypes.TIME(3),
-                        DataTypes.TIME(6),
-                        DataTypes.TIMESTAMP(0),
-                        DataTypes.TIMESTAMP(3),
-                        DataTypes.TIMESTAMP(6),
-                        DataTypes.TIMESTAMP_LTZ(0),
-                        DataTypes.TIMESTAMP_LTZ(3),
-                        DataTypes.TIMESTAMP_LTZ(6),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE(),
-                        DataTypes.DOUBLE());
+                getTestTableRowType("precision_types", true, database == fullTypesMySql57Database);
 
         Object[] expectedSnapshot =
                 new Object[] {
@@ -363,7 +306,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         // skip CreateTableEvent
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
 
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
@@ -375,7 +318,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                 .isEqualTo(expectedStreamRecord);
@@ -471,11 +414,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     BinaryStringData.fromString(expectGeometryCollectionJsonText)
                 };
 
+        RowType recordType =
+                getTestTableRowType("common_types", true, database == fullTypesMySql57Database);
+
         // skip CreateTableEvent
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
-        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, COMMON_TYPES))
+        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
                 .isEqualTo(expectedSnapshot);
 
         try (Connection connection = database.getJdbcConnection();
@@ -489,9 +435,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         Object[] expectedStreamRecord = expectedSnapshot;
 
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
-        Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, COMMON_TYPES))
+        Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                 .isEqualTo(expectedStreamRecord);
     }
 
@@ -519,11 +465,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     1
                 };
 
+        RowType recordType =
+                getTestTableRowType("json_types", true, database == fullTypesMySql57Database);
+
         // skip CreateTableEvent
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
-        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, JSON_TYPES))
+        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
                 .isEqualTo(expectedSnapshot);
 
         try (Connection connection = database.getJdbcConnection();
@@ -533,14 +482,14 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
         Object[] expectedStreamRecord = expectedSnapshot;
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
 
         expectedSnapshot[4] = null;
 
         if (useLegacyJsonFormat) {
             // removed whitespace before value and after comma in json format string value
-            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
+            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                     .containsExactly(
                             DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                             BinaryStringData.fromString("{\"key1\":\"value1\"}"),
@@ -550,7 +499,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                                     "[{\"key1\":\"value1\",\"key2\":{\"key2_1\":\"value2_1\",\"key2_2\":\"value2_2\"},\"key3\":[\"value3\"],\"key4\":[\"value4_1\",\"value4_2\"]},{\"key5\":\"value5\"}]"),
                             null);
         } else {
-            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
+            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                     .containsExactly(expectedStreamRecord);
         }
     }
@@ -560,10 +509,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     private void testTimeDataTypes(
-            UniqueDatabase database,
-            RowType recordType,
-            Object[] expectedSnapshot,
-            Object[] expectedStreamRecord)
+            UniqueDatabase database, Object[] expectedSnapshot, Object[] expectedStreamRecord)
             throws Exception {
         database.createAndInitialize();
         Boolean useLegacyJsonFormat = true;
@@ -578,9 +524,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                                 "Event-Source")
                         .executeAndCollect();
 
+        RowType recordType =
+                getTestTableRowType("time_types", true, database == fullTypesMySql57Database);
+
         // skip CreateTableEvents
         List<Event> snapshotResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
 
         Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, recordType))
@@ -593,7 +542,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         List<Event> streamResults =
-                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+                MySqlSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, recordType))
                 .isEqualTo(expectedStreamRecord);
@@ -619,73 +568,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         .username(database.getUsername())
                         .password(database.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
-                        .serverId(MySqSourceTestUtils.getServerId(env.getParallelism()))
+                        .serverId(MySqlSourceTestUtils.getServerId(env.getParallelism()))
                         .useLegacyJsonFormat(useLegacyJsonFormat);
         return (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
     }
-
-    private static final RowType COMMON_TYPES =
-            RowType.of(
-                    DataTypes.DECIMAL(20, 0).notNull(),
-                    DataTypes.TINYINT(),
-                    DataTypes.SMALLINT(),
-                    DataTypes.SMALLINT(),
-                    DataTypes.SMALLINT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.DECIMAL(20, 0),
-                    DataTypes.DECIMAL(20, 0),
-                    DataTypes.VARCHAR(255),
-                    DataTypes.CHAR(3),
-                    DataTypes.DOUBLE(),
-                    DataTypes.FLOAT(),
-                    DataTypes.FLOAT(),
-                    DataTypes.FLOAT(),
-                    DataTypes.DOUBLE(),
-                    DataTypes.DOUBLE(),
-                    DataTypes.DOUBLE(),
-                    DataTypes.DECIMAL(8, 4),
-                    DataTypes.DECIMAL(8, 4),
-                    DataTypes.DECIMAL(8, 4),
-                    DataTypes.DECIMAL(6, 0),
-                    // Decimal precision larger than 38 will be treated as string.
-                    DataTypes.STRING(),
-                    DataTypes.BOOLEAN(),
-                    DataTypes.BINARY(1),
-                    DataTypes.BOOLEAN(),
-                    DataTypes.BOOLEAN(),
-                    DataTypes.BINARY(16),
-                    DataTypes.BINARY(8),
-                    DataTypes.STRING(),
-                    DataTypes.BYTES(),
-                    DataTypes.BYTES(),
-                    DataTypes.BYTES(),
-                    DataTypes.BYTES(),
-                    DataTypes.INT(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING());
-
-    private static final RowType JSON_TYPES =
-            RowType.of(
-                    DataTypes.DECIMAL(20, 0).notNull(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.STRING(),
-                    DataTypes.INT());
 }

@@ -42,7 +42,7 @@ public final class FloatType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new FloatType(isNullable);
     }
 

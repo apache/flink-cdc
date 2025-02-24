@@ -86,7 +86,7 @@ public final class ZonedTimestampType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new ZonedTimestampType(isNullable, precision);
     }
 

@@ -65,7 +65,7 @@ public final class BinaryType extends DataType {
         this(DEFAULT_LENGTH);
     }
 
-    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link #copy(boolean)}. */
+    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link DataType#copy(boolean)}. */
     private BinaryType(int length, boolean isNullable) {
         super(isNullable, DataTypeRoot.BINARY);
         this.length = length;
@@ -89,7 +89,7 @@ public final class BinaryType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new BinaryType(length, isNullable);
     }
 
