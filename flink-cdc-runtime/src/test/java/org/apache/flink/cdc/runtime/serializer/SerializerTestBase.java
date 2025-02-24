@@ -497,8 +497,7 @@ public abstract class SerializerTestBase<T> {
     private void deepEquals(String message, T should, T is) {
         Assertions.assertThat(is)
                 .withFailMessage(message)
-                .satisfies(
-                        CustomEqualityMatcher.deeplyEquals(should).withChecker(checker)::matches);
+                .matches(CustomEqualityMatcher.deeplyEquals(should).withChecker(checker));
     }
 
     // --------------------------------------------------------------------------------------------
@@ -596,10 +595,9 @@ public abstract class SerializerTestBase<T> {
                         Assertions.assertThat(copySerdeTestItem)
                                 .withFailMessage(
                                         "Serialization/Deserialization cycle resulted in an object that are not equal to the original.")
-                                .satisfies(
+                                .matches(
                                         CustomEqualityMatcher.deeplyEquals(testItem)
-                                                        .withChecker(checker)
-                                                ::matches);
+                                                .withChecker(checker));
 
                         // try to enforce some upper bound to the test time
                         if (System.nanoTime() >= endTimeNanos) {
