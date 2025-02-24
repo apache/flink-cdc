@@ -17,11 +17,10 @@
 
 package org.apache.flink.cdc.connectors.sqlserver;
 
-import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
 import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBaseJUnit4;
+import org.apache.flink.test.util.AbstractTestBase;
 
 import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
@@ -50,7 +49,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Utility class for sqlserver tests. */

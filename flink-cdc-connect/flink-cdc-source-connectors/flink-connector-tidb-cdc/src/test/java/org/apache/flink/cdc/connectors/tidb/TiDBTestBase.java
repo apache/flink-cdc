@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
+import org.apache.flink.test.util.AbstractTestBase;
+
 import com.alibaba.dcm.DnsCacheManipulator;
 import org.apache.commons.lang3.RandomUtils;
 import org.assertj.core.api.Assertions;
@@ -31,7 +33,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;

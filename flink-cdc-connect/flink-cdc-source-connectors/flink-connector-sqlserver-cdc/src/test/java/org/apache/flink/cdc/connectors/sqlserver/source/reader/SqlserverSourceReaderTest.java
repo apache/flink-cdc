@@ -54,8 +54,9 @@ import org.apache.flink.util.Collector;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +65,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -73,13 +73,12 @@ import java.util.function.Supplier;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit.STREAM_SPLIT_ID;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
-import static org.junit.Assert.assertEquals;
 
 /** Tests for Sqlserver incremental source reader. */
-public class SqlserverSourceReaderTest extends SqlServerSourceTestBase {
+class SqlserverSourceReaderTest extends SqlServerSourceTestBase {
 
     @Test
-    public void testIncrementalReadFailoverCrossTransaction() throws Exception {
+    void testIncrementalReadFailoverCrossTransaction() throws Exception {
 
         String databaseName = "customer";
         String tableName = "dbo.customers";
@@ -141,11 +140,11 @@ public class SqlserverSourceReaderTest extends SqlServerSourceTestBase {
                 };
         // the 2 records are produced by 1 operations
         List<String> actualRecords = consumeRecords(reader, dataType);
-        assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
+        Assertions.assertThat(actualRecords).containsExactlyInAnyOrder(expectedRecords);
         // check the binlog split state
         List<SourceSplitBase> splitsState = reader.snapshotState(1L);
 
-        assertEquals(1, splitsState.size());
+        Assertions.assertThat(splitsState).hasSize(1);
         reader.close();
 
         // step-3: mock failover from a restored state
@@ -166,7 +165,7 @@ public class SqlserverSourceReaderTest extends SqlServerSourceTestBase {
 
         // the 4 records are produced by 3 operations
         List<String> restRecords = consumeRecords(restartReader, dataType);
-        assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
+        Assertions.assertThat(restRecords).containsExactlyInAnyOrder(expectedRestRecords);
         restartReader.close();
     }
 

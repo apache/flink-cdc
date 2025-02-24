@@ -18,10 +18,10 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
-import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
 import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
+import org.apache.flink.test.util.AbstractTestBase;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.extension.RegisterExtension;

@@ -20,8 +20,8 @@ package org.apache.flink.cdc.connectors.postgres;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
-import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import io.debezium.config.Configuration;

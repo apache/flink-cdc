@@ -18,8 +18,8 @@
 package org.apache.flink.cdc.connectors.polardbx;
 
 import org.apache.flink.cdc.common.utils.TestCaseUtils;
-import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.apache.flink.types.Row;
 
 import org.apache.commons.lang3.StringUtils;

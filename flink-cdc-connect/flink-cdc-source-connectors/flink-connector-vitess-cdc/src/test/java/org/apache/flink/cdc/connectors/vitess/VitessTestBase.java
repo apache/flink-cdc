@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.vitess;
 
-import org.apache.flink.cdc.connectors.utils.AbstractTestBaseProxy;
 import org.apache.flink.cdc.connectors.vitess.container.VitessContainer;
+import org.apache.flink.test.util.AbstractTestBase;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;

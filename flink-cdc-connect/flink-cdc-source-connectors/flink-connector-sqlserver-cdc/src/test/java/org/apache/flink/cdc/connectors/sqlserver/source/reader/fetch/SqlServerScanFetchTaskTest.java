@@ -55,7 +55,6 @@ import java.util.Optional;
 
 import static org.apache.flink.cdc.connectors.sqlserver.SqlServerTestBase.getConfigFactory;
 import static org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerConnectionUtils.createSqlServerConnection;
-import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /**
  * Tests for {@link
