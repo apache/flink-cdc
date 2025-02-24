@@ -25,6 +25,7 @@ import org.apache.flink.streaming.api.transformations.PartitionTransformation;
 import org.apache.flink.streaming.runtime.partitioner.StreamPartitioner;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+/** FlinkStreamPartitioner with {@link MultiTableCommittableChannelComputer}. */
 public class FlinkStreamPartitioner<T> extends StreamPartitioner<T> {
 
     private final MultiTableCommittableChannelComputer channelComputer;

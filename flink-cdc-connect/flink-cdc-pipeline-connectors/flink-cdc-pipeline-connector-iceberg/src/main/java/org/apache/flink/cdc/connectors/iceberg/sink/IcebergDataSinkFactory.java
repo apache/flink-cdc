@@ -95,6 +95,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         options.add(IcebergDataSinkOptions.WAREHOUSE);
         options.add(IcebergDataSinkOptions.URI);
         options.add(IcebergDataSinkOptions.PARTITION_KEY);
+        options.add(IcebergDataSinkOptions.SMALL_FILE_COMPACTION_ENABLE);
         return options;
     }
 }

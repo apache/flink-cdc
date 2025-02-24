@@ -59,7 +59,8 @@ public class IcebergDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        IcebergSink icebergEventSink = new IcebergSink(catalogOptions, schemaOperatorUid, zoneId);
+        IcebergSink icebergEventSink =
+                new IcebergSink(catalogOptions, tableOptions, schemaOperatorUid, zoneId);
         return FlinkSinkProvider.of(icebergEventSink);
     }
 

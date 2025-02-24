@@ -98,7 +98,7 @@ public class IcebergSinkITCase {
         events.addAll(generateEvents(tableId));
         DataStream<Event> stream = env.fromData(events, TypeInformation.of(Event.class));
 
-        Sink<Event> icebergSink = new IcebergSink(catalogOptions, null, null);
+        Sink<Event> icebergSink = new IcebergSink(catalogOptions, new HashMap<>(), null, null);
         String[] expected = new String[] {"21, 1.732, Disenchanted", "17, 6.28, Doris Day"};
         stream.sinkTo(icebergSink);
         env.execute("Values to Iceberg Sink");

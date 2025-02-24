@@ -24,7 +24,7 @@ import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
 import java.io.Serializable;
 import java.util.Objects;
 
-/** Shuffle by tableId make it same hash in same slot */
+/** Shuffle by tableId make it same hash in same slot. */
 public class MultiTableCommittableChannelComputer implements Serializable {
 
     private static final long serialVersionUID = 1L;

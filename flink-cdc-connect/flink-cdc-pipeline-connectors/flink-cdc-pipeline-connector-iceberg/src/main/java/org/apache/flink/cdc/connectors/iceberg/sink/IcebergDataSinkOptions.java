@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.iceberg.sink;
 
+import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 
 import static org.apache.flink.cdc.common.configuration.ConfigOptions.key;
@@ -57,4 +58,13 @@ public class IcebergDataSinkOptions {
                             "Partition keys for each partitioned table, allow setting multiple primary keys for multiTables. "
                                     + "Tables are separated by ';', and partition keys are separated by ','. "
                                     + "For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SMALL_FILE_COMPACTION_ENABLE =
+            key("small.file.compaction.enable")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Enable iceberg small file optimization. If there are too many tables after enabling it, data flow may be blocked."
+                                    + " Please enable it carefully or use table maintenance service to compaction small file");
 }

@@ -37,6 +37,8 @@ import java.io.IOException;
 import java.time.ZoneId;
 import java.util.Map;
 
+import static org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSinkOptions.SMALL_FILE_COMPACTION_ENABLE;
+
 /** A {@link Sink} implementation for Apache Iceberg. */
 public class IcebergSink
         implements Sink<Event>,
@@ -46,12 +48,17 @@ public class IcebergSink
                 SupportsPostCommitTopology<WriteResultWrapper> {
 
     protected final Map<String, String> catalogOptions;
+    protected final Map<String, String> tableOptions;
 
     private final ZoneId zoneId;
 
     public IcebergSink(
-            Map<String, String> catalogOptions, String schemaOperatorUid, ZoneId zoneId) {
+            Map<String, String> catalogOptions,
+            Map<String, String> tableOptions,
+            String schemaOperatorUid,
+            ZoneId zoneId) {
         this.catalogOptions = catalogOptions;
+        this.tableOptions = tableOptions;
         this.zoneId = zoneId;
     }
 
@@ -110,21 +117,22 @@ public class IcebergSink
     @Override
     public void addPostCommitTopology(
             DataStream<CommittableMessage<WriteResultWrapper>> committableMessageDataStream) {
-
-        TypeInformation<CommittableMessage<WriteResultWrapper>> typeInformation =
-                CommittableMessageTypeInfo.of(this::getCommittableSerializer);
-        // shuffle with different table id
-        DataStream<CommittableMessage<WriteResultWrapper>> keyedStream =
-                FlinkStreamPartitioner.partition(
-                        committableMessageDataStream,
-                        new MultiTableCommittableChannelComputer(),
-                        committableMessageDataStream.getParallelism());
-        // small file compaction
-        keyedStream
-                .transform(
-                        "iceberg-small-files-commiter",
-                        typeInformation,
-                        new PostCommitOperator(catalogOptions))
-                .setParallelism(committableMessageDataStream.getParallelism());
+        if (Boolean.parseBoolean(tableOptions.get(SMALL_FILE_COMPACTION_ENABLE.key()))) {
+            TypeInformation<CommittableMessage<WriteResultWrapper>> typeInformation =
+                    CommittableMessageTypeInfo.of(this::getCommittableSerializer);
+            // shuffle with different table id
+            DataStream<CommittableMessage<WriteResultWrapper>> keyedStream =
+                    FlinkStreamPartitioner.partition(
+                            committableMessageDataStream,
+                            new MultiTableCommittableChannelComputer(),
+                            committableMessageDataStream.getParallelism());
+            // small file compaction
+            keyedStream
+                    .transform(
+                            "iceberg-small-files-commiter",
+                            typeInformation,
+                            new PostCommitOperator(catalogOptions))
+                    .setParallelism(committableMessageDataStream.getParallelism());
+        }
     }
 }
