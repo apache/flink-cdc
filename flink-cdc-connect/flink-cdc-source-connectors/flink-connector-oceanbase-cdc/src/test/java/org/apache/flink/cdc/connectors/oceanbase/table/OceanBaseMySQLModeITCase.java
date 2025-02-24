@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseMySQLCdcMetadata;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.UniqueDatabase;
+import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -42,6 +43,7 @@ import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -630,9 +632,17 @@ class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
 
-        while (result.getJobClient().get().getJobStatus().get().equals(JobStatus.RUNNING)) {
-            Thread.sleep(100);
-            // Waiting for job to finish (SNAPSHOT job will end spontaneously)
+        try {
+            while (result.getJobClient()
+                    .map(JobClient::getJobStatus)
+                    .map(CompletableFuture::join)
+                    .orElse(JobStatus.FINISHED)
+                    .equals(JobStatus.RUNNING)) {
+                Thread.sleep(100);
+                // Waiting for job to finish (SNAPSHOT job will end spontaneously)
+            }
+        } catch (IllegalStateException e) {
+            // It's fine if miniCluster has been shut down
         }
     }
 }
