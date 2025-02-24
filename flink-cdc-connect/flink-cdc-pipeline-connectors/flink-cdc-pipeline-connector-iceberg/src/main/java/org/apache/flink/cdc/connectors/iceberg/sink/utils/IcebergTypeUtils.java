@@ -28,10 +28,8 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSink;
 
 import org.apache.iceberg.types.Type;
-import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.util.DateTimeUtil;
-import org.apache.iceberg.util.DecimalUtil;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -55,7 +53,10 @@ public class IcebergTypeUtils {
                 column.getComment());
     }
 
-    /** Convert data type from CDC framework to Iceberg framework, refer to <a href="https://iceberg.apache.org/docs/nightly/flink/#flink-to-iceberg">...</a>. */
+    /**
+     * Convert data type from CDC framework to Iceberg framework, refer to <a
+     * href="https://iceberg.apache.org/docs/nightly/flink/#flink-to-iceberg">...</a>.
+     */
     public static Type convertCDCTypeToIcebergType(DataType type) {
         // ordered by type root definition
         List<DataType> children = type.getChildren();
@@ -141,7 +142,8 @@ public class IcebergTypeUtils {
                         row -> {
                             DecimalData decimalData =
                                     row.getDecimal(fieldPos, decimalPrecision, decimalScale);
-                            return org.apache.flink.table.data.DecimalData.fromBigDecimal(decimalData.toBigDecimal(), decimalPrecision, decimalScale);
+                            return org.apache.flink.table.data.DecimalData.fromBigDecimal(
+                                    decimalData.toBigDecimal(), decimalPrecision, decimalScale);
                         };
                 break;
             case TINYINT:

@@ -51,12 +51,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,11 +104,28 @@ public class IcebergWriterTest {
                                         DataTypes.STRING(),
                                         "column for descriptions",
                                         "not important")
-                                .physicalColumn("bool_column", DataTypes.BOOLEAN(), "column for bool", "false")
-                                .physicalColumn("float_column", DataTypes.FLOAT(), "column for float", "1.0")
-                                .physicalColumn("double_column", DataTypes.DOUBLE(), "column for double", "1.0")
-                                .physicalColumn("decimal_column", DataTypes.DECIMAL(10, 2), "column for decimal", "1.0")
-                                .physicalColumn("date_column", DataTypes.DATE(), "column for date", "12345")
+                                .physicalColumn(
+                                        "bool_column",
+                                        DataTypes.BOOLEAN(),
+                                        "column for bool",
+                                        "false")
+                                .physicalColumn(
+                                        "float_column",
+                                        DataTypes.FLOAT(),
+                                        "column for float",
+                                        "1.0")
+                                .physicalColumn(
+                                        "double_column",
+                                        DataTypes.DOUBLE(),
+                                        "column for double",
+                                        "1.0")
+                                .physicalColumn(
+                                        "decimal_column",
+                                        DataTypes.DECIMAL(10, 2),
+                                        "column for decimal",
+                                        "1.0")
+                                .physicalColumn(
+                                        "date_column", DataTypes.DATE(), "column for date", "12345")
                                 .primaryKey("id")
                                 .partitionKey("id", "name")
                                 .build());
@@ -126,11 +141,11 @@ public class IcebergWriterTest {
                             BinaryStringData.fromString("Mark"),
                             10,
                             BinaryStringData.fromString("test"),
-                                true,
-                                1.0f,
-                                1.0d,
-                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
-                                9
+                            true,
+                            1.0f,
+                            1.0d,
+                            DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                            9
                         });
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, recordData);
         icebergWriter.write(dataChangeEvent, null);
@@ -141,11 +156,11 @@ public class IcebergWriterTest {
                             BinaryStringData.fromString("Bob"),
                             10,
                             BinaryStringData.fromString("test"),
-                                true,
-                                1.0f,
-                                1.0d,
-                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
-                                9
+                            true,
+                            1.0f,
+                            1.0d,
+                            DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                            9
                         });
         DataChangeEvent dataChangeEvent2 = DataChangeEvent.insertEvent(tableId, recordData2);
         icebergWriter.write(dataChangeEvent2, null);
@@ -156,7 +171,9 @@ public class IcebergWriterTest {
         icebergCommitter.commit(collection);
         List<String> result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
-                .containsExactlyInAnyOrder("1, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10", "2, Bob, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10");
+                .containsExactlyInAnyOrder(
+                        "1, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10",
+                        "2, Bob, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10");
 
         // Add column.
         RecordData recordData3 =
@@ -166,10 +183,11 @@ public class IcebergWriterTest {
                             BinaryStringData.fromString("Bob"),
                             10,
                             BinaryStringData.fromString("test"),
-                                true,
-                                1.0f,
-                                1.0d,
-                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),9
+                            true,
+                            1.0f,
+                            1.0d,
+                            DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                            9
                         });
         DataChangeEvent dataChangeEvent3 = DataChangeEvent.insertEvent(tableId, recordData3);
         icebergWriter.write(dataChangeEvent3, null);
@@ -180,10 +198,11 @@ public class IcebergWriterTest {
                             BinaryStringData.fromString("Bob"),
                             10,
                             BinaryStringData.fromString("test"),
-                                true,
-                                1.0f,
-                                1.0d,
-                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),9
+                            true,
+                            1.0f,
+                            1.0d,
+                            DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                            9
                         });
         DataChangeEvent dataChangeEvent4 = DataChangeEvent.insertEvent(tableId, recordData4);
         icebergWriter.write(dataChangeEvent4, null);
@@ -213,11 +232,11 @@ public class IcebergWriterTest {
                             BinaryStringData.fromString("Mark"),
                             10,
                             BinaryStringData.fromString("test"),
-                                true,
-                                1.0f,
-                                1.0d,
-                                DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
-                                9,
+                            true,
+                            1.0f,
+                            1.0d,
+                            DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
+                            9,
                             BinaryStringData.fromString("newStringColumn"),
                         });
         DataChangeEvent dataChangeEvent5 = DataChangeEvent.insertEvent(tableId, recordData5);

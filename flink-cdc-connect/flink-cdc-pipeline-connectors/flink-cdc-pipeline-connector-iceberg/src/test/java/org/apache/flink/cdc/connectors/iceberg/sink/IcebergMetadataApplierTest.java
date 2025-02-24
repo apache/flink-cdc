@@ -90,10 +90,26 @@ public class IcebergMetadataApplierTest {
                                         DataTypes.STRING(),
                                         "column for descriptions",
                                         "not important")
-                                .physicalColumn("bool_column", DataTypes.BOOLEAN(), "column for bool", "false")
-                                .physicalColumn("float_column", DataTypes.FLOAT(), "column for float", "1.0")
-                                .physicalColumn("double_column", DataTypes.DOUBLE(), "column for double", "1.0")
-                                .physicalColumn("decimal_column", DataTypes.DECIMAL(10, 2), "column for decimal", "1.0")
+                                .physicalColumn(
+                                        "bool_column",
+                                        DataTypes.BOOLEAN(),
+                                        "column for bool",
+                                        "false")
+                                .physicalColumn(
+                                        "float_column",
+                                        DataTypes.FLOAT(),
+                                        "column for float",
+                                        "1.0")
+                                .physicalColumn(
+                                        "double_column",
+                                        DataTypes.DOUBLE(),
+                                        "column for double",
+                                        "1.0")
+                                .physicalColumn(
+                                        "decimal_column",
+                                        DataTypes.DECIMAL(10, 2),
+                                        "column for decimal",
+                                        "1.0")
                                 .primaryKey("id")
                                 .partitionKey("id", "name")
                                 .build());
@@ -142,8 +158,7 @@ public class IcebergMetadataApplierTest {
                                         true,
                                         "decimal_column",
                                         Types.DecimalType.of(10, 2),
-                                        "column for decimal")
-                        ),
+                                        "column for decimal")),
                         new HashSet<>(Arrays.asList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
@@ -203,8 +218,7 @@ public class IcebergMetadataApplierTest {
                                         true,
                                         "decimal_column",
                                         Types.DecimalType.of(10, 2),
-                                        "column for decimal"
-                                ),
+                                        "column for decimal"),
                                 Types.NestedField.of(
                                         9,
                                         true,
@@ -256,8 +270,7 @@ public class IcebergMetadataApplierTest {
                                         true,
                                         "decimal_column",
                                         Types.DecimalType.of(10, 2),
-                                        "column for decimal"
-                                ),
+                                        "column for decimal"),
                                 Types.NestedField.of(
                                         9,
                                         true,
@@ -309,8 +322,7 @@ public class IcebergMetadataApplierTest {
                                         true,
                                         "decimal_column",
                                         Types.DecimalType.of(10, 2),
-                                        "column for decimal"
-                                ),
+                                        "column for decimal"),
                                 Types.NestedField.of(
                                         9,
                                         true,
@@ -363,8 +375,7 @@ public class IcebergMetadataApplierTest {
                                         true,
                                         "decimal_column",
                                         Types.DecimalType.of(10, 2),
-                                        "column for decimal"
-                                ),
+                                        "column for decimal"),
                                 Types.NestedField.of(
                                         9,
                                         true,
