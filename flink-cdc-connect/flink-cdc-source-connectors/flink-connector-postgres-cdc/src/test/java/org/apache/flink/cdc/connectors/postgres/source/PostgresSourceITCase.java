@@ -27,7 +27,9 @@ import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTable;
+import org.apache.flink.cdc.connectors.postgres.testutils.TestTableId;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
+import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -54,6 +56,7 @@ import org.junit.rules.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,6 +65,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -76,6 +80,7 @@ import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
@@ -164,7 +169,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"});
+                new String[] {"Customers"});
     }
 
     @Test
@@ -173,7 +178,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 4,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"});
+                new String[] {"Customers"});
     }
 
     @Test
@@ -182,7 +187,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[] {"Customers", "customers_1"});
     }
 
     @Test
@@ -191,7 +196,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 4,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[] {"Customers", "customers_1"});
     }
 
     // Failover tests
@@ -200,7 +205,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"});
+                new String[] {"Customers", "customers_1"});
     }
 
     @Test
@@ -208,7 +213,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"});
+                new String[] {"Customers", "customers_1"});
     }
 
     @Test
@@ -216,7 +221,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"});
+                new String[] {"Customers", "customers_1"});
     }
 
     @Test
@@ -224,7 +229,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"});
+                new String[] {"Customers", "customers_1"});
     }
 
     @Test
@@ -233,7 +238,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"});
+                new String[] {"Customers"});
     }
 
     @Test
@@ -242,7 +247,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 1,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"});
+                new String[] {"Customers"});
     }
 
     @Test
@@ -283,7 +288,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 DEFAULT_SCAN_STARTUP_MODE,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 RestartStrategies.fixedDelayRestart(1, 0),
                 Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
@@ -299,11 +304,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -325,7 +330,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         customDatabase.getPassword(),
                         customDatabase.getDatabaseName(),
                         SCHEMA_NAME,
-                        "customers",
+                        "Customers",
                         scanStartupMode,
                         slotName);
         tEnv.executeSql(sourceDDL);
@@ -337,7 +342,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     tableResult,
                     PostgresTestUtils.FailoverType.JM,
                     PostgresTestUtils.FailoverPhase.STREAM,
-                    new String[] {"customers"});
+                    new String[] {"Customers"});
         }
 
         // second step: check the stream data
@@ -345,9 +350,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 tableResult,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers"});
+                new String[] {"Customers"});
 
-        tableResult.getJobClient().get().cancel().get();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        optionalJobClient.get().cancel().get();
     }
 
     @Test
@@ -582,7 +589,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         int parallelism = 1;
         PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.JM;
         PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
-        String[] captureCustomerTables = new String[] {"customers"};
+        String[] captureCustomerTables = new String[] {"Customers"};
         RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
                 RestartStrategies.fixedDelayRestart(1, 0);
         boolean skipSnapshotBackfill = false;
@@ -596,11 +603,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc-mock',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -637,7 +644,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // second step: check the stream data
         checkStreamDataWithHook(tableResult, failoverType, failoverPhase, captureCustomerTables);
 
-        tableResult.getJobClient().get().cancel().get();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        optionalJobClient.get().cancel().get();
 
         // sleep 1000ms to wait until connections are closed.
         Thread.sleep(1000L);
@@ -655,7 +664,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     scanStartupMode,
                     PostgresTestUtils.FailoverType.NONE,
                     PostgresTestUtils.FailoverPhase.NEVER,
-                    new String[] {"customers"},
+                    new String[] {"Customers"},
                     RestartStrategies.noRestart(),
                     Collections.singletonMap(
                             "scan.incremental.snapshot.chunk.key-column", chunkColumn));
@@ -665,7 +674,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                     e,
                                     String.format(
                                             "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                            chunkColumn, "id", "customer.customers"))
+                                            chunkColumn, "Id", "customer.Customers"))
                             .isPresent());
         }
     }
@@ -711,17 +720,16 @@ public class PostgresSourceITCase extends PostgresTestBase {
         ResolvedSchema customersSchema =
                 new ResolvedSchema(
                         Arrays.asList(
-                                physical("id", BIGINT().notNull()),
-                                physical("name", STRING()),
+                                physical("Id", BIGINT().notNull()),
+                                physical("Name", STRING()),
                                 physical("address", STRING()),
                                 physical("phone_number", STRING())),
                         new ArrayList<>(),
                         UniqueConstraint.primaryKey("pk", Collections.singletonList("id")));
-        TestTable customerTable =
-                new TestTable(customDatabase, "customer", "customers", customersSchema);
-        String tableId = customerTable.getTableId();
+        TestTableId tableId = new TestTableId("customer", "Customers");
+        TestTable table = new TestTable(customersSchema);
 
-        PostgresSourceBuilder.PostgresIncrementalSource source =
+        PostgresSourceBuilder.PostgresIncrementalSource<RowData> source =
                 PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                         .hostname(customDatabase.getHost())
                         .port(customDatabase.getDatabasePort())
@@ -729,11 +737,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         .password(customDatabase.getPassword())
                         .database(customDatabase.getDatabaseName())
                         .slotName(slotName)
-                        .tableList(tableId)
+                        .tableList(tableId.toString())
                         .startupOptions(startupOptions)
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .lsnCommitCheckpointsDelay(1)
-                        .deserializer(customerTable.getDeserializer())
+                        .deserializer(table.getDeserializer())
                         .build();
 
         // Do some database operations during hook in snapshot period.
@@ -742,17 +750,21 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 new String[] {
                     String.format(
                             "INSERT INTO %s VALUES (15213, 'user_15213', 'Shanghai', '123567891234')",
-                            tableId),
-                    String.format("UPDATE %s SET address='Pittsburgh' WHERE id=2000", tableId),
-                    String.format("DELETE FROM %s WHERE id=1019", tableId)
+                            tableId.toSql()),
+                    String.format(
+                            "UPDATE %s SET address = 'Pittsburgh' WHERE \"Id\" = 2000",
+                            tableId.toSql()),
+                    String.format("DELETE FROM %s WHERE \"Id\" = 1019", tableId.toSql())
                 };
         SnapshotPhaseHook snapshotPhaseHook =
                 (sourceConfig, split) -> {
-                    PostgresDialect dialect =
-                            new PostgresDialect((PostgresSourceConfig) sourceConfig);
-                    try (PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
+                    try (PostgresDialect dialect =
+                                    new PostgresDialect((PostgresSourceConfig) sourceConfig);
+                            PostgresConnection postgresConnection = dialect.openJdbcConnection()) {
                         postgresConnection.execute(statements);
                         postgresConnection.commit();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
                 };
 
@@ -773,7 +785,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         try (CloseableIterator<RowData> iterator =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "Backfill Skipped Source")
                         .executeAndCollect()) {
-            records = fetchRowData(iterator, fetchSize, customerTable::stringify);
+            records = fetchRowData(iterator, fetchSize, table::stringify);
             env.close();
         }
         return records;
@@ -840,11 +852,11 @@ public class PostgresSourceITCase extends PostgresTestBase {
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
-                                + " id BIGINT NOT NULL,"
-                                + " name STRING,"
+                                + " Id BIGINT NOT NULL,"
+                                + " Name STRING,"
                                 + " address STRING,"
                                 + " phone_number STRING,"
-                                + " primary key (id) not enforced"
+                                + " primary key (Id) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'postgres-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
@@ -859,7 +871,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
-                                + "%s"
+                                + " %s"
                                 + ")",
                         customDatabase.getHost(),
                         customDatabase.getDatabasePort(),
@@ -891,7 +903,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // second step: check the stream data
         checkStreamData(tableResult, failoverType, failoverPhase, captureCustomerTables);
 
-        tableResult.getJobClient().get().cancel().get();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        optionalJobClient.get().cancel().get();
 
         // sleep 1000ms to wait until connections are closed.
         Thread.sleep(1000L);
@@ -934,7 +948,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         }
 
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == PostgresTestUtils.FailoverPhase.SNAPSHOT && iterator.hasNext()) {
@@ -954,12 +970,12 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
-        for (String tableId : captureCustomerTables) {
-            makeFirstPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -970,10 +986,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
-        for (String tableId : captureCustomerTables) {
-            makeSecondPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -985,7 +999,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertFalse(hasNextData(iterator));
     }
 
     private void checkStreamDataWithHook(
@@ -996,7 +1010,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
         final AtomicLong savedCheckpointId = new AtomicLong(0);
         final CountDownLatch countDownLatch = new CountDownLatch(1);
@@ -1007,14 +1023,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         if (savedCheckpointId.get() == 0) {
                             savedCheckpointId.set(checkpointId);
 
-                            for (String tableId : captureCustomerTables) {
+                            for (String tableName : captureCustomerTables) {
                                 makeFirstPartStreamEvents(
-                                        getConnection(),
-                                        customDatabase.getDatabaseName()
-                                                + '.'
-                                                + SCHEMA_NAME
-                                                + '.'
-                                                + tableId);
+                                        getConnection(), new TestTableId(SCHEMA_NAME, tableName));
                             }
                             // wait for the stream reading
                             Thread.sleep(2000L);
@@ -1039,10 +1050,8 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
-        for (String tableId : captureCustomerTables) {
-            makeSecondPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -1054,7 +1063,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertFalse(hasNextData(iterator));
     }
 
     private void checkStreamDataWithDDLDuringFailover(
@@ -1065,12 +1074,12 @@ public class PostgresSourceITCase extends PostgresTestBase {
             throws Exception {
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
-        JobID jobId = tableResult.getJobClient().get().getJobID();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertTrue(optionalJobClient.isPresent());
+        JobID jobId = optionalJobClient.get().getJobID();
 
-        for (String tableId : captureCustomerTables) {
-            makeFirstPartStreamEvents(
-                    getConnection(),
-                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        for (String tableName : captureCustomerTables) {
+            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -1083,15 +1092,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     jobId,
                     miniClusterResource.getMiniCluster(),
                     () -> {
-                        for (String tableId : captureCustomerTables) {
+                        for (String tableName : captureCustomerTables) {
                             try {
                                 makeSecondPartStreamEvents(
-                                        getConnection(),
-                                        customDatabase.getDatabaseName()
-                                                + '.'
-                                                + SCHEMA_NAME
-                                                + '.'
-                                                + tableId);
+                                        getConnection(), new TestTableId(SCHEMA_NAME, tableName));
                             } catch (SQLException e) {
                                 throw new RuntimeException(e);
                             }
@@ -1110,7 +1114,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        assertFalse(hasNextData(iterator));
     }
 
     private void sleepMs(long millis) {
@@ -1155,17 +1159,19 @@ public class PostgresSourceITCase extends PostgresTestBase {
      * Make some changes on the specified customer table. Changelog in string could be accessed by
      * {@link #firstPartStreamEvents}.
      */
-    private void makeFirstPartStreamEvents(JdbcConnection connection, String tableId)
+    private void makeFirstPartStreamEvents(JdbcConnection connection, TestTableId tableId)
             throws SQLException {
         try {
             connection.setAutoCommit(false);
 
             // make stream events for the first split
             connection.execute(
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','Shanghai','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103");
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(102, 'user_2', 'Shanghai', '123567891234')",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103");
             connection.commit();
         } finally {
             connection.close();
@@ -1176,19 +1182,20 @@ public class PostgresSourceITCase extends PostgresTestBase {
      * Make some other changes on the specified customer table. Changelog in string could be
      * accessed by {@link #secondPartStreamEvents}.
      */
-    private void makeSecondPartStreamEvents(JdbcConnection connection, String tableId)
+    private void makeSecondPartStreamEvents(JdbcConnection connection, TestTableId tableId)
             throws SQLException {
         try {
             connection.setAutoCommit(false);
 
             // make stream events for split-1
-            connection.execute("UPDATE " + tableId + " SET address = 'Hangzhou' where id = 1010");
+            connection.execute(
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 1010");
             connection.commit();
 
             // make stream events for the last split
             connection.execute(
                     "INSERT INTO "
-                            + tableId
+                            + tableId.toSql()
                             + " VALUES(2001, 'user_22','Shanghai','123567891234'),"
                             + " (2002, 'user_23','Shanghai','123567891234'),"
                             + "(2003, 'user_24','Shanghai','123567891234')");
