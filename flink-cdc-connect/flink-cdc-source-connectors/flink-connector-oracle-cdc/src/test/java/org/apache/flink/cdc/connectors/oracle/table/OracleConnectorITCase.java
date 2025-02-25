@@ -27,12 +27,11 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.RateLimiter;
 
-import org.junit.After;
-import org.junit.Assume;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.assertj.core.api.Assumptions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.lifecycle.Startables;
@@ -42,7 +41,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -61,13 +59,9 @@ import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.createAndInitialize;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.getJdbcConnection;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.getJdbcConnectionAsDBA;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 
 /** Integration tests for Oracle redo log SQL source. */
-@RunWith(Parameterized.class)
-public class OracleConnectorITCase {
+class OracleConnectorITCase {
     private static final int RECORDS_COUNT = 10_000;
     private static final int WORKERS_COUNT = 4;
 
@@ -79,21 +73,7 @@ public class OracleConnectorITCase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    // enable the parallelismSnapshot (i.e: The new source OracleParallelSource)
-    private final boolean parallelismSnapshot;
-
-    public OracleConnectorITCase(boolean parallelismSnapshot) {
-        this.parallelismSnapshot = parallelismSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {true}, new Object[] {false}};
-    }
-
-    @Before
-    public void before() throws Exception {
-
+    void setup(boolean parallelismSnapshot) {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(ORACLE_CONTAINER)).join();
         LOG.info("Containers are started.");
@@ -108,14 +88,15 @@ public class OracleConnectorITCase {
         }
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         ORACLE_CONTAINER.stop();
     }
 
-    @Test
-    public void testConsumingAllEvents() throws Exception {
-
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEvents(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         createAndInitialize("product.sql");
         String sourceDDL =
                 String.format(
@@ -227,9 +208,10 @@ public class OracleConnectorITCase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testSkipNestedTables() throws Exception {
-
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testSkipNestedTables(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         createAndInitialize("product.sql");
         // create nested table
         try (Connection connection = getJdbcConnection();
@@ -361,17 +343,16 @@ public class OracleConnectorITCase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testConsumingAllEventsByChunkKeyColumn() throws Exception {
-
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEventsByChunkKeyColumn(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         createAndInitialize("product.sql");
         try (Connection dbaConnection = getJdbcConnectionAsDBA();
                 Statement dbaStatement = dbaConnection.createStatement()) {
             dbaStatement.execute("GRANT ANALYZE ANY TO " + ORACLE_CONTAINER.getUsername());
         }
-        if (!parallelismSnapshot) {
-            return;
-        }
+        Assumptions.assumeThat(parallelismSnapshot).isTrue();
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -457,9 +438,10 @@ public class OracleConnectorITCase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testMetadataColumns() throws Throwable {
-
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testMetadataColumns(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         createAndInitialize("product.sql");
         String sourceDDL =
                 String.format(
@@ -555,15 +537,14 @@ public class OracleConnectorITCase {
                         "-D[ORCLCDB, DEBEZIUM, PRODUCTS, 112, scooter, Big 2-wheel scooter , 5.170]");
 
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Collections.sort(expected);
-        Collections.sort(actual);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testStartupFromLatestOffset() throws Exception {
-
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testStartupFromLatestOffset(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         createAndInitialize("product.sql");
         String sourceDDL =
                 String.format(
@@ -626,13 +607,15 @@ public class OracleConnectorITCase {
                 new String[] {"+I[110, jacket, new water resistent white wind breaker, 0.500]"};
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testConsumingNumericColumns() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingNumericColumns(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // Prepare numeric type data
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -729,13 +712,14 @@ public class OracleConnectorITCase {
                         "+I[11000000001, true, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965]");
 
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("test_numeric_sink");
-        Collections.sort(actual);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testAllDataTypes() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testAllDataTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         createAndInitialize("column_type_test.sql");
 
         tEnv.getConfig().setLocalTimeZone(ZoneId.of("Asia/Shanghai"));
@@ -847,17 +831,17 @@ public class OracleConnectorITCase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        Collections.sort(actual);
-        assertEquals(Arrays.asList(expected), actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testSnapshotToStreamingSwitchPendingTransactions() throws Exception {
-
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testSnapshotToStreamingSwitchPendingTransactions(boolean parallelismSnapshot)
+            throws Exception {
+        Assumptions.assumeThat(parallelismSnapshot).isFalse();
+        setup(parallelismSnapshot);
         createAndInitialize("product.sql");
-
-        Assume.assumeFalse(parallelismSnapshot);
 
         CompletableFuture<Void> finishFuture = createRecordInserters();
 
@@ -914,8 +898,26 @@ public class OracleConnectorITCase {
         List<Integer> expected =
                 IntStream.range(0, RECORDS_COUNT).boxed().collect(Collectors.toList());
 
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
         result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testCompositePkTableSplitsUnevenlyWithChunkKeyColumn(boolean parallelismSnapshot)
+            throws Exception {
+        Assumptions.assumeThat(parallelismSnapshot).isTrue();
+        setup(parallelismSnapshot);
+        testUseChunkColumn("PRODUCT_KIND", parallelismSnapshot);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testCompositePkTableSplitsEvenlyWithChunkKeyColumn(boolean parallelismSnapshot)
+            throws Exception {
+        Assumptions.assumeThat(parallelismSnapshot).isTrue();
+        setup(parallelismSnapshot);
+        testUseChunkColumn("PRODUCT_NO", parallelismSnapshot);
     }
 
     @SuppressWarnings("unchecked")
@@ -1008,21 +1010,8 @@ public class OracleConnectorITCase {
         }
     }
 
-    @Test
-    public void testCompositePkTableSplitsUnevenlyWithChunkKeyColumn() throws Exception {
-        if (parallelismSnapshot) {
-            testUseChunkColumn("PRODUCT_KIND");
-        }
-    }
-
-    @Test
-    public void testCompositePkTableSplitsEvenlyWithChunkKeyColumn() throws Exception {
-        if (parallelismSnapshot) {
-            testUseChunkColumn("PRODUCT_NO");
-        }
-    }
-
-    private void testUseChunkColumn(String chunkColumn) throws Exception {
+    private void testUseChunkColumn(String chunkColumn, boolean parallelismSnapshot)
+            throws Exception {
         createAndInitialize("customer.sql");
         try (Connection dbaConnection = getJdbcConnectionAsDBA();
                 Statement dbaStatement = dbaConnection.createStatement()) {

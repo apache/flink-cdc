@@ -38,8 +38,9 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import io.debezium.relational.TableId;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -53,22 +54,20 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link MySqlHybridSplitAssigner}. */
-public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
+class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
-    @BeforeClass
+    @BeforeAll
     public static void init() {
         customerDatabase.createAndInitialize();
     }
 
     @Test
-    public void testAssignMySqlBinlogSplitAfterAllSnapshotSplitsFinished() {
+    void testAssignMySqlBinlogSplitAfterAllSnapshotSplitsFinished() {
 
         final String captureTable = "customers";
         MySqlSourceConfig configuration =
@@ -145,12 +144,12 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         finishedSnapshotSplitInfos,
                         new HashMap<>(),
                         finishedSnapshotSplitInfos.size());
-        assertEquals(expected, mySqlBinlogSplit);
+        Assertions.assertThat(mySqlBinlogSplit).isEqualTo(expected);
         assigner.close();
     }
 
     @Test
-    public void testAssigningInSnapshotOnlyMode() {
+    void testAssigningInSnapshotOnlyMode() {
         final String captureTable = "customers";
 
         MySqlSourceConfig sourceConfig =
@@ -181,17 +180,16 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
         // Get the binlog split
         Optional<MySqlSplit> split = assigner.getNext();
-        assertTrue(split.isPresent());
-        assertTrue(split.get() instanceof MySqlBinlogSplit);
+        Assertions.assertThat(split).isPresent().get().isInstanceOf(MySqlBinlogSplit.class);
         MySqlBinlogSplit binlogSplit = split.get().asBinlogSplit();
 
         // Validate if the stopping offset of the binlog split is the maximum among all finished
         // offsets, which should be snapshotSplits.size() - 1
-        assertEquals(
-                BinlogOffset.builder()
-                        .setBinlogFilePosition("foo", snapshotSplits.size() - 1)
-                        .build(),
-                binlogSplit.getEndingOffset());
+        Assertions.assertThat(binlogSplit.getEndingOffset())
+                .isEqualTo(
+                        BinlogOffset.builder()
+                                .setBinlogFilePosition("foo", snapshotSplits.size() - 1)
+                                .build());
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables, StartupOptions startupOptions) {
@@ -270,7 +268,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
             if (!split.isPresent()) {
                 break;
             }
-            assertTrue(split.get() instanceof MySqlSnapshotSplit);
+            Assertions.assertThat(split.get()).isInstanceOf(MySqlSnapshotSplit.class);
             snapshotSplits.add(split.get().asSnapshotSplit());
         }
         return snapshotSplits;

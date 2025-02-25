@@ -38,10 +38,10 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -53,18 +53,18 @@ import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOp
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.USERNAME;
 
 /** IT tests for {@link StarRocksDataSink}. */
-public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
+class StarRocksPipelineITCase extends StarRocksSinkTestBase {
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
     }
 
-    @Before
+    @BeforeEach
     public void initializeDatabaseAndTable() {
         executeSql(
                 String.format(
@@ -92,7 +92,7 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
         LOG.info("Table {} created.", StarRocksContainer.STARROCKS_TABLE_NAME);
     }
 
-    @After
+    @AfterEach
     public void destroyDatabaseAndTable() {
 
         executeSql(
@@ -188,7 +188,7 @@ public class StarRocksPipelineITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    public void testValuesToStarRocks() throws Exception {
+    void testValuesToStarRocks() throws Exception {
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,

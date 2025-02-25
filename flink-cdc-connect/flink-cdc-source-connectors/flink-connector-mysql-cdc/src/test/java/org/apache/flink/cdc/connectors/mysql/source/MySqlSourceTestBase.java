@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
@@ -30,10 +31,10 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Rule;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
@@ -42,12 +43,7 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing {@link MySqlSource}. */
 public abstract class MySqlSourceTestBase extends TestLogger {
@@ -58,28 +54,29 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
     public static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .setConfiguration(
-                                    metricReporter.addToConfiguration(new Configuration()))
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .setConfiguration(
+                                            metricReporter.addToConfiguration(new Configuration()))
+                                    .build()));
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void stopContainers() {
         LOG.info("Stopping containers...");
         if (MYSQL_CONTAINER != null) {
@@ -108,25 +105,16 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     // ------------------------------------------------------------------------
     //  test utilities
     // ------------------------------------------------------------------------
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
+    public static <T> void assertEqualsInAnyOrder(List<T> expected, List<T> actual) {
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+    public static <T> void assertEqualsInOrder(List<T> expected, List<T> actual) {
+        Assertions.assertThat(actual).containsExactlyElementsOf(expected);
     }
 
-    public static void assertMapEquals(Map<String, ?> expected, Map<String, ?> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        for (String key : expected.keySet()) {
-            assertEquals(expected.get(key), actual.get(key));
-        }
+    public static <K, V> void assertMapEquals(Map<K, V> expected, Map<K, V> actual) {
+        Assertions.assertThat(actual).containsExactlyEntriesOf(expected);
     }
 
     /** The type of failover. */
