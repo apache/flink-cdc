@@ -110,8 +110,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 // New created table in binlog reading phase.
                 if (createTableEvent != null) {
                     output.collect(createTableEvent);
-                    alreadySendCreateTableTables.add(tableId);
                 }
+                alreadySendCreateTableTables.add(tableId);
             }
         }
         super.processElement(element, output, splitState);

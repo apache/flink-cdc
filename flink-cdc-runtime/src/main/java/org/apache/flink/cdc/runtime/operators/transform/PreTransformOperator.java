@@ -23,6 +23,7 @@ import org.apache.flink.api.common.state.OperatorStateStore;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -52,10 +53,12 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -70,6 +73,9 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private final List<TransformRule> transformRules;
     private transient List<PreTransformer> transforms;
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
+
+    private Set<TableId> alreadySendCreateTableTables;
+
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private transient ListState<byte[]> state;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
@@ -150,6 +156,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             List<Tuple3<String, String, Map<String, String>>> udfFunctions,
             boolean canContainDistributedTables) {
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
+        this.alreadySendCreateTableTables = new HashSet<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
@@ -224,10 +231,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                                 stateTableChangeInfo.getPreTransformedSchema());
                 // hasAsteriskMap needs to be recalculated after restoring from a checkpoint.
                 cacheTransformRuleInfo(restoredCreateTableEvent);
-
-                // Since PostTransformOperator doesn't preserve state, pre-transformed schema
-                // information needs to be passed by PreTransformOperator.
-                output.collect(new StreamRecord<>(restoredCreateTableEvent));
             }
         }
     }
@@ -270,6 +273,24 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
+        if (event instanceof ChangeEvent) {
+            TableId tableId = ((ChangeEvent) event).tableId();
+            if (!alreadySendCreateTableTables.contains(tableId)) {
+                PreTransformChangeInfo stateTableChangeInfo =
+                        preTransformChangeInfoMap.get(tableId);
+                if (stateTableChangeInfo != null) {
+                    CreateTableEvent restoredCreateTableEvent =
+                            new CreateTableEvent(
+                                    stateTableChangeInfo.getTableId(),
+                                    stateTableChangeInfo.getPreTransformedSchema());
+                    // Since PostTransformOperator doesn't preserve state, pre-transformed schema
+                    // information needs to be passed by PreTransformOperator.
+                    output.collect(new StreamRecord<>(restoredCreateTableEvent));
+                }
+                alreadySendCreateTableTables.add(tableId);
+            }
+        }
+
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             preTransformProcessorMap.remove(createTableEvent.tableId());
