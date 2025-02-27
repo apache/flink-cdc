@@ -60,7 +60,10 @@ import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isLowWatermarkEvent;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils.listTables;
 
 /** The {@link RecordEmitter} implementation for pipeline mysql connector. */
@@ -104,30 +107,19 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 }
             }
         } else {
-            TableId tableId = getTableId(element);
-            if (!alreadySendCreateTableTables.contains(tableId)) {
-                CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
-                // New created table in binlog reading phase.
-                if (createTableEvent != null) {
-                    output.collect(createTableEvent);
+            if (isDataChangeRecord(element) || isSchemaChangeEvent(element)) {
+                TableId tableId = getTableId(element);
+                if (!alreadySendCreateTableTables.contains(tableId)) {
+                    CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
+                    // New created table in binlog reading phase.
+                    if (createTableEvent != null) {
+                        output.collect(createTableEvent);
+                    }
+                    alreadySendCreateTableTables.add(tableId);
                 }
-                alreadySendCreateTableTables.add(tableId);
             }
         }
         super.processElement(element, output, splitState);
-    }
-
-    public static TableId getTableId(SourceRecord dataRecord) {
-        Struct value = (Struct) dataRecord.value();
-        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
-        String dbName = source.getString(DATABASE_NAME_KEY);
-        Field field = source.schema().field(SCHEMA_NAME_KEY);
-        String schemaName = null;
-        if (field != null) {
-            schemaName = source.getString(SCHEMA_NAME_KEY);
-        }
-        String tableName = source.getString(TABLE_NAME_KEY);
-        return new TableId(dbName, schemaName, tableName);
     }
 
     private void sendCreateTableEvent(
