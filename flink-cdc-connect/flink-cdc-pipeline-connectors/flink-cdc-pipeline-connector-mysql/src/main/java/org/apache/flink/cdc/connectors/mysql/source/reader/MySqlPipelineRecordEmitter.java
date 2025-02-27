@@ -32,7 +32,6 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
-import io.debezium.data.Envelope;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -41,8 +40,6 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.text.ParsingException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.connect.data.Field;
-import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,9 +53,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
-import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
-import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isDataChangeRecord;
