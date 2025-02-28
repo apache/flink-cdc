@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
 import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
 import org.apache.flink.configuration.Configuration;
@@ -41,6 +42,7 @@ import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PA
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.PROPERTIES_PREFIX;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_ADD_TABLEID_TO_HEADER_ENABLED;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_CUSTOM_HEADER;
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_DEBEZIUM_JSON_SCHEMA_ENABLED;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_TABLE_ID_TO_TOPIC_MAPPING;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.TOPIC;
 import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.VALUE_FORMAT;
@@ -72,9 +74,15 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                 KeySerializationFactory.createSerializationSchema(configuration, keyFormat, zoneId);
         JsonSerializationType jsonSerializationType =
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.VALUE_FORMAT);
+        Boolean isIncludedDebeziumSchema =
+                context.getFactoryConfiguration().get(SINK_DEBEZIUM_JSON_SCHEMA_ENABLED);
+        Preconditions.checkArgument(
+                !(isIncludedDebeziumSchema
+                        && !jsonSerializationType.equals(JsonSerializationType.DEBEZIUM_JSON)),
+                "sink.debezium_json_schema.enabled only supported debezium-json.");
         SerializationSchema<Event> valueSerialization =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        configuration, jsonSerializationType, zoneId);
+                        configuration, jsonSerializationType, zoneId, isIncludedDebeziumSchema);
         final Properties kafkaProperties = new Properties();
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         allOptions.keySet().stream()
@@ -128,6 +136,7 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
         options.add(SINK_CUSTOM_HEADER);
         options.add(KafkaDataSinkOptions.DELIVERY_GUARANTEE);
         options.add(SINK_TABLE_ID_TO_TOPIC_MAPPING);
+        options.add(SINK_DEBEZIUM_JSON_SCHEMA_ENABLED);
         return options;
     }
 }
