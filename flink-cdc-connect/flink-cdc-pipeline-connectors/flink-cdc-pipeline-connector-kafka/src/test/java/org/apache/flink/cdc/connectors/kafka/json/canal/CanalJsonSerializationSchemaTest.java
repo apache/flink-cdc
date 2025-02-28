@@ -42,6 +42,8 @@ import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_DEBEZIUM_JSON_SCHEMA_ENABLED;
+
 /** Tests for {@link CanalJsonSerializationSchema}. */
 public class CanalJsonSerializationSchemaTest {
 
@@ -57,7 +59,8 @@ public class CanalJsonSerializationSchemaTest {
                 ChangeLogJsonFormatFactory.createSerializationSchema(
                         new Configuration(),
                         JsonSerializationType.CANAL_JSON,
-                        ZoneId.systemDefault());
+                        ZoneId.systemDefault(),
+                        SINK_DEBEZIUM_JSON_SCHEMA_ENABLED.defaultValue());
         serializationSchema.open(new MockInitializationContext());
 
         // create table
