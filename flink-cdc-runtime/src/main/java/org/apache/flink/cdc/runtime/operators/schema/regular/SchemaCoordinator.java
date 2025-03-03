@@ -75,10 +75,20 @@ public class SchemaCoordinator extends SchemaRegistry {
     /** Executor service to execute schema change. */
     private final ExecutorService schemaChangeThreadPool;
 
-    /** Sink writers which have sent flush success events for the request. */
+    /**
+     * Sink writers which have sent flush success events for the request.<br>
+     * {@code MapEntry.Key} is an {@code Integer}, indicating the upstream subTaskId that initiates
+     * this schema change request.<br>
+     * {@code MapEntry.Value} is a {@code Set<Integer>}, containing downstream subTasks' ID that
+     * have acknowledged and successfully flushed pending events for this schema change event.
+     */
     private transient ConcurrentHashMap<Integer, Set<Integer>> flushedSinkWriters;
 
-    /** Currently handling requests' completable future. */
+    /**
+     * Schema evolution requests that we're currently handling.<br>
+     * For each subTask executing in parallelism, they may initiate requests simultaneously, so we
+     * use each task's unique subTaskId as Map key to distinguish each of them.
+     */
     private transient Map<
                     Integer, Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>>
             pendingRequests;
