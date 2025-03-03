@@ -372,10 +372,10 @@ public class SchemaDerivator {
                                         CreateTableEvent::tableId, CreateTableEvent::getSchema));
         Map<TableId, Schema> sinkTableIdToSchemaMap = new HashMap<>();
         for (Set<TableId> sourceTables : sourceTablesByRouteRule) {
-            Set<Schema> toBeMergedSchemas =
-                    sourceTables.stream()
-                            .map(sourceTableIdToSchemaMap::get)
-                            .collect(Collectors.toSet());
+            List<Schema> toBeMergedSchemas = new ArrayList<>();
+            for (TableId tableId : sourceTables) {
+                toBeMergedSchemas.add(sourceTableIdToSchemaMap.get(tableId));
+            }
             if (toBeMergedSchemas.isEmpty()) {
                 continue;
             }
