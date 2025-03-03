@@ -30,6 +30,7 @@ import org.apache.flink.cdc.connectors.mysql.sink.MySqlPooledDataSinkFactory;
 import org.apache.flink.cdc.connectors.mysql.sink.catalog.MySqlCatalog;
 import org.apache.flink.cdc.connectors.mysql.sink.catalog.MySqlCatalogFactory;
 import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
+import org.apache.flink.configuration.ConfigurationUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +86,8 @@ public class MySqlDataSinkFactory implements DataSinkFactory {
         builder.connUrl(jdbcUrl);
 
         if (LOG.isInfoEnabled()) {
-            OptionUtils.printOptions(IDENTIFIER, config.toMap());
+            OptionUtils.printOptions(
+                    IDENTIFIER, ConfigurationUtils.hideSensitiveValues(config.toMap()));
         }
 
         MySqlDataSinkConfig sinkConfig = builder.build();
