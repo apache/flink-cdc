@@ -209,19 +209,24 @@ public class PaimonSinkITCase {
                         table1,
                         Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "2")),
                         Arrays.asList(Tuple2.of(STRING(), "2"), Tuple2.of(STRING(), "x"))));
-        Assertions.assertThat(fetchResults(table1))
-                .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "2", "x"));
+        if (enableDeleteVector) {
+            Assertions.assertThat(fetchResults(table1))
+                    .containsExactlyInAnyOrder(Row.ofKind(RowKind.INSERT, "2", "x"));
+        } else {
+            Assertions.assertThat(fetchResults(table1))
+                    .containsExactlyInAnyOrder(Row.ofKind(RowKind.UPDATE_AFTER, "2", "x"));
+        }
 
         if (enableDeleteVector) {
             Assertions.assertThat(fetchMaxSequenceNumber(table1.getTableName()))
                     .containsExactlyInAnyOrder(
-                            Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 3L));
+                            Row.ofKind(RowKind.INSERT, 1L), Row.ofKind(RowKind.INSERT, 4L));
         } else {
             Assertions.assertThat(fetchMaxSequenceNumber(table1.getTableName()))
                     .containsExactlyInAnyOrder(
                             Row.ofKind(RowKind.INSERT, 1L),
                             Row.ofKind(RowKind.INSERT, 2L),
-                            Row.ofKind(RowKind.INSERT, 3L));
+                            Row.ofKind(RowKind.INSERT, 4L));
         }
     }
 

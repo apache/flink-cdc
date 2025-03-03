@@ -32,6 +32,7 @@ import org.apache.paimon.data.GenericRow;
 
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -79,11 +80,11 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
             return new PaimonEvent(tableId, null, true);
         } else if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            GenericRow genericRow =
-                    PaimonWriterHelper.convertEventToGenericRow(
+            List<GenericRow> genericRows =
+                    PaimonWriterHelper.convertEventToFullGenericRows(
                             dataChangeEvent,
                             schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
-            return new PaimonEvent(tableId, genericRow, false, bucket);
+            return new PaimonEvent(tableId, genericRows, false, bucket);
         } else {
             throw new IllegalArgumentException(
                     "failed to convert Input into PaimonEvent, unsupported event: " + event);

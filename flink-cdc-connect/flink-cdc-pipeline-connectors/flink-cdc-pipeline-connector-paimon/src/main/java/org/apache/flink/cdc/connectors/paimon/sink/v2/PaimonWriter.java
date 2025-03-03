@@ -27,6 +27,7 @@ import org.apache.flink.streaming.api.operators.StreamOperator;
 
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
+import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
 import org.apache.paimon.flink.sink.StoreSinkWrite;
@@ -126,7 +127,7 @@ public class PaimonWriter<InputT>
                 throw new RuntimeException(e);
             }
         }
-        if (paimonEvent.getGenericRow() != null) {
+        if (paimonEvent.getGenericRows() != null) {
             FileStoreTable table;
             table = getTable(tableId);
             if (memoryPoolFactory == null) {
@@ -155,7 +156,9 @@ public class PaimonWriter<InputT>
                                 return storeSinkWrite;
                             });
             try {
-                write.write(paimonEvent.getGenericRow(), paimonEvent.getBucket());
+                for (GenericRow genericRow : paimonEvent.getGenericRows()) {
+                    write.write(genericRow, paimonEvent.getBucket());
+                }
             } catch (Exception e) {
                 throw new IOException(e);
             }
