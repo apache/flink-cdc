@@ -30,8 +30,8 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
-import org.apache.flink.cdc.connectors.jdbc.conn.JdbcConnectionFactory;
-import org.apache.flink.cdc.connectors.jdbc.conn.JdbcConnectionPoolFactory;
+import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionFactory;
+import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 
 import org.slf4j.Logger;
@@ -222,20 +222,20 @@ public abstract class JdbcCatalog implements Serializable {
         TableId tableId = dropTableEvent.tableId();
         checkTableIdArguments(tableId);
 
-        String truncateTableSql = buildDropTableSql(tableId, ignoreIfNotExist);
+        String dropTableSql = buildDropTableSql(tableId, ignoreIfNotExist);
 
         try {
-            executeUpdate(truncateTableSql);
+            executeUpdate(dropTableSql);
             LOG.info(
                     "Successfully dropped table `{}`.`{}`. Raw SQL: {}",
                     tableId.getSchemaName(),
                     tableId.getTableName(),
-                    truncateTableSql);
+                    dropTableSql);
         } catch (SQLException e) {
             throw new CatalogException(
                     String.format(
                             "Failed to drop table `%s`.`%s`. Raw SQL: %s",
-                            tableId.getSchemaName(), tableId.getTableName(), truncateTableSql),
+                            tableId.getSchemaName(), tableId.getTableName(), dropTableSql),
                     e);
         }
     }

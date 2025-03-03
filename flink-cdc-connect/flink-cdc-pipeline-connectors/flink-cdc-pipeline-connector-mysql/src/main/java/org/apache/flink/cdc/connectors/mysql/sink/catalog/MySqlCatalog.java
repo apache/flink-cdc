@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.jdbc.catalog.JdbcCatalog;
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
-import org.apache.flink.cdc.connectors.jdbc.conn.JdbcConnectionPoolFactory;
+import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 
 import java.util.List;

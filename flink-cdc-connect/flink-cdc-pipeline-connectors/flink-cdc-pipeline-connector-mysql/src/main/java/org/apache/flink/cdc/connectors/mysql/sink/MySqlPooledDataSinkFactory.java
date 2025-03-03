@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.sink;
 
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
-import org.apache.flink.cdc.connectors.jdbc.conn.JdbcConnectionPoolFactory;
+import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionPoolFactory;
 
 import java.util.Properties;
 

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.jdbc.conn;
+package org.apache.flink.cdc.connectors.jdbc.connection;
 
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
 import org.apache.flink.util.FlinkRuntimeException;
