@@ -299,7 +299,7 @@ limitations under the License.
                         <artifactItem>
                             <groupId>com.zaxxer</groupId>
                             <artifactId>HikariCP</artifactId>
-                            <version>4.0.3</version>
+                            <version>${hikari.version}</version>
                             <destFileName>HikariCP.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
