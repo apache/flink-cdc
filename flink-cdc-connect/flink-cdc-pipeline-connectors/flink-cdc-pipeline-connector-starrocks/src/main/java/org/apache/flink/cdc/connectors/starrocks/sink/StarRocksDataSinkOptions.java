@@ -78,7 +78,7 @@ public class StarRocksDataSinkOptions {
                     .intType()
                     .defaultValue(-1)
                     .withDescription(
-                            "Supported since 1.2.10. The time duration for which the HTTP client waits for data."
+                            "The time duration for which the HTTP client waits for data."
                                     + " Unit: ms. The default value -1 means there is no timeout.");
 
     public static final ConfigOption<Integer> SINK_WAIT_FOR_CONTINUE_TIMEOUT =
