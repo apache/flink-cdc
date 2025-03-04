@@ -517,6 +517,14 @@ public class SpecificStartingOffsetITCase {
         if (timezone.startsWith("GMT")) {
             timezone = timezone.substring(3);
         }
+
+        // But if we run JVM with -Duser.timezone=GMT+0:00, the timezone String will be set to "GMT"
+        // (without redundant offset part). We can't pass an empty string to MySQL, or it will
+        // panic.
+        if (timezone.isEmpty()) {
+            timezone = "UTC";
+        }
+
         try {
             TemporaryFolder tempFolder = new TemporaryFolder(resourceDirectory);
             tempFolder.create();
