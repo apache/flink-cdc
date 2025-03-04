@@ -17,14 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.parser;
 
-import org.apache.flink.cdc.common.event.AddColumnEvent;
-import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
-import org.apache.flink.cdc.common.event.RenameColumnEvent;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.event.*;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 
@@ -36,6 +29,7 @@ import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
+import io.debezium.relational.ddl.AbstractDdlParser;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -427,12 +421,24 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     () -> {
                         if (ctx.COMMENT() != null) {
                             tableEditor.setComment(
-                                    parser.withoutQuotes(ctx.STRING_LITERAL().getText()));
+                                    AbstractDdlParser.withoutQuotes(
+                                            ctx.STRING_LITERAL().getText()));
                         }
                     },
                     tableEditor);
         }
         super.enterTableOptionComment(ctx);
+    }
+
+    @Override
+    public void exitTableOptionComment(MySqlParser.TableOptionCommentContext ctx) {
+        if (!parser.skipComments() && tableEditor.hasComment()) {
+            changes.add(
+                    new AlterTableCommentEvent(
+                            currentTable,
+                            AbstractDdlParser.withoutQuotes(ctx.STRING_LITERAL().getText())));
+        }
+        super.exitTableOptionComment(ctx);
     }
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {

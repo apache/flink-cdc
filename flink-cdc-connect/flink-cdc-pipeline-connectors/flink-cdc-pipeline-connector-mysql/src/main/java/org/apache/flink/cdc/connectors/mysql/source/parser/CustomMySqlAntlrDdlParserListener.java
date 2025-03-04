@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.ProxyParseTreeListenerUtil;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
+import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
 import io.debezium.connector.mysql.antlr.listener.AlterViewParserListener;
 import io.debezium.connector.mysql.antlr.listener.CreateAndAlterDatabaseParserListener;
 import io.debezium.connector.mysql.antlr.listener.CreateTableParserListener;
@@ -88,6 +89,7 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
         listeners.add(new TruncateTableParserListener(parser));
         listeners.add(new CreateViewParserListener(parser, listeners));
         listeners.add(new AlterViewParserListener(parser, listeners));
+        listeners.add(new AlterTableParserListener(parser, listeners));
         listeners.add(new DropViewParserListener(parser));
         listeners.add(new CreateUniqueIndexParserListener(parser));
         listeners.add(new SetStatementParserListener(parser));
