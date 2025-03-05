@@ -48,6 +48,7 @@ import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
@@ -156,7 +157,8 @@ public class MongoDBTableFactoryTest {
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
-                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -208,6 +210,7 @@ public class MongoDBTableFactoryTest {
                         true,
                         false,
                         true,
+                        true,
                         true);
         assertEquals(expectedSource, actualSource);
     }
@@ -249,7 +252,8 @@ public class MongoDBTableFactoryTest {
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
-                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

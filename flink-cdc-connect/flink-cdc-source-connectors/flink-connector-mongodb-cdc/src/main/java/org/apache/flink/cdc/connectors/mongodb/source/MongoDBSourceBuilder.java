@@ -269,6 +269,15 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link MongoDBSource} should assign the ending chunk first or not during snapshot
+     * reading phase.
+     */
+    public MongoDBSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.

@@ -85,6 +85,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
     private final int lsnCommitCheckpointsDelay;
+    private final boolean assignEndingChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -124,7 +125,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             boolean closeIdleReaders,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            int lsnCommitCheckpointsDelay) {
+            int lsnCommitCheckpointsDelay,
+            boolean assignEndingChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -156,6 +158,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+        this.assignEndingChunkFirst = assignEndingChunkFirst;
     }
 
     @Override
@@ -218,6 +221,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
+                            .assignEndingChunkFirst(assignEndingChunkFirst)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -286,7 +290,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         closeIdleReaders,
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
-                        lsnCommitCheckpointsDelay);
+                        lsnCommitCheckpointsDelay,
+                        assignEndingChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

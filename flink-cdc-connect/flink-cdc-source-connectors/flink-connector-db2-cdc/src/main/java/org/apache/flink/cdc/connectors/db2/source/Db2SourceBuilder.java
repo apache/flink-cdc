@@ -233,6 +233,15 @@ public class Db2SourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link Db2IncrementalSource} should assign the ending chunk first or not during
+     * snapshot reading phase.
+     */
+    public Db2SourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
+        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link Db2IncrementalSource}.
      *
      * @return a Db2ParallelSource with the settings made for this builder.
