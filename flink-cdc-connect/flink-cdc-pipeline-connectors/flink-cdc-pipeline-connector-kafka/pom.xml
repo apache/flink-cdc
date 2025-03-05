@@ -29,6 +29,7 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
 
     <properties>
+        <version.kafka>3.2.0</version.kafka>
     </properties>
 
     <dependencies>
@@ -85,13 +86,13 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-api</artifactId>
-            <version>3.2.0</version>
+            <version>${version.kafka}</version>
         </dependency>
 
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-json</artifactId>
-            <version>3.2.0</version>
+            <version>${version.kafka}</version>
         </dependency>
     </dependencies>
 

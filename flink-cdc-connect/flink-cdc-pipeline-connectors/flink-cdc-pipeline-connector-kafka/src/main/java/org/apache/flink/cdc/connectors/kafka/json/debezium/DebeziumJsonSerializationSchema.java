@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
@@ -41,7 +42,9 @@ import org.apache.flink.table.types.logical.RowType;
 import io.debezium.data.Bits;
 import io.debezium.time.Date;
 import io.debezium.time.MicroTime;
+import io.debezium.time.MicroTimestamp;
 import io.debezium.time.Timestamp;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.json.JsonConverter;
@@ -222,85 +225,109 @@ public class DebeziumJsonSerializationSchema implements SerializationSchema<Even
         }
     }
 
+    /**
+     * convert CDC {@link Schema} to Debezium schema.
+     *
+     * @param schema CDC schema
+     * @return Debezium schema json string
+     */
     public String convertSchemaToDebeziumSchema(Schema schema) {
         List<Column> columns = schema.getColumns();
         SchemaBuilder schemaBuilder = SchemaBuilder.struct();
         SchemaBuilder beforeBuilder = SchemaBuilder.struct();
         SchemaBuilder afterBuilder = SchemaBuilder.struct();
         for (Column column : columns) {
-            String columnName = column.getName();
-            org.apache.flink.cdc.common.types.DataType columnType = column.getType();
-            final SchemaBuilder field;
-            switch (columnType.getTypeRoot()) {
-                case TINYINT:
-                case SMALLINT:
-                    field = SchemaBuilder.int16();
-                    break;
-                case INTEGER:
-                    field = SchemaBuilder.int32();
-                    break;
-                case BIGINT:
-                    field = SchemaBuilder.int64();
-                    break;
-                case DECIMAL:
-                    final int decimalPrecision = ((DecimalType) columnType).getPrecision();
-                    final int decimalScale = ((DecimalType) columnType).getScale();
-                    field =
-                            Decimal.builder(decimalScale)
-                                    .parameter(
-                                            "connect.decimal.precision",
-                                            String.valueOf(decimalPrecision));
-                    break;
-                case BOOLEAN:
-                    field = SchemaBuilder.bool();
-                    break;
-                case FLOAT:
-                case DOUBLE:
-                    field = SchemaBuilder.float64();
-                    break;
-                case DATE:
-                    field = SchemaBuilder.int32().name(Date.SCHEMA_NAME).version(1);
-                    break;
-                case TIME_WITHOUT_TIME_ZONE:
-                    field = SchemaBuilder.int64().name(MicroTime.SCHEMA_NAME).version(1);
-                    break;
-                case TIMESTAMP_WITHOUT_TIME_ZONE:
-                case TIMESTAMP_WITH_TIME_ZONE:
-                    field = SchemaBuilder.string().name(Timestamp.SCHEMA_NAME).version(1);
-                    break;
-                case BINARY:
-                    field =
-                            SchemaBuilder.bytes()
-                                    .name(Bits.LOGICAL_NAME)
-                                    .parameter(
-                                            Bits.LENGTH_FIELD,
-                                            Integer.toString(
-                                                    org.apache.flink.cdc.common.types.DataTypes
-                                                            .getLength(columnType)
-                                                            .orElse(0)))
-                                    .version(1);
-                    break;
-                case CHAR:
-                case VARCHAR:
-                case VARBINARY:
-                default:
-                    field = SchemaBuilder.string();
-            }
-            if (columnType.isNullable()) {
-                field.optional();
-            } else {
-                field.required();
-            }
-            if (column.getDefaultValueExpression() != null) {
-                field.defaultValue(column.getDefaultValueExpression());
-            }
-            beforeBuilder.field(columnName, field).optional();
-            afterBuilder.field(columnName, field).optional();
+            SchemaBuilder field = convertCDCDataTypeToDebeziumDataType(column);
+            beforeBuilder.field(column.getName(), field).optional();
+            afterBuilder.field(column.getName(), field).optional();
         }
         schemaBuilder.field("before", beforeBuilder);
         schemaBuilder.field("after", afterBuilder);
         schemaBuilder.build();
         return jsonConverter.asJsonSchema(schemaBuilder).toString();
+    }
+
+    private static SchemaBuilder convertCDCDataTypeToDebeziumDataType(Column column) {
+        org.apache.flink.cdc.common.types.DataType columnType = column.getType();
+        final SchemaBuilder field;
+        switch (columnType.getTypeRoot()) {
+            case TINYINT:
+            case SMALLINT:
+                field = SchemaBuilder.int16();
+                break;
+            case INTEGER:
+                field = SchemaBuilder.int32();
+                break;
+            case BIGINT:
+                field = SchemaBuilder.int64();
+                break;
+            case DECIMAL:
+                final int decimalPrecision = ((DecimalType) columnType).getPrecision();
+                final int decimalScale = ((DecimalType) columnType).getScale();
+                field =
+                        Decimal.builder(decimalScale)
+                                .parameter(
+                                        "connect.decimal.precision",
+                                        String.valueOf(decimalPrecision));
+                break;
+            case BOOLEAN:
+                field = SchemaBuilder.bool();
+                break;
+            case FLOAT:
+                field = SchemaBuilder.float32();
+                break;
+            case DOUBLE:
+                field = SchemaBuilder.float64();
+                break;
+            case DATE:
+                field = SchemaBuilder.int32().name(Date.SCHEMA_NAME).version(1);
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                field = SchemaBuilder.int64().name(MicroTime.SCHEMA_NAME).version(1);
+                break;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+            case TIMESTAMP_WITH_TIME_ZONE:
+                int timestampPrecisionPrecision = ((TimestampType) columnType).getPrecision();
+                if (timestampPrecisionPrecision > 3) {
+                    field = SchemaBuilder.int64().name(MicroTimestamp.SCHEMA_NAME).version(1);
+                } else {
+                    field = SchemaBuilder.int64().name(Timestamp.SCHEMA_NAME).version(1);
+                }
+                break;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                field = SchemaBuilder.string().name(ZonedTimestamp.SCHEMA_NAME).version(1);
+                break;
+            case BINARY:
+            case VARBINARY:
+                field =
+                        SchemaBuilder.bytes()
+                                .name(Bits.LOGICAL_NAME)
+                                .parameter(
+                                        Bits.LENGTH_FIELD,
+                                        Integer.toString(
+                                                org.apache.flink.cdc.common.types.DataTypes
+                                                        .getLength(columnType)
+                                                        .orElse(0)))
+                                .version(1);
+                break;
+            case CHAR:
+            case VARCHAR:
+            default:
+                field = SchemaBuilder.string();
+        }
+
+        if (columnType.isNullable()) {
+            field.optional();
+        } else {
+            field.required();
+        }
+        if (column.getDefaultValueExpression() != null) {
+            field.defaultValue(column.getDefaultValueExpression());
+        }
+        if (column.getComment() != null) {
+            field.doc(column.getComment());
+        }
+        return field;
     }
 
     private void convertInsertEventToRowData(

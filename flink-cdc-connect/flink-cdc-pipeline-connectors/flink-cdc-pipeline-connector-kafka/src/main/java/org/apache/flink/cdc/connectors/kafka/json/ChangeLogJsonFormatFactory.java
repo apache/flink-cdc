@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.kafka.json;
 import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonSerializationSchema;
 import org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonSerializationSchema;
 import org.apache.flink.cdc.connectors.kafka.utils.JsonRowDataSerializationSchemaUtils;
@@ -30,6 +31,7 @@ import org.apache.flink.formats.json.JsonFormatOptionsUtil;
 
 import java.time.ZoneId;
 
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED;
 import static org.apache.flink.formats.json.JsonFormatOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER;
 import static org.apache.flink.formats.json.debezium.DebeziumJsonFormatOptions.JSON_MAP_NULL_KEY_LITERAL;
 
@@ -49,10 +51,15 @@ public class ChangeLogJsonFormatFactory {
      * @return The configured instance of {@link SerializationSchema}.
      */
     public static SerializationSchema<Event> createSerializationSchema(
-            ReadableConfig formatOptions,
-            JsonSerializationType type,
-            ZoneId zoneId,
-            boolean isIncludedDebeziumSchema) {
+            ReadableConfig formatOptions, JsonSerializationType type, ZoneId zoneId) {
+        boolean isIncludedDebeziumSchema =
+                Boolean.parseBoolean(
+                        formatOptions.toMap().get(SINK_DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED.key()));
+        Preconditions.checkArgument(
+                !(isIncludedDebeziumSchema && !type.equals(JsonSerializationType.DEBEZIUM_JSON)),
+                SINK_DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED.key()
+                        + " is only supported when using debezium-json.");
+
         TimestampFormat timestampFormat = JsonFormatOptionsUtil.getTimestampFormat(formatOptions);
         JsonFormatOptions.MapNullKeyMode mapNullKeyMode =
                 JsonFormatOptionsUtil.getMapNullKeyMode(formatOptions);
