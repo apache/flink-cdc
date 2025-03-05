@@ -57,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 
@@ -172,45 +171,26 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         // Then, queue to request schema change to SchemaCoordinator.
         SchemaChangeResponse response = requestSchemaChange(tableId, originalEvent);
 
-        if (response.isSuccess()) {
-            LOG.info("{}> Successfully requested schema change.", subTaskId);
-            LOG.info(
-                    "{}> Finished schema change events: {}",
-                    subTaskId,
-                    response.getAppliedSchemaChangeEvents());
-            LOG.info("{}> Refreshed evolved schemas: {}", subTaskId, response.getEvolvedSchemas());
+        LOG.info("{}> Successfully requested schema change.", subTaskId);
+        LOG.info(
+                "{}> Finished schema change events: {}",
+                subTaskId,
+                response.getAppliedSchemaChangeEvents());
+        LOG.info("{}> Refreshed evolved schemas: {}", subTaskId, response.getEvolvedSchemas());
 
-            // After this request got successfully applied to DBMS, we can...
-            List<SchemaChangeEvent> finishedSchemaChangeEvents =
-                    response.getAppliedSchemaChangeEvents();
+        // After this request got successfully applied to DBMS, we can...
+        List<SchemaChangeEvent> finishedSchemaChangeEvents =
+                response.getAppliedSchemaChangeEvents();
 
-            // Update local evolved schema map's cache
-            evolvedSchemaMap.putAll(response.getEvolvedSchemas());
+        // Update local evolved schema map's cache
+        evolvedSchemaMap.putAll(response.getEvolvedSchemas());
 
-            // and emit the finished event to downstream
-            for (SchemaChangeEvent finishedEvent : finishedSchemaChangeEvents) {
-                output.collect(new StreamRecord<>(finishedEvent));
-            }
-
-            schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(
-                    finishedSchemaChangeEvents.size());
-        } else if (response.isDuplicate()) {
-            LOG.info(
-                    "{}> Schema change event {} has been handled in another subTask already.",
-                    subTaskId,
-                    originalEvent);
-
-            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(1);
-        } else if (response.isIgnored()) {
-            LOG.info(
-                    "{}> Schema change event {} has been ignored. No schema evolution needed.",
-                    subTaskId,
-                    originalEvent);
-
-            schemaOperatorMetrics.increaseIgnoredSchemaChangeEvents(1);
-        } else {
-            throw new IllegalStateException("Unexpected response status: " + response);
+        // and emit the finished event to downstream
+        for (SchemaChangeEvent finishedEvent : finishedSchemaChangeEvents) {
+            output.collect(new StreamRecord<>(finishedEvent));
         }
+
+        schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(finishedSchemaChangeEvents.size());
     }
 
     private void handleDataChangeEvent(DataChangeEvent dataChangeEvent) {
@@ -243,31 +223,9 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     }
 
     private SchemaChangeResponse requestSchemaChange(
-            TableId tableId, SchemaChangeEvent schemaChangeEvent)
-            throws InterruptedException, TimeoutException {
-        long deadline = System.currentTimeMillis() + rpcTimeout.toMillis();
-        while (true) {
-            SchemaChangeResponse response =
-                    sendRequestToCoordinator(
-                            new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
-            if (System.currentTimeMillis() < deadline) {
-                if (response.isRegistryBusy()) {
-                    LOG.info(
-                            "{}> Schema Registry is busy now, waiting for next request...",
-                            subTaskId);
-                    Thread.sleep(1000);
-                } else if (response.isWaitingForFlush()) {
-                    LOG.info(
-                            "{}> Schema change event has not collected enough flush success events from writers, waiting...",
-                            subTaskId);
-                    Thread.sleep(1000);
-                } else {
-                    return response;
-                }
-            } else {
-                throw new TimeoutException("Timeout when requesting schema change.");
-            }
-        }
+            TableId tableId, SchemaChangeEvent schemaChangeEvent) {
+        return sendRequestToCoordinator(
+                new SchemaChangeRequest(tableId, schemaChangeEvent, subTaskId));
     }
 
     private <REQUEST extends CoordinationRequest, RESPONSE extends CoordinationResponse>
