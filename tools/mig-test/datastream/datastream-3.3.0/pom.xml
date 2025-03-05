@@ -27,7 +27,7 @@ limitations under the License.
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <flink.version>1.19.1</flink.version>
+        <flink.version>1.19.2</flink.version>
         <flink.cdc.version>3.3.0</flink.cdc.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <scala.binary.version>2.12</scala.binary.version>
