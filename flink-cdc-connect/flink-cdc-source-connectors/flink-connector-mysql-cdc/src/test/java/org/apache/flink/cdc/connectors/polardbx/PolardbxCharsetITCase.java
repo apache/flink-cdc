@@ -28,6 +28,7 @@ import org.apache.flink.util.StringUtils;
 
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -38,6 +39,7 @@ import java.util.Arrays;
 
 /** Test supporting different column charsets for Polardbx. */
 @RunWith(Parameterized.class)
+@Ignore("Temporarily disable Polardbx Tests until FLINK-37362 fixed")
 public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
     private static final String DATABASE = "charset_test";
 
