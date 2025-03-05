@@ -67,7 +67,7 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
             new OceanBaseMySQLCdcMetadata(OB_SERVER, LOG_PROXY);
 
     protected final UniqueDatabase obInventoryDatabase =
-            new UniqueDatabase(OB_SERVER, "oceanbase_inventory");
+            new UniqueDatabase(OB_SERVER, "oceanbase_inventory", "ddl");
 
     @Before
     public void before() {
