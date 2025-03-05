@@ -139,13 +139,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                 changeEventSourceContext,
                                 statefulTaskContext.getMySqlPartition(),
                                 statefulTaskContext.getOffsetContext());
-                    } catch (Exception e) {
+                    } catch (Throwable t) {
                         LOG.error(
                                 String.format(
                                         "Execute binlog read task for mysql split %s fail",
                                         currentBinlogSplit),
-                                e);
-                        readException = e;
+                                t);
+                        readException = t;
                     } finally {
                         stopBinlogReadTask();
                     }
