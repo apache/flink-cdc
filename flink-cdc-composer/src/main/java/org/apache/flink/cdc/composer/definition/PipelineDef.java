@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 
+import javax.annotation.Nullable;
+
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +53,8 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCA
  * before being submitted to the computing engine.
  */
 public class PipelineDef {
-    private final SourceDef source;
+    @Nullable private final List<SourceDef> sources;
+    @Nullable private final SourceDef source;
     private final SinkDef sink;
     private final List<RouteDef> routes;
     private final List<TransformDef> transforms;
@@ -60,6 +63,7 @@ public class PipelineDef {
     private final Configuration config;
 
     public PipelineDef(
+            List<SourceDef> sources,
             SourceDef source,
             SinkDef sink,
             List<RouteDef> routes,
@@ -67,25 +71,32 @@ public class PipelineDef {
             List<UdfDef> udfs,
             List<ModelDef> models,
             Configuration config) {
-        this.source = source;
+        this.sources = sources;
         this.sink = sink;
         this.routes = routes;
         this.transforms = transforms;
         this.udfs = udfs;
         this.models = models;
         this.config = evaluatePipelineTimeZone(config);
+        this.source = source;
     }
 
     public PipelineDef(
+            List<SourceDef> sources,
             SourceDef source,
             SinkDef sink,
             List<RouteDef> routes,
             List<TransformDef> transforms,
             List<UdfDef> udfs,
             Configuration config) {
-        this(source, sink, routes, transforms, udfs, new ArrayList<>(), config);
+        this(sources, source, sink, routes, transforms, udfs, new ArrayList<>(), config);
     }
 
+    public List<SourceDef> getSources() {
+        return sources;
+    }
+
+    @Nullable
     public SourceDef getSource() {
         return source;
     }
@@ -117,9 +128,11 @@ public class PipelineDef {
     @Override
     public String toString() {
         return "PipelineDef{"
-                + "source="
+                + "sources="
+                + sources
+                + ",source="
                 + source
-                + ", sink="
+                + ",sink="
                 + sink
                 + ", routes="
                 + routes
@@ -143,7 +156,8 @@ public class PipelineDef {
             return false;
         }
         PipelineDef that = (PipelineDef) o;
-        return Objects.equals(source, that.source)
+        return Objects.equals(sources, that.sources)
+                && Objects.equals(source, that.source)
                 && Objects.equals(sink, that.sink)
                 && Objects.equals(routes, that.routes)
                 && Objects.equals(transforms, that.transforms)
@@ -154,7 +168,7 @@ public class PipelineDef {
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, udfs, models, config);
+        return Objects.hash(sources, source, sink, routes, transforms, udfs, models, config);
     }
 
     // ------------------------------------------------------------------------
