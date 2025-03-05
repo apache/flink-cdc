@@ -94,13 +94,13 @@ public class DebeziumChangeFetcher<T> {
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
      * record fetched into the source operator.
      */
-    private volatile long fetchDelay = 0L;
+    private volatile long fetchDelay = -1L;
 
     /**
      * emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
      * source operator.
      */
-    private volatile long emitDelay = 0L;
+    private volatile long emitDelay = -1L;
 
     /** The number of records that failed to parse or deserialize. */
     private volatile AtomicLong numRecordInErrors = new AtomicLong(0);
@@ -230,8 +230,11 @@ public class DebeziumChangeFetcher<T> {
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
             SourceRecord record = event.value();
             updateMessageTimestamp(record);
-            fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
+            if (messageTimestamp == 0L) {
 
+            } else {
+                fetchDelay = isInDbSnapshotPhase ? -1L : processTime - messageTimestamp;
+            }
             if (isHeartbeatEvent(record)) {
                 // keep offset update
                 synchronized (checkpointLock) {
@@ -248,7 +251,6 @@ public class DebeziumChangeFetcher<T> {
                 LOG.error("Failed to deserialize record {}", record, t);
                 throw t;
             }
-
             if (isInDbSnapshotPhase && !isSnapshotRecord(record)) {
                 LOG.debug("Snapshot phase finishes.");
                 isInDbSnapshotPhase = false;
@@ -268,8 +270,15 @@ public class DebeziumChangeFetcher<T> {
         synchronized (checkpointLock) {
             T record;
             while ((record = records.poll()) != null) {
-                emitDelay =
-                        isInDbSnapshotPhase ? 0L : System.currentTimeMillis() - messageTimestamp;
+                // If the snapshot does not end or no latest data is entered, -1 is reported
+                if (messageTimestamp == 0L) {
+
+                } else {
+                    emitDelay =
+                            isInDbSnapshotPhase
+                                    ? -1L
+                                    : System.currentTimeMillis() - messageTimestamp;
+                }
                 sourceContext.collect(record);
             }
             // update offset to state
