@@ -43,7 +43,7 @@ public class MySqlChunkSplitterTest {
                         .username("")
                         .password("")
                         .serverTimeZone(ZoneId.of("UTC").toString())
-                        .assignEndingChunkFirst(false)
+                        .assignUnboundedChunkFirst(false)
                         .createConfig(0);
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, sourceConfig);
         List<ChunkRange> res =
@@ -70,7 +70,7 @@ public class MySqlChunkSplitterTest {
                         .username("")
                         .password("")
                         .serverTimeZone(ZoneId.of("UTC").toString())
-                        .assignEndingChunkFirst(false)
+                        .assignUnboundedChunkFirst(false)
                         .createConfig(0);
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, sourceConfig);
         List<ChunkRange> res =
@@ -98,7 +98,7 @@ public class MySqlChunkSplitterTest {
                         .username("")
                         .password("")
                         .serverTimeZone(ZoneId.of("UTC").toString())
-                        .assignEndingChunkFirst(true)
+                        .assignUnboundedChunkFirst(true)
                         .createConfig(0);
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, sourceConfig);
 

@@ -85,7 +85,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
     private final int lsnCommitCheckpointsDelay;
-    private final boolean assignEndingChunkFirst;
+    private final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -126,7 +126,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
-            boolean assignEndingChunkFirst) {
+            boolean assignUnboundedChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -158,7 +158,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
-        this.assignEndingChunkFirst = assignEndingChunkFirst;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     @Override
@@ -221,7 +221,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
-                            .assignEndingChunkFirst(assignEndingChunkFirst)
+                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -291,7 +291,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
                         lsnCommitCheckpointsDelay,
-                        assignEndingChunkFirst);
+                        assignUnboundedChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

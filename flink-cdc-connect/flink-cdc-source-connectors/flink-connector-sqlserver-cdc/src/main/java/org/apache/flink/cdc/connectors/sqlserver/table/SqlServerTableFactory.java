@@ -140,7 +140,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
-        boolean assignEndingChunkFirst =
+        boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST);
 
         if (enableParallelRead) {
@@ -178,7 +178,7 @@ public class SqlServerTableFactory implements DynamicTableSourceFactory {
                 chunkKeyColumn,
                 closeIdleReaders,
                 skipSnapshotBackfill,
-                assignEndingChunkFirst);
+                assignUnboundedChunkFirst);
     }
 
     @Override

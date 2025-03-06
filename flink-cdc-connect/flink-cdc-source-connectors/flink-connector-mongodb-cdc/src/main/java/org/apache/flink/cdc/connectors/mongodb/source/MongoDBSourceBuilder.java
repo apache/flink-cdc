@@ -269,11 +269,11 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
-     * Whether the {@link MongoDBSource} should assign the ending chunk first or not during snapshot
-     * reading phase.
+     * Whether the {@link MongoDBSource} should assign the unbounded chunks first or not during
+     * snapshot reading phase.
      */
-    public MongoDBSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+    public MongoDBSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
         return this;
     }
 

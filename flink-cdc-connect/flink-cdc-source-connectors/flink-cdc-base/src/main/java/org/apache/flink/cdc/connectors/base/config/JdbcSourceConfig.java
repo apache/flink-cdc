@@ -74,7 +74,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignEndingChunkFirst) {
+            boolean assignUnboundedChunkFirst) {
         super(
                 startupOptions,
                 splitSize,
@@ -87,7 +87,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
                 isScanNewlyAddedTableEnabled,
                 dbzProperties,
                 dbzConfiguration,
-                assignEndingChunkFirst);
+                assignUnboundedChunkFirst);
         this.driverClassName = driverClassName;
         this.hostname = hostname;
         this.port = port;

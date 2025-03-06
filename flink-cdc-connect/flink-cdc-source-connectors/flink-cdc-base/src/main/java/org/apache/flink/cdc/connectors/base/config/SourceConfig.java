@@ -40,7 +40,7 @@ public interface SourceConfig extends Serializable {
 
     boolean isScanNewlyAddedTableEnabled();
 
-    boolean isAssignEndingChunkFirst();
+    boolean isAssignUnboundedChunkFirst();
 
     /** Factory for the {@code SourceConfig}. */
     @FunctionalInterface

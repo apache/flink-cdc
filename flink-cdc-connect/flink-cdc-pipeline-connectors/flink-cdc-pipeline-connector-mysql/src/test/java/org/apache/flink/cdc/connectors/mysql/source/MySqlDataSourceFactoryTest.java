@@ -274,7 +274,7 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
         assertThat(dataSource.getSourceConfig().isTreatTinyInt1AsBoolean()).isFalse();
         assertThat(dataSource.getSourceConfig().isParseOnLineSchemaChanges()).isTrue();
-        assertThat(dataSource.getSourceConfig().isAssignEndingChunkFirst()).isTrue();
+        assertThat(dataSource.getSourceConfig().isAssignUnboundedChunkFirst()).isTrue();
     }
 
     @Test

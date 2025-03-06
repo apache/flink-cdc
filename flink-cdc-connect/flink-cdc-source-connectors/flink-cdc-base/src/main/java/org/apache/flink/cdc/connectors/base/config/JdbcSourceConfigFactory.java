@@ -60,7 +60,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
     protected boolean scanNewlyAddedTableEnabled =
             JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
-    protected boolean assignEndingChunkFirst =
+    protected boolean assignUnboundedChunkFirst =
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue();
 
     /** Integer port number of the database server. */
@@ -255,10 +255,11 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     }
 
     /**
-     * Whether to assign the ending chunk first during snapshot reading phase. Defaults to false.
+     * Whether to assign the unbounded chunks first during snapshot reading phase. Defaults to
+     * false.
      */
-    public JdbcSourceConfigFactory assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.assignEndingChunkFirst = assignEndingChunkFirst;
+    public JdbcSourceConfigFactory assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         return this;
     }
 

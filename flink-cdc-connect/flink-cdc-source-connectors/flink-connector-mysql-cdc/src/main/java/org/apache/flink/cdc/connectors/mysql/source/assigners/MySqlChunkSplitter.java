@@ -316,10 +316,11 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 break;
             }
         }
-        // add the ending split
-        // assign ending split first, both the largest and smallest unbounded chunks are completed
+        // add the unbounded split
+        // assign unbounded split first, both the largest and smallest unbounded chunks are
+        // completed
         // in the first two splits
-        if (sourceConfig.isAssignEndingChunkFirst()) {
+        if (sourceConfig.isAssignUnboundedChunkFirst()) {
             splits.add(0, ChunkRange.of(chunkStart, null));
         } else {
             splits.add(ChunkRange.of(chunkStart, null));
