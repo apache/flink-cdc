@@ -42,22 +42,19 @@ Flink 可以根据在 JobManager 上运行的作业处理所需的 slot 数量�
 ```bash
 export HADOOP_CLASSPATH=`hadoop classpath`
 ```
-
-## Session 模式
-
 Flink 在所有类 UNIX 的环境中运行，即在 Linux、Mac OS X 以及（针对 Windows 的）Cygwin 上运行。
 你可以参考[概览]({{< ref "docs/connectors/pipeline-connectors/overview" >}})来检查支持的版本并下载[Flink二进制版本](https://flink.apache.org/downloads/)，
 然后解压文件：
-
 ```bash
 tar -xzf flink-*.tgz
 ```
-
 你需要设置 `FLINK_HOME` 环境变量，比如：
 
 ```bash
 export FLINK_HOME=/path/flink-*
 ```
+
+## Session 模式
 
 ### 在 YARN 启动一个Flink Session
 
@@ -150,4 +147,18 @@ Job Description: Sync MySQL Database to Doris
 
 你可以通过 Flink Web UI 找到一个名为 `Sync MySQL Database to Doris` 的作业。
 
-请注意，目前还不支持提交至 application 模式集群和 per-job 模式集群。
+# Yarn Application 模式
+Yarn Application 模式是 Yarn 集群上运行 Flink 作业的推荐模式。对资源的管理和分配更加灵活，可以更好地利用集群资源。
+
+通过Cli将作业提交至 Flink Yarn Application 集群。
+```bash
+cd /path/flink-cdc-*
+./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
+```
+提交成功将返回如下信息：
+```bash
+Pipeline has been submitted to cluster.
+Job ID: application_1728995081590_1254
+Job Description: submit job successful
+```
+你可以通过 Yarn Web UI 找到一个application_id为 `application_1728995081590_1254` 的作业。

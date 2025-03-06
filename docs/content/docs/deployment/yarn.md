@@ -42,9 +42,6 @@ This *Getting Started* section assumes a functional YARN environment, starting f
 ```bash
 export HADOOP_CLASSPATH=`hadoop classpath`
 ```
-
-## Session Mode
-
 Flink runs on all UNIX-like environments, i.e. Linux, Mac OS X, and Cygwin (for Windows).  
 You can refer [overview]({{< ref "docs/connectors/pipeline-connectors/overview" >}}) to check supported versions and download [the binary release](https://flink.apache.org/downloads/) of Flink,
 then extract the archive:
@@ -58,6 +55,8 @@ You should set `FLINK_HOME` environment variables like:
 ```bash
 export FLINK_HOME=/path/flink-*
 ```
+
+## Session Mode
 
 ### Starting a Flink Session on YARN
 
@@ -150,4 +149,19 @@ Job Description: Sync MySQL Database to Doris
 
 You can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.
 
-Please note that submitting to application mode cluster and per-job mode cluster are not supported for now.
+# Yarn Application Mode
+The Yarn Application mode is the recommended approach for running Flink jobs on a Yarn cluster. It offers more flexible resource management and allocation, enabling better utilization of cluster resources.
+
+To submit a job to a Flink Yarn Application cluster using the CLI:
+```bash
+cd /path/flink-cdc-*
+./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
+````
+After successful submission, the return information is as follows:
+```bash
+Pipeline has been submitted to cluster.
+Job ID: application_1728995081590_1254
+Job Description: submit job successful
+```
+You can find a application_id `application_1728995081590_1254` running through Yarn Web UI.
+
