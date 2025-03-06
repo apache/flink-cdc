@@ -362,6 +362,19 @@ public class PostTransformOperatorTest {
                     .primaryKey("id")
                     .build();
 
+    private static final TableId COL_NAME_WITH_MINUS_TABLEID =
+            TableId.tableId("my_company", "my_branch", "col_name_with_minus_table");
+    private static final Schema COL_NAME_WITH_MINUS_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("foo", DataTypes.INT())
+                    .physicalColumn("bar", DataTypes.INT())
+                    .physicalColumn("foo-bar", DataTypes.INT())
+                    .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("f0", DataTypes.INT())
+                    .physicalColumn("f1", DataTypes.INT())
+                    .physicalColumn("f2", DataTypes.INT())
+                    .build();
+
     @Test
     void testDataChangeEventTransform() throws Exception {
         PostTransformOperator transform =
@@ -3248,5 +3261,63 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testColumnNameMapping() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COL_NAME_WITH_MINUS_TABLEID.identifier(),
+                                "*, foo-bar AS f0, bar-foo AS f1, `foo-bar`-`bar-foo` AS f2",
+                                "`foo-bar`-`bar-foo` <> 0")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COL_NAME_WITH_MINUS_TABLEID, COL_NAME_WITH_MINUS_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) COL_NAME_WITH_MINUS_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COL_NAME_WITH_MINUS_TABLEID,
+                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, null, null, null}));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COL_NAME_WITH_MINUS_TABLEID,
+                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, -1, 1, -1}));
+        // Update
+        DataChangeEvent updateEvent =
+                DataChangeEvent.updateEvent(
+                        COL_NAME_WITH_MINUS_TABLEID,
+                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, null, null, null}),
+                        recordDataGenerator.generate(new Object[] {2, 4, 6, 8, null, null, null}));
+        DataChangeEvent updateEventExpect =
+                DataChangeEvent.updateEvent(
+                        COL_NAME_WITH_MINUS_TABLEID,
+                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, -1, 1, -1}),
+                        recordDataGenerator.generate(new Object[] {2, 4, 6, 8, -2, 2, -2}));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        COL_NAME_WITH_MINUS_TABLEID, COL_NAME_WITH_MINUS_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transform.processElement(new StreamRecord<>(updateEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(updateEventExpect));
     }
 }
