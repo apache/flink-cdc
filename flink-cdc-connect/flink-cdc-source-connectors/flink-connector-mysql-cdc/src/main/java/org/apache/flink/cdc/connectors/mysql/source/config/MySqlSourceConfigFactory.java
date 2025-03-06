@@ -73,7 +73,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean parseOnLineSchemaChanges = false;
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
-    private boolean assignEndingChunkFirst = false;
+    private boolean assignUnboundedChunkFirst = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -316,10 +316,11 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
-     * Whether to assign the ending chunk first during snapshot reading phase. Defaults to false.
+     * Whether to assign the unbounded chunks first during snapshot reading phase. Defaults to
+     * false.
      */
-    public MySqlSourceConfigFactory assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.assignEndingChunkFirst = assignEndingChunkFirst;
+    public MySqlSourceConfigFactory assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         return this;
     }
 
@@ -420,6 +421,6 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignEndingChunkFirst);
+                assignUnboundedChunkFirst);
     }
 }

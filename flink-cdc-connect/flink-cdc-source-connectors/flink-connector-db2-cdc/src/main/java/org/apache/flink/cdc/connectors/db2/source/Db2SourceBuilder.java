@@ -233,11 +233,11 @@ public class Db2SourceBuilder<T> {
     }
 
     /**
-     * Whether the {@link Db2IncrementalSource} should assign the ending chunk first or not during
-     * snapshot reading phase.
+     * Whether the {@link Db2IncrementalSource} should assign the unbounded chunks first or not
+     * during snapshot reading phase.
      */
-    public Db2SourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+    public Db2SourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
         return this;
     }
 

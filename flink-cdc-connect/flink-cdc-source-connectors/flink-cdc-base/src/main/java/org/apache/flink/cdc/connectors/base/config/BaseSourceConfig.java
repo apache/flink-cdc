@@ -38,7 +38,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
     protected final boolean closeIdleReaders;
     protected final boolean skipSnapshotBackfill;
     protected final boolean isScanNewlyAddedTableEnabled;
-    protected final boolean assignEndingChunkFirst;
+    protected final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -58,7 +58,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
             boolean isScanNewlyAddedTableEnabled,
             Properties dbzProperties,
             Configuration dbzConfiguration,
-            boolean assignEndingChunkFirst) {
+            boolean assignUnboundedChunkFirst) {
         this.startupOptions = startupOptions;
         this.splitSize = splitSize;
         this.splitMetaGroupSize = splitMetaGroupSize;
@@ -70,7 +70,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
         this.isScanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.dbzProperties = dbzProperties;
         this.dbzConfiguration = dbzConfiguration;
-        this.assignEndingChunkFirst = assignEndingChunkFirst;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     @Override
@@ -120,7 +120,7 @@ public abstract class BaseSourceConfig implements SourceConfig {
     }
 
     @Override
-    public boolean isAssignEndingChunkFirst() {
-        return assignEndingChunkFirst;
+    public boolean isAssignUnboundedChunkFirst() {
+        return assignUnboundedChunkFirst;
     }
 }

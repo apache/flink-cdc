@@ -109,7 +109,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
         boolean closeIdlerReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean scanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
-        boolean assignEndingChunkFirst =
+        boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST);
 
         if (enableParallelRead) {
@@ -149,7 +149,7 @@ public class OracleTableSourceFactory implements DynamicTableSourceFactory {
                 closeIdlerReaders,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignEndingChunkFirst);
+                assignUnboundedChunkFirst);
     }
 
     @Override

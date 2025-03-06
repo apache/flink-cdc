@@ -284,11 +284,11 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
-     * Whether the {@link MySqlSource} should assign the ending chunk first or not during snapshot
-     * reading phase.
+     * Whether the {@link MySqlSource} should assign the unbounded chunks first or not during
+     * snapshot reading phase.
      */
-    public MySqlSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+    public MySqlSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
         return this;
     }
 

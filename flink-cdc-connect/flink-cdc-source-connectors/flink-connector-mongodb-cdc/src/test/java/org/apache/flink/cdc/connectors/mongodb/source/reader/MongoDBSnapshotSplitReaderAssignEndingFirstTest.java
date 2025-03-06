@@ -80,7 +80,7 @@ public class MongoDBSnapshotSplitReaderAssignEndingFirstTest extends MongoDBSour
                         .splitSizeMB(1)
                         .samplesPerChunk(10)
                         .pollAwaitTimeMillis(500)
-                        .assignEndingChunkFirst(true);
+                        .assignUnboundedChunkFirst(true);
 
         sourceConfig = configFactory.create(0);
 

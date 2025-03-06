@@ -57,7 +57,7 @@ public class Db2SourceConfig extends JdbcSourceConfig {
             int connectionPoolSize,
             String chunkKeyColumn,
             boolean skipSnapshotBackfill,
-            boolean assignEndingChunkFirst) {
+            boolean assignUnboundedChunkFirst) {
         super(
                 startupOptions,
                 databaseList,
@@ -84,7 +84,7 @@ public class Db2SourceConfig extends JdbcSourceConfig {
                 chunkKeyColumn,
                 skipSnapshotBackfill,
                 false,
-                assignEndingChunkFirst);
+                assignUnboundedChunkFirst);
     }
 
     @Override

@@ -104,6 +104,6 @@ public class SqlServerSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                assignEndingChunkFirst);
+                assignUnboundedChunkFirst);
     }
 }

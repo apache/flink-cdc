@@ -250,11 +250,11 @@ public class OracleSourceBuilder<T> {
     }
 
     /**
-     * Whether the {@link OracleIncrementalSource} should assign the ending chunk first or not
+     * Whether the {@link OracleIncrementalSource} should assign the unbounded chunks first or not
      * during snapshot reading phase.
      */
-    public OracleSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+    public OracleSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
         return this;
     }
 

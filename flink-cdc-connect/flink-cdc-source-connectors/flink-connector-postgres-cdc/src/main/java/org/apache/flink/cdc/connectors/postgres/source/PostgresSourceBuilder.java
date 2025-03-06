@@ -275,11 +275,11 @@ public class PostgresSourceBuilder<T> {
     }
 
     /**
-     * Whether the {@link PostgresSourceEnumerator} should assign the ending chunk first or not
+     * Whether the {@link PostgresSourceEnumerator} should assign the unbounded chunks first or not
      * during snapshot reading phase.
      */
-    public PostgresSourceBuilder<T> assignEndingChunkFirst(boolean assignEndingChunkFirst) {
-        this.configFactory.assignEndingChunkFirst(assignEndingChunkFirst);
+    public PostgresSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
         return this;
     }
 
