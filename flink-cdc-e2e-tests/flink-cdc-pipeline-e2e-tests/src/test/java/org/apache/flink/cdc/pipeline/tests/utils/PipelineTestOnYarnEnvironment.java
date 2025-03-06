@@ -272,8 +272,8 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String line;
         while ((line = reader.readLine()) != null) {
+            LOG.info(line);
             if (line.startsWith("Job ID")) {
-                LOG.info(line);
                 return line.split(":")[1].trim();
             }
         }

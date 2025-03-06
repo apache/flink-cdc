@@ -38,9 +38,9 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Map;
 
-import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.RESTORE_MODE;
-import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
-import static org.apache.flink.runtime.jobgraph.SavepointConfigOptions.SAVEPOINT_PATH;
+import static org.apache.flink.configuration.StateRecoveryOptions.RESTORE_MODE;
+import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
+import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
