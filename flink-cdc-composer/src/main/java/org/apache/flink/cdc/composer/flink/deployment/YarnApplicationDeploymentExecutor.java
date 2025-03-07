@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.composer.flink.deployment;
 
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.client.deployment.ClusterSpecification;
@@ -121,6 +122,10 @@ public class YarnApplicationDeploymentExecutor implements PipelineDeploymentExec
 
     private String getFlinkCDCDistJarFromEnv() throws IOException {
         String flinkCDCHomeFromEnvVar = System.getenv(FLINK_CDC_HOME_ENV_VAR);
+        Preconditions.checkNotNull(
+                flinkCDCHomeFromEnvVar,
+                "FLINK_CDC_HOME is not correctly set in environment variable, current FLINK_CDC_HOME is: "
+                        + FLINK_CDC_HOME_ENV_VAR);
         Path flinkCDCLibPath = new Path(flinkCDCHomeFromEnvVar, "lib");
         if (!flinkCDCLibPath.getFileSystem().exists(flinkCDCLibPath)
                 || !flinkCDCLibPath.getFileSystem().getFileStatus(flinkCDCLibPath).isDir()) {
