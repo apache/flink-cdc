@@ -140,6 +140,7 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBaseJUnit4 {
                 LOG.warn("PolarDBx CDC node is not ready, waiting...");
             }
         } catch (SQLException e) {
+            cdcReady = false;
             LOG.warn("PolarDBx CDC node is not ready... caused by:{}", e.getMessage());
         }
         return cdcReady;
