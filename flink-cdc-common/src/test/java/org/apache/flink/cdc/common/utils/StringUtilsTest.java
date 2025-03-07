@@ -17,15 +17,15 @@
 
 package org.apache.flink.cdc.common.utils;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /** A test for the {@link StringUtils}. */
-public class StringUtilsTest {
+class StringUtilsTest {
     @Test
-    public void testConvertToCamelCase() {
+    void testConvertToCamelCase() {
         String str = "AA_BB CC";
         String camelCaseStr = StringUtils.convertToCamelCase(str);
-        Assert.assertEquals("aaBbCc", camelCaseStr);
+        Assertions.assertThat(camelCaseStr).isEqualTo("aaBbCc");
     }
 }

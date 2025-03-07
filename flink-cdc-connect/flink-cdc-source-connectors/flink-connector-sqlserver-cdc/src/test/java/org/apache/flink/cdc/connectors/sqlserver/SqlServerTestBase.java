@@ -20,12 +20,13 @@ package org.apache.flink.cdc.connectors.sqlserver;
 import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBaseJUnit4;
+import org.apache.flink.test.util.AbstractTestBase;
 
+import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.MSSQLServerContainer;
@@ -48,11 +49,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Utility class for sqlserver tests. */
-public class SqlServerTestBase extends AbstractTestBaseJUnit4 {
+public class SqlServerTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
@@ -62,22 +62,22 @@ public class SqlServerTestBase extends AbstractTestBaseJUnit4 {
             "IF EXISTS(select 1 from sys.databases where name='#' AND is_cdc_enabled=1)\n"
                     + "EXEC sys.sp_cdc_disable_db";
 
-    public static final MSSQLServerContainer MSSQL_SERVER_CONTAINER =
+    public static final MSSQLServerContainer<?> MSSQL_SERVER_CONTAINER =
             new MSSQLServerContainer<>("mcr.microsoft.com/mssql/server:2019-latest")
                     .withPassword("Password!")
                     .withEnv("MSSQL_AGENT_ENABLED", "true")
                     .withEnv("MSSQL_PID", "Standard")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() throws Exception {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MSSQL_SERVER_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         LOG.info("Stopping containers...");
         if (MSSQL_SERVER_CONTAINER != null) {
             MSSQL_SERVER_CONTAINER.stop();
@@ -176,7 +176,7 @@ public class SqlServerTestBase extends AbstractTestBaseJUnit4 {
     protected void initializeSqlServerTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = SqlServerTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);

@@ -39,7 +39,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /** Tests for {@link PaimonDataSinkFactory}. */
-public class PaimonDataSinkFactoryTest {
+class PaimonDataSinkFactoryTest {
 
     @TempDir public static java.nio.file.Path temporaryFolder;
 

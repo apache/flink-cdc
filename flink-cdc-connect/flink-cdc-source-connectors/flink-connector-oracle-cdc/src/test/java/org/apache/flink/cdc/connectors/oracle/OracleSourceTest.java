@@ -39,8 +39,9 @@ import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,17 +65,14 @@ import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertDelete;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertInsert;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertRead;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertUpdate;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 /** Tests for {@link OracleSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class OracleSourceTest extends OracleSourceTestBase {
+class OracleSourceTest extends OracleSourceTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceTest.class);
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    void testConsumingAllEvents() throws Exception {
 
         createAndInitialize("product.sql");
 
@@ -97,7 +95,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
             runThread.start();
 
             List<SourceRecord> records = drain(sourceContext, 9);
-            assertEquals(9, records.size());
+            Assertions.assertThat(records).hasSize(9);
             for (int i = 0; i < records.size(); i++) {
                 assertRead(records.get(i), "ID", 101 + i);
             }
@@ -147,8 +145,8 @@ public class OracleSourceTest extends OracleSourceTestBase {
     }
 
     @Test
-    @Ignore("It can be open until DBZ-5245 and DBZ-4936 fix")
-    public void testCheckpointAndRestore() throws Exception {
+    @Disabled("It can be open until DBZ-5245 and DBZ-4936 fix")
+    void testCheckpointAndRestore() throws Exception {
 
         createAndInitialize("product.sql");
 
@@ -176,22 +174,23 @@ public class OracleSourceTest extends OracleSourceTestBase {
 
             // wait until consumer is started
             int received = drain(sourceContext, 2).size();
-            assertEquals(2, received);
+            Assertions.assertThat(received).isEqualTo(2);
 
             // we can't perform checkpoint during DB snapshot
-            assertFalse(
-                    waitForCheckpointLock(
-                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3)));
+            Assertions.assertThat(
+                            waitForCheckpointLock(
+                                    sourceContext.getCheckpointLock(), Duration.ofSeconds(3)))
+                    .isFalse();
 
             // unblock the source context to continue the processing
             sourceContext.blocker.release();
             // wait until the source finishes the database snapshot
             List<SourceRecord> records = drain(sourceContext, 9 - received);
-            assertEquals(9, records.size() + received);
+            Assertions.assertThat(records.size() + received).isEqualTo(9);
 
             // state is still empty
-            assertEquals(0, offsetState.list.size());
-            assertEquals(0, historyState.list.size());
+            Assertions.assertThat(offsetState.list).isEmpty();
+            Assertions.assertThat(historyState.list).isEmpty();
 
             // ---------------------------------------------------------------------------
             // Step-2: trigger checkpoint-1 after snapshot finished
@@ -202,12 +201,15 @@ public class OracleSourceTest extends OracleSourceTestBase {
             }
 
             assertHistoryState(historyState);
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
-            assertFalse(state.contains("row"));
-            assertFalse(state.contains("server_id"));
-            assertFalse(state.contains("event"));
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                    .isEqualTo("oracle_logminer");
+
+            Assertions.assertThat(state)
+                    .doesNotContain("row")
+                    .doesNotContain("server_id")
+                    .doesNotContain("event");
 
             source.close();
             runThread.sync();
@@ -230,7 +232,8 @@ public class OracleSourceTest extends OracleSourceTestBase {
             runThread2.start();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2))
+                    .isFalse();
 
             try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
@@ -238,7 +241,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
                 statement.execute(
                         "INSERT INTO debezium.products VALUES (110,'robot','Toy robot',1.304)"); // 110
                 List<SourceRecord> records = drain(sourceContext2, 1);
-                assertEquals(1, records.size());
+                Assertions.assertThat(records).hasSize(1);
                 assertInsert(records.get(0), "ID", 110);
 
                 // ---------------------------------------------------------------------------
@@ -250,9 +253,10 @@ public class OracleSourceTest extends OracleSourceTestBase {
                 }
 
                 assertHistoryState(historyState); // assert the DDL is stored in the history state
-                assertEquals(1, offsetState.list.size());
+                Assertions.assertThat(offsetState.list).hasSize(1);
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-                assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
+                Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                        .isEqualTo("oracle_logminer");
 
                 // execute 2 more DMLs to have more redo log
                 statement.execute(
@@ -289,7 +293,8 @@ public class OracleSourceTest extends OracleSourceTestBase {
             assertUpdate(records.get(1), "ID", 1001);
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3))
+                    .isFalse();
 
             // can continue to receive new events
             try (Connection connection = getJdbcConnection();
@@ -307,9 +312,10 @@ public class OracleSourceTest extends OracleSourceTestBase {
                 source3.snapshotState(new StateSnapshotContextSynchronousImpl(233, 233));
             }
             assertHistoryState(historyState); // assert the DDL is stored in the history state
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                    .isEqualTo("oracle_logminer");
 
             source3.close();
             runThread3.sync();
@@ -334,7 +340,8 @@ public class OracleSourceTest extends OracleSourceTestBase {
             runThread4.start();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4))
+                    .isFalse();
 
             // ---------------------------------------------------------------------------
             // Step-8: trigger checkpoint-3 to make sure we can continue to to further checkpoints
@@ -344,9 +351,10 @@ public class OracleSourceTest extends OracleSourceTestBase {
                 source4.snapshotState(new StateSnapshotContextSynchronousImpl(254, 254));
             }
             assertHistoryState(historyState); // assert the DDL is stored in the history state
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                    .isEqualTo("oracle_logminer");
 
             source4.close();
             runThread4.sync();
@@ -354,8 +362,8 @@ public class OracleSourceTest extends OracleSourceTestBase {
     }
 
     @Test
-    @Ignore("Debezium Oracle connector don't monitor unknown tables since 1.6, see DBZ-3612")
-    public void testRecoverFromRenameOperation() throws Exception {
+    @Disabled("Debezium Oracle connector don't monitor unknown tables since 1.6, see DBZ-3612")
+    void testRecoverFromRenameOperation() throws Exception {
 
         createAndInitialize("product.sql");
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -381,11 +389,11 @@ public class OracleSourceTest extends OracleSourceTestBase {
 
                 // wait until the source finishes the database snapshot
                 List<SourceRecord> records = drain(sourceContext, 9);
-                assertEquals(9, records.size());
+                Assertions.assertThat(records).hasSize(9);
 
                 // state is still empty
-                assertEquals(0, offsetState.list.size());
-                assertEquals(0, historyState.list.size());
+                Assertions.assertThat(offsetState.list).isEmpty();
+                Assertions.assertThat(historyState.list).isEmpty();
 
                 // create temporary tables which are not in the whitelist
                 statement.execute(
@@ -402,7 +410,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
                         "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT) VALUES (112,'cargo train','City cargo train',1.304)"); // 112
 
                 int received = drain(sourceContext, 3).size();
-                assertEquals(3, received);
+                Assertions.assertThat(received).isEqualTo(3);
 
                 // Step-2: trigger a checkpoint
                 synchronized (sourceContext.getCheckpointLock()) {
@@ -410,8 +418,8 @@ public class OracleSourceTest extends OracleSourceTestBase {
                     source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
                 }
 
-                assertTrue(historyState.list.size() > 0);
-                assertTrue(offsetState.list.size() > 0);
+                Assertions.assertThat(historyState.list).isNotEmpty();
+                Assertions.assertThat(offsetState.list).isNotEmpty();
 
                 source.close();
                 runThread.sync();
@@ -433,14 +441,15 @@ public class OracleSourceTest extends OracleSourceTestBase {
             runThread2.start();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2))
+                    .isFalse();
 
             try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
                 statement.execute(
                         "INSERT INTO debezium.PRODUCTS (ID,NAME,DESCRIPTION,WEIGHT) VALUES (113,'Airplane','Toy airplane',1.304)"); // 113
                 List<SourceRecord> records = drain(sourceContext2, 1);
-                assertEquals(1, records.size());
+                Assertions.assertThat(records).hasSize(1);
                 assertInsert(records.get(0), "ID", 113);
 
                 source2.close();
@@ -450,7 +459,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
     }
 
     @Test
-    public void testConsumingEmptyTable() throws Exception {
+    void testConsumingEmptyTable() throws Exception {
 
         createAndInitialize("product.sql");
         final TestingListState<byte[]> offsetState = new TestingListState<>();
@@ -489,10 +498,11 @@ public class OracleSourceTest extends OracleSourceTestBase {
             }
 
             // state is still empty
-            assertEquals(0, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).isEmpty();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext))
+                    .isFalse();
 
             try (Connection connection = getJdbcConnection();
                     Statement statement = connection.createStatement()) {
@@ -501,7 +511,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
                 statement.execute("INSERT INTO debezium.category VALUES (2, 'shoes')");
                 statement.execute("UPDATE debezium.category SET category_name='books' WHERE id=1");
                 List<SourceRecord> records = drain(sourceContext, 3);
-                assertEquals(3, records.size());
+                Assertions.assertThat(records).hasSize(3);
                 assertInsert(records.get(0), "ID", 1);
                 assertInsert(records.get(1), "ID", 2);
                 assertUpdate(records.get(2), "ID", 1);
@@ -515,9 +525,10 @@ public class OracleSourceTest extends OracleSourceTestBase {
                 }
 
                 assertHistoryState(historyState); // assert the DDL is stored in the history state
-                assertEquals(1, offsetState.list.size());
+                Assertions.assertThat(offsetState.list).hasSize(1);
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-                assertEquals("oracle_logminer", JsonPath.read(state, "$.sourcePartition.server"));
+                Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                        .isEqualTo("oracle_logminer");
             }
 
             source.close();
@@ -527,7 +538,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
 
     private void assertHistoryState(TestingListState<String> historyState) {
         // assert the DDL is stored in the history state
-        assertTrue(historyState.list.size() > 0);
+        Assertions.assertThat(historyState.list).isNotEmpty();
         boolean hasTable =
                 historyState.list.stream()
                         .skip(1)
@@ -540,7 +551,7 @@ public class OracleSourceTest extends OracleSourceTestBase {
                                                         || JsonPath.read(history, "$.type")
                                                                 .toString()
                                                                 .equals("ALTER")));
-        assertTrue(hasTable);
+        Assertions.assertThat(hasTable).isTrue();
     }
 
     // ------------------------------------------------------------------------------------------
