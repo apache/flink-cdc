@@ -109,9 +109,10 @@ class MySqlChunkSplitterTest {
                         20,
                         10,
                         10);
-        assertEquals(3, res.size());
-        assertEquals(ChunkRange.of(null, 2147483637), res.get(1));
-        assertEquals(ChunkRange.of(2147483637, 2147483647), res.get(2));
-        assertEquals(ChunkRange.of(2147483647, null), res.get(0));
+        Assertions.assertThat(res)
+                .containsExactly(
+                        ChunkRange.of(2147483647, null),
+                        ChunkRange.of(null, 2147483637),
+                        ChunkRange.of(2147483637, 2147483647));
     }
 }
