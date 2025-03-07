@@ -28,25 +28,21 @@ import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfig
 import org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceConfigFactory;
 
 import io.debezium.relational.TableId;
+import org.assertj.core.api.Assertions;
 import org.bson.BsonDocument;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.BSON_MAX_KEY;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.junit.Assert.assertTrue;
 
 /** MongoDB snapshot split reader test case. */
-@RunWith(Parameterized.class)
-public class MongoDBSnapshotSplitReaderAssignEndingFirstTest extends MongoDBSourceTestBase {
+class MongoDBSnapshotSplitReaderAssignEndingFirstTest extends MongoDBSourceTestBase {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(MongoDBSnapshotSplitReaderAssignEndingFirstTest.class);
@@ -57,22 +53,13 @@ public class MongoDBSnapshotSplitReaderAssignEndingFirstTest extends MongoDBSour
 
     private SplitContext splitContext;
 
-    public MongoDBSnapshotSplitReaderAssignEndingFirstTest(String mongoVersion) {
-        super(mongoVersion);
-    }
-
-    @Parameterized.Parameters(name = "mongoVersion: {0}")
-    public static Object[] parameters() {
-        return Stream.of(getMongoVersions()).map(e -> new Object[] {e}).toArray();
-    }
-
-    @Before
-    public void before() {
-        database = mongoContainer.executeCommandFileInSeparateDatabase("chunk_test");
+    @BeforeEach
+    void before() {
+        database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("chunk_test");
 
         MongoDBSourceConfigFactory configFactory =
                 new MongoDBSourceConfigFactory()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .databaseList(database)
                         .collectionList(database + ".shopping_cart")
                         .username(FLINK_USER)
@@ -88,27 +75,29 @@ public class MongoDBSnapshotSplitReaderAssignEndingFirstTest extends MongoDBSour
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithSplitVectorSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithSplitVectorSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(SplitVectorSplitStrategy.INSTANCE);
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithSamplerSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithSamplerSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(SampleBucketSplitStrategy.INSTANCE);
     }
 
     @Test
-    public void testMongoDBSnapshotSplitReaderWithSingleSplitter() throws Exception {
+    void testMongoDBSnapshotSplitReaderWithSingleSplitter() throws Exception {
         testMongoDBSnapshotSplitReader(SingleSplitStrategy.INSTANCE);
     }
 
-    private void testMongoDBSnapshotSplitReader(SplitStrategy splitter) throws Exception {
+    private void testMongoDBSnapshotSplitReader(SplitStrategy splitter) {
         LinkedList<SnapshotSplit> snapshotSplits = new LinkedList<>(splitter.split(splitContext));
-        assertTrue(snapshotSplits.size() > 0);
-        assertTrue(snapshotSplits.get(0).getSplitEnd()[1] instanceof BsonDocument);
-        assertTrue(
-                ((BsonDocument) snapshotSplits.get(0).getSplitEnd()[1])
-                        .get("_id")
-                        .equals(BSON_MAX_KEY));
+        Assertions.assertThat(snapshotSplits)
+                .isNotEmpty()
+                .first()
+                .extracting(SnapshotSplit::getSplitEnd)
+                .extracting(o -> o[1])
+                .isInstanceOf(BsonDocument.class)
+                .extracting(o -> ((BsonDocument) o).get("_id"))
+                .isEqualTo(BSON_MAX_KEY);
     }
 }

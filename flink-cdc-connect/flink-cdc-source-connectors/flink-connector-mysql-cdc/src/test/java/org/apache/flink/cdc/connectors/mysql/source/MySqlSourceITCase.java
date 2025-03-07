@@ -175,21 +175,22 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testReadSingleTableWithSingleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    void testReadSingleTableWithSingleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 new String[] {tableName},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
     void testReadSingleTableWithSingleParallelismAndSkipBackFill(
-            String tableName, String chunkColumnName) throws Exception {
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 DEFAULT_SCAN_STARTUP_MODE,
@@ -199,77 +200,83 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 RestartStrategies.fixedDelayRestart(1, 0),
                 true,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testReadSingleTableWithMultipleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    void testReadSingleTableWithMultipleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 4,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 new String[] {tableName},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testReadMultipleTableWithSingleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    void testReadMultipleTableWithSingleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testReadMultipleTableWithMultipleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    void testReadMultipleTableWithMultipleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 4,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     // Failover tests
     @ParameterizedTest
     @MethodSource("parameters")
-    void testTaskManagerFailoverInSnapshotPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    void testTaskManagerFailoverInSnapshotPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.TM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testTaskManagerFailoverInBinlogPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    void testTaskManagerFailoverInBinlogPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testTaskManagerFailoverFromLatestOffset(String tableName, String chunkColumnName)
-            throws Exception {
+    void testTaskManagerFailoverFromLatestOffset(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
@@ -278,37 +285,40 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testJobManagerFailoverInSnapshotPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    void testJobManagerFailoverInSnapshotPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testJobManagerFailoverInBinlogPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    void testJobManagerFailoverInBinlogPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testJobManagerFailoverFromLatestOffset(String tableName, String chunkColumnName)
-            throws Exception {
+    void testJobManagerFailoverFromLatestOffset(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
@@ -317,33 +327,36 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testTaskManagerFailoverSingleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    void testTaskManagerFailoverSingleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 FailoverType.TM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    void testJobManagerFailoverSingleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    void testJobManagerFailoverSingleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     @ParameterizedTest
@@ -681,6 +694,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                         .password(customDatabase.getPassword())
                         .deserializer(new StringDebeziumDeserializationSchema())
                         .serverId(getServerId())
+                        .serverTimeZone("UTC")
                         .build();
         DataStreamSource<String> stream =
                 env.fromSource(source, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
@@ -1062,7 +1076,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            String assignEndingFirst)
             throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
@@ -1070,7 +1085,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     private void testMySqlParallelSource(
@@ -1079,7 +1095,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            String assignEndingFirst)
             throws Exception {
         testMySqlParallelSource(
                 parallelism,
@@ -1089,7 +1106,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 captureCustomerTables,
                 RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     private void testMySqlParallelSource(
@@ -1100,7 +1118,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            String assignEndingFirst)
             throws Exception {
         testMySqlParallelSource(
                 parallelism,
@@ -1111,7 +1130,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 restartStrategyConfiguration,
                 false,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                assignEndingFirst);
     }
 
     private void testMySqlParallelSource(
