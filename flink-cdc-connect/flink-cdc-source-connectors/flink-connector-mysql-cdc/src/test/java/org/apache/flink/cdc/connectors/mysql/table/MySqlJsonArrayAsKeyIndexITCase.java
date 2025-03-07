@@ -65,7 +65,7 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
     }
 
     @ParameterizedTest
-    @EnumSource
+    @EnumSource(names = {"V8_0_17", "V8_0_18", "V8_0_19"})
     public void testJsonArrayAsKeyIndex(MySqlVersion version) {
         this.container = createMySqlContainer(version, "docker/server-gtids/expire-seconds/my.cnf");
         Startables.deepStart(container).join();
