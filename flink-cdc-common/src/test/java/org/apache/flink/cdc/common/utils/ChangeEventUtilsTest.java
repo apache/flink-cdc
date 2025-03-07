@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_TABLE_COMMENT;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
@@ -55,7 +56,8 @@ public class ChangeEventUtilsTest {
                                 DROP_TABLE,
                                 ALTER_COLUMN_TYPE,
                                 ADD_COLUMN,
-                                DROP_COLUMN));
+                                DROP_COLUMN,
+                                ALTER_TABLE_COMMENT));
 
         assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
@@ -66,7 +68,8 @@ public class ChangeEventUtilsTest {
                                 ALTER_COLUMN_TYPE,
                                 RENAME_COLUMN,
                                 CREATE_TABLE,
-                                TRUNCATE_TABLE));
+                                TRUNCATE_TABLE,
+                                ALTER_TABLE_COMMENT));
 
         assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
@@ -89,7 +92,8 @@ public class ChangeEventUtilsTest {
                                 TRUNCATE_TABLE,
                                 RENAME_COLUMN,
                                 ALTER_COLUMN_TYPE,
-                                CREATE_TABLE));
+                                CREATE_TABLE,
+                                ALTER_TABLE_COMMENT));
     }
 
     @Test
@@ -103,14 +107,17 @@ public class ChangeEventUtilsTest {
                                 DROP_COLUMN,
                                 DROP_TABLE,
                                 RENAME_COLUMN,
-                                TRUNCATE_TABLE));
+                                TRUNCATE_TABLE,
+                                ALTER_TABLE_COMMENT));
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("column"))
                 .isEqualTo(
                         Arrays.asList(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("table"))
-                .isEqualTo(Arrays.asList(CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE));
+                .isEqualTo(
+                        Arrays.asList(
+                                CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE, ALTER_TABLE_COMMENT));
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("rename.column"))
                 .isEqualTo(Collections.singletonList(RENAME_COLUMN));
@@ -138,5 +145,8 @@ public class ChangeEventUtilsTest {
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add.column"))
                 .isEqualTo(Collections.singletonList(ADD_COLUMN));
+
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter.table.comment"))
+                .isEqualTo(Collections.singletonList(ALTER_TABLE_COMMENT));
     }
 }
