@@ -27,7 +27,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.sql.Connection;
@@ -43,7 +42,6 @@ import static java.lang.String.format;
  * we added fallback in {@link MySqlSchema} when parsing ddl failed and provided these cases to
  * test.
  */
-@Ignore("Temporarily disable Polardbx Tests until FLINK-37362 fixed")
 public class PolardbxSourceITCase extends PolardbxSourceTestBase {
     private static final String DATABASE = "polardbx_ddl_test";
 

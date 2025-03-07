@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
@@ -87,12 +88,13 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBaseJUnit4 {
     }
 
     @BeforeClass
-    public static void startContainers() {
+    public static void startContainers() throws InterruptedException {
         Startables.deepStart(Stream.of(POLARDBX_CONTAINER)).join();
-        LOG.info("Containers are started.");
-
+        // wait and check PolarDBx CDC node is ready
+        Thread.sleep(30_000);
         TestCaseUtils.repeatedCheck(
-                PolardbxSourceTestBase::checkConnection, WAITING_TIMEOUT, Duration.ofSeconds(1));
+                PolardbxSourceTestBase::checkConnection, WAITING_TIMEOUT, Duration.ofSeconds(20));
+        LOG.info("Containers are started.");
     }
 
     @AfterClass
@@ -113,14 +115,35 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBaseJUnit4 {
     }
 
     protected static Boolean checkConnection() {
-        LOG.info("check polardbx connection validation...");
-        try {
-            Connection connection = getJdbcConnection();
-            return connection.isValid(3);
+        LOG.info("check PolarDBx CDC node status...");
+        boolean cdcReady = false;
+        try (Connection connection = getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery("SHOW MASTER STATUS");
+            if (rs.next()) {
+                String binlogFilename = rs.getString(1);
+                long binlogPosition = rs.getLong(2);
+                // the initial binlog position is 4
+                cdcReady = StringUtils.isNotEmpty(binlogFilename) && binlogPosition > 4L;
+                if (cdcReady) {
+                    LOG.info(
+                            "PolarDBx CDC node is ready at offset {}:{}",
+                            binlogFilename,
+                            binlogPosition);
+                } else {
+                    LOG.warn(
+                            "PolarDBx CDC node is not ready at offset {}:{},  waiting...",
+                            binlogFilename,
+                            binlogPosition);
+                }
+            } else {
+                LOG.warn("PolarDBx CDC node is not ready, waiting...");
+            }
         } catch (SQLException e) {
-            LOG.warn("polardbx connection is not valid... caused by:" + e.getMessage());
-            return false;
+            cdcReady = false;
+            LOG.warn("PolarDBx CDC node is not ready... caused by:{}", e.getMessage());
         }
+        return cdcReady;
     }
 
     /** initialize database and tables with ${databaseName}.sql for testing. */
@@ -154,8 +177,8 @@ public abstract class PolardbxSourceTestBase extends AbstractTestBaseJUnit4 {
             for (String stmt : statements) {
                 statement.execute(stmt);
             }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+        } catch (Throwable t) {
+            throw new RuntimeException(t);
         }
     }
 
