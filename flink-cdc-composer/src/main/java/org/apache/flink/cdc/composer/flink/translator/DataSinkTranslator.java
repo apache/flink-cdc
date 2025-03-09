@@ -141,7 +141,7 @@ public class DataSinkTranslator {
             OperatorID schemaOperatorID) {
         StreamSink<Event> sinkOperator;
         if (isBatchMode) {
-            sinkOperator = new DataBatchSinkFunctionOperator(sinkFunction, schemaOperatorID);
+            sinkOperator = new DataBatchSinkFunctionOperator(sinkFunction);
         } else {
             sinkOperator = new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
         }
