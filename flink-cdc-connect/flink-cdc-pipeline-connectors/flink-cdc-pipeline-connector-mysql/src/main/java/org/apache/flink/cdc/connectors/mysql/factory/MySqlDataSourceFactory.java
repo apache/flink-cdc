@@ -25,7 +25,6 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.pipeline.RunTimeMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -276,10 +275,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         Configuration pipelineConfiguration = context.getPipelineConfiguration();
         boolean isBatchMode = false;
         if (pipelineConfiguration != null
-                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_RUNTIME_MODE)) {
-            isBatchMode =
-                    RunTimeMode.BATCH.equals(
-                            pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
+            isBatchMode = pipelineConfiguration.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED);
         }
         return new MySqlDataSource(configFactory, isBatchMode, readableMetadataList);
     }

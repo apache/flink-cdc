@@ -24,6 +24,7 @@ import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreBatchTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -49,10 +50,35 @@ public class TransformTranslator {
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
-            boolean canContainDistributedTables) {
+            boolean canContainDistributedTables,
+            boolean isBatchMode) {
         if (transforms.isEmpty()) {
             return input;
         }
+        if (isBatchMode) {
+            return input.transform(
+                    "BatchTransform:Schema",
+                    new EventTypeInfo(),
+                    generatePreBatchTransform(
+                            transforms, udfFunctions, models, supportedMetadataColumns));
+        }
+        return input.transform(
+                "Transform:Schema",
+                new EventTypeInfo(),
+                generatePreTransform(
+                        transforms,
+                        udfFunctions,
+                        models,
+                        supportedMetadataColumns,
+                        canContainDistributedTables));
+    }
+
+    private PreTransformOperator generatePreTransform(
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            boolean canContainDistributedTables) {
 
         PreTransformOperator.Builder preTransformFunctionBuilder =
                 PreTransformOperator.newBuilder();
@@ -77,8 +103,38 @@ public class TransformTranslator {
                         models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
                 .canContainDistributedTables(canContainDistributedTables);
 
-        return input.transform(
-                "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
+        return preTransformFunctionBuilder.build();
+    }
+
+    private PreBatchTransformOperator generatePreBatchTransform(
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+
+        PreBatchTransformOperator.Builder preBatchTransformFunctionBuilder =
+                PreBatchTransformOperator.newBuilder();
+        for (TransformDef transform : transforms) {
+            preBatchTransformFunctionBuilder.addTransform(
+                    transform.getSourceTable(),
+                    transform.getProjection(),
+                    transform.getFilter(),
+                    transform.getPrimaryKeys(),
+                    transform.getPartitionKeys(),
+                    transform.getTableOptions(),
+                    transform.getPostTransformConverter(),
+                    supportedMetadataColumns);
+        }
+
+        preBatchTransformFunctionBuilder
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addUdfFunctions(
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+
+        return preBatchTransformFunctionBuilder.build();
     }
 
     public DataStream<Event> translatePostTransform(

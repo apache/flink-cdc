@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
-import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -81,6 +80,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private boolean isBatchMode = false;
     private boolean alreadySendCreateTableForBinlogSplit = false;
     private boolean alreadySendAllCreateTable = false;
+    private List<CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
@@ -114,18 +114,14 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
-        if (isBatchMode
-                && StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())
-                && !alreadySendAllCreateTable) {
+        if (StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())) {
             // In snapshot mode, we simply emit all schemas at once.
             createTableEventCache.forEach(
                 (tableId, createTableEvent) -> {
                         output.collect(createTableEvent);
                         alreadySendCreateTableTables.add(tableId);
                     });
-            output.collect(new CreateTableCompletedEvent());
             alreadySendCreateTableForBinlogSplit = true;
-            alreadySendAllCreateTable = true;
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             // In Snapshot phase of INITIAL startup mode, we lazily send CreateTableEvent to
             // downstream to avoid checkpoint timeout.

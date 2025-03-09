@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -101,15 +100,14 @@ public class SchemaBatchOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> streamRecord) throws Exception {
         Event event = streamRecord.getValue();
-        //        System.out.println("Print Event:" + event.toString());
         // Only catch create table event and data change event in batch mode
         if (event instanceof CreateTableEvent) {
             handleCreateTableEvent((CreateTableEvent) event);
-        } else if (event instanceof CreateTableCompletedEvent) {
-            if (!alreadyMergedCreateTableTables) {
-                handleCreateTableCompletedEvent();
-            }
         } else if (event instanceof DataChangeEvent) {
+            if (!alreadyMergedCreateTableTables) {
+                handleFirstDataChangeEvent();
+                alreadyMergedCreateTableTables = true;
+            }
             handleDataChangeEvent((DataChangeEvent) event);
         } else {
             throw new RuntimeException("Unknown event type in Batch record: " + event);
@@ -120,7 +118,7 @@ public class SchemaBatchOperator extends AbstractStreamOperator<Event>
         originalSchemaMap.put(originalEvent.tableId(), originalEvent.getSchema());
     }
 
-    private void handleCreateTableCompletedEvent() {
+    private void handleFirstDataChangeEvent() {
         List<CreateTableEvent> originalCreateTableEvents =
                 originalSchemaMap.entrySet().stream()
                         .map(entry -> new CreateTableEvent(entry.getKey(), entry.getValue()))

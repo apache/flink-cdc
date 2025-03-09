@@ -68,9 +68,7 @@ public class PartitioningTranslator {
                         new PartitioningEventTypeInfo(),
                         isBatchMode
                                 ? new RegularPrePartitionBatchOperator(
-                                        schemaOperatorID,
-                                        downstreamParallelism,
-                                        hashFunctionProvider)
+                                        downstreamParallelism, hashFunctionProvider)
                                 : new RegularPrePartitionOperator(
                                         schemaOperatorID,
                                         downstreamParallelism,

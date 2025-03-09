@@ -25,7 +25,6 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.pipeline.RunTimeMode;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
@@ -54,10 +53,8 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         boolean isBatchMode = false;
         Configuration pipelineConfiguration = context.getPipelineConfiguration();
         if (pipelineConfiguration != null
-                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_RUNTIME_MODE)) {
-            isBatchMode =
-                    RunTimeMode.BATCH.equals(
-                            pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
+            isBatchMode = pipelineConfiguration.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED);
         }
         return new ValuesDataSource(eventType, failAtPos, isBatchMode);
     }

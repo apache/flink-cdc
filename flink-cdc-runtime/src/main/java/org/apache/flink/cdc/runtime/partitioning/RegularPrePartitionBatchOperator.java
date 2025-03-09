@@ -27,16 +27,11 @@ import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
-import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
-import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
-import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 
 import java.io.Serializable;
 import java.time.Duration;
@@ -58,13 +53,11 @@ public class RegularPrePartitionBatchOperator extends AbstractStreamOperator<Par
     private final int downstreamParallelism;
     private final HashFunctionProvider<DataChangeEvent> hashFunctionProvider;
 
-    private transient LoadingCache<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
+    private transient Map<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
 
     public RegularPrePartitionBatchOperator(
-            OperatorID schemaOperatorId,
-            int downstreamParallelism,
-            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+            int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
@@ -73,7 +66,7 @@ public class RegularPrePartitionBatchOperator extends AbstractStreamOperator<Par
     @Override
     public void open() throws Exception {
         super.open();
-        cachedHashFunctions = createCache();
+        cachedHashFunctions = new HashMap<>();
         originalSchemaMap = new HashMap<>();
     }
 
@@ -132,18 +125,6 @@ public class RegularPrePartitionBatchOperator extends AbstractStreamOperator<Par
 
     private HashFunction<DataChangeEvent> recreateHashFunction(TableId tableId) {
         return hashFunctionProvider.getHashFunction(tableId, loadSchemaFromCache(tableId));
-    }
-
-    private LoadingCache<TableId, HashFunction<DataChangeEvent>> createCache() {
-        return CacheBuilder.newBuilder()
-                .expireAfterAccess(CACHE_EXPIRE_DURATION)
-                .build(
-                        new CacheLoader<TableId, HashFunction<DataChangeEvent>>() {
-                            @Override
-                            public HashFunction<DataChangeEvent> load(TableId key) {
-                                return recreateHashFunction(key);
-                            }
-                        });
     }
 
     @Override

@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.values.source;
 
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
-import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -101,9 +100,6 @@ public class ValuesDataSourceHelper {
         List<Event> dataChangeEvents = new ArrayList<>();
         for (List<Event> events : sourceEvents) {
             for (Event event : events) {
-                if (event instanceof CreateTableCompletedEvent) {
-                    return sourceEvents;
-                }
                 if (event instanceof CreateTableEvent) {
                     mergeEvents.add(event);
                 } else {
@@ -111,7 +107,6 @@ public class ValuesDataSourceHelper {
                 }
             }
         }
-        mergeEvents.add(new CreateTableCompletedEvent());
         mergeEvents.addAll(dataChangeEvents);
 
         sourceEvents = Collections.singletonList(mergeEvents);

@@ -21,12 +21,8 @@ import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.common.event.ChangeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
@@ -44,11 +40,6 @@ import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 /**
  * An operator that processes records to be written into a {@link Sink} in batch mode.
@@ -79,11 +70,6 @@ public class DataBatchSinkWriterOperator<CommT>
      */
     private SinkWriter<Event> copySinkWriter;
 
-    /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
-    private final Set<TableId> processedTableIds;
-
-    private transient volatile Map<TableId, Schema> originalSchemaMap;
-
     public DataBatchSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
@@ -91,7 +77,6 @@ public class DataBatchSinkWriterOperator<CommT>
         this.sink = sink;
         this.processingTimeService = processingTimeService;
         this.mailboxExecutor = mailboxExecutor;
-        this.processedTableIds = new HashSet<>();
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
@@ -104,7 +89,6 @@ public class DataBatchSinkWriterOperator<CommT>
         flinkWriterOperator = createFlinkWriterOperator();
         this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .setup(containingTask, config, output);
-        originalSchemaMap = new HashMap<>();
     }
 
     @Override
@@ -149,25 +133,6 @@ public class DataBatchSinkWriterOperator<CommT>
             return;
         }
 
-        // CreateTableEvent marks the table as processed directly
-        if (event instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) event;
-            processedTableIds.add(createTableEvent.tableId());
-            originalSchemaMap.put(createTableEvent.tableId(), createTableEvent.getSchema());
-            this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
-                    .processElement(element);
-            return;
-        }
-
-        // Check if the table is processed before emitting all other events, because we have to make
-        // sure that sink have a view of the full schema before processing any change events,
-        // including schema changes.
-        ChangeEvent changeEvent = (ChangeEvent) event;
-        if (!processedTableIds.contains(changeEvent.tableId())) {
-            emitLatestSchema(changeEvent.tableId());
-            processedTableIds.add(changeEvent.tableId());
-        }
-        processedTableIds.add(changeEvent.tableId());
         this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .processElement(element);
     }
@@ -193,21 +158,6 @@ public class DataBatchSinkWriterOperator<CommT>
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
         copySinkWriter.flush(false);
-    }
-
-    private void emitLatestSchema(TableId tableId) throws Exception {
-        Optional<Schema> schema = Optional.ofNullable(originalSchemaMap.get(tableId));
-        if (schema.isPresent()) {
-            // request and process CreateTableEvent because SinkWriter need to retrieve
-            // Schema to deserialize RecordData after resuming job.
-            this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
-                    .processElement(
-                            new StreamRecord<>(new CreateTableEvent(tableId, schema.get())));
-            processedTableIds.add(tableId);
-        } else {
-            throw new RuntimeException(
-                    "Could not find schema message from SchemaRegistry for " + tableId);
-        }
     }
 
     // -------------------------- Reflection helper functions --------------------------

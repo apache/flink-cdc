@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
-import org.apache.flink.cdc.common.event.CreateTableCompletedEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -285,8 +284,6 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             if (dataChangeEventOptional.isPresent()) {
                 output.collect(new StreamRecord<>(dataChangeEventOptional.get()));
             }
-        } else if (event instanceof CreateTableCompletedEvent) {
-            output.collect(new StreamRecord<>(event));
         }
     }
 

@@ -22,7 +22,6 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.pipeline.RunTimeMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
@@ -114,8 +113,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
         boolean isBatchMode = false;
-        if (RunTimeMode.BATCH.equals(
-                pipelineDefConfig.get(PipelineOptions.PIPELINE_RUNTIME_MODE))) {
+        if (pipelineDefConfig.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
             isBatchMode = true;
             env.setRuntimeMode(RuntimeExecutionMode.BATCH);
         }
@@ -154,7 +152,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
-                        isParallelMetadataSource);
+                        isParallelMetadataSource,
+                        isBatchMode);
 
         // PreTransform ---> PostTransform
         stream =
