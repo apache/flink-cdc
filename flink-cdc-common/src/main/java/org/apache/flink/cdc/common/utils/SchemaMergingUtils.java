@@ -332,16 +332,18 @@ public class SchemaMergingUtils {
         targetType = targetType.notNull();
 
         if (Objects.equals(currentType, targetType)) {
-            return currentType.copy(nullable);
+            return currentType.copy(nullable, currentType.getRawDataType());
         }
 
         // For TIMESTAMP and EXACT_NUMERIC types, we have fine-grained type merging logic.
         if (currentType.is(DataTypeFamily.TIMESTAMP) && targetType.is(DataTypeFamily.TIMESTAMP)) {
-            return mergeTimestampType(currentType, targetType).copy(nullable);
+            return mergeTimestampType(currentType, targetType)
+                    .copy(nullable, targetType.getRawDataType());
         }
 
         if (currentType instanceof DecimalType || targetType instanceof DecimalType) {
-            return mergeDecimalType(currentType, targetType).copy(nullable);
+            return mergeDecimalType(currentType, targetType)
+                    .copy(nullable, targetType.getRawDataType());
         }
 
         List<DataType> currentTypeTree = TYPE_MERGING_TREE.get(currentType.getClass());
@@ -349,12 +351,12 @@ public class SchemaMergingUtils {
 
         for (DataType type : currentTypeTree) {
             if (targetTypeTree.contains(type)) {
-                return type.copy(nullable);
+                return type.copy(nullable, type.getRawDataType());
             }
         }
 
         // The most universal type and our final resort: STRING.
-        return DataTypes.STRING().copy(nullable);
+        return DataTypes.STRING().copy(nullable, currentType.getRawDataType());
     }
 
     @VisibleForTesting

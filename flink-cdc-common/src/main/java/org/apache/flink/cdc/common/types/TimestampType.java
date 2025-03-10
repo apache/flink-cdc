@@ -75,18 +75,13 @@ public final class TimestampType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new TimestampType(isNullable, precision);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, precision);
-    }
-
-    @Override
-    public String asSummaryString() {
-        return asSerializableString();
     }
 
     @Override
