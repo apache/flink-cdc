@@ -95,6 +95,8 @@ public class TransformParser {
     private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
     private static final String DEFAULT_TABLE = "TB";
+    private static final String MAPPED_COLUMN_NAME_PREFIX = "$";
+    private static final String MAPPED_SINGLE_COLUMN_NAME = MAPPED_COLUMN_NAME_PREFIX + "0";
 
     private static SqlParser getCalciteParser(String sql) {
         return SqlParser.create(
@@ -334,6 +336,8 @@ public class TransformParser {
                                     columnName,
                                     supportedMetadataColumns);
                 } else {
+                    List<String> originalColumnNames = parseColumnNameList(exprNode);
+                    Map<String, String> columnNameMap = generateColumnNameMap(originalColumnNames);
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
@@ -341,8 +345,9 @@ public class TransformParser {
                                             relDataTypeMap.get(columnName)),
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
-                                            exprNode, udfDescriptors),
-                                    parseColumnNameList(exprNode));
+                                            exprNode, udfDescriptors, columnNameMap),
+                                    originalColumnNames,
+                                    columnNameMap);
                 }
             }
             // ... or an existing column's name identifier.
@@ -384,6 +389,8 @@ public class TransformParser {
             String identifier,
             String projectedColumnName,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        Map<String, String> columnNameMap =
+                Collections.singletonMap(identifier, MAPPED_SINGLE_COLUMN_NAME);
         if (isMetadataColumn(identifier, supportedMetadataColumns)) {
             // For a metadata column, we simply generate a projection column with the same
             return ProjectionColumn.ofCalculated(
@@ -393,8 +400,9 @@ public class TransformParser {
                                     relDataTypeMap.get(projectedColumnName))
                             .notNull(),
                     identifier,
-                    identifier,
-                    Collections.singletonList(identifier));
+                    columnNameMap.get(identifier),
+                    Collections.singletonList(identifier),
+                    columnNameMap);
         }
 
         Preconditions.checkArgument(
@@ -404,14 +412,17 @@ public class TransformParser {
 
         Column column = originalColumnMap.get(identifier);
         if (Objects.equals(identifier, projectedColumnName)) {
-            return ProjectionColumn.ofForwarded(column);
+            return ProjectionColumn.ofForwarded(column, MAPPED_SINGLE_COLUMN_NAME);
         } else {
-            return ProjectionColumn.ofAliased(column, projectedColumnName);
+            return ProjectionColumn.ofAliased(
+                    column, projectedColumnName, MAPPED_SINGLE_COLUMN_NAME);
         }
     }
 
     public static String translateFilterExpressionToJaninoExpression(
-            String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            String filterExpression,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
         }
@@ -420,7 +431,8 @@ public class TransformParser {
             return "";
         }
         SqlNode where = sqlSelect.getWhere();
-        return JaninoCompiler.translateSqlNodeToJaninoExpression(where, udfDescriptors);
+        return JaninoCompiler.translateSqlNodeToJaninoExpression(
+                where, udfDescriptors, columnNameMap);
     }
 
     public static List<String> parseComputedColumnNames(
@@ -641,5 +653,17 @@ public class TransformParser {
         } else {
             return false;
         }
+    }
+
+    public static Map<String, String> generateColumnNameMap(List<String> originalColumnNames) {
+        int i = 0;
+        Map<String, String> columnNameMap = new HashMap<>();
+        for (String columnName : originalColumnNames) {
+            if (!columnNameMap.containsKey(columnName)) {
+                columnNameMap.put(columnName, MAPPED_COLUMN_NAME_PREFIX + i);
+                i++;
+            }
+        }
+        return columnNameMap;
     }
 }

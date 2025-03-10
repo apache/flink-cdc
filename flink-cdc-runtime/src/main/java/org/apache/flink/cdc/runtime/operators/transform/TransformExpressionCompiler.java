@@ -74,8 +74,9 @@ public class TransformExpressionCompiler {
                             expressionEvaluator.cook(key.getExpression());
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
-                                    "Expression cannot be compiled. This is a bug. Please file an issue.\nExpression: "
-                                            + key.getExpression(),
+                                    String.format(
+                                            "Expression cannot be compiled. This is a bug. Please file an issue.\nExpression: %s\nColumn name map: %s",
+                                            key.getExpression(), key.getColumnNameMap()),
                                     e);
                         }
                         return expressionEvaluator;

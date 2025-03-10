@@ -182,6 +182,24 @@ public class PreTransformOperatorTest {
                     .primaryKey("id")
                     .build();
 
+    private static final Schema COL_NAME_MAPPING_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("foo", DataTypes.INT())
+                    .physicalColumn("bar", DataTypes.INT())
+                    .physicalColumn("foo-bar", DataTypes.INT())
+                    .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("class", DataTypes.INT())
+                    .build();
+
+    private static final Schema EXPECTED_COL_NAME_MAPPING_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("foo", DataTypes.INT())
+                    .physicalColumn("bar", DataTypes.INT())
+                    .physicalColumn("foo-bar", DataTypes.INT())
+                    .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("class", DataTypes.INT())
+                    .build();
+
     @Test
     void testEventTransform() throws Exception {
         PreTransformOperator transform =
@@ -679,6 +697,35 @@ public class PreTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testColumnNameMapping() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "foo, `foo-bar`, foo-bar AS f0, `bar-foo` AS f1, class",
+                                " `foo-bar` > 1 and foo-bar > 1 and class > 1")
+                        .build();
+
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, COL_NAME_MAPPING_SCHEMA);
+        transform.processElement(new StreamRecord<>(createTableEvent));
+
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        CUSTOMERS_TABLEID, EXPECTED_COL_NAME_MAPPING_SCHEMA)));
         transformFunctionEventEventOperatorTestHarness.close();
     }
 }

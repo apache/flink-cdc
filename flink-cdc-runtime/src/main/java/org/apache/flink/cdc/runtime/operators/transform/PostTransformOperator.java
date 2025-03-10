@@ -409,7 +409,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                 Optional<TransformFilter> transformFilterOptional = transform.getFilter();
 
                 if (transformFilterOptional.isPresent()
-                        && transformFilterOptional.get().isVaild()) {
+                        && transformFilterOptional.get().isValid()) {
                     TransformFilter transformFilter = transformFilterOptional.get();
                     if (!transformFilterProcessorMap.containsKey(
                             Tuple2.of(tableId, transformFilter))) {

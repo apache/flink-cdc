@@ -956,6 +956,69 @@ class FlinkPipelineTransformITCase {
         Arrays.stream(outputEvents).forEach(this::extractDataLines);
     }
 
+    @ParameterizedTest
+    @EnumSource
+    public void testTransformWithColumnNameMap(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.COMPLEX_COLUMN_NAME_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        TransformDef transformDef =
+                new TransformDef(
+                        "default_namespace.default_schema.table1",
+                        "*, `timestamp-type`",
+                        "`foo-bar` > 0",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        new ArrayList<>(Arrays.asList(transformDef)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`class` STRING NOT NULL,`foo-bar` INT,`bar-foo` INT,`timestamp-type` STRING NOT NULL}, primaryKeys=class, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[class1, 1, 10, type1], op=INSERT, meta=({timestamp-type=type1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[class2, 2, 100, type2], op=INSERT, meta=({timestamp-type=type2})}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`import-package` STRING, position=AFTER, existedColumnName=bar-foo}]}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={bar-foo=bar-baz}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[bar-baz]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[class1, 1, , type1], after=[], op=DELETE, meta=({timestamp-type=type1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[class2, 2, , type2], after=[new-class2, 20, new-package2, type2], op=UPDATE, meta=({timestamp-type=type2})}");
+    }
+
     void runGenericTransformTest(
             ValuesDataSink.SinkApi sinkApi,
             List<TransformDef> transformDefs,
