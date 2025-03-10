@@ -79,11 +79,7 @@ class PostgresSourceReaderTest {
         configFactory.password("password");
         configFactory.setLsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay);
         final TestTable customerTable =
-                new TestTable(
-                        "pgdb",
-                        "customer",
-                        "customers",
-                        ResolvedSchema.of(Column.physical("id", BIGINT())));
+                new TestTable(ResolvedSchema.of(Column.physical("id", BIGINT())));
         final DebeziumDeserializationSchema<?> deserializer = customerTable.getDeserializer();
         MockPostgresDialect dialect = new MockPostgresDialect(configFactory.create(0));
         final PostgresSourceBuilder.PostgresIncrementalSource<?> source =
