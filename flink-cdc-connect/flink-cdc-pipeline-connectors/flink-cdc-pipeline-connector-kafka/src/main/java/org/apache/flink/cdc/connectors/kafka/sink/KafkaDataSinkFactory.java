@@ -26,7 +26,6 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.kafka.json.ChangeLogJsonFormatFactory;
 import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 
 import java.time.ZoneId;
@@ -52,10 +51,14 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
-        FactoryHelper.createFactoryHelper(this, context).validateExcept(PROPERTIES_PREFIX);
+        KeyFormat keyFormat = context.getFactoryConfiguration().get(KEY_FORMAT);
+        JsonSerializationType jsonSerializationType =
+                context.getFactoryConfiguration().get(KafkaDataSinkOptions.VALUE_FORMAT);
 
-        Configuration configuration =
-                Configuration.fromMap(context.getFactoryConfiguration().toMap());
+        FactoryHelper helper = FactoryHelper.createFactoryHelper(this, context);
+        helper.validateExcept(
+                PROPERTIES_PREFIX, keyFormat.toString(), jsonSerializationType.toString());
+
         DeliveryGuarantee deliveryGuarantee =
                 context.getFactoryConfiguration().get(KafkaDataSinkOptions.DELIVERY_GUARANTEE);
         ZoneId zoneId = ZoneId.systemDefault();
@@ -67,14 +70,14 @@ public class KafkaDataSinkFactory implements DataSinkFactory {
                             context.getPipelineConfiguration()
                                     .get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         }
-        KeyFormat keyFormat = context.getFactoryConfiguration().get(KEY_FORMAT);
         SerializationSchema<Event> keySerialization =
-                KeySerializationFactory.createSerializationSchema(configuration, keyFormat, zoneId);
-        JsonSerializationType jsonSerializationType =
-                context.getFactoryConfiguration().get(KafkaDataSinkOptions.VALUE_FORMAT);
+                KeySerializationFactory.createSerializationSchema(
+                        helper.getFormatConfig(keyFormat.toString()), keyFormat, zoneId);
         SerializationSchema<Event> valueSerialization =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
-                        configuration, jsonSerializationType, zoneId);
+                        helper.getFormatConfig(jsonSerializationType.toString()),
+                        jsonSerializationType,
+                        zoneId);
         final Properties kafkaProperties = new Properties();
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         allOptions.keySet().stream()
