@@ -179,6 +179,51 @@ public class PaimonWriterHelper {
         return genericRow;
     }
 
+    /** create full {@link GenericRow}s from a {@link DataChangeEvent} for {@link PaimonWriter}. */
+    public static List<GenericRow> convertEventToFullGenericRows(
+            DataChangeEvent dataChangeEvent, List<RecordData.FieldGetter> fieldGetters) {
+        List<GenericRow> fullGenericRows = new ArrayList<>();
+        switch (dataChangeEvent.op()) {
+            case INSERT:
+                {
+                    fullGenericRows.add(
+                            convertRecordDataToGenericRow(
+                                    dataChangeEvent.after(), fieldGetters, RowKind.INSERT));
+                    break;
+                }
+            case UPDATE:
+            case REPLACE:
+                {
+                    fullGenericRows.add(
+                            convertRecordDataToGenericRow(
+                                    dataChangeEvent.before(), fieldGetters, RowKind.UPDATE_BEFORE));
+                    fullGenericRows.add(
+                            convertRecordDataToGenericRow(
+                                    dataChangeEvent.after(), fieldGetters, RowKind.UPDATE_AFTER));
+                    break;
+                }
+            case DELETE:
+                {
+                    fullGenericRows.add(
+                            convertRecordDataToGenericRow(
+                                    dataChangeEvent.before(), fieldGetters, RowKind.DELETE));
+                    break;
+                }
+            default:
+                throw new IllegalArgumentException("don't support type of " + dataChangeEvent.op());
+        }
+        return fullGenericRows;
+    }
+
+    private static GenericRow convertRecordDataToGenericRow(
+            RecordData recordData, List<RecordData.FieldGetter> fieldGetters, RowKind rowKind) {
+        GenericRow genericRow = new GenericRow(rowKind, recordData.getArity());
+        for (int i = 0; i < recordData.getArity(); i++) {
+            genericRow.setField(i, fieldGetters.get(i).getFieldOrNull(recordData));
+        }
+        return genericRow;
+    }
+
     /** A helper class for {@link PaimonWriter} to create FieldGetter and GenericRow. */
     public static class BinaryFieldDataGetter implements RecordData.FieldGetter {
         private final int fieldPos;
