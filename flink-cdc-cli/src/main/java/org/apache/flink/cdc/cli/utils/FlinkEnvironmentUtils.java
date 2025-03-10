@@ -19,7 +19,8 @@ package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
-import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
+import org.apache.flink.client.deployment.executors.LocalExecutor;
+import org.apache.flink.configuration.DeploymentOptions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,16 +47,10 @@ public class FlinkEnvironmentUtils {
     }
 
     public static FlinkPipelineComposer createComposer(
-            boolean useMiniCluster,
-            Configuration flinkConfig,
-            List<Path> additionalJars,
-            SavepointRestoreSettings savepointSettings) {
-        if (useMiniCluster) {
-            return FlinkPipelineComposer.ofMiniCluster();
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        if (flinkConfig.get(DeploymentOptions.TARGET).equalsIgnoreCase(LocalExecutor.NAME)) {
+            return FlinkPipelineComposer.ofMiniCluster(flinkConfig);
         }
-        org.apache.flink.configuration.Configuration configuration =
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
-        SavepointRestoreSettings.toConfiguration(savepointSettings, configuration);
-        return FlinkPipelineComposer.ofRemoteCluster(configuration, additionalJars);
+        return FlinkPipelineComposer.ofRemoteCluster(flinkConfig, additionalJars);
     }
 }
