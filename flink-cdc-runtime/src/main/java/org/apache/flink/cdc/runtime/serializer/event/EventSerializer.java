@@ -155,6 +155,6 @@ public final class EventSerializer extends TypeSerializerSingleton<Event> {
     enum EventClass {
         DATA_CHANGE_EVENT,
         SCHEME_CHANGE_EVENT,
-        FLUSH_EVENT,
+        FLUSH_EVENT
     }
 }
