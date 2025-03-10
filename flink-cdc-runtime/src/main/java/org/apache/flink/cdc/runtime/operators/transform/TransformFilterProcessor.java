@@ -102,15 +102,13 @@ public class TransformFilterProcessor {
                     transformFilter.getColumnNameMap(),
                     e);
             throw new RuntimeException(e);
-        } catch (IllegalArgumentException e) {
-            throw e;
         }
     }
 
     private Tuple2<List<String>, List<Class<?>>> generateArguments(boolean mapColumnNames) {
         List<String> argNames = new ArrayList<>();
         List<Class<?>> argTypes = new ArrayList<>();
-        String scriptExpression = transformFilter.getExpression();
+        String expression = transformFilter.getExpression();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         Map<String, String> columnNameMap = transformFilter.getColumnNameMap();
         LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
@@ -126,7 +124,7 @@ public class TransformFilterProcessor {
 
         METADATA_COLUMNS.forEach(
                 col -> {
-                    if (scriptExpression.contains(col.f0) && !argNames.contains(col.f0)) {
+                    if (expression.contains(col.f0) && !argNames.contains(col.f0)) {
                         argNames.add(mapColumnNames ? columnNameMap.get(col.f0) : col.f0);
                         argTypes.add(col.f2);
                     }
@@ -136,7 +134,7 @@ public class TransformFilterProcessor {
                 .keySet()
                 .forEach(
                         colName -> {
-                            if (scriptExpression.contains(colName) && !argNames.contains(colName)) {
+                            if (expression.contains(colName) && !argNames.contains(colName)) {
                                 argNames.add(mapColumnNames ? columnNameMap.get(colName) : colName);
                                 argTypes.add(supportedMetadataColumns.get(colName).getJavaClass());
                             }
