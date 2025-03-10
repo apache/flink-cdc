@@ -99,10 +99,11 @@ public class ProjectionColumnProcessor {
             return expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
             LOG.error(
-                    "Table:{} column:{} projection:{} execute failed. {}",
+                    "Table:{} column:{} projection:{} column name map:{} execute failed. {}",
                     tableInfo.getName(),
                     projectionColumn.getColumnName(),
                     projectionColumn.getScriptExpression(),
+                    projectionColumn.getColumnNameMap(),
                     e);
             throw new RuntimeException(e);
         }
@@ -215,6 +216,7 @@ public class ProjectionColumnProcessor {
                 JaninoCompiler.loadSystemFunction(scriptExpression),
                 argumentNames,
                 paramTypes,
-                DataTypeConverter.convertOriginalClass(projectionColumn.getDataType()));
+                DataTypeConverter.convertOriginalClass(projectionColumn.getDataType()),
+                columnNameMap);
     }
 }

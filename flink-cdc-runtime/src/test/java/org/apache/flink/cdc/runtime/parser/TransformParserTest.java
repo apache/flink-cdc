@@ -483,13 +483,13 @@ public class TransformParserTest {
 
         List<String> expected =
                 Arrays.asList(
-                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='field0', originalColumnNames=[id], columnNameMap={id=field0}}",
-                        "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(field0)', originalColumnNames=[name], columnNameMap={name=field0}}",
-                        "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='field0 + 1', originalColumnNames=[age], columnNameMap={age=field0}}",
-                        "ProjectionColumn{column=`newCreateTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='field0', originalColumnNames=[createTime], columnNameMap={createTime=field0}}",
-                        "ProjectionColumn{column=`newAddress` VARCHAR(50) 'newAddress', expression='address', scriptExpression='field0', originalColumnNames=[address], columnNameMap={address=field0}}",
-                        "ProjectionColumn{column=`deposits` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='field0', originalColumnNames=[deposit], columnNameMap={deposit=field0}}",
-                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='field0 / field1 * field1', originalColumnNames=[weight, height, height], columnNameMap={weight=field0, height=field1}}");
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
+                        "ProjectionColumn{column=`name` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper($0)', originalColumnNames=[name], columnNameMap={name=$0}}",
+                        "ProjectionColumn{column=`newage` INT, expression='`TB`.`age` + 1', scriptExpression='$0 + 1', originalColumnNames=[age], columnNameMap={age=$0}}",
+                        "ProjectionColumn{column=`newCreateTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='$0', originalColumnNames=[createTime], columnNameMap={createTime=$0}}",
+                        "ProjectionColumn{column=`newAddress` VARCHAR(50) 'newAddress', expression='address', scriptExpression='$0', originalColumnNames=[address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`deposits` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`bmi` DOUBLE, expression='`TB`.`weight` / (`TB`.`height` * `TB`.`height`)', scriptExpression='$0 / $1 * $1', originalColumnNames=[weight, height, height], columnNameMap={weight=$0, height=$1}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
 
         List<ProjectionColumn> metadataResult =
@@ -501,17 +501,17 @@ public class TransformParserTest {
 
         List<String> metadataExpected =
                 Arrays.asList(
-                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='field0', originalColumnNames=[id], columnNameMap={id=field0}}",
-                        "ProjectionColumn{column=`name` STRING 'name', expression='name', scriptExpression='field0', originalColumnNames=[name], columnNameMap={name=field0}}",
-                        "ProjectionColumn{column=`age` INT 'age', expression='age', scriptExpression='field0', originalColumnNames=[age], columnNameMap={age=field0}}",
-                        "ProjectionColumn{column=`createTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='field0', originalColumnNames=[createTime], columnNameMap={createTime=field0}}",
-                        "ProjectionColumn{column=`address` VARCHAR(50) 'newAddress', expression='address', scriptExpression='field0', originalColumnNames=[address], columnNameMap={address=field0}}",
-                        "ProjectionColumn{column=`deposit` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='field0', originalColumnNames=[deposit], columnNameMap={deposit=field0}}",
-                        "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='field0', originalColumnNames=[weight], columnNameMap={weight=field0}}",
-                        "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='field0', originalColumnNames=[height], columnNameMap={height=field0}}",
-                        "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='field0', originalColumnNames=[__namespace_name__], columnNameMap={__namespace_name__=field0}}",
-                        "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='field0', originalColumnNames=[__schema_name__], columnNameMap={__schema_name__=field0}}",
-                        "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='field0', originalColumnNames=[__table_name__], columnNameMap={__table_name__=field0}}");
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
+                        "ProjectionColumn{column=`name` STRING 'name', expression='name', scriptExpression='$0', originalColumnNames=[name], columnNameMap={name=$0}}",
+                        "ProjectionColumn{column=`age` INT 'age', expression='age', scriptExpression='$0', originalColumnNames=[age], columnNameMap={age=$0}}",
+                        "ProjectionColumn{column=`createTime` TIMESTAMP(3) 'newCreateTime', expression='createTime', scriptExpression='$0', originalColumnNames=[createTime], columnNameMap={createTime=$0}}",
+                        "ProjectionColumn{column=`address` VARCHAR(50) 'newAddress', expression='address', scriptExpression='$0', originalColumnNames=[address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`deposit` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='$0', originalColumnNames=[weight], columnNameMap={weight=$0}}",
+                        "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='$0', originalColumnNames=[height], columnNameMap={height=$0}}",
+                        "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='$0', originalColumnNames=[__namespace_name__], columnNameMap={__namespace_name__=$0}}",
+                        "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='$0', originalColumnNames=[__schema_name__], columnNameMap={__schema_name__=$0}}",
+                        "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='$0', originalColumnNames=[__table_name__], columnNameMap={__table_name__=$0}}");
         Assertions.assertThat(metadataResult)
                 .map(ProjectionColumn::toString)
                 .containsExactlyElementsOf(metadataExpected);
@@ -553,15 +553,15 @@ public class TransformParserTest {
 
         List<String> expected =
                 Arrays.asList(
-                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='field0', originalColumnNames=[id], columnNameMap={id=field0}}",
-                        "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper(field0)', originalColumnNames=[name], columnNameMap={name=field0}}",
-                        "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper(field0)', originalColumnNames=[sex], columnNameMap={sex=field0}}",
-                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != field0 ? field0 : field0)', originalColumnNames=[address, address, address], columnNameMap={address=field0}}",
-                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != field0 ? field0 : field0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=field0}}",
-                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != field0 ? field0 : field0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=field0}}",
-                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != field0 ? field0 : field0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=field0}}",
-                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != field0 ? field0 : field0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=field0}}",
-                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != field0 ? field0 : field0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=field0}}");
+                        "ProjectionColumn{column=`id` INT 'id', expression='id', scriptExpression='$0', originalColumnNames=[id], columnNameMap={id=$0}}",
+                        "ProjectionColumn{column=`name2` STRING, expression='UPPER(`TB`.`name`)', scriptExpression='upper($0)', originalColumnNames=[name], columnNameMap={name=$0}}",
+                        "ProjectionColumn{column=`sex2` STRING, expression='UPPER(`TB`.`sex`)', scriptExpression='upper($0)', originalColumnNames=[sex], columnNameMap={sex=$0}}",
+                        "ProjectionColumn{column=`address2` BINARY(50), expression='CASE WHEN `TB`.`address` IS NOT NULL THEN `TB`.`address` ELSE `TB`.`address` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[address, address, address], columnNameMap={address=$0}}",
+                        "ProjectionColumn{column=`phone2` VARBINARY(50), expression='CASE WHEN `TB`.`phone` IS NOT NULL THEN `TB`.`phone` ELSE `TB`.`phone` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[phone, phone, phone], columnNameMap={phone=$0}}",
+                        "ProjectionColumn{column=`deposit2` DECIMAL(10, 2), expression='CASE WHEN `TB`.`deposit` IS NOT NULL THEN `TB`.`deposit` ELSE `TB`.`deposit` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[deposit, deposit, deposit], columnNameMap={deposit=$0}}",
+                        "ProjectionColumn{column=`birthday2` TIMESTAMP(3), expression='CASE WHEN `TB`.`birthday` IS NOT NULL THEN `TB`.`birthday` ELSE `TB`.`birthday` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday, birthday, birthday], columnNameMap={birthday=$0}}",
+                        "ProjectionColumn{column=`birthday_ltz2` TIMESTAMP_LTZ(3), expression='CASE WHEN `TB`.`birthday_ltz` IS NOT NULL THEN `TB`.`birthday_ltz` ELSE `TB`.`birthday_ltz` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[birthday_ltz, birthday_ltz, birthday_ltz], columnNameMap={birthday_ltz=$0}}",
+                        "ProjectionColumn{column=`update_time2` TIME(3), expression='CASE WHEN `TB`.`update_time` IS NOT NULL THEN `TB`.`update_time` ELSE `TB`.`update_time` END', scriptExpression='(null != $0 ? $0 : $0)', originalColumnNames=[update_time, update_time, update_time], columnNameMap={update_time=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 
@@ -667,49 +667,49 @@ public class TransformParserTest {
     @Test
     public void testTranslateUdfFilterToJaninoExpressionWithColumnNameMap() {
         Map<String, String> columnNameMap = new HashMap<>();
-        columnNameMap.put("a", "field0");
-        columnNameMap.put("b", "field1");
-        columnNameMap.put("a-b", "field2");
+        columnNameMap.put("a", "$0");
+        columnNameMap.put("b", "$1");
+        columnNameMap.put("a-b", "$2");
 
         testFilterExpressionWithUdf(
                 "format(upper(a))",
-                "__instanceOfFormatFunctionClass.eval(upper(field0))",
+                "__instanceOfFormatFunctionClass.eval(upper($0))",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "format(lower(b))",
-                "__instanceOfFormatFunctionClass.eval(lower(field1))",
+                "__instanceOfFormatFunctionClass.eval(lower($1))",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "format(concat(a,b))",
-                "__instanceOfFormatFunctionClass.eval(concat(field0, field1))",
+                "__instanceOfFormatFunctionClass.eval(concat($0, $1))",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "format(SUBSTR(`a-b`,1))",
-                "__instanceOfFormatFunctionClass.eval(substr(field2, 1))",
+                "__instanceOfFormatFunctionClass.eval(substr($2, 1))",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(`a-b` like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(like(field2, \"^[a-zA-Z]\"))",
+                "__instanceOfTypeOfFunctionClass.eval(like($2, \"^[a-zA-Z]\"))",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(`a-b` not like '^[a-zA-Z]')",
-                "__instanceOfTypeOfFunctionClass.eval(notLike(field2, \"^[a-zA-Z]\"))",
+                "__instanceOfTypeOfFunctionClass.eval(notLike($2, \"^[a-zA-Z]\"))",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(a-b-`a-b`)",
-                "__instanceOfTypeOfFunctionClass.eval(field0 - field1 - field2)",
+                "__instanceOfTypeOfFunctionClass.eval($0 - $1 - $2)",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "typeof(a-b-2)",
-                "__instanceOfTypeOfFunctionClass.eval(field0 - field1 - 2)",
+                "__instanceOfTypeOfFunctionClass.eval($0 - $1 - 2)",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "addone(addone(`a-b`)) > 4 OR typeof(a-b) <> 'bool' AND format('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(field2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(field0 - field1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columnNameMap);
         testFilterExpressionWithUdf(
                 "ADDONE(ADDONE(`a-b`)) > 4 OR TYPEOF(a-b) <> 'bool' AND FORMAT('from %s to %s is %s', 'a', 'z', 'lie') <> ''",
-                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval(field2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval(field0 - field1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
+                "greaterThan(__instanceOfAddOneFunctionClass.eval(__instanceOfAddOneFunctionClass.eval($2)), 4) || !valueEquals(__instanceOfTypeOfFunctionClass.eval($0 - $1), \"bool\") && !valueEquals(__instanceOfFormatFunctionClass.eval(\"from %s to %s is %s\", \"a\", \"z\", \"lie\"), \"\")",
                 columnNameMap);
     }
 
@@ -762,15 +762,15 @@ public class TransformParserTest {
 
         List<String> expected =
                 Arrays.asList(
-                        "ProjectionColumn{column=`a` INT 'a', expression='a', scriptExpression='field0', originalColumnNames=[a], columnNameMap={a=field0}}",
-                        "ProjectionColumn{column=`b` INT 'b', expression='b', scriptExpression='field0', originalColumnNames=[b], columnNameMap={b=field0}}",
-                        "ProjectionColumn{column=`c` INT, expression='`TB`.`a` - `TB`.`b`', scriptExpression='field0 - field1', originalColumnNames=[a, b], columnNameMap={a=field0, b=field1}}",
-                        "ProjectionColumn{column=`a-b` DOUBLE '`a-b`', expression='a-b', scriptExpression='field0', originalColumnNames=[a-b], columnNameMap={a-b=field0}}",
-                        "ProjectionColumn{column=`d` DOUBLE '`a-b`', expression='a-b', scriptExpression='field0', originalColumnNames=[a-b], columnNameMap={a-b=field0}}",
-                        "ProjectionColumn{column=`e` DOUBLE, expression='`TB`.`a-b` - 1', scriptExpression='field0 - 1', originalColumnNames=[a-b], columnNameMap={a-b=field0}}",
-                        "ProjectionColumn{column=`f` DOUBLE, expression='`TB`.`a` - `TB`.`b` + `TB`.`a-b`', scriptExpression='field0 - field1 + field2', originalColumnNames=[a, b, a-b], columnNameMap={a=field0, b=field1, a-b=field2}}",
-                        "ProjectionColumn{column=`test-meta-col` INT NOT NULL, expression='test-meta-col', scriptExpression='field0', originalColumnNames=[test-meta-col], columnNameMap={test-meta-col=field0}}",
-                        "ProjectionColumn{column=`g` INT, expression='`TB`.`test-meta-col` - `TB`.`a` - `TB`.`b`', scriptExpression='field0 - field1 - field2', originalColumnNames=[test-meta-col, a, b], columnNameMap={a=field1, b=field2, test-meta-col=field0}}");
+                        "ProjectionColumn{column=`a` INT 'a', expression='a', scriptExpression='$0', originalColumnNames=[a], columnNameMap={a=$0}}",
+                        "ProjectionColumn{column=`b` INT 'b', expression='b', scriptExpression='$0', originalColumnNames=[b], columnNameMap={b=$0}}",
+                        "ProjectionColumn{column=`c` INT, expression='`TB`.`a` - `TB`.`b`', scriptExpression='$0 - $1', originalColumnNames=[a, b], columnNameMap={a=$0, b=$1}}",
+                        "ProjectionColumn{column=`a-b` DOUBLE '`a-b`', expression='a-b', scriptExpression='$0', originalColumnNames=[a-b], columnNameMap={a-b=$0}}",
+                        "ProjectionColumn{column=`d` DOUBLE '`a-b`', expression='a-b', scriptExpression='$0', originalColumnNames=[a-b], columnNameMap={a-b=$0}}",
+                        "ProjectionColumn{column=`e` DOUBLE, expression='`TB`.`a-b` - 1', scriptExpression='$0 - 1', originalColumnNames=[a-b], columnNameMap={a-b=$0}}",
+                        "ProjectionColumn{column=`f` DOUBLE, expression='`TB`.`a` - `TB`.`b` + `TB`.`a-b`', scriptExpression='$0 - $1 + $2', originalColumnNames=[a, b, a-b], columnNameMap={a=$0, b=$1, a-b=$2}}",
+                        "ProjectionColumn{column=`test-meta-col` INT NOT NULL, expression='test-meta-col', scriptExpression='$0', originalColumnNames=[test-meta-col], columnNameMap={test-meta-col=$0}}",
+                        "ProjectionColumn{column=`g` INT, expression='`TB`.`test-meta-col` - `TB`.`a` - `TB`.`b`', scriptExpression='$0 - $1 - $2', originalColumnNames=[test-meta-col, a, b], columnNameMap={a=$1, b=$2, test-meta-col=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 

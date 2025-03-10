@@ -362,14 +362,15 @@ public class PostTransformOperatorTest {
                     .primaryKey("id")
                     .build();
 
-    private static final TableId COL_NAME_WITH_MINUS_TABLEID =
-            TableId.tableId("my_company", "my_branch", "col_name_with_minus_table");
-    private static final Schema COL_NAME_WITH_MINUS_SCHEMA =
+    private static final TableId COL_NAME_MAPPING_TABLEID =
+            TableId.tableId("my_company", "my_branch", "col_name_mapping_table");
+    private static final Schema COL_NAME_MAPPING_SCHEMA =
             Schema.newBuilder()
                     .physicalColumn("foo", DataTypes.INT())
                     .physicalColumn("bar", DataTypes.INT())
                     .physicalColumn("foo-bar", DataTypes.INT())
                     .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("class", DataTypes.STRING())
                     .physicalColumn("f0", DataTypes.INT())
                     .physicalColumn("f1", DataTypes.INT())
                     .physicalColumn("f2", DataTypes.INT())
@@ -3268,8 +3269,8 @@ public class PostTransformOperatorTest {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
-                                COL_NAME_WITH_MINUS_TABLEID.identifier(),
-                                "*, foo-bar AS f0, bar-foo AS f1, `foo-bar`-`bar-foo` AS f2",
+                                COL_NAME_MAPPING_TABLEID.identifier(),
+                                "*, class, foo-bar AS f0, bar-foo AS f1, `foo-bar`-`bar-foo` AS f2",
                                 "`foo-bar`-`bar-foo` <> 0")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
@@ -3279,30 +3280,68 @@ public class PostTransformOperatorTest {
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
         CreateTableEvent createTableEvent =
-                new CreateTableEvent(COL_NAME_WITH_MINUS_TABLEID, COL_NAME_WITH_MINUS_SCHEMA);
+                new CreateTableEvent(COL_NAME_MAPPING_TABLEID, COL_NAME_MAPPING_SCHEMA);
         BinaryRecordDataGenerator recordDataGenerator =
-                new BinaryRecordDataGenerator(
-                        ((RowType) COL_NAME_WITH_MINUS_SCHEMA.toRowDataType()));
+                new BinaryRecordDataGenerator(((RowType) COL_NAME_MAPPING_SCHEMA.toRowDataType()));
         // Insert
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
-                        COL_NAME_WITH_MINUS_TABLEID,
-                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, null, null, null}));
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    2,
+                                    3,
+                                    4,
+                                    BinaryStringData.fromString("class0"),
+                                    null,
+                                    null,
+                                    null
+                                }));
         DataChangeEvent insertEventExpect =
                 DataChangeEvent.insertEvent(
-                        COL_NAME_WITH_MINUS_TABLEID,
-                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, -1, 1, -1}));
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, 2, 3, 4, BinaryStringData.fromString("class0"), -1, 1, -1
+                                }));
         // Update
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
-                        COL_NAME_WITH_MINUS_TABLEID,
-                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, null, null, null}),
-                        recordDataGenerator.generate(new Object[] {2, 4, 6, 8, null, null, null}));
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    2,
+                                    3,
+                                    4,
+                                    BinaryStringData.fromString("class0"),
+                                    null,
+                                    null,
+                                    null
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    2,
+                                    4,
+                                    6,
+                                    8,
+                                    BinaryStringData.fromString("class1"),
+                                    null,
+                                    null,
+                                    null
+                                }));
         DataChangeEvent updateEventExpect =
                 DataChangeEvent.updateEvent(
-                        COL_NAME_WITH_MINUS_TABLEID,
-                        recordDataGenerator.generate(new Object[] {1, 2, 3, 4, -1, 1, -1}),
-                        recordDataGenerator.generate(new Object[] {2, 4, 6, 8, -2, 2, -2}));
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, 2, 3, 4, BinaryStringData.fromString("class0"), -1, 1, -1
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    2, 4, 6, 8, BinaryStringData.fromString("class1"), -2, 2, -2
+                                }));
 
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
@@ -3310,7 +3349,7 @@ public class PostTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(
-                                        COL_NAME_WITH_MINUS_TABLEID, COL_NAME_WITH_MINUS_SCHEMA)));
+                                        COL_NAME_MAPPING_TABLEID, COL_NAME_MAPPING_SCHEMA)));
         transform.processElement(new StreamRecord<>(insertEvent));
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())

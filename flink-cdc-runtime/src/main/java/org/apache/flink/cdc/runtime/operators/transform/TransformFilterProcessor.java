@@ -96,9 +96,10 @@ public class TransformFilterProcessor {
                     expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
             LOG.error(
-                    "Table:{} filter:{} execute failed. {}",
+                    "Table:{} filter:{} column name map:{} execute failed. {}",
                     tableInfo.getName(),
                     transformFilter.getExpression(),
+                    transformFilter.getColumnNameMap(),
                     e);
             throw new RuntimeException(e);
         } catch (IllegalArgumentException e) {
@@ -204,6 +205,7 @@ public class TransformFilterProcessor {
                 JaninoCompiler.loadSystemFunction(transformFilter.getScriptExpression()),
                 args.f0,
                 args.f1,
-                Boolean.class);
+                Boolean.class,
+                transformFilter.getColumnNameMap());
     }
 }

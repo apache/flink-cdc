@@ -1170,28 +1170,31 @@ public class UnifiedTransformOperatorTest {
         TableId tableId = TableId.tableId("my_company", "my_branch", "column_name_map");
         UnifiedTransformTestCase.of(
                         tableId,
-                        "foo-bar AS f0, `foo-bar`, foo-bar-`foo-bar` AS f1",
+                        "foo-bar AS f0, `foo-bar`, foo-bar-`foo-bar` AS f1, class",
                         "foo-bar <> 0",
                         Schema.newBuilder()
                                 .physicalColumn("foo", DataTypes.INT())
                                 .physicalColumn("bar", DataTypes.INT())
                                 .physicalColumn("foo-bar", DataTypes.INT())
                                 .physicalColumn("bar-foo", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("foo", DataTypes.INT())
                                 .physicalColumn("bar", DataTypes.INT())
                                 .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("f0", DataTypes.INT())
                                 .physicalColumn("foo-bar", DataTypes.INT())
                                 .physicalColumn("f1", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
                                 .build())
                 .initializeHarness()
-                .insertSource(1, 2, 3, 4)
-                .insertPreTransformed(1, 2, 3)
-                .insertPostTransformed(-1, 3, -4)
+                .insertSource(1, 2, 3, 4, "class")
+                .insertPreTransformed(1, 2, 3, "class")
+                .insertPostTransformed(-1, 3, -4, "class")
                 .runTests()
                 .destroyHarness();
     }
