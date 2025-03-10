@@ -36,10 +36,19 @@ public class DataSinkWriterOperatorFactory<CommT>
                 YieldingOperatorFactory<CommittableMessage<CommT>> {
 
     private final Sink<Event> sink;
+    private final boolean isBatchMode;
     private final OperatorID schemaOperatorID;
 
     public DataSinkWriterOperatorFactory(Sink<Event> sink, OperatorID schemaOperatorID) {
         this.sink = sink;
+        this.isBatchMode = false;
+        this.schemaOperatorID = schemaOperatorID;
+    }
+
+    public DataSinkWriterOperatorFactory(
+            Sink<Event> sink, boolean isBatchMode, OperatorID schemaOperatorID) {
+        this.sink = sink;
+        this.isBatchMode = isBatchMode;
         this.schemaOperatorID = schemaOperatorID;
     }
 
@@ -47,6 +56,17 @@ public class DataSinkWriterOperatorFactory<CommT>
     @Override
     public <T extends StreamOperator<CommittableMessage<CommT>>> T createStreamOperator(
             StreamOperatorParameters<CommittableMessage<CommT>> parameters) {
+
+        if (isBatchMode) {
+            DataBatchSinkWriterOperator<CommT> writerOperator =
+                    new DataBatchSinkWriterOperator<>(
+                            sink, processingTimeService, getMailboxExecutor());
+            writerOperator.setup(
+                    parameters.getContainingTask(),
+                    parameters.getStreamConfig(),
+                    parameters.getOutput());
+            return (T) writerOperator;
+        }
         DataSinkWriterOperator<CommT> writerOperator =
                 new DataSinkWriterOperator<>(
                         sink, processingTimeService, getMailboxExecutor(), schemaOperatorID);
@@ -59,6 +79,9 @@ public class DataSinkWriterOperatorFactory<CommT>
 
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
+        if (isBatchMode) {
+            return DataBatchSinkWriterOperator.class;
+        }
         return DataSinkWriterOperator.class;
     }
 }
