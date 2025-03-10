@@ -77,16 +77,13 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private Map<TableId, CreateTableEvent> createTableEventCache;
     // Used when startup mode is not initial
-    private boolean isBatchMode = false;
     private boolean alreadySendCreateTableForBinlogSplit = false;
     private boolean alreadySendAllCreateTable = false;
-    private List<CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            MySqlSourceConfig sourceConfig,
-            boolean isBatchMode) {
+            MySqlSourceConfig sourceConfig) {
         super(
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
@@ -145,7 +142,6 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 }
             }
         }
-
         super.processElement(element, output, splitState);
     }
 
