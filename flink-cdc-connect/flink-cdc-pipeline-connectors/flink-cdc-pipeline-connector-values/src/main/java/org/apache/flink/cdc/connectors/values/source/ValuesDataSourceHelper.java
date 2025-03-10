@@ -79,38 +79,17 @@ public class ValuesDataSourceHelper {
     private static List<List<Event>> sourceEvents;
 
     public static List<List<Event>> getSourceEvents() {
-        return getSourceEvents(false);
-    }
-
-    public static List<List<Event>> getSourceEvents(boolean isBatchSource) {
         if (sourceEvents == null) {
             // use default enum of SINGLE_SPLIT_SINGLE_TABLE
             sourceEvents = singleSplitSingleTable();
         }
         // put all events into one list to avoid CI failure and make sure that SchemaChangeEvent are
         // sent in order.
-        if (!isBatchSource) {
-            List<Event> mergeEvents = new ArrayList<>();
-            for (List<Event> events : sourceEvents) {
-                mergeEvents.addAll(events);
-            }
-            return Collections.singletonList(mergeEvents);
-        }
         List<Event> mergeEvents = new ArrayList<>();
-        List<Event> dataChangeEvents = new ArrayList<>();
         for (List<Event> events : sourceEvents) {
-            for (Event event : events) {
-                if (event instanceof CreateTableEvent) {
-                    mergeEvents.add(event);
-                } else {
-                    dataChangeEvents.add(event);
-                }
-            }
+            mergeEvents.addAll(events);
         }
-        mergeEvents.addAll(dataChangeEvents);
-
-        sourceEvents = Collections.singletonList(mergeEvents);
-        return sourceEvents;
+        return Collections.singletonList(mergeEvents);
     }
 
     /** set sourceEvents using custom events. */

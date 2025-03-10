@@ -1173,6 +1173,7 @@ public class FlinkPipelineBatchComposerITCase {
 
     private List<Event> generateTemporalColumnEvents(String tableNamePrefix) {
         List<Event> events = new ArrayList<>();
+        List<Event> dataChangeEvents = new ArrayList<>();
 
         // Initialize schemas
         List<String> names = Arrays.asList("ts_0", "ts_9", "tz_0", "tz_9", "ltz_0", "ltz_9");
@@ -1221,7 +1222,7 @@ public class FlinkPipelineBatchComposerITCase {
                             "default_namespace", "default_schema", tableNamePrefix + names.get(i));
             Schema generatedSchema = schemas.get(i);
             events.add(new CreateTableEvent(generatedTableId, generatedSchema));
-            events.add(
+            dataChangeEvents.add(
                     DataChangeEvent.insertEvent(
                             generatedTableId,
                             generate(generatedSchema, 1 + i, "Alice", 17, values.get(i))));
@@ -1232,17 +1233,19 @@ public class FlinkPipelineBatchComposerITCase {
                     TableId.tableId(
                             "default_namespace", "default_schema", tableNamePrefix + names.get(i));
             Schema generatedSchema = schemas.get(i);
-            events.add(
+            dataChangeEvents.add(
                     DataChangeEvent.insertEvent(
                             generatedTableId,
                             generate(generatedSchema, 101 + i, "Zen", 19, values.get(i))));
         }
 
+        events.addAll(dataChangeEvents);
         return events;
     }
 
     private List<Event> generateDecimalColumnEvents(String tableNamePrefix) {
         List<Event> events = new ArrayList<>();
+        List<Event> dataChangeEvents = new ArrayList<>();
 
         // Initialize schemas
         List<String> names =
@@ -1298,7 +1301,7 @@ public class FlinkPipelineBatchComposerITCase {
                             "default_namespace", "default_schema", tableNamePrefix + names.get(i));
             Schema generatedSchema = schemas.get(i);
             events.add(new CreateTableEvent(generatedTableId, generatedSchema));
-            events.add(
+            dataChangeEvents.add(
                     DataChangeEvent.insertEvent(
                             generatedTableId,
                             generate(generatedSchema, 1 + i, "Alice", 17, values.get(i))));
@@ -1309,12 +1312,13 @@ public class FlinkPipelineBatchComposerITCase {
                     TableId.tableId(
                             "default_namespace", "default_schema", tableNamePrefix + names.get(i));
             Schema generatedSchema = schemas.get(i);
-            events.add(
+            dataChangeEvents.add(
                     DataChangeEvent.insertEvent(
                             generatedTableId,
                             generate(generatedSchema, 101 + i, "Zen", 19, values.get(i))));
         }
 
+        events.addAll(dataChangeEvents);
         return events;
     }
 
