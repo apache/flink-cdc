@@ -61,7 +61,8 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected boolean scanNewlyAddedTableEnabled =
             JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
     protected boolean assignUnboundedChunkFirst =
-            JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue();
+            JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                    .defaultValue();
 
     /** Integer port number of the database server. */
     public JdbcSourceConfigFactory hostname(String hostname) {
