@@ -183,6 +183,8 @@ public class MongoDBTableFactoryTest {
         options.put("scan.newly-added-table.enabled", "true");
         options.put("scan.full-changelog", "true");
         options.put("scan.cursor.no-timeout", "false");
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", "true");
+
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =

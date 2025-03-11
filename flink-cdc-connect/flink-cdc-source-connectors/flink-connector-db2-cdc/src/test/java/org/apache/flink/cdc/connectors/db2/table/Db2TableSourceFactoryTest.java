@@ -130,6 +130,7 @@ public class Db2TableSourceFactoryTest {
         options.put("port", "50000");
         options.put("server-time-zone", "Asia/Shanghai");
         options.put("debezium.snapshot.mode", "schema_only");
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(options, SCHEMA);
         Properties dbzProperties = new Properties();

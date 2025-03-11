@@ -822,6 +822,7 @@ public class MySqlTableSourceFactoryTest {
         Map<String, String> properties = getAllOptions();
         properties.put("scan.parse.online.schema.changes.enabled", "true");
         properties.put("use.legacy.json.format", "true");
+        properties.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", "true");
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
