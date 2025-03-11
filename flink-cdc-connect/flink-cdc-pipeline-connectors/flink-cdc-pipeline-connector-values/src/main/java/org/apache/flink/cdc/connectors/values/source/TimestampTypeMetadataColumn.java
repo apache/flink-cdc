@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 
 import java.util.Map;
 
-/** A {@link SupportedMetadataColumn} for op_ts. */
+/** A {@link SupportedMetadataColumn} for timestamp-type. */
 public class TimestampTypeMetadataColumn implements SupportedMetadataColumn {
 
     @Override
