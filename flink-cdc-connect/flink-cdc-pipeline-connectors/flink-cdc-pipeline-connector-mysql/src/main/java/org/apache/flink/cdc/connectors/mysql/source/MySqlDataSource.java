@@ -81,6 +81,7 @@ public class MySqlDataSource implements DataSource {
                         (sourceReaderMetrics, sourceConfig) ->
                                 new MySqlPipelineRecordEmitter(
                                         deserializer, sourceReaderMetrics, sourceConfig));
+
         return FlinkSourceProvider.of(source);
     }
 

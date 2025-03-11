@@ -48,7 +48,6 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         int failAtPos =
                 context.getFactoryConfiguration()
                         .get(ValuesDataSourceOptions.FAILURE_INJECTION_INDEX);
-
         return new ValuesDataSource(eventType, failAtPos);
     }
 
