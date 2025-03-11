@@ -244,6 +244,49 @@ public class PaimonMetadataApplierTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
+    public void testCreateTableWithoutPrimaryKey(String metastore)
+            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table1"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .physicalColumn(
+                                        "col3",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .physicalColumn(
+                                        "col4",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        Table table = catalog.getTable(Identifier.fromString("test.table1"));
+        RowType tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(0, "col1", DataTypes.STRING().notNull()),
+                                new DataField(1, "col2", DataTypes.STRING()),
+                                new DataField(2, "col3", DataTypes.STRING()),
+                                new DataField(3, "col4", DataTypes.STRING())));
+        Assertions.assertEquals(tableSchema, table.rowType());
+        Assertions.assertEquals(new ArrayList<>(), table.primaryKeys());
+        Assertions.assertEquals(new ArrayList<>(), table.partitionKeys());
+        Assertions.assertEquals("-1", table.options().get("bucket"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithOptions(String metastore)
             throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
                     Catalog.DatabaseNotExistException, SchemaEvolveException {

@@ -31,6 +31,7 @@ import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,6 +70,60 @@ public class PaimonHashFunctionTest {
     public void afterEach() throws Exception {
         catalog.dropDatabase(TEST_DATABASE, true, true);
         catalog.close();
+    }
+
+    @Test
+    public void testHashCodeForAppendOnlyTable() {
+        TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
+        Map<String, String> tableOptions = new HashMap<>();
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("pt", DataTypes.STRING())
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        metadataApplier.applySchemaChange(createTableEvent);
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+        PaimonHashFunction hashFunction =
+                new PaimonHashFunction(catalogOptions, tableId, schema, ZoneId.systemDefault(), 4);
+        DataChangeEvent dataChangeEvent1 =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("2024")
+                                }));
+        int key1 = hashFunction.hashcode(dataChangeEvent1);
+
+        DataChangeEvent dataChangeEvent2 =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("2024")
+                                }));
+        int key2 = hashFunction.hashcode(dataChangeEvent2);
+
+        DataChangeEvent dataChangeEvent3 =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("3"),
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("2024")
+                                }));
+        int key3 = hashFunction.hashcode(dataChangeEvent3);
+        Assertions.assertTrue(
+                key1 >= 0 && key1 < 4 && key2 >= 0 && key2 < 4 && key3 >= 0 && key3 < 4);
     }
 
     @Test

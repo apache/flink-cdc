@@ -24,12 +24,14 @@ import org.apache.flink.cdc.common.function.HashFunction;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonWriterHelper;
 
+import org.apache.paimon.AppendOnlyFileStore;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.RowAssignerChannelComputer;
 import org.apache.paimon.options.Options;
+import org.apache.paimon.shade.org.apache.commons.lang3.RandomUtils;
 import org.apache.paimon.table.FileStoreTable;
 
 import java.io.Serializable;
@@ -48,8 +50,11 @@ public class PaimonHashFunction implements HashFunction<DataChangeEvent>, Serial
 
     private final RowAssignerChannelComputer channelComputer;
 
+    private final int parallelism;
+
     public PaimonHashFunction(
             Options options, TableId tableId, Schema schema, ZoneId zoneId, int parallelism) {
+        this.parallelism = parallelism;
         Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(options);
         FileStoreTable table;
         try {
@@ -57,14 +62,25 @@ public class PaimonHashFunction implements HashFunction<DataChangeEvent>, Serial
         } catch (Catalog.TableNotExistException e) {
             throw new RuntimeException(e);
         }
-        this.fieldGetters = PaimonWriterHelper.createFieldGetters(schema, zoneId);
-        channelComputer = new RowAssignerChannelComputer(table.schema(), parallelism);
-        channelComputer.setup(parallelism);
+        if (table instanceof AppendOnlyFileStore) {
+            this.fieldGetters = null;
+            channelComputer = null;
+        } else {
+            this.fieldGetters = PaimonWriterHelper.createFieldGetters(schema, zoneId);
+            channelComputer = new RowAssignerChannelComputer(table.schema(), parallelism);
+            channelComputer.setup(parallelism);
+        }
     }
 
     @Override
     public int hashcode(DataChangeEvent event) {
-        GenericRow genericRow = PaimonWriterHelper.convertEventToGenericRow(event, fieldGetters);
-        return channelComputer.channel(genericRow);
+        if (channelComputer != null) {
+            GenericRow genericRow =
+                    PaimonWriterHelper.convertEventToGenericRow(event, fieldGetters);
+            return channelComputer.channel(genericRow);
+        } else {
+            // Avoid sending all events to the same subtask when table has no primary key.
+            return RandomUtils.nextInt(0, parallelism);
+        }
     }
 }

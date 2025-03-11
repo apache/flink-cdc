@@ -147,14 +147,24 @@ public class PaimonSinkITCase {
     }
 
     private List<Event> createTestEvents(boolean enableDeleteVectors) throws SchemaEvolveException {
+        return createTestEvents(enableDeleteVectors, false, true);
+    }
+
+    private List<Event> createTestEvents(
+            boolean enableDeleteVectors, boolean appendOnly, boolean enabledBucketKey)
+            throws SchemaEvolveException {
         List<Event> testEvents = new ArrayList<>();
+        Schema.Builder builder = Schema.newBuilder();
+        if (!appendOnly) {
+            builder.primaryKey("col1");
+        } else if (enabledBucketKey) {
+            builder.option("bucket-key", "col1");
+            builder.option("bucket", "5");
+        }
         // create table
         Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", STRING())
+                builder.physicalColumn("col1", STRING())
                         .physicalColumn("col2", STRING())
-                        .primaryKey("col1")
-                        .option("bucket", "1")
                         .option("deletion-vectors.enabled", String.valueOf(enableDeleteVectors))
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
@@ -228,6 +238,41 @@ public class PaimonSinkITCase {
                             Row.ofKind(RowKind.INSERT, 2L),
                             Row.ofKind(RowKind.INSERT, 4L));
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"filesystem, true", "hive, true", "filesystem, false", "hive, false"})
+    public void testSinkWithDataChangeForAppendOnlyTable(String metastore, boolean enabledBucketKey)
+            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        PaimonSink<Event> paimonSink =
+                new PaimonSink<>(
+                        catalogOptions, new PaimonRecordEventSerializer(ZoneId.systemDefault()));
+        PaimonWriter<Event> writer = paimonSink.createWriter(new MockInitContext());
+        Committer<MultiTableCommittable> committer = paimonSink.createCommitter();
+
+        // insert
+        writeAndCommit(
+                writer,
+                committer,
+                createTestEvents(false, true, enabledBucketKey).toArray(new Event[0]));
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"), Row.ofKind(RowKind.INSERT, "2", "2"));
+
+        // Insert
+        writeAndCommit(
+                writer,
+                committer,
+                generateInsert(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3"))));
+
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"));
     }
 
     @ParameterizedTest
