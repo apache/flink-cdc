@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkFactory}. */
-public class StarRocksDataSinkFactoryTest {
+class StarRocksDataSinkFactoryTest {
 
     @Test
     void testCreateDataSink() {
@@ -153,7 +153,7 @@ public class StarRocksDataSinkFactoryTest {
     }
 
     @Test
-    void testCreateDataSinkWithSpecificedTimeZone() {
+    void testCreateDataSinkWithSpecifiedTimeZone() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("starrocks", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(StarRocksDataSinkFactory.class);
@@ -180,7 +180,7 @@ public class StarRocksDataSinkFactoryTest {
         Assertions.assertThat(dataSink).isInstanceOf(StarRocksDataSink.class);
 
         ZoneId zoneId = ((StarRocksDataSink) dataSink).getZoneId();
-        ZoneId expectedZondId = ZoneId.of("America/Los_Angeles");
-        Assertions.assertThat(zoneId).isEqualTo(expectedZondId);
+        ZoneId expectedZoneId = ZoneId.of("America/Los_Angeles");
+        Assertions.assertThat(zoneId).isEqualTo(expectedZoneId);
     }
 }

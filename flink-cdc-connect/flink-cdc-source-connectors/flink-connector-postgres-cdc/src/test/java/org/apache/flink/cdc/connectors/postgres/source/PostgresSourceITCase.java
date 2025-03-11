@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.testutils.PostgresTestUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTable;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -46,13 +47,14 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.assertj.core.api.Assumptions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -63,6 +65,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -75,12 +78,11 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link PostgresSourceBuilder.PostgresIncrementalSource}. */
-@RunWith(Parameterized.class)
-public class PostgresSourceITCase extends PostgresTestBase {
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
+class PostgresSourceITCase extends PostgresTestBase {
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
 
@@ -93,19 +95,16 @@ public class PostgresSourceITCase extends PostgresTestBase {
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
     private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
-    private final String scanStartupMode;
-
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
-
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .build()));
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -136,117 +135,129 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     "+I[2003, user_24, Shanghai, 123567891234]",
                     "+U[1010, user_11, Hangzhou, 123567891234]");
 
-    public PostgresSourceITCase(String scanStartupMode) {
-        this.scanStartupMode = scanStartupMode;
-    }
-
-    @Parameterized.Parameters(name = "scanStartupMode: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {"initial"}, new Object[] {"latest-offset"}};
-    }
-
-    @Before
+    @BeforeEach
     public void before() {
         customDatabase.createAndInitialize();
         this.slotName = getSlotName();
     }
 
-    @After
+    @AfterEach
     public void after() throws Exception {
         // sleep 1000ms to wait until connections are closed.
         Thread.sleep(1000L);
         customDatabase.removeSlot(slotName);
     }
 
-    @Test
-    public void testReadSingleTableWithSingleParallelism() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testReadSingleTableWithSingleParallelism(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 1,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"});
+                new String[] {"customers"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testReadSingleTableWithMultipleParallelism() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testReadSingleTableWithMultipleParallelism(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 4,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"});
+                new String[] {"customers"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testReadMultipleTableWithSingleParallelism() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testReadMultipleTableWithSingleParallelism(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 1,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_1"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testReadMultipleTableWithMultipleParallelism() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testReadMultipleTableWithMultipleParallelism(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 4,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_1"},
+                scanStartupMode);
     }
 
     // Failover tests
-    @Test
-    public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testTaskManagerFailoverInSnapshotPhase(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_1"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testTaskManagerFailoverInStreamPhase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testTaskManagerFailoverInStreamPhase(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_1"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testJobManagerFailoverInSnapshotPhase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testJobManagerFailoverInSnapshotPhase(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_1"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testJobManagerFailoverInStreamPhase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testJobManagerFailoverInStreamPhase(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
-                new String[] {"customers", "customers_1"});
+                new String[] {"customers", "customers_1"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testTaskManagerFailoverSingleParallelism() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testTaskManagerFailoverSingleParallelism(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 1,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"});
+                new String[] {"customers"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testJobManagerFailoverSingleParallelism() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testJobManagerFailoverSingleParallelism(String scanStartupMode) throws Exception {
         testPostgresParallelSource(
                 1,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
-                new String[] {"customers"});
+                new String[] {"customers"},
+                scanStartupMode);
     }
 
-    @Test
-    public void testConsumingTableWithoutPrimaryKey() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testConsumingTableWithoutPrimaryKey(String scanStartupMode) throws Exception {
         if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             try {
                 testPostgresParallelSource(
@@ -257,13 +268,13 @@ public class PostgresSourceITCase extends PostgresTestBase {
                         new String[] {"customers_no_pk"},
                         RestartStrategies.noRestart());
             } catch (Exception e) {
-                assertTrue(
-                        ExceptionUtils.findThrowableWithMessage(
+                Assertions.assertThat(
+                                ExceptionUtils.findThrowableWithMessage(
                                         e,
                                         String.format(
                                                 "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                                SCHEMA_NAME + ".customers_no_pk"))
-                                .isPresent());
+                                                SCHEMA_NAME + ".customers_no_pk")))
+                        .isPresent();
             }
         } else {
             testPostgresParallelSource(
@@ -276,8 +287,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @Test
-    public void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill(String scanStartupMode)
+            throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
@@ -288,8 +301,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
 
-    @Test
-    public void testDebeziumSlotDropOnStop() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testDebeziumSlotDropOnStop(String scanStartupMode) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -350,8 +364,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         tableResult.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testSnapshotOnlyModeWithDMLPostHighWaterMark(String scanStartupMode) throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -382,8 +397,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @Test
-    public void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testSnapshotOnlyModeWithDMLPreHighWaterMark(String scanStartupMode) throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -416,8 +432,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @Test
-    public void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testEnableBackfillWithDMLPreHighWaterMark(String scanStartupMode) throws Exception {
         if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
@@ -454,8 +471,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @Test
-    public void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testEnableBackfillWithDMLPostLowWaterMark(String scanStartupMode) throws Exception {
         if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
@@ -492,8 +510,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @Test
-    public void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testSkipBackfillWithDMLPreHighWaterMark(String scanStartupMode) throws Exception {
         if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
@@ -534,8 +553,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @Test
-    public void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testSkipBackfillWithDMLPostLowWaterMark(String scanStartupMode) throws Exception {
         if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             return;
         }
@@ -577,8 +597,9 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @Test
-    public void testNewLsnCommittedWhenCheckpoint() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testNewLsnCommittedWhenCheckpoint(String scanStartupMode) throws Exception {
         int parallelism = 1;
         PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.JM;
         PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
@@ -643,11 +664,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(1000L);
     }
 
-    @Test
-    public void testTableWithChunkColumnOfNoPrimaryKey() {
-        if (!DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
-            return;
-        }
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) {
+        Assumptions.assumeThat(scanStartupMode).isEqualTo(DEFAULT_SCAN_STARTUP_MODE);
         String chunkColumn = "name";
         try {
             testPostgresParallelSource(
@@ -660,18 +680,17 @@ public class PostgresSourceITCase extends PostgresTestBase {
                     Collections.singletonMap(
                             "scan.incremental.snapshot.chunk.key-column", chunkColumn));
         } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    String.format(
-                                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                            chunkColumn, "id", "customer.customers"))
-                            .isPresent());
+            Assertions.assertThat(e)
+                    .hasStackTraceContaining(
+                            String.format(
+                                    "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                                    chunkColumn, "id", "customer.customers"));
         }
     }
 
-    @Test
-    public void testHeartBeat() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testHeartBeat(String scanStartupMode) throws Exception {
         try (PostgresConnection connection = getConnection()) {
             connection.execute("CREATE TABLE IF NOT EXISTS heart_beat_table(a int)");
             connection.commit();
@@ -679,7 +698,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         TableId tableId = new TableId(null, "public", "heart_beat_table");
         try (PostgresConnection connection = getConnection()) {
-            assertEquals(0, getCountOfTable(connection, tableId));
+            Assertions.assertThat(getCountOfTable(connection, tableId)).isZero();
         }
 
         Map<String, String> options = new HashMap<>();
@@ -694,7 +713,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                 RestartStrategies.noRestart(),
                 options);
         try (PostgresConnection connection = getConnection()) {
-            assertTrue(getCountOfTable(connection, tableId) > 0);
+            assertThat(getCountOfTable(connection, tableId)).isGreaterThan(0);
         }
     }
 
@@ -782,17 +801,23 @@ public class PostgresSourceITCase extends PostgresTestBase {
     private void testPostgresParallelSource(
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
-            String[] captureCustomerTables)
+            String[] captureCustomerTables,
+            String scanStartupMode)
             throws Exception {
         testPostgresParallelSource(
-                DEFAULT_PARALLELISM, failoverType, failoverPhase, captureCustomerTables);
+                DEFAULT_PARALLELISM,
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                scanStartupMode);
     }
 
     private void testPostgresParallelSource(
             int parallelism,
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
-            String[] captureCustomerTables)
+            String[] captureCustomerTables,
+            String scanStartupMode)
             throws Exception {
         testPostgresParallelSource(
                 parallelism,
@@ -939,7 +964,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == PostgresTestUtils.FailoverPhase.SNAPSHOT && iterator.hasNext()) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(3000));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(3000));
         }
 
         assertEqualsInAnyOrder(
@@ -967,7 +995,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
         for (String tableId : captureCustomerTables) {
@@ -985,7 +1016,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
     }
 
     private void checkStreamDataWithHook(
@@ -1022,7 +1053,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
                             triggerFailover(
                                     failoverType,
                                     jobId,
-                                    miniClusterResource.getMiniCluster(),
+                                    miniClusterResource.get().getMiniCluster(),
                                     () -> sleepMs(200));
                             countDownLatch.countDown();
                         }
@@ -1036,7 +1067,10 @@ public class PostgresSourceITCase extends PostgresTestBase {
 
         if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
         for (String tableId : captureCustomerTables) {
@@ -1054,7 +1088,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
     }
 
     private void checkStreamDataWithDDLDuringFailover(
@@ -1081,7 +1115,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
             triggerFailover(
                     failoverType,
                     jobId,
-                    miniClusterResource.getMiniCluster(),
+                    miniClusterResource.get().getMiniCluster(),
                     () -> {
                         for (String tableId : captureCustomerTables) {
                             try {
@@ -1110,7 +1144,7 @@ public class PostgresSourceITCase extends PostgresTestBase {
         Thread.sleep(2000L);
 
         assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
-        assertTrue(!hasNextData(iterator));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
     }
 
     private void sleepMs(long millis) {

@@ -28,16 +28,16 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 /** A test for the {@link org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkHelper}. */
-public class ValuesDataSinkHelperTest {
+class ValuesDataSinkHelperTest {
 
     @Test
-    public void testConvertEventToStr() {
+    void testConvertEventToStr() {
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING())
@@ -49,10 +49,11 @@ public class ValuesDataSinkHelperTest {
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
 
         List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(schema);
-        Assert.assertEquals(
-                "CreateTableEvent{tableId=default.default.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
-                ValuesDataSinkHelper.convertEventToStr(
-                        new CreateTableEvent(tableId, schema), fieldGetters));
+        Assertions.assertThat(
+                        ValuesDataSinkHelper.convertEventToStr(
+                                new CreateTableEvent(tableId, schema), fieldGetters))
+                .isEqualTo(
+                        "CreateTableEvent{tableId=default.default.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}");
 
         DataChangeEvent insertEvent =
                 DataChangeEvent.insertEvent(
@@ -62,9 +63,9 @@ public class ValuesDataSinkHelperTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
                                 }));
-        Assert.assertEquals(
-                "DataChangeEvent{tableId=default.default.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
-                ValuesDataSinkHelper.convertEventToStr(insertEvent, fieldGetters));
+        Assertions.assertThat(ValuesDataSinkHelper.convertEventToStr(insertEvent, fieldGetters))
+                .isEqualTo(
+                        "DataChangeEvent{tableId=default.default.table1, before=[], after=[1, 1], op=INSERT, meta=()}");
         DataChangeEvent deleteEvent =
                 DataChangeEvent.deleteEvent(
                         tableId,
@@ -73,9 +74,9 @@ public class ValuesDataSinkHelperTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
                                 }));
-        Assert.assertEquals(
-                "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[], op=DELETE, meta=()}",
-                ValuesDataSinkHelper.convertEventToStr(deleteEvent, fieldGetters));
+        Assertions.assertThat(ValuesDataSinkHelper.convertEventToStr(deleteEvent, fieldGetters))
+                .isEqualTo(
+                        "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[], op=DELETE, meta=()}");
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
                         tableId,
@@ -89,8 +90,8 @@ public class ValuesDataSinkHelperTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("x")
                                 }));
-        Assert.assertEquals(
-                "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[1, x], op=UPDATE, meta=()}",
-                ValuesDataSinkHelper.convertEventToStr(updateEvent, fieldGetters));
+        Assertions.assertThat(ValuesDataSinkHelper.convertEventToStr(updateEvent, fieldGetters))
+                .isEqualTo(
+                        "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[1, x], op=UPDATE, meta=()}");
     }
 }

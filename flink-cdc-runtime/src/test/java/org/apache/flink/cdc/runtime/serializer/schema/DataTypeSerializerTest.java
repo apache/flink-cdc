@@ -27,6 +27,7 @@ import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,11 +38,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
 /** A test for the {@link DataTypeSerializer}. */
-public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
+class DataTypeSerializerTest extends SerializerTestBase<DataType> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DataTypeSerializerTest.class);
 
@@ -108,12 +106,14 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
         DataTypeSerializer serializer = new DataTypeSerializer();
 
         // Log to ensure INSTANCE is initialized
-        assertNotNull(RowTypeSerializer.INSTANCE, "RowTypeSerializer.INSTANCE is null");
+        Assertions.assertThat(RowTypeSerializer.INSTANCE)
+                .as("RowTypeSerializer.INSTANCE should not be null")
+                .isNotNull();
         LOG.info("RowTypeSerializer.INSTANCE is initialized");
 
         // Copy the RowType
         RowType copiedRow = (RowType) serializer.copy(outerRowType);
-        assertNotNull(copiedRow, "Copied RowType is null");
+        Assertions.assertThat(copiedRow).as("Copied RowType should not be null").isNotNull();
         LOG.info("Copied RowType: {}", copiedRow);
 
         // Serialize the RowType
@@ -128,9 +128,11 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
         RowType deserializedRow = (RowType) serializer.deserialize(inputView);
 
         // Assert that the deserialized RowType is not null and equals the original
-        assertNotNull(deserializedRow, "Deserialized RowType is null");
-        assertEquals(
-                outerRowType, deserializedRow, "Deserialized RowType does not match the original");
+        Assertions.assertThat(deserializedRow)
+                .as("Deserialized RowType should not be null")
+                .isNotNull()
+                .as("Deserialized RowType should match the original")
+                .isEqualTo(outerRowType);
         LOG.info("Deserialized RowType: {}", deserializedRow);
     }
 }

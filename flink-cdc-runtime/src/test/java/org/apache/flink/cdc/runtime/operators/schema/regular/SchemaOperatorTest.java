@@ -50,7 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 
 /** Unit tests for the {@link SchemaOperator}. */
-public class SchemaOperatorTest {
+class SchemaOperatorTest {
 
     private static final TableId CUSTOMERS =
             TableId.tableId("my_company", "my_branch", "customers");

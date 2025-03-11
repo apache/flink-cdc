@@ -37,19 +37,19 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonGenerator
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 
 /** Tests for {@link CanalJsonSerializationSchema}. */
-public class CanalJsonSerializationSchemaTest {
+class CanalJsonSerializationSchemaTest {
 
     public static final TableId TABLE_1 =
             TableId.tableId("default_namespace", "default_schema", "table1");
 
     @Test
-    public void testSerialize() throws Exception {
+    void testSerialize() throws Exception {
         ObjectMapper mapper =
                 JacksonMapperFactory.createObjectMapper()
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
@@ -68,7 +68,7 @@ public class CanalJsonSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        Assertions.assertNull(serializationSchema.serialize(createTableEvent));
+        Assertions.assertThat(serializationSchema.serialize(createTableEvent)).isNull();
 
         // insert
         BinaryRecordDataGenerator generator =
@@ -85,7 +85,7 @@ public class CanalJsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"old\":null,\"data\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         DataChangeEvent insertEvent2 =
                 DataChangeEvent.insertEvent(
@@ -99,7 +99,7 @@ public class CanalJsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(insertEvent2));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         DataChangeEvent deleteEvent =
                 DataChangeEvent.deleteEvent(
@@ -113,7 +113,7 @@ public class CanalJsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"old\":null,\"data\":[{\"col1\":\"2\",\"col2\":\"2\"}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(deleteEvent));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         DataChangeEvent updateEvent =
                 DataChangeEvent.updateEvent(
@@ -132,6 +132,6 @@ public class CanalJsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"old\":[{\"col1\":\"1\",\"col2\":\"1\"}],\"data\":[{\"col1\":\"1\",\"col2\":\"x\"}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"table1\",\"pkNames\":[\"col1\"]}");
         actual = mapper.readTree(serializationSchema.serialize(updateEvent));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
     }
 }

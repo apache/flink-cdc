@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Unit tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
-public class UnifiedTransformOperatorTest {
+class UnifiedTransformOperatorTest {
 
     /** Defines a unified transform test cases. */
     static class UnifiedTransformTestCase {
@@ -332,7 +332,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testDataChangeEventTransform() throws Exception {
+    void testDataChangeEventTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -377,7 +377,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testSchemaNullabilityTransform() throws Exception {
+    void testSchemaNullabilityTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -427,7 +427,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testReduceColumnsTransform() throws Exception {
+    void testReduceColumnsTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "reduce_column");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -496,7 +496,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testWildcardTransform() throws Exception {
+    void testWildcardTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "wildcard");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -592,7 +592,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testMetadataTransform() throws Exception {
+    void testMetadataTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "metadata");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -646,7 +646,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testCalculatedMetadataTransform() throws Exception {
+    void testCalculatedMetadataTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "metadata_transform");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -746,7 +746,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testMetadataAndCalculatedTransform() throws Exception {
+    void testMetadataAndCalculatedTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "metadata_transform");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -922,7 +922,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testMetadataTransformIncludeMetaColumnString() throws Exception {
+    void testMetadataTransformIncludeMetaColumnString() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -975,7 +975,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testTransformWithCast() throws Exception {
+    void testTransformWithCast() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "transform_with_cast");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -1041,7 +1041,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testTransformWithCommentsAndExpressions() throws Exception {
+    void testTransformWithCommentsAndExpressions() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         UnifiedTransformTestCase.of(
                         tableId,
