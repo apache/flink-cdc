@@ -99,10 +99,11 @@ public class ProjectionColumnProcessor {
             return expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
             LOG.error(
-                    "Table:{} column:{} projection:{} execute failed. {}",
+                    "Table:{} column:{} projection:{} column name map:{} execute failed. {}",
                     tableInfo.getName(),
                     projectionColumn.getColumnName(),
                     projectionColumn.getScriptExpression(),
+                    projectionColumn.getColumnNameMap(),
                     e);
             throw new RuntimeException(e);
         }
@@ -176,12 +177,13 @@ public class ProjectionColumnProcessor {
         List<Class<?>> paramTypes = new ArrayList<>();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         String scriptExpression = projectionColumn.getScriptExpression();
+        Map<String, String> columnNameMap = projectionColumn.getColumnNameMap();
         LinkedHashSet<String> originalColumnNames =
                 new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
         for (String originalColumnName : originalColumnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(originalColumnName)) {
-                    argumentNames.add(originalColumnName);
+                    argumentNames.add(columnNameMap.get(originalColumnName));
                     paramTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     break;
                 }
@@ -192,7 +194,7 @@ public class ProjectionColumnProcessor {
                     .findFirst()
                     .ifPresent(
                             col -> {
-                                argumentNames.add(col.f0);
+                                argumentNames.add(columnNameMap.get(col.f0));
                                 paramTypes.add(col.f2);
                             });
             Stream.of(supportedMetadataColumns)
@@ -200,7 +202,7 @@ public class ProjectionColumnProcessor {
                     .findFirst()
                     .ifPresent(
                             col -> {
-                                argumentNames.add(col.getName());
+                                argumentNames.add(columnNameMap.get(col.getName()));
                                 paramTypes.add(col.getJavaClass());
                             });
         }
@@ -214,6 +216,7 @@ public class ProjectionColumnProcessor {
                 JaninoCompiler.loadSystemFunction(scriptExpression),
                 argumentNames,
                 paramTypes,
-                DataTypeConverter.convertOriginalClass(projectionColumn.getDataType()));
+                DataTypeConverter.convertOriginalClass(projectionColumn.getDataType()),
+                columnNameMap);
     }
 }

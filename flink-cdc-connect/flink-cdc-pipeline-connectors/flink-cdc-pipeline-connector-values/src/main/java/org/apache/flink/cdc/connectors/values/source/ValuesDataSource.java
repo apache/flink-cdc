@@ -83,7 +83,9 @@ public class ValuesDataSource implements DataSource {
 
     @Override
     public SupportedMetadataColumn[] supportedMetadataColumns() {
-        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
+        return new SupportedMetadataColumn[] {
+            new OpTsMetadataColumn(), new TimestampTypeMetadataColumn()
+        };
     }
 
     /**

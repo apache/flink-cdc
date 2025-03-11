@@ -22,6 +22,7 @@ import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -41,11 +42,17 @@ public class TransformFilter implements Serializable {
     private final String expression;
     private final String scriptExpression;
     private final List<String> columnNames;
+    private final Map<String, String> columnNameMap;
 
-    public TransformFilter(String expression, String scriptExpression, List<String> columnNames) {
+    public TransformFilter(
+            String expression,
+            String scriptExpression,
+            List<String> columnNames,
+            Map<String, String> columnNameMap) {
         this.expression = expression;
         this.scriptExpression = scriptExpression;
         this.columnNames = columnNames;
+        this.columnNameMap = columnNameMap;
     }
 
     public String getExpression() {
@@ -60,19 +67,26 @@ public class TransformFilter implements Serializable {
         return columnNames;
     }
 
+    public Map<String, String> getColumnNameMap() {
+        return columnNameMap;
+    }
+
     public static Optional<TransformFilter> of(
             String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return Optional.empty();
         }
         List<String> columnNames = TransformParser.parseFilterColumnNameList(filterExpression);
+        Map<String, String> columnNameMap = TransformParser.generateColumnNameMap(columnNames);
         String scriptExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
-                        filterExpression, udfDescriptors);
-        return Optional.of(new TransformFilter(filterExpression, scriptExpression, columnNames));
+                        filterExpression, udfDescriptors, columnNameMap);
+        return Optional.of(
+                new TransformFilter(
+                        filterExpression, scriptExpression, columnNames, columnNameMap));
     }
 
-    public boolean isVaild() {
+    public boolean isValid() {
         return !columnNames.isEmpty();
     }
 }
