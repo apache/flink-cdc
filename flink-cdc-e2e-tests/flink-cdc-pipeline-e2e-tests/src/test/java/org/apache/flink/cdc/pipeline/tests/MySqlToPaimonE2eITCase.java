@@ -212,6 +212,185 @@ public class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
     }
 
+    @Test
+    public void testSinkToAppendOnlyTable() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.appendOnlySource\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.incremental.snapshot.chunk.key-column: %s.appendOnlySource:id\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: 4",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, database, warehouse);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(), MYSQL.getDatabasePort(), database);
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute(
+                    "CREATE TABLE appendOnlySource (\n"
+                            + "  id INTEGER NOT NULL,\n"
+                            + "  name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
+                            + "  description VARCHAR(512),\n"
+                            + "  weight FLOAT,\n"
+                            + "  enum_c enum('red', 'white') default 'red',\n"
+                            + "  json_c JSON,\n"
+                            + "  point_c POINT)");
+            stat.execute(
+                    "INSERT INTO appendOnlySource \n"
+                            + "VALUES (1,\"One\",   \"Alice\",   3.202, 'red', '{\"key1\": \"value1\"}', null),\n"
+                            + "       (2,\"Two\",   \"Bob\",     1.703, 'white', '{\"key2\": \"value2\"}', null),\n"
+                            + "       (3,\"Three\", \"Cecily\",  4.105, 'red', '{\"key3\": \"value3\"}', null),\n"
+                            + "       (4,\"Four\",  \"Derrida\", 1.857, 'white', '{\"key4\": \"value4\"}', null),\n"
+                            + "       (5,\"Five\",  \"Evelyn\",  5.211, 'red', '{\"K\": \"V\", \"k\": \"v\"}', null),\n"
+                            + "       (6,\"Six\",   \"Ferris\",  9.813, null, null, null),\n"
+                            + "       (7,\"Seven\", \"Grace\",   2.117, null, null, null),\n"
+                            + "       (8,\"Eight\", \"Hesse\",   6.819, null, null, null),\n"
+                            + "       (9,\"Nine\",  \"IINA\",    5.223, null, null, null)");
+        } catch (SQLException e) {
+            LOG.error("Create table for CDC failed.", e);
+            throw e;
+        }
+        submitPipelineJob(pipelineJob, mysqlCdcJar, paimonCdcConnector, mysqlDriverJar, hadoopJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        validateSinkResult(
+                warehouse,
+                database,
+                "appendOnlySource",
+                Arrays.asList(
+                        "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
+                        "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
+                        "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
+                        "4, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
+                        "5, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
+                        "6, Six, Ferris, 9.813, null, null, null",
+                        "7, Seven, Grace, 2.117, null, null, null",
+                        "8, Eight, Hesse, 6.819, null, null, null",
+                        "9, Nine, IINA, 5.223, null, null, null"));
+
+        LOG.info("Begin incremental reading stage.");
+        // generate binlogs
+        List<String> recordsInIncrementalPhase;
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+
+            stat.execute(
+                    "INSERT INTO appendOnlySource VALUES (10,'Ten','Jukebox',0.2, null, null, null);");
+            stat.execute(
+                    "INSERT INTO appendOnlySource VALUES (11,'Eleven','Kryo',5.18, null, null, null);");
+            stat.execute(
+                    "INSERT INTO appendOnlySource VALUES (12,'Twelve', 'Lily', 2.14, null, null, null);");
+            recordsInIncrementalPhase = createChangesAndValidateForAppendOnlyTable(stat);
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+        List<String> recordsInSnapshotPhase =
+                new ArrayList<>(
+                        Arrays.asList(
+                                "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null, null, null, null, null, null, null, null, null, null, null",
+                                "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null, null",
+                                "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null, null",
+                                "4, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null, null",
+                                "5, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null, null",
+                                "6, Six, Ferris, 9.813, null, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "7, Seven, Grace, 2.117, null, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "8, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "9, Nine, IINA, 5.223, null, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "10, Ten, Jukebox, 0.2, null, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "11, Eleven, Kryo, 5.18, null, null, null, null, null, null, null, null, null, null, null, null, null",
+                                "12, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null, null"));
+        recordsInSnapshotPhase.addAll(recordsInIncrementalPhase);
+        validateSinkResult(warehouse, database, "appendOnlySource", recordsInSnapshotPhase);
+    }
+
+    /**
+     * Basic Schema: id INTEGER NOT NULL, name VARCHAR(255) NOT NULL, description VARCHAR(512),
+     * weight FLOAT, enum_c enum('red', 'white'), json_c JSON.
+     */
+    private List<String> createChangesAndValidateForAppendOnlyTable(Statement stat)
+            throws SQLException {
+        List<String> result = new ArrayList<>();
+        StringBuilder sqlFields = new StringBuilder();
+        int id = 13;
+
+        // Add Column.
+        for (int addColumnRepeat = 0; addColumnRepeat < 10; addColumnRepeat++) {
+            stat.execute(
+                    String.format(
+                            "ALTER TABLE appendOnlySource ADD COLUMN point_c_%s VARCHAR(10);",
+                            addColumnRepeat));
+            sqlFields.append(", '1'");
+            StringBuilder resultFields = new StringBuilder();
+            for (int j = 0; j < 10; j++) {
+                if (j <= addColumnRepeat) {
+                    resultFields.append(", 1");
+                } else {
+                    resultFields.append(", null");
+                }
+            }
+            for (int j = 0; j < 1000; j++) {
+                stat.addBatch(
+                        String.format(
+                                "INSERT INTO appendOnlySource VALUES (%s,'finally', null, 2.14, null, null, null %s);",
+                                id, sqlFields));
+                result.add(
+                        String.format(
+                                "%s, finally, null, 2.14, null, null, null%s", id, resultFields));
+                id++;
+            }
+            stat.executeBatch();
+        }
+
+        // Modify Column type.
+        for (int modifyColumnRepeat = 0; modifyColumnRepeat < 10; modifyColumnRepeat++) {
+            for (int j = 0; j < 1000; j++) {
+                stat.addBatch(
+                        String.format(
+                                "INSERT INTO appendOnlySource VALUES (%s,'finally', null, 2.14, null, null, null %s);",
+                                id, sqlFields));
+                result.add(
+                        String.format(
+                                "%s, finally, null, 2.14, null, null, null%s",
+                                id, ", 1, 1, 1, 1, 1, 1, 1, 1, 1, 1"));
+                id++;
+            }
+            stat.executeBatch();
+            stat.execute(
+                    String.format(
+                            "ALTER TABLE appendOnlySource MODIFY point_c_0 VARCHAR(%s);",
+                            10 + modifyColumnRepeat));
+        }
+        return result;
+    }
+
     /**
      * Basic Schema: id INTEGER NOT NULL, name VARCHAR(255) NOT NULL, description VARCHAR(512),
      * weight FLOAT, enum_c enum('red', 'white'), json_c JSON.
