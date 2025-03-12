@@ -31,12 +31,12 @@ import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.sink.RowAssignerChannelComputer;
 import org.apache.paimon.options.Options;
-import org.apache.paimon.shade.org.apache.commons.lang3.RandomUtils;
 import org.apache.paimon.table.FileStoreTable;
 
 import java.io.Serializable;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * A {@link HashFunction} implementation for {@link PaimonDataSink}. Shuffle {@link DataChangeEvent}
@@ -80,7 +80,7 @@ public class PaimonHashFunction implements HashFunction<DataChangeEvent>, Serial
             return channelComputer.channel(genericRow);
         } else {
             // Avoid sending all events to the same subtask when table has no primary key.
-            return RandomUtils.nextInt(0, parallelism);
+            return ThreadLocalRandom.current().nextInt(parallelism);
         }
     }
 }
