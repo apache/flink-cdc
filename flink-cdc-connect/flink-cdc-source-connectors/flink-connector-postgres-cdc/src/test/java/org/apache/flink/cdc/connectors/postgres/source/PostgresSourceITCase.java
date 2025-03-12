@@ -698,6 +698,74 @@ public class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
+    @Test
+    public void testCommitLsnWhenTaskManagerFailover() throws Exception {
+        int parallelism = 1;
+        PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.TM;
+        PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
+        String[] captureCustomerTables = new String[] {"customers"};
+        RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration =
+                RestartStrategies.fixedDelayRestart(1, 0);
+        boolean skipSnapshotBackfill = false;
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(1000L);
+        env.setRestartStrategy(restartStrategyConfiguration);
+        String sourceDDL =
+                format(
+                        "CREATE TABLE customers ("
+                                + " id BIGINT NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " primary key (id) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.startup.mode' = '%s',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
+                                + " 'scan.newly-added-table.enabled' = 'true',"
+                                + " 'scan.lsn-commit.checkpoints-num-delay' = '0'"
+                                + ")",
+                        customDatabase.getHost(),
+                        customDatabase.getDatabasePort(),
+                        customDatabase.getUsername(),
+                        customDatabase.getPassword(),
+                        customDatabase.getDatabaseName(),
+                        SCHEMA_NAME,
+                        getTableNameRegex(captureCustomerTables),
+                        scanStartupMode,
+                        slotName,
+                        skipSnapshotBackfill);
+        tEnv.executeSql(sourceDDL);
+        TableResult tableResult = tEnv.executeSql("select * from customers");
+
+        // first step: check the snapshot data
+        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+            checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
+        }
+
+        // second step: check the stream data
+        checkStreamDataWithTestLsn(tableResult, failoverType, failoverPhase, captureCustomerTables);
+
+        tableResult.getJobClient().get().cancel().get();
+
+        // sleep 1000ms to wait until connections are closed.
+        Thread.sleep(1000L);
+    }
+
     private List<String> testBackfillWhenWritingEvents(
             boolean skipSnapshotBackfill,
             int fetchSize,
@@ -1113,6 +1181,46 @@ public class PostgresSourceITCase extends PostgresTestBase {
         assertTrue(!hasNextData(iterator));
     }
 
+    private void checkStreamDataWithTestLsn(
+            TableResult tableResult,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        waitUntilJobRunning(tableResult);
+        JobID jobId = tableResult.getJobClient().get().getJobID();
+
+        for (String tableId : captureCustomerTables) {
+            makeFirstPartStreamEvents(
+                    getConnection(),
+                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        }
+
+        // wait for the stream reading and isCommitOffset is true
+        Thread.sleep(20000L);
+
+        String confirmedFlushLsn;
+        try (PostgresConnection connection = getConnection()) {
+            confirmedFlushLsn = getConfirmedFlushLsn(connection);
+        }
+        if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
+            triggerFailover(
+                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+            waitUntilJobRunning(tableResult);
+        }
+        // wait for the stream reading and isCommitOffset is true
+        Thread.sleep(30000L);
+        for (String tableId : captureCustomerTables) {
+            makeSecondPartStreamEvents(
+                    getConnection(),
+                    customDatabase.getDatabaseName() + '.' + SCHEMA_NAME + '.' + tableId);
+        }
+        Thread.sleep(5000L);
+        try (PostgresConnection connection = getConnection()) {
+            assertTrue(!confirmedFlushLsn.equals(getConfirmedFlushLsn(connection)));
+        }
+    }
+
     private void sleepMs(long millis) {
         try {
             Thread.sleep(millis);
@@ -1224,6 +1332,26 @@ public class PostgresSourceITCase extends PostgresTestBase {
                                         "No result returned after running query [%s]", query));
                     }
                     return rs.getLong(1);
+                });
+    }
+
+    private String getConfirmedFlushLsn(JdbcConnection jdbc) throws SQLException {
+        final String query =
+                String.format(
+                        "SELECT\n"
+                                + "confirmed_flush_lsn\n"
+                                + "FROM pg_replication_slots where slot_name = '%s'",
+                        slotName);
+
+        return jdbc.queryAndMap(
+                query,
+                rs -> {
+                    if (!rs.next()) {
+                        throw new SQLException(
+                                String.format(
+                                        "No result returned after running query [%s]", query));
+                    }
+                    return rs.getString(1);
                 });
     }
 }
