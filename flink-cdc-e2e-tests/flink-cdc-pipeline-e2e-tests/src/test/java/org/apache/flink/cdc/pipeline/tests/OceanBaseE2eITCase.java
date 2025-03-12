@@ -213,6 +213,73 @@ class OceanBaseE2eITCase extends PipelineTestEnvironment {
         dropDatabase(getConnection(false), uniqueDatabaseName);
     }
 
+    @Test
+    public void testSyncWholeDatabaseInBatchMode() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n\n"
+                                + "sink:\n"
+                                + "  type: oceanbase\n"
+                                + "  url: %s\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  name: oceanbase IT\n"
+                                + "  parallelism: 1\n"
+                                + "  batch-mode.enabled: true",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        uniqueDatabaseName,
+                        getJdbcUrlInContainer("test", "oceanbase"),
+                        OB_SERVER.getUsername(),
+                        OB_SERVER.getPassword());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path oceanbaseCdcJar = TestUtils.getResource("oceanbase-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, oceanbaseCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 9);
+        List<String> originList = queryTable(MYSQL_TEST_TABLE_NAME, false);
+        MatcherAssert.assertThat(
+                originList,
+                Matchers.containsInAnyOrder(
+                        Stream.of(
+                                        "101,scooter,Small 2-wheel scooter,3.14,red,{\"key1\": \"value1\"},{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                                        "102,car battery,12V car battery,8.1,white,{\"key2\": \"value2\"},{\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                                        "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8,red,{\"key3\": \"value3\"},{\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                                        "104,hammer,12oz carpenter's hammer,0.75,white,{\"key4\": \"value4\"},{\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                                        "105,hammer,14oz carpenter's hammer,0.875,red,{\"k1\": \"v1\", \"k2\": \"v2\"},{\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                                        "106,hammer,16oz carpenter's hammer,1.0,null,null,null",
+                                        "107,rocks,box of assorted rocks,5.3,null,null,null",
+                                        "108,jacket,water resistent black wind breaker,0.1,null,null,null",
+                                        "109,spare tire,24 inch spare tire,22.2,null,null,null")
+                                .map(StringEscapeUtils::unescapeJava)
+                                .toArray()));
+        // validate table of customers
+        List<String> customerList = queryTable("customers", false);
+        MatcherAssert.assertThat(
+                customerList,
+                Matchers.containsInAnyOrder(
+                        Stream.of(
+                                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
+                                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
+                                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
+                                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11")
+                                .toArray()));
+    }
+
     private void waitingAndAssertTableCount(String tableName, boolean isMySQL, int expectedCount)
             throws InterruptedException {
         // waiting for databases were created in oceanbase to avoid get connection fail.
