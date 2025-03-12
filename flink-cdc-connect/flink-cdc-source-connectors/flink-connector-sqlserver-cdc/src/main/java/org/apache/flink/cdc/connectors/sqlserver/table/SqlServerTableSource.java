@@ -288,7 +288,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders)
-                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
     }
 
     @Override
@@ -317,7 +318,8 @@ public class SqlServerTableSource implements ScanTableSource, SupportsReadingMet
                 distributionFactorLower,
                 chunkKeyColumn,
                 closeIdleReaders,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                assignUnboundedChunkFirst);
     }
 
     @Override

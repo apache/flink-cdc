@@ -120,7 +120,7 @@ public class OracleTableSourceFactoryTest {
                         JdbcSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -159,7 +159,7 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -203,7 +203,7 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         true,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -231,6 +231,9 @@ public class OracleTableSourceFactoryTest {
         options.put(SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.key(), "true");
         options.put(SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.key(), "true");
         options.put(SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.key(), "true");
+        options.put(
+                SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.key(),
+                "true");
 
         options.put(
                 JdbcSourceOptions.CONNECT_TIMEOUT.key(),
@@ -312,7 +315,7 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -352,7 +355,7 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
@@ -396,7 +399,7 @@ public class OracleTableSourceFactoryTest {
                         SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED.defaultValue(),
                         SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
                                 .defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =

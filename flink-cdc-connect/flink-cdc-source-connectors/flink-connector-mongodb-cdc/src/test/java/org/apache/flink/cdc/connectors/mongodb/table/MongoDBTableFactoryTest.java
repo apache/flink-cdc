@@ -48,8 +48,8 @@ import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
-import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
@@ -158,7 +158,7 @@ public class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -183,6 +183,8 @@ public class MongoDBTableFactoryTest {
         options.put("scan.newly-added-table.enabled", "true");
         options.put("scan.full-changelog", "true");
         options.put("scan.cursor.no-timeout", "false");
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", "true");
+
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
@@ -253,7 +255,7 @@ public class MongoDBTableFactoryTest {
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
-                        SCAN_INCREMENTAL_SNAPSHOT_ASSIGN_ENDING_CHUNK_FIRST.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");

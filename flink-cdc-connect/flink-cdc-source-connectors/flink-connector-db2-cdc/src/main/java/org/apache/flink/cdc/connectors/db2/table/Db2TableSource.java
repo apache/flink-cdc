@@ -275,7 +275,8 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders)
-                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
     }
 
     @Override
@@ -302,7 +303,8 @@ public class Db2TableSource implements ScanTableSource, SupportsReadingMetadata 
                 distributionFactorLower,
                 chunkKeyColumn,
                 closeIdleReaders,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                assignUnboundedChunkFirst);
     }
 
     @Override
