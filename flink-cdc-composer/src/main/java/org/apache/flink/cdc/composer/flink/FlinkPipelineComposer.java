@@ -56,6 +56,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
     private final StreamExecutionEnvironment env;
     private final boolean isBlocking;
 
+    public static FlinkPipelineComposer ofStreamExecutionEnvironment(
+            StreamExecutionEnvironment env) {
+        return new FlinkPipelineComposer(env, false);
+    }
+
     public static FlinkPipelineComposer ofRemoteCluster(
             org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
         org.apache.flink.configuration.Configuration effectiveConfiguration =
