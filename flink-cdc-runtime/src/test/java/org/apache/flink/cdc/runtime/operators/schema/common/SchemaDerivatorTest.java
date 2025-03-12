@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -598,5 +599,51 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                 SchemaChangeBehavior.IGNORE,
                                 new DropTableEvent(NORMALIZE_TEST_TABLE_ID)))
                 .isEmpty();
+    }
+
+    @Test
+    void testDeduceMergedCreateTableEventInBatchMode() {
+        TableIdRouter router =
+                new TableIdRouter(
+                        Arrays.asList(
+                                // Merging tables
+                                new RouteRule("db_3.table_\\.*", "db_3.table_merged")));
+        List<CreateTableEvent> createTableEvents =
+                Arrays.asList(
+                        new CreateTableEvent(
+                                TableId.parse("db_3.table_1"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id", DataTypes.INT())
+                                        .physicalColumn("name", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age", DataTypes.FLOAT())
+                                        .physicalColumn("notes", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_3.table_2"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id", DataTypes.INT())
+                                        .physicalColumn("name", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age", DataTypes.FLOAT())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_3.table_3"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id", DataTypes.BIGINT())
+                                        .physicalColumn("name", DataTypes.VARCHAR(200))
+                                        .physicalColumn("age", DataTypes.FLOAT())
+                                        .physicalColumn("notes", DataTypes.STRING())
+                                        .build()));
+        List<CreateTableEvent> mergedCreateTableEvents =
+                SchemaDerivator.deduceMergedCreateTableEventInBatchMode(router, createTableEvents);
+        assertThat(mergedCreateTableEvents)
+                .containsExactly(
+                        new CreateTableEvent(
+                                TableId.parse("db_3.table_merged"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id", DataTypes.BIGINT())
+                                        .physicalColumn("name", DataTypes.STRING())
+                                        .physicalColumn("age", DataTypes.FLOAT())
+                                        .physicalColumn("notes", DataTypes.STRING())
+                                        .build()));
     }
 }
