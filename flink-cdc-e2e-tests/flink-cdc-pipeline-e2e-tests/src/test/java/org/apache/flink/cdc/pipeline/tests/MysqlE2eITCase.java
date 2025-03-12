@@ -554,9 +554,18 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
         submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
+        try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+        }
         validateResult(
-                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
-                "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}");
+                String.format(
+                        "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
+                        mysqlInventoryDatabase.getDatabaseName()),
+                String.format(
+                        "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
+                        mysqlInventoryDatabase.getDatabaseName()));
     }
 
     private void validateResult(String... expectedEvents) throws Exception {

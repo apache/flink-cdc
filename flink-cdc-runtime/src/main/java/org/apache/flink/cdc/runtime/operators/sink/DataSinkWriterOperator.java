@@ -199,7 +199,8 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
 
     private void handleFlushEvent(FlushEvent event) throws Exception {
         copySinkWriter.flush(false);
-        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
+        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE
+                && event.getSchemaChangeEventType() != SchemaChangeEventType.DROP_TABLE) {
             event.getTableIds().stream()
                     .filter(tableId -> !processedTableIds.contains(tableId))
                     .forEach(
