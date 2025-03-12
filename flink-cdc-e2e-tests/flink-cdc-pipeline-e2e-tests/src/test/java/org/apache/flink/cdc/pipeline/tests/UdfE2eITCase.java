@@ -88,8 +88,18 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
+    void testUserDefinedFunctionsInJavaInBatchMode() throws Exception {
+        testUserDefinedFunctionsInBatchMode("java");
+    }
+
+    @Test
     void testUserDefinedFunctionsInScala() throws Exception {
         testUserDefinedFunctions("scala");
+    }
+
+    @Test
+    void testUserDefinedFunctionsInScalaInBatchMode() throws Exception {
+        testUserDefinedFunctionsInBatchMode("scala");
     }
 
     @Test
@@ -98,8 +108,18 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
+    void testFlinkCompatibleScalarFunctionsInJavaInBatchMode() throws Exception {
+        testFlinkCompatibleScalarFunctionsInBatchMode("java");
+    }
+
+    @Test
     void testFlinkCompatibleScalarFunctionsInScala() throws Exception {
         testFlinkCompatibleScalarFunctions("scala");
+    }
+
+    @Test
+    void testFlinkCompatibleScalarFunctionsInScalaInBatchMode() throws Exception {
+        testFlinkCompatibleScalarFunctionsInBatchMode("scala");
     }
 
     private void testUserDefinedFunctions(String language) throws Exception {
@@ -242,6 +262,110 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 20000L);
     }
 
+    private void testUserDefinedFunctionsInBatchMode(String language) throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: ID, VERSION, addone(addone(ID)) AS INC_ID, format('<%%s>', VERSION) AS FMT_VER\n"
+                                + "    filter: addone(ID) <> '1009'\n"
+                                + "  - source-table: %s.TABLEBETA\n"
+                                + "    projection: ID, VERSION, answer() AS ANS, typeof(ID) AS TYP\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  batch-mode.enabled: true\n"
+                                + "  user-defined-function:\n"
+                                + "    - name: addone\n"
+                                + "      classpath: org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass\n"
+                                + "    - name: format\n"
+                                + "      classpath: org.apache.flink.cdc.udf.examples.%s.FormatFunctionClass\n"
+                                + "    - name: lifecycle\n"
+                                + "      classpath: org.apache.flink.cdc.udf.examples.%s.LifecycleFunctionClass\n"
+                                + "    - name: typeof\n"
+                                + "      classpath: org.apache.flink.cdc.udf.examples.%s.TypeOfFunctionClass\n"
+                                + "    - name: answer\n"
+                                + "      classpath: org.apache.flink.cdc.udf.examples.%s.TypeHintFunctionClass\n",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        parallelism,
+                        language,
+                        language,
+                        language,
+                        language,
+                        language);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        Path udfJar = TestUtils.getResource("udf-examples.jar");
+        Path scalaLibJar = TestUtils.getResource("scala-library.jar");
+        submitPipelineJob(
+                pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar, udfJar, scalaLibJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitUntilSpecificEvent("[ LifecycleFunction ] opened.", 60000L);
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()),
+                60000L);
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()),
+                60000L);
+
+        List<String> expectedEvents =
+                Arrays.asList(
+                        String.format(
+                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`ANS` STRING,`TYP` STRING}, primaryKeys=ID, options=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 1011, <8.1>], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 1012, <10>], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Forty-two, Integer: 2011], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Forty-two, Integer: 2012], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Forty-two, Integer: 2013], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()));
+        validateResult(expectedEvents);
+    }
+
     private void testFlinkCompatibleScalarFunctions(String language) throws Exception {
         String pipelineJob =
                 String.format(
@@ -372,6 +496,102 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Integer: 2011], after=[], op=DELETE, meta=()}",
                         transformRenameDatabase.getDatabaseName()),
                 20000L);
+    }
+
+    private void testFlinkCompatibleScalarFunctionsInBatchMode(String language) throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.TABLEALPHA\n"
+                                + "    projection: ID, VERSION, addone(addone(ID)) AS INC_ID, format('<%%s>', VERSION) AS FMT_VER\n"
+                                + "    filter: addone(ID) <> '1009'\n"
+                                + "  - source-table: %s.TABLEBETA\n"
+                                + "    projection: ID, VERSION, typeof(ID) AS TYP\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  batch-mode.enabled: true\n"
+                                + "  user-defined-function:\n"
+                                + "    - name: addone\n"
+                                + "      classpath: org.apache.flink.udf.examples.%s.AddOneFunctionClass\n"
+                                + "    - name: format\n"
+                                + "      classpath: org.apache.flink.udf.examples.%s.FormatFunctionClass\n"
+                                + "    - name: typeof\n"
+                                + "      classpath: org.apache.flink.udf.examples.%s.TypeOfFunctionClass\n",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        transformRenameDatabase.getDatabaseName(),
+                        parallelism,
+                        language,
+                        language,
+                        language);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        Path udfJar = TestUtils.getResource("udf-examples.jar");
+        Path scalaLibJar = TestUtils.getResource("scala-library.jar");
+        submitPipelineJob(
+                pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar, udfJar, scalaLibJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()),
+                60000L);
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Integer: 2014], op=INSERT, meta=()}",
+                        transformRenameDatabase.getDatabaseName()),
+                60000L);
+
+        List<String> expectedEvents =
+                Arrays.asList(
+                        String.format(
+                                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`TYP` STRING}, primaryKeys=ID, options=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 1011, <8.1>], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 1012, <10>], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 1013, <11>], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Integer: 2011], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Integer: 2012], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Integer: 2013], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()),
+                        String.format(
+                                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Integer: 2014], op=INSERT, meta=()}",
+                                transformRenameDatabase.getDatabaseName()));
+        validateResult(expectedEvents);
     }
 
     private void validateResult(List<String> expectedEvents) throws Exception {

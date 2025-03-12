@@ -329,6 +329,92 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
+    void testSyncWholeDatabaseInBatchMode() throws Exception {
+        String databaseName = mysqlInventoryDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: doris\n"
+                                + "  fenodes: doris:8030\n"
+                                + "  benodes: doris:8040\n"
+                                + "  username: %s\n"
+                                + "  password: \"%s\"\n"
+                                + "  table.create.properties.replication_num: 1\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  batch-mode.enabled: true",
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        databaseName,
+                        DORIS.getUsername(),
+                        DORIS.getPassword(),
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        validateSinkSchema(
+                databaseName,
+                "products",
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(765) | Yes | false | flink",
+                        "description | VARCHAR(1536) | Yes | false | null",
+                        "weight | FLOAT | Yes | false | null",
+                        "enum_c | TEXT | Yes | false | red",
+                        "json_c | TEXT | Yes | false | null",
+                        "point_c | TEXT | Yes | false | null"));
+
+        validateSinkSchema(
+                databaseName,
+                "customers",
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(765) | Yes | false | flink",
+                        "address | VARCHAR(3072) | Yes | false | null",
+                        "phone_number | VARCHAR(1536) | Yes | false | null"));
+
+        validateSinkResult(
+                databaseName,
+                "products",
+                7,
+                Arrays.asList(
+                        "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                        "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                        "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                        "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                        "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                        "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null",
+                        "107 | rocks | box of assorted rocks | 5.3 | null | null | null",
+                        "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null",
+                        "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null"));
+
+        validateSinkResult(
+                databaseName,
+                "customers",
+                4,
+                Arrays.asList(
+                        "101 | user_1 | Shanghai | 123567891234",
+                        "102 | user_2 | Shanghai | 123567891234",
+                        "103 | user_3 | Shanghai | 123567891234",
+                        "104 | user_4 | Shanghai | 123567891234"));
+    }
+
+    @Test
     void testComplexDataTypes() throws Exception {
         String databaseName = complexDataTypesDatabase.getDatabaseName();
         String pipelineJob =

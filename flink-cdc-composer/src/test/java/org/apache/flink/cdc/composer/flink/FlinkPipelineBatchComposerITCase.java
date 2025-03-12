@@ -74,6 +74,7 @@ import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelp
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** Integration test for {@link FlinkPipelineComposer} in batch mode. */
 public class FlinkPipelineBatchComposerITCase {
 
     private static final int MAX_PARALLELISM = 4;
