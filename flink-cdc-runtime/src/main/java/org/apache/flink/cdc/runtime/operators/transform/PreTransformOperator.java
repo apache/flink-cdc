@@ -280,6 +280,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             // which may be different with the schema currently being processed.
             if (!preTransformProcessorMap.containsKey(createTableEvent.tableId())) {
                 output.collect(new StreamRecord<>(cacheCreateTable(createTableEvent)));
+                alreadySentCreateTableEvents.add(createTableEvent.tableId());
             }
         } else if (event instanceof DropTableEvent) {
             preTransformProcessorMap.remove(((DropTableEvent) event).tableId());
