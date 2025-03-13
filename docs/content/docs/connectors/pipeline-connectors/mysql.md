@@ -332,6 +332,15 @@ pipeline:
           When 'use.legacy.json.format' = 'false', the data would be converted to {"key1": "value1", "key2": "value2"}, with whitespace before values and after commas preserved.
       </td>
     </tr>
+    <tr>
+      <td>metadata.list</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>String</td>
+      <td>
+        List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
