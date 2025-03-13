@@ -960,7 +960,9 @@ class FlinkParallelizedPipelineITCase {
             SourceTraits traits,
             SchemaChangeBehavior exception)
             throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();

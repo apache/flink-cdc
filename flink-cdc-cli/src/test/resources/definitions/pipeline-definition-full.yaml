@@ -64,3 +64,7 @@ pipeline:
     openai.model: text-embedding-3-small
     openai.host: https://xxxx
     openai.apikey: abcd1234
+  flink:
+    yarn.application.id: application_1714009558476_9999
+    execution.savepoint-restore-mode: CLAIM
+    yarn.tags: flink-cdc-job
