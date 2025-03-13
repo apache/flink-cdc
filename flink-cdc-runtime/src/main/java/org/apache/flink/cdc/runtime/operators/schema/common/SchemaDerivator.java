@@ -50,6 +50,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -358,7 +359,7 @@ public class SchemaDerivator {
     /** Deduce merged CreateTableEvent in batch mode. */
     public static List<CreateTableEvent> deduceMergedCreateTableEventInBatchMode(
             TableIdRouter router, List<CreateTableEvent> createTableEvents) {
-        Set<org.apache.flink.cdc.common.event.TableId> originalTables =
+        Set<TableId> originalTables =
                 createTableEvents.stream()
                         .map(CreateTableEvent::tableId)
                         .collect(Collectors.toSet());
@@ -371,10 +372,12 @@ public class SchemaDerivator {
                                 Collectors.toMap(
                                         CreateTableEvent::tableId, CreateTableEvent::getSchema));
         Map<TableId, Schema> sinkTableIdToSchemaMap = new HashMap<>();
+        Set<TableId> routedTables = new HashSet<>();
         for (Set<TableId> sourceTables : sourceTablesByRouteRule) {
             List<Schema> toBeMergedSchemas = new ArrayList<>();
             for (TableId tableId : sourceTables) {
                 toBeMergedSchemas.add(sourceTableIdToSchemaMap.get(tableId));
+                routedTables.add(tableId);
             }
             if (toBeMergedSchemas.isEmpty()) {
                 continue;
@@ -394,6 +397,11 @@ public class SchemaDerivator {
                 for (TableId sinkTableId : sinkTableIds) {
                     sinkTableIdToSchemaMap.put(sinkTableId, mergedSchema);
                 }
+            }
+        }
+        for (TableId tableId : originalTables) {
+            if (!sinkTableIdToSchemaMap.containsKey(tableId) && !routedTables.contains(tableId)) {
+                sinkTableIdToSchemaMap.put(tableId, sourceTableIdToSchemaMap.get(tableId));
             }
         }
         return sinkTableIdToSchemaMap.entrySet().stream()
