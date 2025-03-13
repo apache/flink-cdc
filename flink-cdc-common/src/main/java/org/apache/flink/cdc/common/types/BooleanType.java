@@ -39,12 +39,12 @@ public class BooleanType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new BooleanType(isNullable);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT);
     }
 

@@ -39,12 +39,12 @@ public final class TinyIntType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new TinyIntType(isNullable);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT);
     }
 

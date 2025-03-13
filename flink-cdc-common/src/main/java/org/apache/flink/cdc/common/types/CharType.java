@@ -64,7 +64,7 @@ public class CharType extends DataType {
         this(DEFAULT_LENGTH);
     }
 
-    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link #copy(boolean)}. */
+    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link DataType#copy(boolean)}. */
     private CharType(int length, boolean isNullable) {
         super(isNullable, DataTypeRoot.CHAR);
         this.length = length;
@@ -88,12 +88,12 @@ public class CharType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new CharType(length, isNullable);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         if (length == EMPTY_LITERAL_LENGTH) {
             throw new IllegalArgumentException(
                     "Zero-length character strings have no serializable string representation.");
@@ -103,7 +103,8 @@ public class CharType extends DataType {
 
     @Override
     public String asSummaryString() {
-        return withNullability(FORMAT, length);
+        return withNullability(FORMAT, length)
+                + (getRawDataType() == null ? "" : " " + getRawDataType());
     }
 
     @Override

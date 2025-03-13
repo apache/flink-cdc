@@ -65,7 +65,7 @@ public final class BinaryType extends DataType {
         this(DEFAULT_LENGTH);
     }
 
-    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link #copy(boolean)}. */
+    /** Helper constructor for {@link #ofEmptyLiteral()} and {@link DataType#copy(boolean)}. */
     private BinaryType(int length, boolean isNullable) {
         super(isNullable, DataTypeRoot.BINARY);
         this.length = length;
@@ -89,12 +89,12 @@ public final class BinaryType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new BinaryType(length, isNullable);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         if (length == EMPTY_LITERAL_LENGTH) {
             throw new IllegalArgumentException(
                     "Zero-length binary strings have no serializable string representation.");
@@ -104,7 +104,8 @@ public final class BinaryType extends DataType {
 
     @Override
     public String asSummaryString() {
-        return withNullability(FORMAT, length);
+        return withNullability(FORMAT, length)
+                + (getRawDataType() == null ? "" : " " + getRawDataType());
     }
 
     @Override

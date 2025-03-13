@@ -39,12 +39,12 @@ public final class DoubleType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new DoubleType(isNullable);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT);
     }
 

@@ -61,7 +61,7 @@ public final class MapType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new MapType(isNullable, keyType.copy(), valueType.copy());
     }
 
@@ -71,7 +71,7 @@ public final class MapType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(
                 FORMAT, keyType.asSerializableString(), valueType.asSerializableString());
     }

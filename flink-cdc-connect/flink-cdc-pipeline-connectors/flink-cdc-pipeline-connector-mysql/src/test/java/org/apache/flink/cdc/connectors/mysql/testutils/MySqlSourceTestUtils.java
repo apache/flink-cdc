@@ -29,7 +29,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
 /** Test utilities for MySQL event source. */
-public class MySqSourceTestUtils {
+public class MySqlSourceTestUtils {
 
     public static final String TEST_USER = "mysqluser";
     public static final String TEST_PASSWORD = "mysqlpw";
@@ -80,5 +80,5 @@ public class MySqSourceTestUtils {
                 "Ran out of time when waiting for " + description + " to success.");
     }
 
-    private MySqSourceTestUtils() {}
+    private MySqlSourceTestUtils() {}
 }

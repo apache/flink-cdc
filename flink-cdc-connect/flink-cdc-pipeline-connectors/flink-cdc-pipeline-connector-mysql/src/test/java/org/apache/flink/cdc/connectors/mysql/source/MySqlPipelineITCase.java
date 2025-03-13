@@ -84,10 +84,10 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.USERNAME;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_PASSWORD;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.TEST_USER;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.fetchResults;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MySqlSourceTestUtils.getServerId;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link MySqlDataSource}. */
