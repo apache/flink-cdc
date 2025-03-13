@@ -19,11 +19,9 @@ package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.StreamSink;
-import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /**
  * An operator that processes records to be written into a {@link SinkFunction} in batch mode.
@@ -38,17 +36,5 @@ public class DataBatchSinkFunctionOperator extends StreamSink<Event> {
     public DataBatchSinkFunctionOperator(SinkFunction<Event> userFunction) {
         super(userFunction);
         this.chainingStrategy = ChainingStrategy.ALWAYS;
-    }
-
-    @Override
-    public void processElement(StreamRecord<Event> element) throws Exception {
-        Event event = element.getValue();
-
-        // FlushEvent triggers flush
-        if (event instanceof FlushEvent) {
-            return;
-        }
-
-        super.processElement(element);
     }
 }
