@@ -159,9 +159,10 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: iceberg\n"
+                                + "  sink.compaction.enabled: true\n"
+                                + "  sink.compaction.commit.interval: 1\n"
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.type: hadoop\n"
-                                + "  catalog.properties.clients: 20\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
@@ -170,10 +171,8 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path icebergCdcConnector = TestUtils.getResource("iceberg-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        Path hiveJar = TestUtils.getResource("hive-exec.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(
-                pipelineJob, mysqlCdcJar, icebergCdcConnector, mysqlDriverJar, hadoopJar, hiveJar);
+        submitPipelineJob(pipelineJob, mysqlCdcJar, icebergCdcConnector, mysqlDriverJar, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         validateSinkResult(

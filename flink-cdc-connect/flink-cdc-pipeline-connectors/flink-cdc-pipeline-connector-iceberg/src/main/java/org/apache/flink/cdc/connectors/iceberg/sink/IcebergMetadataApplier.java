@@ -98,7 +98,7 @@ public class IcebergMetadataApplier implements MetadataApplier {
         if (catalog == null) {
             catalog =
                     CatalogUtil.buildIcebergCatalog(
-                            "cdc-iceberg-catalog", catalogOptions, new Configuration());
+                            "cdc-iceberg-metadata-catalog", catalogOptions, new Configuration());
         }
         SchemaChangeEventVisitor.visit(
                 schemaChangeEvent,

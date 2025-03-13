@@ -78,7 +78,7 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
             Map<String, String> catalogOptions, int taskId, int attemptId, ZoneId zoneId) {
         catalog =
                 CatalogUtil.buildIcebergCatalog(
-                        "cdc-iceberg-catalog", catalogOptions, new Configuration());
+                        "cdc-iceberg-writer-catalog", catalogOptions, new Configuration());
         writerFactoryMap = new HashMap<>();
         writerMap = new HashMap<>();
         schemaMap = new HashMap<>();
