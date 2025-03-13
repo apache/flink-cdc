@@ -801,6 +801,7 @@ public class FlinkPipelineBatchComposerITCase {
 
         TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
         TableId myTable2 = TableId.tableId("default_namespace", "default_schema", "mytable2");
+        TableId myTable3 = TableId.tableId("default_namespace", "default_schema", "mytable_other");
         Schema table1Schema =
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT())
@@ -816,14 +817,23 @@ public class FlinkPipelineBatchComposerITCase {
                         .physicalColumn("description", DataTypes.STRING())
                         .primaryKey("id")
                         .build();
-
+        Schema table3Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("address", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
         // Create test dataset:
         // Create table 1 [id, name, age]
         // Create table 2 [id, name, age, description]
+        // Create table 3 [id, name, address]
         // Table 1: +I[1, Alice, 18]
         // Table 1: +I[2, Bob, 20]
         // Table 2: +I[3, Charlie, 15, student]
         // Table 2: +I[4, Donald, 25, student]
+        // Table 3: +I[5, E, Beijing]
+        // Table 3: +I[6, F, Hangzhou]
         List<Event> events = new ArrayList<>();
         BinaryRecordDataGenerator table1dataGenerator =
                 new BinaryRecordDataGenerator(
@@ -831,8 +841,12 @@ public class FlinkPipelineBatchComposerITCase {
         BinaryRecordDataGenerator table2dataGenerator =
                 new BinaryRecordDataGenerator(
                         table2Schema.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator table3dataGenerator =
+                new BinaryRecordDataGenerator(
+                        table3Schema.getColumnDataTypes().toArray(new DataType[0]));
         events.add(new CreateTableEvent(myTable1, table1Schema));
         events.add(new CreateTableEvent(myTable2, table2Schema));
+        events.add(new CreateTableEvent(myTable3, table3Schema));
         events.add(
                 DataChangeEvent.insertEvent(
                         myTable1,
@@ -862,6 +876,24 @@ public class FlinkPipelineBatchComposerITCase {
                                     BinaryStringData.fromString("Donald"),
                                     (byte) 25,
                                     BinaryStringData.fromString("student")
+                                })));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable3,
+                        table3dataGenerator.generate(
+                                new Object[] {
+                                    5,
+                                    BinaryStringData.fromString("E"),
+                                    BinaryStringData.fromString("Beijing")
+                                })));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable3,
+                        table3dataGenerator.generate(
+                                new Object[] {
+                                    6,
+                                    BinaryStringData.fromString("F"),
+                                    BinaryStringData.fromString("Hangzhou")
                                 })));
 
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
@@ -925,14 +957,26 @@ public class FlinkPipelineBatchComposerITCase {
                                 .physicalColumn("description", DataTypes.STRING())
                                 .primaryKey("id")
                                 .build());
+        Schema myTable3Schema = ValuesDatabase.getTableSchema(myTable3);
+        assertThat(myTable3Schema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("address", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
         String[] outputEvents = outCaptor.toString().trim().split("\n");
         assertThat(outputEvents)
                 .containsExactly(
                         "CreateTableEvent{tableId=default_namespace.default_schema.merged, schema=columns={`id` BIGINT NOT NULL,`name` STRING,`age` INT,`last_name` STRING,`description` STRING}, primaryKeys=id, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable_other, schema=columns={`id` INT NOT NULL,`name` STRING,`address` STRING}, primaryKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[1, Alice, 18, last_name, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[2, Bob, 20, last_name, null], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[3, Charlie, 15, last_name, student], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[4, Donald, 25, last_name, student], op=INSERT, meta=()}");
+                        "DataChangeEvent{tableId=default_namespace.default_schema.merged, before=[], after=[4, Donald, 25, last_name, student], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable_other, before=[], after=[5, E, Beijing], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable_other, before=[], after=[6, F, Hangzhou], op=INSERT, meta=()}");
     }
 
     @ParameterizedTest
