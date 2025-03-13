@@ -258,6 +258,10 @@ limitations under the License.
                             </artifactSet>
                             <relocations>
                                 <relocation>
+                                    <pattern>org.apache.iceberg</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.shaded.org.apache.iceberg</shadedPattern>
+                                </relocation>
+                                <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>shaded.iceberg.org.apache.kafka</shadedPattern>
                                 </relocation>
