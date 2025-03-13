@@ -125,14 +125,6 @@ public class DataBatchSinkWriterOperator<CommT>
 
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
-        Event event = element.getValue();
-
-        // FlushEvent triggers flush
-        if (event instanceof FlushEvent) {
-            handleFlushEvent(((FlushEvent) event));
-            return;
-        }
-
         this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
                 .processElement(element);
     }

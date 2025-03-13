@@ -22,17 +22,14 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -49,7 +46,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -199,16 +195,6 @@ public class PreBatchTransformOperator extends AbstractStreamOperator<Event>
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             preTransformProcessorMap.remove(createTableEvent.tableId());
             output.collect(new StreamRecord<>(cacheCreateTable(createTableEvent)));
-        } else if (event instanceof DropTableEvent) {
-            preTransformProcessorMap.remove(((DropTableEvent) event).tableId());
-            output.collect(new StreamRecord<>(event));
-        } else if (event instanceof TruncateTableEvent) {
-            output.collect(new StreamRecord<>(event));
-        } else if (event instanceof SchemaChangeEvent) {
-            SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            preTransformProcessorMap.remove(schemaChangeEvent.tableId());
-            cacheChangeSchema(schemaChangeEvent)
-                    .ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {
             output.collect(new StreamRecord<>(processDataChangeEvent(((DataChangeEvent) event))));
         }
@@ -222,44 +208,6 @@ public class PreBatchTransformOperator extends AbstractStreamOperator<Event>
         preTransformChangeInfoMap.put(
                 tableId, PreTransformChangeInfo.of(tableId, originalSchema, newSchema));
         return event;
-    }
-
-    private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
-        TableId tableId = event.tableId();
-        PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
-        Schema originalSchema =
-                SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
-        Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
-
-        Optional<SchemaChangeEvent> schemaChangeEvent;
-        if (hasAsteriskMap.getOrDefault(tableId, true)) {
-            // If this TableId is asterisk-ful, we should use the latest upstream schema as
-            // referenced columns to perform schema evolution, not of the original ones generated
-            // when creating tables. If hasAsteriskMap has no entry for this TableId, it means that
-            // this TableId has not been referenced by any transform rules, and should be regarded
-            // as asterisk-ful by default.
-            schemaChangeEvent =
-                    SchemaUtils.transformSchemaChangeEvent(
-                            true, tableChangeInfo.getSourceSchema().getColumnNames(), event);
-        } else {
-            // Otherwise, we will use the pre-transformed columns to determine if the given schema
-            // change event should be passed to downstream, only when it is presented in the
-            // pre-transformed schema.
-            schemaChangeEvent =
-                    SchemaUtils.transformSchemaChangeEvent(
-                            false,
-                            tableChangeInfo.getPreTransformedSchema().getColumnNames(),
-                            event);
-        }
-        if (schemaChangeEvent.isPresent()) {
-            preTransformedSchema =
-                    SchemaUtils.applySchemaChangeEvent(
-                            tableChangeInfo.getPreTransformedSchema(), schemaChangeEvent.get());
-        }
-        cachePreTransformProcessor(tableId, originalSchema);
-        preTransformChangeInfoMap.put(
-                tableId, PreTransformChangeInfo.of(tableId, originalSchema, preTransformedSchema));
-        return schemaChangeEvent;
     }
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
