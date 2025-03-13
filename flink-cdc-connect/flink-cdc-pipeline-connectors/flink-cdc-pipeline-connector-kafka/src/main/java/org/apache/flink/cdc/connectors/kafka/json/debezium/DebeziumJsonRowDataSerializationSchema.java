@@ -145,7 +145,8 @@ public class DebeziumJsonRowDataSerializationSchema implements SerializationSche
                 && mapNullKeyMode.equals(that.mapNullKeyMode)
                 && mapNullKeyLiteral.equals(that.mapNullKeyLiteral)
                 && encodeDecimalAsPlainNumber == that.encodeDecimalAsPlainNumber
-                && ignoreNullFields == that.ignoreNullFields;
+                && ignoreNullFields == that.ignoreNullFields
+                && isIncludedDebeziumSchema == that.isIncludedDebeziumSchema;
     }
 
     @Override
@@ -156,6 +157,7 @@ public class DebeziumJsonRowDataSerializationSchema implements SerializationSche
                 mapNullKeyMode,
                 mapNullKeyLiteral,
                 encodeDecimalAsPlainNumber,
-                ignoreNullFields);
+                ignoreNullFields,
+                isIncludedDebeziumSchema);
     }
 }
