@@ -31,8 +31,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
-import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.ArrayList;

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -128,6 +129,13 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
         StartupOptions startupOptions = getStartupOptions(config);
+
+        // Batch mode only supports StartupMode.SNAPSHOT.
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
+            startupOptions = StartupOptions.snapshot();
+        }
 
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
 
