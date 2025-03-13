@@ -70,6 +70,29 @@ transform:
 | __table_name__      | String    | Name of the table that contains the row.     |
 | __data_event_type__ | String    | Operation type of data change event.         |
 
+除了以上的元数据字段，连接器也可以解析额外的元数据并放入 DataChangeEvent 的 meta map中，这些元数据也可以在transform使用。
+例如如下的作业，MySQL 连接器可以解析 `op_ts` 元数据并在transform中使用。
+
+```yaml
+source:
+  type: mysql
+  hostname: localhost
+  port: 3306
+  username: testuser
+  password: testpwd
+  tables: testdb.customer
+  server-id: 5400-5404
+  server-time-zone: UTC
+  metadata.list: op_ts
+  
+transform:
+  - source-table: testdb.customer
+    projection: \*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts
+  
+sink:
+  type: values
+```
+
 ## Metadata relationship
 
 | Type                 | Namespace | SchemaName | Table |
