@@ -28,6 +28,8 @@ import java.io.Serializable;
 /** A wrapper class for {@link WriteResult} and {@link TableId}. */
 public class WriteResultWrapper implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
     private final WriteResult writeResult;
 
     private final TableId tableId;

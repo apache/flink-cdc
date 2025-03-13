@@ -131,12 +131,6 @@ limitations under the License.
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-flink-runtime-${flink.major.version}</artifactId>
-            <version>${iceberg.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-oceanbase-cdc</artifactId>
             <version>${project.version}</version>
@@ -380,15 +374,6 @@ limitations under the License.
                             <artifactId>paimon-flink-${flink-major-1.19}</artifactId>
                             <version>${paimon.version}</version>
                             <destFileName>paimon-sql-connector-${flink-1.19}.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-                        <artifactItem>
-                            <groupId>org.apache.iceberg</groupId>
-                            <artifactId>iceberg-flink-runtime-1.19</artifactId>
-                            <version>${iceberg.version}</version>
-                            <destFileName>iceberg-sql-connector-flink-1.19.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

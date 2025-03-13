@@ -18,11 +18,13 @@
 package org.apache.flink.cdc.connectors.iceberg.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.iceberg.sink.utils.OptionUtils;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -60,6 +62,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                                 value);
                     }
                 });
+        // Hard code to disable catalog cache as we will try to get latest schema after schema
+        // change.
         catalogOptions.put("cache-enabled", "false");
         ZoneId zoneId = ZoneId.systemDefault();
         if (!Objects.equals(
@@ -73,8 +77,25 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         String schemaOperatorUid =
                 context.getPipelineConfiguration()
                         .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
+        CompactionOptions compactionOptions =
+                getCompactionStrategy(context.getFactoryConfiguration());
+
         return new IcebergDataSink(
-                catalogOptions, tableOptions, new HashMap<>(), zoneId, schemaOperatorUid);
+                catalogOptions,
+                tableOptions,
+                new HashMap<>(),
+                zoneId,
+                schemaOperatorUid,
+                compactionOptions);
+    }
+
+    private CompactionOptions getCompactionStrategy(Configuration configuration) {
+        return CompactionOptions.builder()
+                .enabled(configuration.get(IcebergDataSinkOptions.SINK_COMPACTION_ENABLED))
+                .commitInterval(
+                        configuration.get(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL))
+                .parallelism(configuration.get(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM))
+                .build();
     }
 
     @Override
@@ -93,8 +114,9 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(IcebergDataSinkOptions.TYPE);
         options.add(IcebergDataSinkOptions.WAREHOUSE);
-        options.add(IcebergDataSinkOptions.URI);
         options.add(IcebergDataSinkOptions.PARTITION_KEY);
+        options.add(IcebergDataSinkOptions.SINK_COMPACTION_ENABLED);
+        options.add(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL);
         return options;
     }
 }

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.IcebergSink;
+import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
 
 import java.io.Serializable;
 import java.time.ZoneId;
@@ -44,22 +45,27 @@ public class IcebergDataSink implements DataSink, Serializable {
 
     public final String schemaOperatorUid;
 
+    public final CompactionOptions compactionOptions;
+
     public IcebergDataSink(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             Map<TableId, List<String>> partitionMaps,
             ZoneId zoneId,
-            String schemaOperatorUid) {
+            String schemaOperatorUid,
+            CompactionOptions compactionOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.partitionMaps = partitionMaps;
         this.zoneId = zoneId;
         this.schemaOperatorUid = schemaOperatorUid;
+        this.compactionOptions = compactionOptions;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        IcebergSink icebergEventSink = new IcebergSink(catalogOptions, schemaOperatorUid, zoneId);
+        IcebergSink icebergEventSink =
+                new IcebergSink(catalogOptions, tableOptions, zoneId, compactionOptions);
         return FlinkSinkProvider.of(icebergEventSink);
     }
 
