@@ -216,6 +216,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 
     private static final String SCAN_STARTUP_MODE_VALUE_SNAPSHOT = "snapshot";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_COMMITTED = "committed-offset";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -227,6 +228,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 return StartupOptions.snapshot();
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
+            case SCAN_STARTUP_MODE_VALUE_COMMITTED:
+                return StartupOptions.committed();
 
             default:
                 throw new ValidationException(
@@ -236,6 +239,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_SNAPSHOT,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_COMMITTED,
                                 modeString));
         }
     }
