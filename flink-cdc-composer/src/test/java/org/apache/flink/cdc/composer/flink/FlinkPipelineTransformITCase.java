@@ -930,6 +930,7 @@ class FlinkPipelineTransformITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, "America/Los_Angeles");
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1068,6 +1069,7 @@ class FlinkPipelineTransformITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1175,6 +1177,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1261,6 +1264,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1356,6 +1360,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1439,6 +1444,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1534,6 +1540,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1630,6 +1637,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1725,6 +1733,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -1937,8 +1946,10 @@ class FlinkPipelineTransformITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
@@ -2004,6 +2015,7 @@ class FlinkPipelineTransformITCase {
                     PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
             PipelineDef pipelineDef =
                     new PipelineDef(
+                            null,
                             sourceDef,
                             sinkDef,
                             Collections.emptyList(),
@@ -2178,6 +2190,7 @@ class FlinkPipelineTransformITCase {
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
