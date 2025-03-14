@@ -398,6 +398,158 @@ public class FlinkPipelineBatchComposerITCase {
 
     @ParameterizedTest
     @EnumSource
+    void testTwoTransformInBatchMode(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        TableId myTable2 = TableId.tableId("default_namespace", "default_schema", "mytable2");
+        Schema table1Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        Schema table2Schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT())
+                        .physicalColumn("name", DataTypes.VARCHAR(255))
+                        .physicalColumn("description", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        // Create test dataset:
+        // Create table 1 [id, name, age]
+        // Create table 2 [id, name, description]
+        // Table 1: +I[1, Alice, 18]
+        // Table 1: +I[2, Bob, 20]
+        // Table 2: +I[3, Charlie, student]
+        // Table 2: +I[4, Donald, student]
+        List<Event> events = new ArrayList<>();
+        BinaryRecordDataGenerator table1dataGenerator =
+                new BinaryRecordDataGenerator(
+                        table1Schema.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator table2dataGenerator =
+                new BinaryRecordDataGenerator(
+                        table2Schema.getColumnDataTypes().toArray(new DataType[0]));
+        events.add(new CreateTableEvent(myTable1, table1Schema));
+        events.add(new CreateTableEvent(myTable2, table2Schema));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        table1dataGenerator.generate(
+                                new Object[] {1, BinaryStringData.fromString("Alice"), 18})));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable1,
+                        table1dataGenerator.generate(
+                                new Object[] {2, BinaryStringData.fromString("Bob"), 20})));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable2,
+                        table2dataGenerator.generate(
+                                new Object[] {
+                                    3L,
+                                    BinaryStringData.fromString("Charlie"),
+                                    BinaryStringData.fromString("student")
+                                })));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        myTable2,
+                        table2dataGenerator.generate(
+                                new Object[] {
+                                    4L,
+                                    BinaryStringData.fromString("Donald"),
+                                    BinaryStringData.fromString("student")
+                                })));
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        List<TransformDef> transformDef =
+                Arrays.asList(
+                        new TransformDef(
+                                "default_namespace.default_schema.mytable1",
+                                "*,'last_name' as last_name",
+                                null,
+                                null,
+                                null,
+                                null,
+                                "",
+                                null),
+                        new TransformDef(
+                                "default_namespace.default_schema.mytable2",
+                                "*,'new_address' as new_address",
+                                null,
+                                null,
+                                null,
+                                null,
+                                "",
+                                null));
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        transformDef,
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+        Schema myTable1Schema = ValuesDatabase.getTableSchema(myTable1);
+        assertThat(myTable1Schema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .physicalColumn("last_name", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        Schema myTable2Schema = ValuesDatabase.getTableSchema(myTable2);
+        assertThat(myTable2Schema)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.BIGINT().notNull())
+                                .physicalColumn("name", DataTypes.VARCHAR(255))
+                                .physicalColumn("description", DataTypes.STRING())
+                                .physicalColumn("new_address", DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`last_name` STRING}, primaryKeys=id, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`description` STRING,`new_address` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, last_name], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, last_name], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Charlie, student, new_address], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Donald, student, new_address], op=INSERT, meta=()}");
+    }
+
+    @ParameterizedTest
+    @EnumSource
     void testOpTypeMetadataColumnInBatchMode(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
