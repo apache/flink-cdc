@@ -312,6 +312,15 @@ pipeline:
       <td>Boolean</td>
       <td>是否将TINYINT(1)类型当做Boolean类型处理，默认true。</td>
     </tr>
+    <tr>
+      <td>metadata.list</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>String</td>
+      <td>
+        可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
