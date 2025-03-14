@@ -98,6 +98,9 @@ public class TableIdRouter {
     }
 
     public List<Set<TableId>> groupSourceTablesByRouteRule(Set<TableId> tableIdSet) {
+        if (routes.isEmpty()) {
+            return new ArrayList<>();
+        }
         List<Set<TableId>> routedTableIds =
                 routes.stream()
                         .map(
@@ -110,9 +113,6 @@ public class TableIdRouter {
                                             .collect(Collectors.toSet());
                                 })
                         .collect(Collectors.toList());
-        if (routedTableIds.isEmpty()) {
-            routedTableIds.add(tableIdSet);
-        }
         return routedTableIds;
     }
 }
