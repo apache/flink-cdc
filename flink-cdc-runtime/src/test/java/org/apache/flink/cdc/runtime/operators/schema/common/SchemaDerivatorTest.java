@@ -606,10 +606,33 @@ public class SchemaDerivatorTest extends SchemaTestBase {
         TableIdRouter router =
                 new TableIdRouter(
                         Arrays.asList(
+                                // Simple 1-to-1 routing rules
+                                new RouteRule("db_1.table_1", "db_1.table_1"),
+                                // Re-routed rules
+                                new RouteRule("db_2.table_1", "db_2.table_2"),
                                 // Merging tables
-                                new RouteRule("db_3.table_\\.*", "db_3.table_merged")));
+                                new RouteRule("db_3.table_\\.*", "db_3.table_merged"),
+                                // Broadcast tables
+                                new RouteRule("db_4.table_1", "db_4.table_a"),
+                                new RouteRule("db_4.table_1", "db_4.table_b")));
         List<CreateTableEvent> createTableEvents =
                 Arrays.asList(
+                        new CreateTableEvent(
+                                TableId.parse("db_1.table_1"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id1", DataTypes.INT())
+                                        .physicalColumn("name1", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age1", DataTypes.FLOAT())
+                                        .physicalColumn("notes1", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_2.table_1"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id2", DataTypes.INT())
+                                        .physicalColumn("name2", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age2", DataTypes.FLOAT())
+                                        .physicalColumn("notes2", DataTypes.STRING())
+                                        .build()),
                         new CreateTableEvent(
                                 TableId.parse("db_3.table_1"),
                                 Schema.newBuilder()
@@ -632,6 +655,14 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                         .physicalColumn("name", DataTypes.VARCHAR(200))
                                         .physicalColumn("age", DataTypes.FLOAT())
                                         .physicalColumn("notes", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_4.table_1"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id4", DataTypes.INT())
+                                        .physicalColumn("name4", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age4", DataTypes.FLOAT())
+                                        .physicalColumn("notes4", DataTypes.STRING())
                                         .build()));
         List<CreateTableEvent> mergedCreateTableEvents =
                 SchemaDerivator.deduceMergedCreateTableEventInBatchMode(router, createTableEvents);
@@ -644,6 +675,38 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                         .physicalColumn("name", DataTypes.STRING())
                                         .physicalColumn("age", DataTypes.FLOAT())
                                         .physicalColumn("notes", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_4.table_a"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id4", DataTypes.INT())
+                                        .physicalColumn("name4", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age4", DataTypes.FLOAT())
+                                        .physicalColumn("notes4", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_4.table_b"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id4", DataTypes.INT())
+                                        .physicalColumn("name4", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age4", DataTypes.FLOAT())
+                                        .physicalColumn("notes4", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_1.table_1"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id1", DataTypes.INT())
+                                        .physicalColumn("name1", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age1", DataTypes.FLOAT())
+                                        .physicalColumn("notes1", DataTypes.STRING())
+                                        .build()),
+                        new CreateTableEvent(
+                                TableId.parse("db_2.table_2"),
+                                Schema.newBuilder()
+                                        .physicalColumn("id2", DataTypes.INT())
+                                        .physicalColumn("name2", DataTypes.VARCHAR(128))
+                                        .physicalColumn("age2", DataTypes.FLOAT())
+                                        .physicalColumn("notes2", DataTypes.STRING())
                                         .build()));
     }
 }
