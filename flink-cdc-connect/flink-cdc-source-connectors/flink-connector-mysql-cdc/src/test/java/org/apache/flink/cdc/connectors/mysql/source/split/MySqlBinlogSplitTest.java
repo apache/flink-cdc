@@ -67,6 +67,8 @@ public class MySqlBinlogSplitTest {
                         tableSchemas,
                         0,
                         false);
+        String expectedTables = "[catalog1.table1, catalog2.table2]";
+        Assert.assertEquals(expectedTables, binlogSplit.getTables());
 
         // case 1: only include table1
         Tables.TableFilter currentTableFilter = tableId -> tableId.table().equals("table1");
@@ -77,6 +79,8 @@ public class MySqlBinlogSplitTest {
                 mySqlBinlogSplit.getTableSchemas();
         Assert.assertEquals(1, filterTableSchemas.size());
         Assert.assertEquals(tableChange1, filterTableSchemas.get(tableId1));
+        String expectedTables1 = "[catalog1.table1]";
+        Assert.assertEquals(expectedTables1, mySqlBinlogSplit.getTables());
 
         // case 2: include all tables
         currentTableFilter = tableId -> tableId.table().startsWith("table");
@@ -87,6 +91,61 @@ public class MySqlBinlogSplitTest {
         Assert.assertEquals(2, filterTableSchemas.size());
         Assert.assertEquals(tableChange1, filterTableSchemas.get(tableId1));
         Assert.assertEquals(tableChange2, filterTableSchemas.get(tableId2));
+        String expectedTables2 = "[catalog1.table1, catalog2.table2]";
+        Assert.assertEquals(expectedTables2, mySqlBinlogSplit.getTables());
+    }
+
+    @Test
+    public void testTruncatedTablesForLog() {
+        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+
+        // mock table1
+        TableId tableId1 = new TableId("catalog1", null, "table1");
+
+        TableChanges.TableChange tableChange1 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog1.table1")));
+
+        // mock table2
+        TableId tableId2 = new TableId("catalog2", null, "table2");
+
+        TableChanges.TableChange tableChange2 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog2.table2")));
+
+        // mock table3
+        TableId tableId3 = new TableId("catalog3", null, "table3");
+
+        TableChanges.TableChange tableChange3 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog3.table3")));
+
+        // mock table4
+        TableId tableId4 = new TableId("catalog4", null, "table4");
+
+        TableChanges.TableChange tableChange4 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog4.table4")));
+
+        tableSchemas.put(tableId1, tableChange1);
+        tableSchemas.put(tableId2, tableChange2);
+        tableSchemas.put(tableId3, tableChange3);
+        tableSchemas.put(tableId4, tableChange4);
+        MySqlBinlogSplit binlogSplit =
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        BinlogOffset.ofLatest(),
+                        null,
+                        new ArrayList<>(),
+                        tableSchemas,
+                        0,
+                        false);
+        String expectedTables = "[catalog1.table1, catalog2.table2, catalog3.table3]";
+        Assert.assertEquals(expectedTables, binlogSplit.getTables());
     }
 
     /** A mock implementation for {@link Table} which is used for unit tests. */
