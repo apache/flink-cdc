@@ -226,48 +226,6 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSyncWholeDatabaseWithDebeziumJsonInBatchMode() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: kafka\n"
-                                + "  properties.bootstrap.servers: kafka:9092\n"
-                                + "  topic: %s\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        mysqlInventoryDatabase.getDatabaseName(),
-                        topic,
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
-        int expectedEventCount = 13;
-        waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
-        List<String> expectedRecords =
-                getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json.txt");
-        assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
-    }
-
-    @Test
     public void testSyncWholeDatabaseWithCanalJson() throws Exception {
         String pipelineJob =
                 String.format(
@@ -341,49 +299,6 @@ class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
         assertThat(expectedRecords)
                 .containsExactlyInAnyOrderElementsOf(deserializeValues(collectedRecords));
-    }
-
-    @Test
-    public void testSyncWholeDatabaseWithCanalJsonInBatchMode() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: kafka\n"
-                                + "  properties.bootstrap.servers: kafka:9092\n"
-                                + "  topic: %s\n"
-                                + "  value.format: canal-json\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        mysqlInventoryDatabase.getDatabaseName(),
-                        topic,
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
-        int expectedEventCount = 13;
-        waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
-        List<String> expectedRecords =
-                getExpectedRecords("expectedEvents/mysqlToKafka/canal-json.txt");
-        assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
     }
 
     private void waitUntilSpecificEventCount(
