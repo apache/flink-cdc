@@ -50,6 +50,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -131,6 +132,19 @@ public class SchemaDerivator {
                         tableIdRouter, evolvedTableId, schemaManager.getAllOriginalTables())
                 .stream()
                 .map(utid -> schemaManager.getLatestOriginalSchema(utid).get())
+                .collect(Collectors.toSet());
+    }
+
+    /** For an evolved table ID, reverse lookup all upstream schemas that needs to be fit in. */
+    public static Set<Schema> reverseLookupDependingUpstreamSchemas(
+            final TableIdRouter tableIdRouter,
+            final TableId evolvedTableId,
+            final Set<TableId> allOriginalTables,
+            final Schema originalSchema) {
+        return reverseLookupDependingUpstreamTables(
+                        tableIdRouter, evolvedTableId, allOriginalTables)
+                .stream()
+                .map(utid -> originalSchema)
                 .collect(Collectors.toSet());
     }
 
@@ -340,5 +354,58 @@ public class SchemaDerivator {
         }
 
         return Optional.of(dataChangeEvent);
+    }
+
+    /** Deduce merged CreateTableEvent in batch mode. */
+    public static List<CreateTableEvent> deduceMergedCreateTableEventInBatchMode(
+            TableIdRouter router, List<CreateTableEvent> createTableEvents) {
+        Set<TableId> originalTables =
+                createTableEvents.stream()
+                        .map(CreateTableEvent::tableId)
+                        .collect(Collectors.toSet());
+
+        List<Set<TableId>> sourceTablesByRouteRule =
+                router.groupSourceTablesByRouteRule(originalTables);
+        Map<TableId, Schema> sourceTableIdToSchemaMap =
+                createTableEvents.stream()
+                        .collect(
+                                Collectors.toMap(
+                                        CreateTableEvent::tableId, CreateTableEvent::getSchema));
+        Map<TableId, Schema> sinkTableIdToSchemaMap = new HashMap<>();
+        Set<TableId> routedTables = new HashSet<>();
+        for (Set<TableId> sourceTables : sourceTablesByRouteRule) {
+            List<Schema> toBeMergedSchemas = new ArrayList<>();
+            for (TableId tableId : sourceTables) {
+                toBeMergedSchemas.add(sourceTableIdToSchemaMap.get(tableId));
+                routedTables.add(tableId);
+            }
+            if (toBeMergedSchemas.isEmpty()) {
+                continue;
+            }
+            Schema mergedSchema = null;
+            for (Schema toBeMergedSchema : toBeMergedSchemas) {
+                if (mergedSchema == null) {
+                    mergedSchema = toBeMergedSchema;
+                    continue;
+                }
+                mergedSchema =
+                        SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
+            }
+
+            for (TableId tableId : sourceTables) {
+                List<TableId> sinkTableIds = router.calculateRoute(tableId);
+                for (TableId sinkTableId : sinkTableIds) {
+                    sinkTableIdToSchemaMap.put(sinkTableId, mergedSchema);
+                }
+            }
+        }
+        for (TableId tableId : originalTables) {
+            if (!sinkTableIdToSchemaMap.containsKey(tableId) && !routedTables.contains(tableId)) {
+                sinkTableIdToSchemaMap.put(tableId, sourceTableIdToSchemaMap.get(tableId));
+            }
+        }
+        return sinkTableIdToSchemaMap.entrySet().stream()
+                .map(entry -> new CreateTableEvent(entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
     }
 }

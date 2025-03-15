@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
+import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -90,7 +91,14 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
-        if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
+        if (StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())) {
+            // In snapshot mode, we simply emit all schemas at once.
+            createTableEventCache.forEach(
+                    (tableId, createTableEvent) -> {
+                        output.collect(createTableEvent);
+                        alreadySendCreateTableTables.add(tableId);
+                    });
+        } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             // In Snapshot phase of INITIAL startup mode, we lazily send CreateTableEvent to
             // downstream to avoid checkpoint timeout.
             TableId tableId = splitState.asSnapshotSplitState().toMySqlSplit().getTableId();

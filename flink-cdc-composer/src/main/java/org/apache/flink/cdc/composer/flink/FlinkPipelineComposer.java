@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.composer.flink;
 
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
@@ -111,6 +112,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaChangeBehavior schemaChangeBehavior =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
+        boolean isBatchMode = false;
+        if (pipelineDefConfig.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
+            isBatchMode = true;
+            env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        }
+
         // Initialize translators
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         TransformTranslator transformTranslator = new TransformTranslator();
@@ -145,7 +152,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
-                        isParallelMetadataSource);
+                        isParallelMetadataSource,
+                        isBatchMode);
 
         // PreTransform ---> PostTransform
         stream =
@@ -186,6 +194,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                     schemaOperatorTranslator.translateRegular(
                             stream,
                             parallelism,
+                            isBatchMode,
                             dataSink.getMetadataApplier()
                                     .setAcceptedSchemaEvolutionTypes(
                                             pipelineDef
@@ -199,13 +208,18 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             stream,
                             parallelism,
                             parallelism,
+                            isBatchMode,
                             schemaOperatorIDGenerator.generate(),
                             dataSink.getDataChangeEventHashFunctionProvider(parallelism));
         }
 
         // Schema Operator -> Sink -> X
         sinkTranslator.translate(
-                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
+                pipelineDef.getSink(),
+                stream,
+                dataSink,
+                isBatchMode,
+                schemaOperatorIDGenerator.generate());
     }
 
     private void addFrameworkJars() {
