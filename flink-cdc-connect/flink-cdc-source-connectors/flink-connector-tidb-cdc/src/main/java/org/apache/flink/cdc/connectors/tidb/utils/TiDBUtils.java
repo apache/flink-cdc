@@ -180,10 +180,13 @@ public class TiDBUtils {
             case DATE:
                 return DataTypes.DATE();
             case DATETIME:
-            case TIMESTAMP:
                 return column.length() >= 0
                         ? DataTypes.TIMESTAMP(column.length())
-                        : DataTypes.TIMESTAMP();
+                        : DataTypes.TIMESTAMP(0);
+            case TIMESTAMP:
+                return column.length() >= 0
+                        ? DataTypes.TIMESTAMP_LTZ(column.length())
+                        : DataTypes.TIMESTAMP_LTZ(0);
             case CHAR:
                 return DataTypes.CHAR(column.length());
             case VARCHAR:

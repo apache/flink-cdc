@@ -49,13 +49,13 @@ public class UriHostMappingTest {
 
     @Test
     public void uriHostMappingError() {
-        try {
-            final TiConfiguration tiConf =
-                    TiDBSourceOptions.getTiConfiguration(
-                            "http://0.0.0.0:2347", "host1=1;host2=2;host3=3", new HashMap<>());
-        } catch (IllegalArgumentException e) {
-            Assertions.assertThat(e.getMessage())
-                    .isEqualTo("Invalid host mapping string: host1=1;host2=2;host3=3");
-        }
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TiDBSourceOptions.getTiConfiguration(
+                                        "http://0.0.0.0:2347",
+                                        "host1=1;host2=2;host3=3",
+                                        new HashMap<>()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid host mapping string: host1=1;host2=2;host3=3");
     }
 }

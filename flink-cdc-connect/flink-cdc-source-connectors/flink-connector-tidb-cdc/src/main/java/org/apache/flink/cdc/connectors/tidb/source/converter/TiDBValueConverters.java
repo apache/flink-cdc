@@ -71,6 +71,7 @@ public class TiDBValueConverters extends JdbcValueConverters {
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TiDBValueConverters.class);
+
     /** Used to parse values of TIME columns. Format: 000:00:00.000000. */
     private static final Pattern TIME_FIELD_PATTERN =
             Pattern.compile("(\\-?[0-9]*):([0-9]*):([0-9]*)(\\.([0-9]*))?");
@@ -717,8 +718,22 @@ public class TiDBValueConverters extends JdbcValueConverters {
     }
 
     @Override
+    protected Object convertBit(Column column, Field fieldDefn, Object data) {
+        if (data instanceof byte[]) {
+            boolean value = false;
+            for (byte current : (byte[]) data) {
+                value |= current != 0;
+            }
+            data = value;
+        }
+        return super.convertBit(column, fieldDefn, data);
+    }
+
+    @Override
     protected Object convertTime(Column column, Field fieldDefn, Object data) {
-        if (data instanceof String) {
+        if (data instanceof Long) {
+            data = Duration.ofNanos((Long) data);
+        } else if (data instanceof String) {
             data = Strings.asDuration((String) data);
         }
         return super.convertTime(column, fieldDefn, data);

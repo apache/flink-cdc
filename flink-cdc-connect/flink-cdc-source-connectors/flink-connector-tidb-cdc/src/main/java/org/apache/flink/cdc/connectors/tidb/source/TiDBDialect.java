@@ -46,8 +46,6 @@ import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -63,7 +61,6 @@ public class TiDBDialect implements JdbcDataSourceDialect {
 
     private final TiDBSourceConfig sourceConfig;
     private transient TiDBSchema tiDBSchema;
-    @Nullable private TiDBStreamFetchTask streamFetchTask;
 
     public TiDBDialect(TiDBSourceConfig sourceConfig) {
         this.sourceConfig = sourceConfig;
@@ -87,7 +84,7 @@ public class TiDBDialect implements JdbcDataSourceDialect {
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
-            return TiDBConnectionUtils.isTableIdCaseInsensitive(jdbcConnection);
+            return !TiDBConnectionUtils.isTableIdCaseInsensitive(jdbcConnection);
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error reading TiDB variables: " + e.getMessage(), e);
         }
@@ -108,13 +105,6 @@ public class TiDBDialect implements JdbcDataSourceDialect {
     @Override
     public FetchTask.Context createFetchTaskContext(JdbcSourceConfig sourceConfig) {
         return new TiDBSourceFetchTaskContext(sourceConfig, this, openJdbcConnection());
-    }
-
-    @Override
-    public void notifyCheckpointComplete(long checkpointId, Offset offset) throws Exception {
-        if (streamFetchTask != null) {
-            streamFetchTask.commitCurrentOffset(offset);
-        }
     }
 
     @Override
@@ -203,8 +193,7 @@ public class TiDBDialect implements JdbcDataSourceDialect {
         if (sourceSplitBase.isSnapshotSplit()) {
             return new TiDBScanFetchTask(sourceSplitBase.asSnapshotSplit());
         } else {
-            this.streamFetchTask = new TiDBStreamFetchTask(sourceSplitBase.asStreamSplit());
-            return this.streamFetchTask;
+            return new TiDBStreamFetchTask(sourceSplitBase.asStreamSplit());
         }
     }
 

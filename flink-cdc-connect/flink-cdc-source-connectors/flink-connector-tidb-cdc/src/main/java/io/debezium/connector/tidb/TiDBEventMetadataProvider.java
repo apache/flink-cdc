@@ -53,10 +53,13 @@ public class TiDBEventMetadataProvider implements EventMetadataProvider {
             return null;
         }
         final Struct sourceInfo = value.getStruct(Envelope.FieldName.SOURCE);
-        if (source == null) {
+        if (sourceInfo == null) {
             return null;
         }
-        return Collect.hashMapOf(COMMIT_VERSION_KEY, sourceInfo.getString(COMMIT_VERSION_KEY));
+        final Long commitVersion = sourceInfo.getInt64(COMMIT_VERSION_KEY);
+        return commitVersion == null
+                ? null
+                : Collect.hashMapOf(COMMIT_VERSION_KEY, String.valueOf(commitVersion));
     }
 
     @Override

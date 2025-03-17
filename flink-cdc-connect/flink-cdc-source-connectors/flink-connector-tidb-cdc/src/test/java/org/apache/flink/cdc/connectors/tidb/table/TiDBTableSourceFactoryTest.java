@@ -98,7 +98,6 @@ public class TiDBTableSourceFactoryTest {
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(properties);
-        System.out.println(actualSource.asSummaryString());
         TiDBTableSource expectedSource =
                 new TiDBTableSource(
                         SCHEMA,
@@ -150,13 +149,6 @@ public class TiDBTableSourceFactoryTest {
         dbzProperties.put("test", "test");
 
         DynamicTableSource actualSource = createTableSource(properties);
-        Map<String, String> options = new HashMap<>();
-        //        options.put("tikv.grpc.timeout_in_ms", "20000");
-        //        options.put("tikv.grpc.scan_timeout_in_ms", "20000");
-        //        options.put("tikv.batch_get_concurrency", "4");
-        //        options.put("tikv.batch_put_concurrency", "4");
-        //        options.put("tikv.batch_scan_concurrency", "4");
-        //        options.put("tikv.batch_delete_concurrency", "4");
         TiDBTableSource expectedSource =
                 new TiDBTableSource(
                         SCHEMA,

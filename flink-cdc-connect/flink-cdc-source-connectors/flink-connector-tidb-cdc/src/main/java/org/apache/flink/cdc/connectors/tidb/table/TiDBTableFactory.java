@@ -180,6 +180,14 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
                 config.getOptional(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN).orElse(null);
         Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
         if (chunkKeyColumn != null) {
+            if (databaseName == null || tableName == null) {
+                throw new ValidationException(
+                        String.format(
+                                "Option '%s' requires both '%s' and '%s' to be set.",
+                                SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN.key(),
+                                DATABASE_NAME.key(),
+                                TABLE_NAME.key()));
+            }
             chunkKeyColumns.put(new ObjectPath(databaseName, tableName), chunkKeyColumn);
         }
 

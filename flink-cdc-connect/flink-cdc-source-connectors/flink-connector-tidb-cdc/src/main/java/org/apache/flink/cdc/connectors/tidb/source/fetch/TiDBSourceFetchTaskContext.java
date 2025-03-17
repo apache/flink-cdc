@@ -24,7 +24,7 @@ import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
-import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
+import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBConnectorConfig;
 import org.apache.flink.cdc.connectors.tidb.source.connection.TiDBConnection;
 import org.apache.flink.cdc.connectors.tidb.source.handler.TiDBErrorHandler;
@@ -173,12 +173,11 @@ public class TiDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         if (this.offsetContext.isSnapshotRunning()) {
             RowType splitKeyType =
                     getSplitType(getDatabaseSchema().tableFor(this.getTableId(record)));
-            Object[] key =
-                    SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
-            return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
+            Object[] key = SplitKeyUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
+            return SplitKeyUtils.splitKeyRangeContains(key, splitStart, splitEnd);
         } else {
             EventOffset newOffset = new EventOffset(record.sourceOffset());
-            return SourceRecordUtils.splitKeyRangeContains(
+            return SplitKeyUtils.splitKeyRangeContains(
                     new EventOffset[] {newOffset}, splitStart, splitEnd);
         }
     }
