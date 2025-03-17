@@ -32,7 +32,7 @@ public class TiDBPartition implements Partition {
 
     @Override
     public Map<String, String> getSourcePartition() {
-        return Collections.emptyMap();
+        return Collections.singletonMap("server", serverName);
     }
 
     @Override

@@ -29,6 +29,7 @@ import org.apache.flink.cdc.connectors.tidb.TiDBTestBase;
 import org.apache.flink.cdc.connectors.tidb.source.TiDBDialect;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfig;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfigFactory;
+import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions;
 import org.apache.flink.cdc.connectors.tidb.source.connection.TiDBConnection;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetFactory;
@@ -72,8 +73,12 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     public void before() {
         initializeTidbTable("customer");
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
-        tiDBSourceConfigFactory.pdAddresses(
-                PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN));
+        String pdAddress = PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN);
+        tiDBSourceConfigFactory
+                .pdAddresses(pdAddress)
+                .tiConfiguration(
+                        TiDBSourceOptions.getTiConfiguration(
+                                pdAddress, "", Collections.emptyMap()));
         tiDBSourceConfigFactory.hostname(TIDB.getHost());
         tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
         tiDBSourceConfigFactory.username(TiDBTestBase.TIDB_USER);
@@ -138,7 +143,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
             streamSplitReader.handleSplitsChanges(new SplitsAddition<>(singletonList(streamSplit)));
             int retry = 0;
             int count = 0;
-            while (retry < MAX_RETRY_TIMES) {
+            while (retry++ < MAX_RETRY_TIMES) {
                 ChangeEventRecords records = (ChangeEventRecords) streamSplitReader.fetch();
                 if (records.nextSplit() != null) {
                     SourceRecords sourceRecords;
@@ -161,8 +166,9 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                     break;
                 }
             }
+            Assertions.fail("Timed out waiting for change events from stream split.");
         } catch (Exception e) {
-            LOG.error("Stream split read error.", e);
+            throw new AssertionError("Stream split read error.", e);
         } finally {
             streamSplitReader.close();
         }

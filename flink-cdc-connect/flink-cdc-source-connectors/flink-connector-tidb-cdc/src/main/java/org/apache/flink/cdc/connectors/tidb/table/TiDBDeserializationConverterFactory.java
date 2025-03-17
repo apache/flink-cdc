@@ -21,6 +21,7 @@ import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverter;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverterFactory;
 import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.StringData;
+import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.logical.ArrayType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeFamily;
@@ -32,10 +33,12 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import io.debezium.data.EnumSet;
 import io.debezium.data.geometry.Geometry;
 import io.debezium.data.geometry.Point;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,12 +62,33 @@ public class TiDBDeserializationConverterFactory {
                         return createStringConverter();
                     case ARRAY:
                         return createArrayConverter((ArrayType) logicalType);
+                    case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                        return createTimestampLtzConverter();
                     default:
                         // fallback to default converter
                         return Optional.empty();
                 }
             }
         };
+    }
+
+    private static Optional<DeserializationRuntimeConverter> createTimestampLtzConverter() {
+        return Optional.of(
+                new DeserializationRuntimeConverter() {
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) {
+                        if (dbzObj instanceof String) {
+                            Instant instant =
+                                    ZonedTimestamp.FORMATTER.parse((String) dbzObj, Instant::from);
+                            return TimestampData.fromInstant(instant);
+                        }
+
+                        throw new IllegalArgumentException(
+                                "Unable to convert TIMESTAMP_LTZ from " + dbzObj);
+                    }
+                });
     }
 
     private static Optional<DeserializationRuntimeConverter> createStringConverter() {

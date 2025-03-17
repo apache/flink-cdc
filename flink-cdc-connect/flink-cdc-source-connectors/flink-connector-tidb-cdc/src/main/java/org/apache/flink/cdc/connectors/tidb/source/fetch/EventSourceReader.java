@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.tidb.source.fetch;
 
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
-import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBConnectorConfig;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetContext;
@@ -61,10 +60,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.tikv.common.codec.TableCodec.decodeObjects;
+import static org.tikv.common.codec.TiDBRowV2Decoder.decodeObjectsPreservingBinary;
 
 /** TiDB streaming change event source reader. */
 public class EventSourceReader
@@ -77,7 +78,7 @@ public class EventSourceReader
     private final ErrorHandler errorHandler;
     private final TiDBSourceFetchTaskContext taskContext;
     private final Map<TableSchema, Map<String, Integer>> fieldIndexMap = new HashMap<>();
-    public ChangeEventSourceContext context;
+    public volatile ChangeEventSourceContext context;
 
     private static final long STREAMING_VERSION_START_EPOCH = 0L;
 
@@ -93,8 +94,10 @@ public class EventSourceReader
     private transient TableId tableId;
     private transient TiTableInfo tableInfo;
 
-    private transient boolean running = true;
+    private transient volatile boolean running;
+    private transient volatile Thread executionThread;
     private transient ExecutorService executorService;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public EventSourceReader(
             TiDBConnectorConfig connectorConfig,
@@ -111,33 +114,43 @@ public class EventSourceReader
     }
 
     @Override
-    public void init() throws InterruptedException {
-        StreamingChangeEventSource.super.init();
-        session = TiSession.create(ticonf);
-        Set<TableId> tableIds = this.split.getTableSchemas().keySet();
-        if (tableIds.isEmpty() && tableIds.size() != 1) {
-            LOG.error("Currently only single table ingest is supported.");
+    public synchronized void init() throws InterruptedException {
+        if (closed.get()) {
             return;
         }
-        this.tableId = tableIds.stream().findFirst().get();
-        this.tableInfo = session.getCatalog().getTable(tableId.catalog(), tableId.table());
-        if (tableInfo == null) {
-            throw new RuntimeException(
-                    String.format(
-                            "Table %s.%s does not exist.", tableId.catalog(), tableId.table()));
+        StreamingChangeEventSource.super.init();
+        try {
+            session = TiSession.create(ticonf);
+            Set<TableId> tableIds = this.split.getTableSchemas().keySet();
+            if (tableIds.size() != 1) {
+                throw new IllegalStateException(
+                        "Currently only single table ingest is supported, but found "
+                                + tableIds.size()
+                                + " tables.");
+            }
+            this.tableId = tableIds.stream().findFirst().get();
+            this.tableInfo = session.getCatalog().getTable(tableId.catalog(), tableId.table());
+            if (tableInfo == null) {
+                throw new RuntimeException(
+                        String.format(
+                                "Table %s.%s does not exist.", tableId.catalog(), tableId.table()));
+            }
+            keyRange = TableKeyRangeUtils.getTableKeyRange(tableInfo.getId(), 1, 0);
+            cdcClient = new CDCClient(session, keyRange);
+            prewrites = new TreeMap<>();
+            commits = new TreeMap<>();
+            // cdc event will lose if pull cdc event block when region split
+            // use queue to separate read and write to ensure pull event unblock.
+            // since sink jdbc is slow, 5000W queue size may be safe size.
+            committedEvents = new LinkedBlockingQueue<>();
+            resolvedTs = EventOffset.getStartTs(this.split.getStartingOffset());
+            ThreadFactory threadFactory =
+                    new ThreadFactoryBuilder().setNameFormat("tidb-source-function-0").build();
+            executorService = Executors.newSingleThreadExecutor(threadFactory);
+        } catch (RuntimeException e) {
+            close();
+            throw e;
         }
-        keyRange = TableKeyRangeUtils.getTableKeyRange(tableInfo.getId(), 1, 0);
-        cdcClient = new CDCClient(session, keyRange);
-        prewrites = new TreeMap<>();
-        commits = new TreeMap<>();
-        // cdc event will lose if pull cdc event block when region split
-        // use queue to separate read and write to ensure pull event unblock.
-        // since sink jdbc is slow, 5000W queue size may be safe size.
-        committedEvents = new LinkedBlockingQueue<>();
-        resolvedTs = EventOffset.getStartTs(this.split.getStartingOffset());
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder().setNameFormat("tidb-source-function-0").build();
-        executorService = Executors.newSingleThreadExecutor(threadFactory);
     }
 
     @Override
@@ -146,26 +159,36 @@ public class EventSourceReader
             TiDBPartition partition,
             EventOffsetContext offsetContext)
             throws InterruptedException {
-        this.context = context;
-        if (connectorConfig.getSourceConfig().getStartupOptions().isSnapshotOnly()) {
-            LOG.info("Streaming is not enabled in current configuration");
+        if (closed.get()) {
             return;
         }
-        this.taskContext.getDatabaseSchema().assureNonEmptySchema();
-        cdcClient.start(resolvedTs);
+        this.context = context;
+        this.executionThread = Thread.currentThread();
         running = true;
-        EventOffsetContext effectiveOffsetContext =
-                offsetContext != null
-                        ? offsetContext
-                        : EventOffsetContext.initial(this.connectorConfig);
         try {
-            EventOffset currentOffset = new EventOffset(effectiveOffsetContext.getOffset());
-            if (currentOffset.isBefore(split.getStartingOffset())) {
+            if (connectorConfig.getSourceConfig().getStartupOptions().isSnapshotOnly()) {
+                LOG.info("Streaming is not enabled in current configuration");
                 return;
             }
+            this.taskContext.getDatabaseSchema().assureNonEmptySchema();
+            cdcClient.start(resolvedTs);
+            EventOffsetContext effectiveOffsetContext =
+                    offsetContext != null
+                            ? offsetContext
+                            : EventOffsetContext.initial(this.connectorConfig);
             readChangeEvents(partition, effectiveOffsetContext);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (!closed.get()) {
+                throw e;
+            }
         } catch (Exception e) {
-            this.errorHandler.setProducerThrowable(e);
+            if (!closed.get()) {
+                this.errorHandler.setProducerThrowable(e);
+            }
+        } finally {
+            running = false;
+            executionThread = null;
         }
     }
 
@@ -175,44 +198,22 @@ public class EventSourceReader
         // child thread to sink committed rows.
         executorService.execute(
                 () -> {
-                    while (running) {
+                    while (running && context.isRunning()) {
                         try {
                             Cdcpb.Event.Row committedRow = committedEvents.take();
-                            EventOffset currentOffset = new EventOffset(offsetContext.getOffset());
-                            if (currentOffset.isBefore(split.getStartingOffset())) {
-                                return;
-                            }
-                            if (!EventOffset.NO_STOPPING_OFFSET.equals(split.getEndingOffset())
-                                    && currentOffset.isAtOrAfter(split.getEndingOffset())) {
-                                // send watermark event;
-                                try {
-                                    eventDispatcher.dispatchWatermarkEvent(
-                                            partition.getSourcePartition(),
-                                            split,
-                                            currentOffset,
-                                            WatermarkKind.END);
-                                } catch (InterruptedException e) {
-                                    LOG.error("Send signal event error.", e);
-                                    errorHandler.setProducerThrowable(
-                                            new RuntimeException(
-                                                    "Error processing log signal event", e));
-                                }
-                                ((StoppableChangeEventSourceContext) context)
-                                        .stopChangeEventSource();
-                                return;
-                            }
-
-                            final EventOffsetContext localOffsetContext =
-                                    new EventOffsetContext.Loader(this.connectorConfig)
-                                            .load(currentOffset.getOffset());
-                            emitChangeEvent(partition, localOffsetContext, committedRow);
+                            emitChangeEvent(partition, offsetContext, committedRow);
                             // use startTs of row as messageTs, use commitTs of row as fetchTs
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
                         } catch (Exception e) {
-                            LOG.error("Read change events error.", e);
+                            if (running && context.isRunning()) {
+                                LOG.error("Read change events error.", e);
+                            }
                         }
                     }
                 });
-        while (resolvedTs >= STREAMING_VERSION_START_EPOCH) {
+        while (running && context.isRunning() && resolvedTs >= STREAMING_VERSION_START_EPOCH) {
             for (int i = 0; i < 1000; i++) {
                 final Cdcpb.Event.Row row = cdcClient.get();
                 if (row == null) {
@@ -294,7 +295,11 @@ public class EventSourceReader
 
             Object[] tiKVValueAfter;
             if (value != null && !value.isEmpty()) {
-                tiKVValueAfter = decodeObjects(value.toByteArray(), handle, tableInfo);
+                byte[] encodedValue = value.toByteArray();
+                tiKVValueAfter =
+                        Byte.toUnsignedInt(encodedValue[0]) == org.tikv.common.codec.RowV2.CODEC_VER
+                                ? decodeObjectsPreservingBinary(encodedValue, handle, tableInfo)
+                                : decodeObjects(encodedValue, handle, tableInfo);
             } else {
                 return null;
             }
@@ -336,7 +341,7 @@ public class EventSourceReader
 
     private Envelope.Operation getOperation(final Cdcpb.Event.Row row) {
         if (row.getOpType() == Cdcpb.Event.Row.OpType.PUT) { // create ，update
-            if (row.getValue() != null && row.getOldValue() != null) {
+            if (row.getValue() != null && !row.getOldValue().isEmpty()) {
                 return Envelope.Operation.UPDATE;
             } else {
                 return Envelope.Operation.CREATE;
@@ -396,9 +401,49 @@ public class EventSourceReader
         return StreamingChangeEventSource.super.executeIteration(context, partition, offsetContext);
     }
 
-    @Override
-    public void commitOffset(Map<String, ?> offset) {
-        StreamingChangeEventSource.super.commitOffset(offset);
+    /** Stops event production and releases all TiDB resources. This operation is idempotent. */
+    public synchronized void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+
+        running = false;
+        ChangeEventSourceContext currentContext = context;
+        if (currentContext instanceof StoppableChangeEventSourceContext) {
+            ((StoppableChangeEventSourceContext) currentContext).stopChangeEventSource();
+        }
+
+        Thread currentExecutionThread = executionThread;
+        if (currentExecutionThread != null && currentExecutionThread != Thread.currentThread()) {
+            currentExecutionThread.interrupt();
+        }
+
+        if (cdcClient != null) {
+            try {
+                cdcClient.close();
+            } catch (RuntimeException e) {
+                LOG.warn("Failed to close TiDB CDC client.", e);
+            } finally {
+                cdcClient = null;
+            }
+        }
+        if (executorService != null) {
+            executorService.shutdownNow();
+            executorService = null;
+        }
+        if (session != null) {
+            try {
+                session.close();
+            } catch (Exception e) {
+                LOG.warn("Failed to close TiDB session.", e);
+            } finally {
+                session = null;
+            }
+        }
+    }
+
+    boolean isClosed() {
+        return closed.get();
     }
 
     // ---------------------------------------

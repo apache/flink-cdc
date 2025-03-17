@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.tidb.source.fetch;
 
-import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -25,15 +24,14 @@ import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
-
 /** TiDBStreamFetchTask. */
 public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBStreamFetchTask.class);
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
     private volatile boolean stopped = false;
-    EventSourceReader eventSourceReader;
+    private volatile EventSourceReader eventSourceReader;
+    private volatile StoppableChangeEventSourceContext changeEventSourceContext;
 
     public TiDBStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -50,27 +48,37 @@ public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             LOG.debug("execute StreamFetchTask for split: {}", split);
         }
         taskRunning = true;
-        TiDBSourceFetchTaskContext sourceFetchContext = (TiDBSourceFetchTaskContext) context;
-        sourceFetchContext.getOffsetContext().preSnapshotCompletion();
+        try {
+            TiDBSourceFetchTaskContext sourceFetchContext = (TiDBSourceFetchTaskContext) context;
+            sourceFetchContext.getOffsetContext().preSnapshotCompletion();
 
-        eventSourceReader =
-                new EventSourceReader(
-                        sourceFetchContext.getDbzConnectorConfig(),
-                        sourceFetchContext.getEventDispatcher(),
-                        sourceFetchContext.getErrorHandler(),
-                        sourceFetchContext.getTaskContext(),
-                        split);
-        eventSourceReader.init();
-        StoppableChangeEventSourceContext changeEventSourceContext =
-                new StoppableChangeEventSourceContext();
-        eventSourceReader.execute(
-                changeEventSourceContext,
-                sourceFetchContext.getPartition(),
-                sourceFetchContext.getOffsetContext());
-    }
-
-    public void commitCurrentOffset(@Nullable Offset offsetToCommit) {
-        // todo
+            EventSourceReader reader =
+                    new EventSourceReader(
+                            sourceFetchContext.getDbzConnectorConfig(),
+                            sourceFetchContext.getEventDispatcher(),
+                            sourceFetchContext.getErrorHandler(),
+                            sourceFetchContext.getTaskContext(),
+                            split);
+            StoppableChangeEventSourceContext sourceContext =
+                    new StoppableChangeEventSourceContext();
+            this.eventSourceReader = reader;
+            this.changeEventSourceContext = sourceContext;
+            if (stopped) {
+                reader.close();
+                return;
+            }
+            reader.init();
+            if (stopped) {
+                reader.close();
+                return;
+            }
+            reader.execute(
+                    sourceContext,
+                    sourceFetchContext.getPartition(),
+                    sourceFetchContext.getOffsetContext());
+        } finally {
+            taskRunning = false;
+        }
     }
 
     @Override
@@ -86,11 +94,15 @@ public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     @Override
     public void close() {
         LOG.debug("stopping StreamFetchTask for split: {}", split);
-        if (eventSourceReader != null) {
-            ((StoppableChangeEventSourceContext) (eventSourceReader.context))
-                    .stopChangeEventSource();
-        }
-        stopped = false;
+        stopped = true;
         taskRunning = false;
+        StoppableChangeEventSourceContext sourceContext = changeEventSourceContext;
+        if (sourceContext != null) {
+            sourceContext.stopChangeEventSource();
+        }
+        EventSourceReader reader = eventSourceReader;
+        if (reader != null) {
+            reader.close();
+        }
     }
 }

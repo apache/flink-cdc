@@ -115,7 +115,7 @@ public class EventOffsetContext implements OffsetContext {
 
     @Override
     public Schema getSourceInfoSchema() {
-        return sourceInfoSchema.schema();
+        return sourceInfoSchema;
     }
 
     @Override

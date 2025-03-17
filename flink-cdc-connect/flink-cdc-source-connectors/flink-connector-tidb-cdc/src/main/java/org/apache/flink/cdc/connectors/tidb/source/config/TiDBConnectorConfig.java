@@ -64,14 +64,15 @@ public class TiDBConnectorConfig extends RelationalDatabaseConnectorConfig {
     public static final Field BIGINT_UNSIGNED_HANDLING_MODE =
             Field.create("bigint.unsigned.handling.mode")
                     .withDisplayName("BIGINT UNSIGNED Handling")
-                    .withEnum(BigIntUnsignedHandlingMode.class, BigIntUnsignedHandlingMode.LONG)
+                    .withEnum(BigIntUnsignedHandlingMode.class, BigIntUnsignedHandlingMode.PRECISE)
                     .withGroup(Field.createGroupEntry(Field.Group.CONNECTOR, 27))
                     .withWidth(ConfigDef.Width.SHORT)
                     .withImportance(ConfigDef.Importance.MEDIUM)
                     .withDescription(
                             "Specify how BIGINT UNSIGNED columns should be represented in change events, including:"
                                     + "'precise' uses java.math.BigDecimal to represent values, which are encoded in the change events using a binary representation and Kafka Connect's 'org.apache.kafka.connect.data.Decimal' type; "
-                                    + "'long' (the default) represents values using Java's 'long', which may not offer the precision but will be far easier to use in consumers.");
+                                    + "'long' represents values using Java's 'long', which may not offer the precision but will be far easier to use in consumers. "
+                                    + "The default is 'precise'.");
 
     public static final Field ENABLE_TIME_ADJUSTER =
             Field.create("enable.time.adjuster")
