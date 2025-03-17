@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.flink.cdc.connectors.tidb.source.config;
 
 import org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions;
@@ -29,10 +28,9 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 
-/** Options for {@link org.apache.flink.cdc.connectors.tidb.table.TiDBTableSource}. */
 public class TiDBSourceOptions extends JdbcSourceOptions {
 
-    public static final ConfigOption<Integer> TIDB_PORT =
+    public static final ConfigOption<Integer> TiDB_PORT =
             ConfigOptions.key("port")
                     .intType()
                     .defaultValue(4000)

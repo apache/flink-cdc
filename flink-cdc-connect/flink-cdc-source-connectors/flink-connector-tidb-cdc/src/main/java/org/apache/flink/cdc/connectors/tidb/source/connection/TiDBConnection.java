@@ -54,7 +54,6 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-/** TiDB JDBC connection. */
 public class TiDBConnection extends JdbcConnection {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBConnection.class);
 

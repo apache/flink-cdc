@@ -27,13 +27,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-/** TiDBStreamFetchTask. */
 public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBStreamFetchTask.class);
     private final StreamSplit split;
     private volatile boolean taskRunning = false;
     private volatile boolean stopped = false;
-    EventSourceReader eventSourceReader;
 
     public TiDBStreamFetchTask(StreamSplit split) {
         this.split = split;
@@ -53,14 +51,13 @@ public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         TiDBSourceFetchTaskContext sourceFetchContext = (TiDBSourceFetchTaskContext) context;
         sourceFetchContext.getOffsetContext().preSnapshotCompletion();
 
-        eventSourceReader =
+        EventSourceReader eventSourceReader =
                 new EventSourceReader(
                         sourceFetchContext.getDbzConnectorConfig(),
                         sourceFetchContext.getEventDispatcher(),
                         sourceFetchContext.getErrorHandler(),
                         sourceFetchContext.getTaskContext(),
                         split);
-        eventSourceReader.init();
         StoppableChangeEventSourceContext changeEventSourceContext =
                 new StoppableChangeEventSourceContext();
         eventSourceReader.execute(
@@ -69,9 +66,7 @@ public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 sourceFetchContext.getOffsetContext());
     }
 
-    public void commitCurrentOffset(@Nullable Offset offsetToCommit) {
-        // todo
-    }
+    public void commitCurrentOffset(@Nullable Offset offsetToCommit) {}
 
     @Override
     public boolean isRunning() {
@@ -86,10 +81,10 @@ public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     @Override
     public void close() {
         LOG.debug("stopping StreamFetchTask for split: {}", split);
-        if (eventSourceReader != null) {
-            ((StoppableChangeEventSourceContext) (eventSourceReader.context))
-                    .stopChangeEventSource();
-        }
+        //        if (CDCEventSource != null) {
+        //            ((StoppableChangeEventSourceContext)
+        // (CDCEventSource.context)).stopChangeEventSource();
+        //        }
         stopped = false;
         taskRunning = false;
     }

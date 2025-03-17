@@ -24,7 +24,6 @@ import io.debezium.schema.SchemaChangeEvent;
 import java.util.HashMap;
 import java.util.Map;
 
-/** TiDB schema change event handler. */
 public class TiDBSchemaChangeEventHandler implements SchemaChangeEventHandler {
 
     @Override

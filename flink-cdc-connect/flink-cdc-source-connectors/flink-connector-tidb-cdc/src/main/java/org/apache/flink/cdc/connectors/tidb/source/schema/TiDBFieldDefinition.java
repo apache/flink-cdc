@@ -21,7 +21,6 @@ import org.apache.flink.cdc.connectors.tidb.utils.TiDBUtils;
 
 import org.apache.commons.lang3.StringUtils;
 
-/** TiDB field definition. */
 public class TiDBFieldDefinition {
     private String columnName;
     private String columnType;

@@ -24,7 +24,6 @@ import org.apache.kafka.connect.data.Struct;
 
 import java.time.Instant;
 
-/** TiDBSourceInfoStructMaker. */
 public class TiDBSourceInfoStructMaker implements SourceInfoStructMaker<TiDBSourceInfo> {
     private final Schema schema;
 

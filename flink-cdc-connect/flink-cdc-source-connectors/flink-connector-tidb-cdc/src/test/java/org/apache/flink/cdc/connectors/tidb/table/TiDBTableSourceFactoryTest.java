@@ -21,17 +21,16 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.catalog.CatalogTableAdapter;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
-import org.apache.flink.table.factories.FactoryUtilAdapter;
+import org.apache.flink.table.factories.FactoryUtil;
 
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -52,6 +51,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_K
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.JDBC_DRIVER;
+import static org.junit.Assert.assertEquals;
 
 /** Unit tests for TiDB table source factory. */
 public class TiDBTableSourceFactoryTest {
@@ -128,7 +128,7 @@ public class TiDBTableSourceFactoryTest {
                         new HashMap<>(),
                         JDBC_DRIVER.defaultValue(),
                         StartupOptions.initial());
-        Assertions.assertThat(expectedSource).isEqualTo(actualSource);
+        assertEquals(expectedSource, actualSource);
     }
 
     @Test
@@ -137,10 +137,6 @@ public class TiDBTableSourceFactoryTest {
         properties.put("port", MY_PORT);
         properties.put("scan.startup.mode", "initial");
         properties.put("heartbeat.interval.ms", "15213ms");
-        properties.put("debezium.tombstones.on.delete", "true");
-        properties.put("debezium.snapshot.mode", "never");
-        properties.put("debezium.offset.flush.interval.ms", "3000");
-        properties.put("debezium.test", "test");
         //        properties.put("server-time-zone", "Asia/Shanghai");
 
         Properties dbzProperties = new Properties();
@@ -160,7 +156,7 @@ public class TiDBTableSourceFactoryTest {
         TiDBTableSource expectedSource =
                 new TiDBTableSource(
                         SCHEMA,
-                        4000,
+                        4111,
                         MY_HOSTNAME,
                         MY_DATABASE,
                         MY_TABLE,
@@ -183,10 +179,10 @@ public class TiDBTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         null,
-                        new HashMap<>(),
+                        null,
                         JDBC_DRIVER.defaultValue(),
                         StartupOptions.initial());
-        Assertions.assertThat(expectedSource).isEqualTo(actualSource);
+        assertEquals(expectedSource, actualSource);
     }
 
     private Map<String, String> getAllOptions() {
@@ -206,11 +202,11 @@ public class TiDBTableSourceFactoryTest {
 
     private static DynamicTableSource createTableSource(
             ResolvedSchema schema, Map<String, String> options) {
-        return FactoryUtilAdapter.createTableSource(
+        return FactoryUtil.createTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
-                        CatalogTableAdapter.of(
+                        CatalogTable.of(
                                 Schema.newBuilder().fromResolvedSchema(schema).build(),
                                 "mock source",
                                 new ArrayList<>(),

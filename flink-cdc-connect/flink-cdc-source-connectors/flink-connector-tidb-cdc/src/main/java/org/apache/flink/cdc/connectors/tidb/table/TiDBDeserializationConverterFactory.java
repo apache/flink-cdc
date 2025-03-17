@@ -41,7 +41,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/** Factory for creating {@link DeserializationRuntimeConverter} for TiDB. */
 public class TiDBDeserializationConverterFactory {
     public static DeserializationRuntimeConverterFactory instance() {
         return new DeserializationRuntimeConverterFactory() {

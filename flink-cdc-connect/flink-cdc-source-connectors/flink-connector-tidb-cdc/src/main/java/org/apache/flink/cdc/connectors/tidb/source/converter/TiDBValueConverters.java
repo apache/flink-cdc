@@ -64,9 +64,8 @@ import java.util.regex.Pattern;
 /** JdbcValueConverters for tiDB. */
 public class TiDBValueConverters extends JdbcValueConverters {
 
-    /** Handler for parsing errors. */
     @FunctionalInterface
-    public interface ParsingErrorHandler {
+    public static interface ParsingErrorHandler {
         void error(String message, Exception exception);
     }
 
@@ -319,7 +318,6 @@ public class TiDBValueConverters extends JdbcValueConverters {
                 if (adaptiveTimeMicrosecondsPrecisionMode) {
                     return (data) -> convertTime(column, fieldDefn, data);
                 }
-                break;
             case Types.TIMESTAMP:
                 return ((ValueConverter)
                                 (data -> convertTimestampToLocalDateTime(column, fieldDefn, data)))

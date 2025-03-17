@@ -53,7 +53,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 
-/** A wrapped task to fetch snapshot split of table. */
 public class TiDBScanFetchTask extends AbstractScanFetchTask {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBScanFetchTask.class);
 
@@ -78,12 +77,7 @@ public class TiDBScanFetchTask extends AbstractScanFetchTask {
                 WatermarkKind.END);
     }
 
-    /**
-     * Execute data snapshot task.
-     *
-     * @param context the task context
-     * @throws Exception exception
-     */
+    /** 创建并执行一个 TiDBSnapshotSplitReadTask */
     @Override
     protected void executeDataSnapshot(Context context) throws Exception {
         TiDBSourceFetchTaskContext sourceFetchContext = (TiDBSourceFetchTaskContext) context;
@@ -302,7 +296,6 @@ public class TiDBScanFetchTask extends AbstractScanFetchTask {
         }
     }
 
-    /** Context for snapshotting. */
     public class TiDBSnapshotSplitChangeEventSourceContext
             implements ChangeEventSource.ChangeEventSourceContext {
 
