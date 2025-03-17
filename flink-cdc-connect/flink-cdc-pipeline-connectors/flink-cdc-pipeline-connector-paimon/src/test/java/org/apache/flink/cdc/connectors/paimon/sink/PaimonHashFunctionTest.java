@@ -31,7 +31,6 @@ import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,8 +121,9 @@ class PaimonHashFunctionTest {
                                     BinaryStringData.fromString("2024")
                                 }));
         int key3 = hashFunction.hashcode(dataChangeEvent3);
-        Assertions.assertTrue(
-                key1 >= 0 && key1 < 4 && key2 >= 0 && key2 < 4 && key3 >= 0 && key3 < 4);
+        assertThat(key1).isBetween(0, 3);
+        assertThat(key2).isBetween(0, 3);
+        assertThat(key3).isBetween(0, 3);
     }
 
     @Test

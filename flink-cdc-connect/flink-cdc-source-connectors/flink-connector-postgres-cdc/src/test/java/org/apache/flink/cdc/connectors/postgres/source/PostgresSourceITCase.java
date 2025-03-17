@@ -717,8 +717,9 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @Test
-    public void testCommitLsnWhenTaskManagerFailover() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testCommitLsnWhenTaskManagerFailover(String scanStartupMode) throws Exception {
         int parallelism = 1;
         PostgresTestUtils.FailoverType failoverType = PostgresTestUtils.FailoverType.TM;
         PostgresTestUtils.FailoverPhase failoverPhase = PostgresTestUtils.FailoverPhase.STREAM;
@@ -1239,7 +1240,10 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
         if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(200));
             waitUntilJobRunning(tableResult);
         }
         // wait for the stream reading and isCommitOffset is true
@@ -1251,7 +1255,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
         Thread.sleep(5000L);
         try (PostgresConnection connection = getConnection()) {
-            assertTrue(!confirmedFlushLsn.equals(getConfirmedFlushLsn(connection)));
+            Assertions.assertThat(getConfirmedFlushLsn(connection)).isNotEqualTo(confirmedFlushLsn);
         }
     }
 

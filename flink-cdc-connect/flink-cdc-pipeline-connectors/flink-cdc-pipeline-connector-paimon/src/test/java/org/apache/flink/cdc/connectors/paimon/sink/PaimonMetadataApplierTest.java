@@ -278,10 +278,10 @@ class PaimonMetadataApplierTest {
                                 new DataField(1, "col2", DataTypes.STRING()),
                                 new DataField(2, "col3", DataTypes.STRING()),
                                 new DataField(3, "col4", DataTypes.STRING())));
-        Assertions.assertEquals(tableSchema, table.rowType());
-        Assertions.assertEquals(new ArrayList<>(), table.primaryKeys());
-        Assertions.assertEquals(new ArrayList<>(), table.partitionKeys());
-        Assertions.assertEquals("-1", table.options().get("bucket"));
+        Assertions.assertThat(table.rowType()).isEqualTo(tableSchema);
+        Assertions.assertThat(table.primaryKeys()).isEmpty();
+        Assertions.assertThat(table.partitionKeys()).isEmpty();
+        Assertions.assertThat(table.options()).containsEntry("bucket", "-1");
     }
 
     @ParameterizedTest
