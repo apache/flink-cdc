@@ -79,7 +79,7 @@ public class CreateTableEvent implements SchemaChangeEvent {
     }
 
     @Override
-    public CreateTableEvent copy(TableId newTableId) {
+    public SchemaChangeEvent copy(TableId newTableId) {
         return new CreateTableEvent(newTableId, schema);
     }
 }
