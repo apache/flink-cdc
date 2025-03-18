@@ -88,8 +88,8 @@ public class OceanBaseValueConverters extends JdbcValueConverters {
                 x -> x,
                 BigIntUnsignedMode.PRECISE,
                 connectorConfig.binaryHandlingMode());
-        this.compatibleMode = connectorConfig.getCompatibleMode();
-        this.serverTimezone = connectorConfig.getServerTimeZone();
+        this.compatibleMode = connectorConfig.getSourceConfig().getCompatibleMode();
+        this.serverTimezone = connectorConfig.getSourceConfig().getServerTimeZone();
     }
 
     @Override
