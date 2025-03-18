@@ -17,6 +17,20 @@
 
 package org.apache.flink.cdc.connectors.tidb.source.fetch;
 
+import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.tidb.TiDBEventMetadataProvider;
+import io.debezium.connector.tidb.TiDBPartition;
+import io.debezium.connector.tidb.TiDBTaskContext;
+import io.debezium.pipeline.DataChangeEvent;
+import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
+import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
+import io.debezium.pipeline.metrics.spi.ChangeEventSourceMetricsFactory;
+import io.debezium.pipeline.source.spi.EventMetadataProvider;
+import io.debezium.relational.Table;
+import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
+import io.debezium.schema.TopicSelector;
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
@@ -36,21 +50,6 @@ import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetUtils;
 import org.apache.flink.cdc.connectors.tidb.source.schema.TiDBDatabaseSchema;
 import org.apache.flink.cdc.connectors.tidb.utils.TiDBUtils;
 import org.apache.flink.table.types.logical.RowType;
-
-import io.debezium.connector.base.ChangeEventQueue;
-import io.debezium.connector.tidb.TiDBEventMetadataProvider;
-import io.debezium.connector.tidb.TiDBPartition;
-import io.debezium.connector.tidb.TiDBTaskContext;
-import io.debezium.pipeline.DataChangeEvent;
-import io.debezium.pipeline.ErrorHandler;
-import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
-import io.debezium.pipeline.metrics.SnapshotChangeEventSourceMetrics;
-import io.debezium.pipeline.metrics.spi.ChangeEventSourceMetricsFactory;
-import io.debezium.pipeline.source.spi.EventMetadataProvider;
-import io.debezium.relational.Table;
-import io.debezium.relational.TableId;
-import io.debezium.relational.Tables;
-import io.debezium.schema.TopicSelector;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -178,7 +177,7 @@ public class TiDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         } else {
             EventOffset newOffset = new EventOffset(record.sourceOffset());
             return SourceRecordUtils.splitKeyRangeContains(
-                    new EventOffset[] {newOffset}, splitStart, splitEnd);
+                    new EventOffset[]{newOffset}, splitStart, splitEnd);
         }
     }
 
@@ -199,7 +198,7 @@ public class TiDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public WatermarkDispatcher getWaterMarkDispatcher() {
-        return null;
+        return dispatcher;
     }
 
     @Override
@@ -226,7 +225,7 @@ public class TiDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         Offset offset =
                 sourceSplitBase.isSnapshotSplit()
                         ? new EventOffsetFactory()
-                                .createInitialOffset() // get an offset for starting snapshot
+                        .createInitialOffset() // get an offset for starting snapshot
                         : sourceSplitBase.asStreamSplit().getStartingOffset();
 
         return EventOffsetUtils.getEventOffsetContext(loader, offset);
