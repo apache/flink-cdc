@@ -1,7 +1,5 @@
 package org.apache.flink.cdc.connectors.tidb.source.reader;
 
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
@@ -19,6 +17,9 @@ import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetFactory;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
+
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Before;
@@ -85,13 +86,13 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
         try {
             EventOffset startOffset = new EventOffset(Instant.now().toEpochMilli());
             String[] insertDataSql =
-                    new String[]{
-                            "INSERT INTO "
-                                    + tableId
-                                    + " VALUES(112, 'user_12','Shanghai','123567891234')",
-                            "INSERT INTO "
-                                    + tableId
-                                    + " VALUES(113, 'user_13','Shanghai','123567891234')",
+                    new String[] {
+                        "INSERT INTO "
+                                + tableId
+                                + " VALUES(112, 'user_12','Shanghai','123567891234')",
+                        "INSERT INTO "
+                                + tableId
+                                + " VALUES(113, 'user_13','Shanghai','123567891234')",
                     };
             try (TiDBConnection tiDBConnection = tiDBDialect.openJdbcConnection()) {
                 tiDBConnection.execute(insertDataSql);
@@ -104,8 +105,8 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                     new FinishedSnapshotSplitInfo(
                             tableIds,
                             STREAM_SPLIT_ID,
-                            new Object[]{startOffset},
-                            new Object[]{EventOffset.NO_STOPPING_OFFSET},
+                            new Object[] {startOffset},
+                            new Object[] {EventOffset.NO_STOPPING_OFFSET},
                             startOffset,
                             cdcEventOffsetFactory);
             StreamSplit streamSplit =

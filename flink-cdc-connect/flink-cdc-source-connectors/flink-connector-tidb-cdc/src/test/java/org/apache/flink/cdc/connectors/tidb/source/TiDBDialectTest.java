@@ -1,8 +1,9 @@
 package org.apache.flink.cdc.connectors.tidb.source;
 
-import io.debezium.relational.TableId;
 import org.apache.flink.cdc.connectors.tidb.TiDBTestBase;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfigFactory;
+
+import io.debezium.relational.TableId;
 import org.junit.Assert;
 import org.junit.Test;
 

@@ -28,6 +28,7 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
+
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.time.ZoneId;
@@ -35,9 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Formatter that formats the {@link SourceRecord} to String.
- */
+/** Formatter that formats the {@link SourceRecord} to String. */
 public class RecordsFormatter {
 
     private final DataType dataType;
