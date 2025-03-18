@@ -17,22 +17,20 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
-import org.apache.flink.test.util.AbstractTestBase;
-
 import com.alibaba.dcm.DnsCacheManipulator;
-import org.apache.commons.lang3.RandomUtils;
-import org.assertj.core.api.Assertions;
+import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfigFactory;
+import org.apache.flink.test.util.AbstractTestBase;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
@@ -51,7 +49,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/** Utility class for tidb tests. */
+import static org.junit.Assert.assertNotNull;
+
+/**
+ * Utility class for tidb tests.
+ */
 public class TiDBTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -66,13 +68,14 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final int TIDB_PORT = 4000;
     public static final int TIKV_PORT_ORIGIN = 20160;
     public static final int PD_PORT_ORIGIN = 2379;
-    public static int pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
+    public static int pdPort = PD_PORT_ORIGIN + 10;
 
+    @ClassRule
     public static final Network NETWORK = Network.newNetwork();
 
-    @Container
+    @ClassRule
     public static final GenericContainer<?> PD =
-            new FixedHostPortGenericContainer<>("pingcap/pd:v6.1.0")
+            new FixedHostPortGenericContainer<>("pingcap/pd:v6.5.4")
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
                     .withFixedExposedPort(pdPort, PD_PORT_ORIGIN)
                     .withCommand(
@@ -88,11 +91,12 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withNetwork(NETWORK)
                     .withNetworkAliases(PD_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
+                    .withEnv("TZ", "Asia/Shanghai")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @Container
+    @ClassRule
     public static final GenericContainer<?> TIKV =
-            new FixedHostPortGenericContainer<>("pingcap/tikv:v6.1.0")
+            new FixedHostPortGenericContainer<>("pingcap/tikv:v6.5.4")
                     .withFixedExposedPort(TIKV_PORT_ORIGIN, TIKV_PORT_ORIGIN)
                     .withFileSystemBind("src/test/resources/config/tikv.toml", "/tikv.toml")
                     .withCommand(
@@ -106,11 +110,12 @@ public class TiDBTestBase extends AbstractTestBase {
                     .dependsOn(PD)
                     .withNetworkAliases(TIKV_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .withEnv("TZ", "Asia/Shanghai");
 
-    @Container
+    @ClassRule
     public static final GenericContainer<?> TIDB =
-            new GenericContainer<>("pingcap/tidb:v6.1.0")
+            new GenericContainer<>("pingcap/tidb:v6.5.4")
                     .withExposedPorts(TIDB_PORT)
                     .withFileSystemBind("src/test/resources/config/tidb.toml", "/tidb.toml")
                     .withCommand(
@@ -122,10 +127,11 @@ public class TiDBTestBase extends AbstractTestBase {
                     .dependsOn(TIKV)
                     .withNetworkAliases(TIDB_SERVICE_NAME)
                     .withStartupTimeout(Duration.ofSeconds(120))
+                    .withEnv("TZ", "Asia/Shanghai")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeAll
-    static void startContainers() throws Exception {
+    @BeforeClass
+    public static void startContainers() throws Exception {
         // Add jvm dns cache for flink to invoke pd interface.
         DnsCacheManipulator.setDnsCache(PD_SERVICE_NAME, "127.0.0.1");
         DnsCacheManipulator.setDnsCache(TIKV_SERVICE_NAME, "127.0.0.1");
@@ -134,8 +140,8 @@ public class TiDBTestBase extends AbstractTestBase {
         LOG.info("Containers are started.");
     }
 
-    @AfterAll
-    static void stopContainers() {
+    @AfterClass
+    public static void stopContainers() {
         DnsCacheManipulator.removeDnsCache(PD_SERVICE_NAME);
         DnsCacheManipulator.removeDnsCache(TIKV_SERVICE_NAME);
         Stream.of(TIKV, PD, TIDB).forEach(GenericContainer::stop);
@@ -187,9 +193,9 @@ public class TiDBTestBase extends AbstractTestBase {
     protected void initializeTidbTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = TiDBTestBase.class.getClassLoader().getResource(ddlFile);
-        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
+        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try (Connection connection = getJdbcConnection("");
-                Statement statement = connection.createStatement()) {
+             Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);
             final List<String> statements =
                     Arrays.stream(
@@ -211,5 +217,29 @@ public class TiDBTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected TiDBSourceConfigFactory getMockTiDBSourceConfigFactory(
+            String database, String schemaName, String tableName, int splitSize) {
+        return getMockTiDBSourceConfigFactory(database, schemaName, tableName, splitSize, false);
+    }
+
+    protected TiDBSourceConfigFactory getMockTiDBSourceConfigFactory(
+            String database,
+            String schemaName,
+            String tableName,
+            int splitSize,
+            boolean skipSnapshotBackfill) {
+
+        TiDBSourceConfigFactory TiDBSourceConfigFactory = new TiDBSourceConfigFactory();
+        TiDBSourceConfigFactory.hostname(TIDB.getContainerIpAddress());
+        TiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
+        TiDBSourceConfigFactory.username(TIDB_USER);
+        TiDBSourceConfigFactory.password(TIDB_PASSWORD);
+        TiDBSourceConfigFactory.databaseList(database);
+        TiDBSourceConfigFactory.tableList(database + "." + tableName);
+        TiDBSourceConfigFactory.splitSize(splitSize);
+        TiDBSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
+        return TiDBSourceConfigFactory;
     }
 }
