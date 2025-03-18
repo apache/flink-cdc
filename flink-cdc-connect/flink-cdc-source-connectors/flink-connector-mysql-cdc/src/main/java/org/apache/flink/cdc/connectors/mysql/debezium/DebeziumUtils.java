@@ -21,6 +21,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.connection.JdbcConnectionFactory;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
+import org.apache.flink.util.ConfigurationException;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
@@ -47,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /** Utilities related to Debezium. */
@@ -118,33 +121,57 @@ public class DebeziumUtils {
 
     /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
-        final String showMasterStmt = "SHOW MASTER STATUS";
         try {
-            return jdbc.queryAndMap(
-                    showMasterStmt,
+            return queryBinlogStatus(
+                    jdbc,
                     rs -> {
-                        if (rs.next()) {
-                            final String binlogFilename = rs.getString(1);
-                            final long binlogPosition = rs.getLong(2);
-                            final String gtidSet =
-                                    rs.getMetaData().getColumnCount() > 4 ? rs.getString(5) : null;
-                            return BinlogOffset.builder()
-                                    .setBinlogFilePosition(binlogFilename, binlogPosition)
-                                    .setGtidSet(gtidSet)
-                                    .build();
-                        } else {
-                            throw new FlinkRuntimeException(
-                                    "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
-                                            + "'. Make sure your server is correctly configured");
+                        try {
+                            if (rs.next()) {
+                                final String binlogFilename = rs.getString(1);
+                                final long binlogPosition = rs.getLong(2);
+                                final String gtidSet =
+                                        rs.getMetaData().getColumnCount() > 4
+                                                ? rs.getString(5)
+                                                : null;
+                                return BinlogOffset.builder()
+                                        .setBinlogFilePosition(binlogFilename, binlogPosition)
+                                        .setGtidSet(gtidSet)
+                                        .build();
+                            } else {
+                                throw new ConfigurationException(
+                                        "Cannot read the binlog filename and position. Make sure your server is correctly configured");
+                            }
+                        } catch (Exception e) {
+                            throw new FlinkRuntimeException(e);
                         }
                     });
         } catch (SQLException e) {
-            throw new FlinkRuntimeException(
-                    "Cannot read the binlog filename and position via '"
-                            + showMasterStmt
-                            + "'. Make sure your server is correctly configured",
-                    e);
+            throw new FlinkRuntimeException(e);
+        }
+    }
+
+    public static <T> T queryBinlogStatus(
+            JdbcConnection connection, Function<ResultSet, T> callback) throws SQLException {
+        String showMasterStmt = "SHOW MASTER STATUS";
+        try {
+            return connection.queryAndMap(showMasterStmt, rs -> callback.apply(rs));
+        } catch (SQLException skipped) {
+            String showBinaryStmt = "SHOW BINARY LOG STATUS";
+            LOG.warn(
+                    "Failed to get binlog offset: {}, try to get binlog offset by: ",
+                    showMasterStmt,
+                    showBinaryStmt);
+            try {
+                return connection.queryAndMap(showBinaryStmt, rs -> callback.apply(rs));
+            } catch (SQLException e) {
+                throw new FlinkRuntimeException(
+                        "Cannot read the binlog filename and position via '"
+                                + showMasterStmt
+                                + "' or '"
+                                + showBinaryStmt
+                                + "'. Make sure your server is correctly configured",
+                        e);
+            }
         }
     }
 

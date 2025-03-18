@@ -136,7 +136,7 @@ Flink CDC 支持的.
 
 ### Q8: 同一个实例下，某个库的表无法同步增量数据，其他库都可以，这是为啥？
 
-这个问题是因为 mysql 服务器 可以配置 binlog 过滤器，忽略了某些库的 binlog。用户可以通过 show master status 命令查看 Binlog_Ignore_DB 和 Binlog_Do_DB。
+这个问题是因为 mysql 服务器 可以配置 binlog 过滤器，忽略了某些库的 binlog。用户可以通过 show master status 或者 show binary log status 命令查看 Binlog_Ignore_DB 和 Binlog_Do_DB。
 
 ```mysql
 mysql> show master status;
@@ -146,6 +146,7 @@ mysql> show master status;
 | mysql-bin.000006 |     4594 |              |                  | xxx:1-15             |
 +------------------+----------+--------------+------------------+----------------------+
 ```
+注意：在 mysql 8.4 及之后的版本可能不支持 `show master status` 语法，取而代之的是 [`show binary log status`](https://dev.mysql.com/doc/refman/8.4/en/show-master-status.html)
 
 ### Q9: 作业报错 The connector is trying to read binlog starting at GTIDs xxx and binlog file 'binlog.000064', pos=89887992, skipping 4 events plus 1 rows, but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed，怎么办呢？
 

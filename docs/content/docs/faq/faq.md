@@ -137,7 +137,7 @@ Flink CDC provides DataStream API `MysqlSource` since version 2.1. Users can con
 
 ### Q8: In the same MySQL instance, the table of one database cannot synchronize incremental data, but other databases works fine. Why?
 
-Users can check Binlog_Ignore_DB and Binlog_Do_DB through the `show master status` command
+Users can check Binlog_Ignore_DB and Binlog_Do_DB through the `show master status` or `` command
 
 ```mysql
 mysql> show master status;
@@ -147,6 +147,7 @@ mysql> show master status;
 | mysql-bin.000006 |     4594 |              |                  | xxx:1-15             |
 +------------------+----------+--------------+------------------+----------------------+
 ```
+Note：In MySQL 8.4 and later versions, the `show master status` syntax might not be supported, and it is replaced with [`show binary log status`](https://dev.mysql.com/doc/refman/8.4/en/show-master-status.html)
 
 ### Q9: The job reports an error the connector is trying to read binlog starting at GTIDs xxx and binlog file 'binlog.000064', pos=89887992, skipping 4 events plus 1 rows, but this is no longer available on the server. Reconfigure the connector to use a snapshot when needed, What should I do?
 
