@@ -152,10 +152,7 @@ public class DebeziumUtils {
         }
     }
 
-    /**
-     * Compatibility Issue with MySQL Syntax SHOW MASTER STATUS:
-     * https://issues.apache.org/jira/browse/FLINK-37503
-     */
+    /** Compatibility Issue with MySQL Syntax: https://issues.apache.org/jira/browse/FLINK-3750 */
     public static <T> T queryBinlogStatus(
             JdbcConnection connection, Function<ResultSet, T> callback) throws SQLException {
 
