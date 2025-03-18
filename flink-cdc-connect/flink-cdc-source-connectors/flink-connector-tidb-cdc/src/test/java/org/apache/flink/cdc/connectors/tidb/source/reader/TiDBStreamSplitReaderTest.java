@@ -1,22 +1,7 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.cdc.connectors.tidb.source.reader;
 
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.source.meta.split.ChangeEventRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
@@ -34,14 +19,10 @@ import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetFactory;
 import org.apache.flink.connector.base.source.reader.splitreader.SplitsAddition;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
-
-import io.debezium.relational.TableId;
-import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.Before;
+import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +33,9 @@ import java.util.Iterator;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
-/** Test for {@link TiDBTestBase}. */
 public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBStreamSplitReaderTest.class);
     private static final String databaseName = "customer";
@@ -68,7 +50,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     private TiDBDialect tiDBDialect;
     private EventOffsetFactory cdcEventOffsetFactory;
 
-    @BeforeEach
+    @Before
     public void before() {
         initializeTidbTable("customer");
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
@@ -103,13 +85,13 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
         try {
             EventOffset startOffset = new EventOffset(Instant.now().toEpochMilli());
             String[] insertDataSql =
-                    new String[] {
-                        "INSERT INTO "
-                                + tableId
-                                + " VALUES(112, 'user_12','Shanghai','123567891234')",
-                        "INSERT INTO "
-                                + tableId
-                                + " VALUES(113, 'user_13','Shanghai','123567891234')",
+                    new String[]{
+                            "INSERT INTO "
+                                    + tableId
+                                    + " VALUES(112, 'user_12','Shanghai','123567891234')",
+                            "INSERT INTO "
+                                    + tableId
+                                    + " VALUES(113, 'user_13','Shanghai','123567891234')",
                     };
             try (TiDBConnection tiDBConnection = tiDBDialect.openJdbcConnection()) {
                 tiDBConnection.execute(insertDataSql);
@@ -122,8 +104,8 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                     new FinishedSnapshotSplitInfo(
                             tableIds,
                             STREAM_SPLIT_ID,
-                            new Object[] {startOffset},
-                            new Object[] {EventOffset.NO_STOPPING_OFFSET},
+                            new Object[]{startOffset},
+                            new Object[]{EventOffset.NO_STOPPING_OFFSET},
                             startOffset,
                             cdcEventOffsetFactory);
             StreamSplit streamSplit =
@@ -134,7 +116,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                             Collections.singletonList(finishedSnapshotSplitInfo),
                             tableSchemas,
                             0);
-            Assertions.assertThat(streamSplitReader.canAssignNextSplit()).isTrue();
+            assertTrue(streamSplitReader.canAssignNextSplit());
             streamSplitReader.handleSplitsChanges(new SplitsAddition<>(singletonList(streamSplit)));
             int retry = 0;
             int count = 0;
@@ -147,11 +129,11 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                         while (iterator.hasNext()) {
                             Struct value = (Struct) iterator.next().value();
                             String opType = value.getString("op");
-                            Assertions.assertThat(opType).isEqualTo("c");
+                            assertEquals(opType, "c");
                             Struct after = (Struct) value.get("after");
                             String name = after.getString("name");
 
-                            Assertions.assertThat(name.contains("user")).isTrue();
+                            assertTrue(name.contains("user"));
                             if (++count >= insertDataSql.length) {
                                 return;
                             }

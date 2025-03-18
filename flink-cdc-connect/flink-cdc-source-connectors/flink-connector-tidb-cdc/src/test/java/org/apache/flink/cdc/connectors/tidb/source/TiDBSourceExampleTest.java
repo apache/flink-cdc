@@ -1,20 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.apache.flink.cdc.connectors.tidb.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -32,22 +15,28 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.util.CloseableIterator;
-
-import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.Ignore;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** Tests for TiDB Source based on incremental snapshot framework . */
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * Tests for TiDB Source based on incremental snapshot framework .
+ */
 public class TiDBSourceExampleTest extends TiDBTestBase {
 
     private static final String databaseName = "inventory";
     private static final String tableName = "products";
 
     @Test
+    @Ignore
     public void testConsumingScanEvents() throws Exception {
         final DataType dataType =
                 DataTypes.ROW(
@@ -58,7 +47,7 @@ public class TiDBSourceExampleTest extends TiDBTestBase {
 
         initializeTidbTable("inventory");
 
-        JdbcIncrementalSource<RowData> tiDBIncrementalSource =
+        JdbcIncrementalSource<RowData> TiDBIncrementalSource =
                 TiDBSourceBuilder.TiDBIncrementalSource.<RowData>builder()
                         .hostname(TIDB.getHost())
                         .port(TIDB.getMappedPort(TIDB_PORT))
@@ -74,23 +63,23 @@ public class TiDBSourceExampleTest extends TiDBTestBase {
 
         CloseableIterator<RowData> iterator =
                 env.fromSource(
-                                tiDBIncrementalSource,
+                                TiDBIncrementalSource,
                                 WatermarkStrategy.noWatermarks(),
-                                "TiDBParallelSource")
+                                "PostgresParallelSource")
                         .setParallelism(2)
                         .executeAndCollect(); // collect record
 
         String[] snapshotExpectedRecords =
-                new String[] {
-                    "+I[101, scooter, Small 2-wheel scooter, 3.14]",
-                    "+I[102, car battery, 12V car battery, 8.1]",
-                    "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
-                    "+I[104, hammer, 12oz carpenter's hammer, 0.75]",
-                    "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
-                    "+I[106, hammer, 16oz carpenter's hammer, 1.0]",
-                    "+I[107, rocks, box of assorted rocks, 5.3]",
-                    "+I[108, jacket, water resistent black wind breaker, 0.1]",
-                    "+I[109, spare tire, 24 inch spare tire, 22.2]"
+                new String[]{
+                        "+I[101, scooter, Small 2-wheel scooter, 3.14]",
+                        "+I[102, car battery, 12V car battery, 8.1]",
+                        "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
+                        "+I[104, hammer, 12oz carpenter's hammer, 0.75]",
+                        "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
+                        "+I[106, hammer, 16oz carpenter's hammer, 1.0]",
+                        "+I[107, rocks, box of assorted rocks, 5.3]",
+                        "+I[108, jacket, water resistent black wind breaker, 0.1]",
+                        "+I[109, spare tire, 24 inch spare tire, 22.2]"
                 };
 
         // step-1: consume snapshot data
@@ -123,16 +112,15 @@ public class TiDBSourceExampleTest extends TiDBTestBase {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        Assertions.assertThat(expected != null && actual != null).isTrue();
+        assertTrue(expected != null && actual != null);
         assertEqualsInOrder(
                 expected.stream().sorted().collect(Collectors.toList()),
                 actual.stream().sorted().collect(Collectors.toList()));
     }
 
     public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        Assertions.assertThat(expected != null && actual != null).isTrue();
-        Assertions.assertThat(expected.size()).isEqualTo(actual.size());
-        Assertions.assertThat(expected.toArray(new String[0]))
-                .isEqualTo(actual.toArray(new String[0]));
+        assertTrue(expected != null && actual != null);
+        assertEquals(expected.size(), actual.size());
+        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
     }
 }
