@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+/** The configuration for TiDB source. */
 public class TiDBSourceConfig extends JdbcSourceConfig {
     private static final long serialVersionUID = 1L;
     private final String compatibleMode;

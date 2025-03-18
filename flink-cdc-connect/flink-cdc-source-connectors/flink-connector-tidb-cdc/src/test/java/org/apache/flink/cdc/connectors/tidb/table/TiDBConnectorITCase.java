@@ -72,12 +72,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -177,12 +184,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -256,12 +270,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -344,12 +365,19 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " PRIMARY KEY (`id`) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'tidb-cdc',"
-                                + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "inventory",
                         "products");
 
@@ -456,10 +484,18 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'connector' = 'tidb-cdc',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "column_type_test",
                         "full_types");
 
@@ -569,10 +605,18 @@ class TiDBConnectorITCase extends TiDBTestBase {
                                 + " 'connector' = 'tidb-cdc',"
                                 + " 'tikv.grpc.timeout_in_ms' = '20000',"
                                 + " 'pd-addresses' = '%s',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'username' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s'"
                                 + ")",
                         PD.getContainerIpAddress() + ":" + PD.getMappedPort(PD_PORT_ORIGIN),
+                        TIDB.getHost(),
+                        TIDB.getMappedPort(TIDB_PORT),
+                        TIDB_PASSWORD,
+                        TIDB_USER,
                         "column_type_test",
                         "full_types");
 

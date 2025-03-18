@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/** The source info of TiDB. */
 public class TiDBSourceInfo extends BaseSourceInfo {
     public static final String COMMIT_VERSION_KEY = "commitVersion";
     private Long commitVersion = -1L;

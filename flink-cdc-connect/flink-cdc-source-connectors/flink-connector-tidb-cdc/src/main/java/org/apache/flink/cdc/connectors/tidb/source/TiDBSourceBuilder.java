@@ -33,6 +33,7 @@ import java.util.Properties;
 
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
+/** Builder for {@link JdbcIncrementalSource}. */
 public class TiDBSourceBuilder<T> {
     private final TiDBSourceConfigFactory configFactory = new TiDBSourceConfigFactory();
     private EventOffsetFactory offsetFactory;
@@ -187,6 +188,7 @@ public class TiDBSourceBuilder<T> {
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
     }
 
+    /** TiDB incremental source. */
     public static class TiDBIncrementalSource<T> extends JdbcIncrementalSource<T> {
         public TiDBIncrementalSource(
                 JdbcSourceConfigFactory configFactory,

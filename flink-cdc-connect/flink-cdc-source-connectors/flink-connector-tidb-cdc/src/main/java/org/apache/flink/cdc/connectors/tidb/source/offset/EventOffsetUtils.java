@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/** Utils for EventOffset. */
 public class EventOffsetUtils {
     public static EventOffsetContext getEventOffsetContext(
             OffsetContext.Loader loader, Offset offset) {

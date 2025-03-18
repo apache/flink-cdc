@@ -40,6 +40,7 @@ import java.util.Set;
 import static org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset.COMMIT_VERSION_KEY;
 import static org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset.TIMESTAMP_KEY;
 
+/** The offset context for TiDB connector. */
 public class EventOffsetContext implements OffsetContext {
     private static final String SNAPSHOT_COMPLETED_KEY = "snapshot_completed";
 
@@ -168,6 +169,7 @@ public class EventOffsetContext implements OffsetContext {
         this.commitVersion = commitVersion;
     }
 
+    /** The loader for TiDB offset context. */
     public static class Loader implements OffsetContext.Loader<EventOffsetContext> {
 
         private final TiDBConnectorConfig connectorConfig;
