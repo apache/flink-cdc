@@ -291,6 +291,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             SourceRecord highWatermark = null;
 
             Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
+            final List<SourceRecord> normalizedRecords = new ArrayList<>();
             while (!reachBinlogEnd) {
                 checkReadException();
                 List<DataChangeEvent> batch = queue.poll();
@@ -338,15 +339,17 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             }
             // snapshot split return its data once
             hasNextElement.set(false);
-
-            final List<SourceRecord> normalizedRecords = new ArrayList<>();
-            normalizedRecords.add(lowWatermark);
+            if (lowWatermark != null) {
+                normalizedRecords.add(lowWatermark);
+            }
             normalizedRecords.addAll(
                     RecordUtils.formatMessageTimestamp(
                             snapshotRecords.values().stream()
                                     .flatMap(Collection::stream)
                                     .collect(Collectors.toList())));
-            normalizedRecords.add(highWatermark);
+            if (highWatermark != null) {
+                normalizedRecords.add(highWatermark);
+            }
 
             final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
             sourceRecordsSet.add(new SourceRecords(normalizedRecords));

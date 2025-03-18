@@ -202,7 +202,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverPhase.NEVER,
                 new String[] {tableName},
                 RestartStrategies.fixedDelayRestart(1, 0),
-                true);
+                Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
 
     @Test
@@ -280,6 +280,21 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
     public void testJobManagerFailoverSingleParallelism() throws Exception {
         testMySqlParallelSource(
                 1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {tableName});
+    }
+
+    @Test
+    public void testReadSingleTableMutilpleFetch() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.snapshot.fetch.size", "2");
+        options.put("debezium.max.batch.size", "3");
+        testMySqlParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                options);
     }
 
     @Test
@@ -914,7 +929,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 restartStrategyConfiguration,
-                false);
+                Collections.emptyMap());
     }
 
     private void testMySqlParallelSource(
@@ -924,7 +939,7 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
-            boolean skipSnapshotBackfill)
+            Map<String, String> otherOptions)
             throws Exception {
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -954,7 +969,6 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
-                                + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.unbounded-chunk-first.enabled' = '%s',"
                                 + " 'server-id' = '%s'"
@@ -967,14 +981,23 @@ public class MySqlSourceITCase extends MySqlSourceTestBase {
                         customDatabase.getDatabaseName(),
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
-                        skipSnapshotBackfill,
                         assignEndingFirst == null ? "false" : "true",
                         getServerId(),
                         chunkColumnName == null
                                 ? ""
                                 : String.format(
                                         ", 'scan.incremental.snapshot.chunk.key-column' = '%s'",
-                                        chunkColumnName));
+                                        chunkColumnName),
+                        otherOptions.isEmpty()
+                                ? ""
+                                : ","
+                                        + otherOptions.entrySet().stream()
+                                                .map(
+                                                        e ->
+                                                                String.format(
+                                                                        "'%s'='%s'",
+                                                                        e.getKey(), e.getValue()))
+                                                .collect(Collectors.joining(",")));
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
