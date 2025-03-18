@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.tidb.source.fetch;
 
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBConnectorConfig;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset;
 import org.apache.flink.cdc.connectors.tidb.source.offset.EventOffsetContext;
@@ -157,6 +158,10 @@ public class EventSourceReader
                         ? offsetContext
                         : EventOffsetContext.initial(this.connectorConfig);
         try {
+            EventOffset currentOffset = new EventOffset(effectiveOffsetContext.getOffset());
+            if (currentOffset.isBefore(split.getStartingOffset())) {
+                return;
+            }
             readChangeEvents(partition, effectiveOffsetContext);
         } catch (Exception e) {
             this.errorHandler.setProducerThrowable(e);
@@ -172,7 +177,34 @@ public class EventSourceReader
                     while (running) {
                         try {
                             Cdcpb.Event.Row committedRow = committedEvents.take();
-                            emitChangeEvent(partition, offsetContext, committedRow);
+                            EventOffset currentOffset = new EventOffset(offsetContext.getOffset());
+                            if (currentOffset.isBefore(split.getStartingOffset())) {
+                                return;
+                            }
+                            if (!EventOffset.NO_STOPPING_OFFSET.equals(split.getEndingOffset())
+                                    && currentOffset.isAtOrAfter(split.getEndingOffset())) {
+                                // send watermark event;
+                                try {
+                                    eventDispatcher.dispatchWatermarkEvent(
+                                            partition.getSourcePartition(),
+                                            split,
+                                            currentOffset,
+                                            WatermarkKind.END);
+                                } catch (InterruptedException e) {
+                                    LOG.error("Send signal event error.", e);
+                                    errorHandler.setProducerThrowable(
+                                            new RuntimeException(
+                                                    "Error processing log signal event", e));
+                                }
+                                ((StoppableChangeEventSourceContext) context)
+                                        .stopChangeEventSource();
+                                return;
+                            }
+
+                            final EventOffsetContext localOffsetContext =
+                                    new EventOffsetContext.Loader(this.connectorConfig)
+                                            .load(currentOffset.getOffset());
+                            emitChangeEvent(partition, localOffsetContext, committedRow);
                             // use startTs of row as messageTs, use commitTs of row as fetchTs
                         } catch (Exception e) {
                             LOG.error("Read change events error.", e);
