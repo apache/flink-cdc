@@ -17,9 +17,10 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
-import com.alibaba.dcm.DnsCacheManipulator;
 import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfigFactory;
 import org.apache.flink.test.util.AbstractTestBase;
+
+import com.alibaba.dcm.DnsCacheManipulator;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.AfterClass;
@@ -51,9 +52,7 @@ import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
 
-/**
- * Utility class for tidb tests.
- */
+/** Utility class for tidb tests. */
 public class TiDBTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -70,8 +69,7 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final int PD_PORT_ORIGIN = 2379;
     public static int pdPort = PD_PORT_ORIGIN + 10;
 
-    @ClassRule
-    public static final Network NETWORK = Network.newNetwork();
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @ClassRule
     public static final GenericContainer<?> PD =
@@ -195,7 +193,7 @@ public class TiDBTestBase extends AbstractTestBase {
         final URL ddlTestFile = TiDBTestBase.class.getClassLoader().getResource(ddlFile);
         assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
         try (Connection connection = getJdbcConnection("");
-             Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);
             final List<String> statements =
                     Arrays.stream(
