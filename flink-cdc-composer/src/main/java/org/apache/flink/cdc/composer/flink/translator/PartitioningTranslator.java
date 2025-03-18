@@ -63,16 +63,23 @@ public class PartitioningTranslator {
             boolean isBatchMode,
             OperatorID schemaOperatorID,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+        if (isBatchMode) {
+            return input.transform(
+                            "BatchPrePartition",
+                            new PartitioningEventTypeInfo(),
+                            new RegularPrePartitionBatchOperator(
+                                    downstreamParallelism, hashFunctionProvider))
+                    .setParallelism(upstreamParallelism)
+                    .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
+                    .map(new PostPartitionProcessor(), new EventTypeInfo())
+                    .name("BatchPostPartition")
+                    .setParallelism(downstreamParallelism);
+        }
         return input.transform(
-                        isBatchMode ? "BatchPrePartition" : "PrePartition",
+                        "PrePartition",
                         new PartitioningEventTypeInfo(),
-                        isBatchMode
-                                ? new RegularPrePartitionBatchOperator(
-                                        downstreamParallelism, hashFunctionProvider)
-                                : new RegularPrePartitionOperator(
-                                        schemaOperatorID,
-                                        downstreamParallelism,
-                                        hashFunctionProvider))
+                        new RegularPrePartitionOperator(
+                                schemaOperatorID, downstreamParallelism, hashFunctionProvider))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
                 .map(new PostPartitionProcessor(), new EventTypeInfo())
