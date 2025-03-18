@@ -886,7 +886,9 @@ class FlinkPipelineTransformITCase {
     /** This tests if transform temporal functions works as expected. */
     @Test
     void testTransformWithTemporalFunction() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1024,7 +1026,9 @@ class FlinkPipelineTransformITCase {
             List<TransformDef> transformDefs,
             List<String> expectedResults)
             throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1148,7 +1152,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testVanillaTransformWithSchemaEvolution() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1234,7 +1240,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testWildcardTransformWithSchemaEvolution() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1329,7 +1337,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testExplicitTransformWithSchemaEvolution() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1412,7 +1422,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testPreAsteriskWithSchemaEvolution() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1507,7 +1519,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testPostAsteriskWithSchemaEvolution() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1602,7 +1616,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testTransformWithFilterButNoProjection() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1697,7 +1713,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testTransformUnmatchedSchemaEvolution() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1793,7 +1811,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testExplicitPrimaryKeyWithNullable() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1888,7 +1908,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testTransformWithCommentsAndDefaultExpr() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1976,7 +1998,9 @@ class FlinkPipelineTransformITCase {
 
     String[] runNumericCastingWith(String expression) throws Exception {
         try {
-            FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+            FlinkPipelineComposer composer =
+                    FlinkPipelineComposer.ofMiniCluster(
+                            new org.apache.flink.configuration.Configuration());
 
             // Setup value source
             Configuration sourceConfig = new Configuration();
@@ -2150,7 +2174,9 @@ class FlinkPipelineTransformITCase {
 
     @Test
     void testTransformWithLargeLiterals() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
