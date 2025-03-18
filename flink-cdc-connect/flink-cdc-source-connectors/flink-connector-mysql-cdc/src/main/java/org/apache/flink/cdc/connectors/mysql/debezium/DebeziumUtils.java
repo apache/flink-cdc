@@ -65,6 +65,8 @@ public class DebeziumUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(DebeziumUtils.class);
 
+    private static String showMasterStmt = null;
+
     /** Creates and opens a new {@link JdbcConnection} backing connection pool. */
     public static JdbcConnection openJdbcConnection(MySqlSourceConfig sourceConfig) {
         JdbcConnection jdbc =
@@ -150,28 +152,43 @@ public class DebeziumUtils {
         }
     }
 
+    /**
+     * Compatibility Issue with MySQL Syntax SHOW MASTER STATUS:
+     * https://issues.apache.org/jira/browse/FLINK-37503
+     */
     public static <T> T queryBinlogStatus(
             JdbcConnection connection, Function<ResultSet, T> callback) throws SQLException {
-        String showMasterStmt = "SHOW MASTER STATUS";
-        try {
-            return connection.queryAndMap(showMasterStmt, rs -> callback.apply(rs));
-        } catch (SQLException skipped) {
-            String showBinaryStmt = "SHOW BINARY LOG STATUS";
-            LOG.warn(
-                    "Failed to get binlog offset: {}, try to get binlog offset by: ",
-                    showMasterStmt,
-                    showBinaryStmt);
+
+        if (showMasterStmt == null) {
+            String masterStmt = "SHOW MASTER STATUS";
             try {
-                return connection.queryAndMap(showBinaryStmt, rs -> callback.apply(rs));
-            } catch (SQLException e) {
-                throw new FlinkRuntimeException(
-                        "Cannot read the binlog filename and position via '"
-                                + showMasterStmt
-                                + "' or '"
-                                + showBinaryStmt
-                                + "'. Make sure your server is correctly configured",
-                        e);
+                T t = connection.queryAndMap(masterStmt, rs -> callback.apply(rs));
+                showMasterStmt = masterStmt;
+                return t;
+            } catch (SQLException skipped) {
+                String binaryStmt = "SHOW BINARY LOG STATUS";
+                LOG.warn(
+                        "Failed to get binlog offset by: '"
+                                + masterStmt
+                                + "', try to get binlog offset by: '"
+                                + binaryStmt
+                                + "'");
+                try {
+                    T t = connection.queryAndMap(binaryStmt, rs -> callback.apply(rs));
+                    showMasterStmt = binaryStmt;
+                    return t;
+                } catch (SQLException e) {
+                    throw new FlinkRuntimeException(
+                            "Cannot read the binlog filename and position via '"
+                                    + masterStmt
+                                    + "' or '"
+                                    + binaryStmt
+                                    + "'. Make sure your server is correctly configured",
+                            e);
+                }
             }
+        } else {
+            return connection.queryAndMap(showMasterStmt, rs -> callback.apply(rs));
         }
     }
 
