@@ -25,6 +25,7 @@ import io.debezium.util.Clock;
 
 import java.io.Serializable;
 
+/** TiDB event emitter. */
 public class EventEmitter extends RelationalChangeRecordEmitter<TiDBPartition> {
     private final Envelope.Operation operation;
     private final Object[] before;

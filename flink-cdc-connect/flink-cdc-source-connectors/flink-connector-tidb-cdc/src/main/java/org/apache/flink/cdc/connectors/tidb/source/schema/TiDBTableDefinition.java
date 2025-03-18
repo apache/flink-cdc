@@ -25,6 +25,7 @@ import io.debezium.relational.TableId;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/** TiDB table definition. */
 public class TiDBTableDefinition {
     TableId tableId;
     List<TiDBFieldDefinition> fieldDefinitions;

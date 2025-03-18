@@ -47,6 +47,7 @@ import static org.apache.flink.cdc.connectors.tidb.utils.TiDBConnectionUtils.get
 import static org.apache.flink.table.api.DataTypes.FIELD;
 import static org.apache.flink.table.api.DataTypes.ROW;
 
+/** Utils for TiDB. */
 public class TiDBUtils {
     private static final String BIT = "BIT";
     private static final String TINYINT = "TINYINT";
