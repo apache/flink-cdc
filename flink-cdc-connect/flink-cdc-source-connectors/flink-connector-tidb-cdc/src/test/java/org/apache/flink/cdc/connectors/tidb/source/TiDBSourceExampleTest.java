@@ -15,6 +15,7 @@ import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.flink.util.CloseableIterator;
+
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -27,9 +28,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-/**
- * Tests for TiDB Source based on incremental snapshot framework .
- */
+/** Tests for TiDB Source based on incremental snapshot framework . */
 public class TiDBSourceExampleTest extends TiDBTestBase {
 
     private static final String databaseName = "inventory";
@@ -65,21 +64,21 @@ public class TiDBSourceExampleTest extends TiDBTestBase {
                 env.fromSource(
                                 TiDBIncrementalSource,
                                 WatermarkStrategy.noWatermarks(),
-                                "PostgresParallelSource")
+                                "TiDBParallelSource")
                         .setParallelism(2)
                         .executeAndCollect(); // collect record
 
         String[] snapshotExpectedRecords =
-                new String[]{
-                        "+I[101, scooter, Small 2-wheel scooter, 3.14]",
-                        "+I[102, car battery, 12V car battery, 8.1]",
-                        "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
-                        "+I[104, hammer, 12oz carpenter's hammer, 0.75]",
-                        "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
-                        "+I[106, hammer, 16oz carpenter's hammer, 1.0]",
-                        "+I[107, rocks, box of assorted rocks, 5.3]",
-                        "+I[108, jacket, water resistent black wind breaker, 0.1]",
-                        "+I[109, spare tire, 24 inch spare tire, 22.2]"
+                new String[] {
+                    "+I[101, scooter, Small 2-wheel scooter, 3.14]",
+                    "+I[102, car battery, 12V car battery, 8.1]",
+                    "+I[103, 12-pack drill bits, 12-pack of drill bits with sizes ranging from #40 to #3, 0.8]",
+                    "+I[104, hammer, 12oz carpenter's hammer, 0.75]",
+                    "+I[105, hammer, 14oz carpenter's hammer, 0.875]",
+                    "+I[106, hammer, 16oz carpenter's hammer, 1.0]",
+                    "+I[107, rocks, box of assorted rocks, 5.3]",
+                    "+I[108, jacket, water resistent black wind breaker, 0.1]",
+                    "+I[109, spare tire, 24 inch spare tire, 22.2]"
                 };
 
         // step-1: consume snapshot data

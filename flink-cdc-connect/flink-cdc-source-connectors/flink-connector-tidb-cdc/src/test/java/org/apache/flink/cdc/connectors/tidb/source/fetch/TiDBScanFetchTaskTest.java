@@ -1,6 +1,5 @@
 package org.apache.flink.cdc.connectors.tidb.source.fetch;
 
-import io.debezium.relational.TableId;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
@@ -19,6 +18,8 @@ import org.apache.flink.cdc.connectors.tidb.source.connection.TiDBConnection;
 import org.apache.flink.cdc.connectors.tidb.testutils.RecordsFormatter;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
+
+import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.junit.Test;
 
@@ -34,9 +35,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/**
- * Tests for {@link TiDBScanFetchTask}.
- */
+/** Tests for {@link TiDBScanFetchTask}. */
 
 /**
  * VALUES (default, "scooter", "Small 2-wheel scooter", 3.14), (default, "car battery", "12V car
@@ -58,29 +57,26 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
         initializeTidbTable("customer");
         String tableId = databaseName + "." + tableName;
         String[] changingDataSql =
-                new String[]{
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                        "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
                 };
         String[] expected =
-                new String[]{
-                        "+I[101, user_1, Shanghai, 123567891234]",
-                        "+I[102, user_2, Shanghai, 123567891234]",
-                        "+I[103, user_3, Shanghai, 123567891234]",
-                        "+I[109, user_4, Shanghai, 123567891234]",
-                        "+I[110, user_5, Hangzhou, 123567891234]",
-                        "+I[111, user_6, Hangzhou, 123567891234]",
-                        "+I[118, user_7, Shanghai, 123567891234]",
-                        "+I[121, user_8, Shanghai, 123567891234]",
-                        "+I[123, user_9, Shanghai, 123567891234]",
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Hangzhou, 123567891234]",
+                    "+I[111, user_6, Hangzhou, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
                 };
         List<String> actual =
-                getDataInSnapshotScan(
-                        changingDataSql,
-                        USE_POST_LOWWATERMARK_HOOK,
-                        false);
+                getDataInSnapshotScan(changingDataSql, USE_POST_LOWWATERMARK_HOOK, false);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -89,29 +85,28 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
         initializeTidbTable("customer");
         String tableId = databaseName + "." + tableName;
         String[] insertDataSql =
-                new String[]{
-                        "INSERT INTO " + tableId + " VALUES(112, 'user_12','Shanghai','123567891234')",
-                        "INSERT INTO " + tableId + " VALUES(113, 'user_13','Shanghai','123567891234')",
+                new String[] {
+                    "INSERT INTO " + tableId + " VALUES(112, 'user_12','Shanghai','123567891234')",
+                    "INSERT INTO " + tableId + " VALUES(113, 'user_13','Shanghai','123567891234')",
                 };
 
         String[] expected =
-                new String[]{
-                        "+I[101, user_1, Shanghai, 123567891234]",
-                        "+I[102, user_2, Shanghai, 123567891234]",
-                        "+I[103, user_3, Shanghai, 123567891234]",
-                        "+I[109, user_4, Shanghai, 123567891234]",
-                        "+I[110, user_5, Shanghai, 123567891234]",
-                        "+I[111, user_6, Shanghai, 123567891234]",
-                        "+I[112, user_12, Shanghai, 123567891234]",
-                        "+I[113, user_13, Shanghai, 123567891234]",
-                        "+I[118, user_7, Shanghai, 123567891234]",
-                        "+I[121, user_8, Shanghai, 123567891234]",
-                        "+I[123, user_9, Shanghai, 123567891234]",
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[112, user_12, Shanghai, 123567891234]",
+                    "+I[113, user_13, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
                 };
 
         List<String> actual =
-                getDataInSnapshotScan(
-                        insertDataSql, USE_POST_LOWWATERMARK_HOOK, false);
+                getDataInSnapshotScan(insertDataSql, USE_POST_LOWWATERMARK_HOOK, false);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -120,23 +115,22 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
         initializeTidbTable("customer");
         String tableId = databaseName + "." + tableName;
         String[] deleteDataSql =
-                new String[]{
-                        "DELETE FROM " + tableId + " where id = 101",
-                        "DELETE FROM " + tableId + " where id = 102",
+                new String[] {
+                    "DELETE FROM " + tableId + " where id = 101",
+                    "DELETE FROM " + tableId + " where id = 102",
                 };
         String[] expected =
-                new String[]{
-                        "+I[103, user_3, Shanghai, 123567891234]",
-                        "+I[109, user_4, Shanghai, 123567891234]",
-                        "+I[110, user_5, Shanghai, 123567891234]",
-                        "+I[111, user_6, Shanghai, 123567891234]",
-                        "+I[118, user_7, Shanghai, 123567891234]",
-                        "+I[121, user_8, Shanghai, 123567891234]",
-                        "+I[123, user_9, Shanghai, 123567891234]",
+                new String[] {
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
                 };
         List<String> actual =
-                getDataInSnapshotScan(
-                        deleteDataSql, USE_POST_LOWWATERMARK_HOOK, false);
+                getDataInSnapshotScan(deleteDataSql, USE_POST_LOWWATERMARK_HOOK, false);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -146,32 +140,31 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
         String tableId = databaseName + "." + tableName;
 
         String[] changingDataSql =
-                new String[]{
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                        "DELETE FROM " + tableId + " where id = 102",
-                        "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                        "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    "DELETE FROM " + tableId + " where id = 102",
+                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
                 };
 
         String[] expected =
-                new String[]{
-                        "+I[101, user_1, Shanghai, 123567891234]",
-                        "+I[102, user_2, hangzhou, 123567891234]",
-                        "+I[103, user_3, Shanghai, 123567891234]",
-                        "+I[109, user_4, Shanghai, 123567891234]",
-                        "+I[110, user_5, Hangzhou, 123567891234]",
-                        "+I[111, user_6, Hangzhou, 123567891234]",
-                        "+I[118, user_7, Shanghai, 123567891234]",
-                        "+I[121, user_8, Shanghai, 123567891234]",
-                        "+I[123, user_9, Shanghai, 123567891234]",
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, hangzhou, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Hangzhou, 123567891234]",
+                    "+I[111, user_6, Hangzhou, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
                 };
 
         // Change data during [low_watermark, snapshot) will not be captured by snapshotting
         List<String> actual =
-                getDataInSnapshotScan(
-                        changingDataSql, USE_POST_LOWWATERMARK_HOOK, true);
+                getDataInSnapshotScan(changingDataSql, USE_POST_LOWWATERMARK_HOOK, true);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -181,41 +174,37 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
         String tableId = databaseName + "." + tableName;
 
         String[] changingDataSql =
-                new String[]{
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                        //                    "DELETE FROM " + tableId + " where id = 102",
-                        //                    "INSERT INTO " + tableId + " VALUES(102,
-                        // 'user_2',Hangzhou','123567891234')",
-                        "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
-                        "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                new String[] {
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
+                    //                    "DELETE FROM " + tableId + " where id = 102",
+                    //                    "INSERT INTO " + tableId + " VALUES(102,
+                    // 'user_2',Hangzhou','123567891234')",
+                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
+                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
                 };
 
         String[] expected =
-                new String[]{
-                        "+I[101, user_1, Shanghai, 123567891234]",
-                        "+I[102, user_2, Shanghai, 123567891234]",
-                        "+I[103, user_3, Shanghai, 123567891234]",
-                        "+I[109, user_4, Shanghai, 123567891234]",
-                        "+I[110, user_5, Hangzhou, 123567891234]",
-                        "+I[111, user_6, Hangzhou, 123567891234]",
-                        "+I[118, user_7, Shanghai, 123567891234]",
-                        "+I[121, user_8, Shanghai, 123567891234]",
-                        "+I[123, user_9, Shanghai, 123567891234]",
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Hangzhou, 123567891234]",
+                    "+I[111, user_6, Hangzhou, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
                 };
 
         // Change data during [snapshot, high_watermark) will not be captured by snapshotting
         List<String> actual =
-                getDataInSnapshotScan(
-                        changingDataSql, USE_POST_LOWWATERMARK_HOOK, true);
+                getDataInSnapshotScan(changingDataSql, USE_POST_LOWWATERMARK_HOOK, true);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
     private List<String> getDataInSnapshotScan(
-            String[] changingDataSql,
-            int hookType,
-            boolean skipSnapshotBackfill)
-            throws Exception {
+            String[] changingDataSql, int hookType, boolean skipSnapshotBackfill) throws Exception {
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
         tiDBSourceConfigFactory.hostname(TIDB.getHost());
         tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
@@ -276,9 +265,7 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
             SnapshotSplit sqlSplit = snapshotSplits.get(i);
             if (sourceScanFetcher.isFinished()) {
                 FetchTask<SourceSplitBase> fetchTask =
-                        taskContext
-                                .getDataSourceDialect()
-                                .createFetchTask(sqlSplit);
+                        taskContext.getDataSourceDialect().createFetchTask(sqlSplit);
                 ((AbstractScanFetchTask) fetchTask).setSnapshotPhaseHooks(snapshotPhaseHooks);
                 sourceScanFetcher.submitTask(fetchTask);
             }
@@ -303,9 +290,7 @@ public class TiDBScanFetchTaskTest extends TiDBTestBase {
         return formatter.format(records);
     }
 
-    /**
-     * 于从给定的 TiDB 配置和 JDBC 数据源方言生成SnapshotSplit列表
-     */
+    /** 于从给定的 TiDB 配置和 JDBC 数据源方言生成SnapshotSplit列表 */
     private List<SnapshotSplit> getSnapshotSplits(
             TiDBSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect) throws Exception {
         List<TableId> discoverTables = sourceDialect.discoverDataCollections(sourceConfig);
