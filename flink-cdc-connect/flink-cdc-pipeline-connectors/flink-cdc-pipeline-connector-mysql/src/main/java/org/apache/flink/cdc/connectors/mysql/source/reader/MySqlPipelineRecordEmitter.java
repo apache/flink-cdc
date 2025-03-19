@@ -72,6 +72,9 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     // Used when startup mode is initial
     private Set<TableId> alreadySendCreateTableTables;
 
+    // Used when startup mode is snapshot
+    private boolean alreadySendAllCreateTableTables = false;
+
     private Map<TableId, CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
@@ -93,11 +96,11 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             throws Exception {
         if (StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())) {
             // In snapshot mode, we simply emit all schemas at once.
-            if (alreadySendCreateTableTables.isEmpty()) {
+            if (!alreadySendAllCreateTableTables) {
                 createTableEventCache.forEach(
                         (tableId, createTableEvent) -> {
                             output.collect(createTableEvent);
-                            alreadySendCreateTableTables.add(tableId);
+                            alreadySendAllCreateTableTables = true;
                         });
             }
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {

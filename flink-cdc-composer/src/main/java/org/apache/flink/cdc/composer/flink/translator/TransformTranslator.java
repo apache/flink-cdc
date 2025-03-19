@@ -23,8 +23,8 @@ import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.cdc.runtime.operators.transform.BatchPreTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
-import org.apache.flink.cdc.runtime.operators.transform.PreBatchTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -106,14 +106,14 @@ public class TransformTranslator {
         return preTransformFunctionBuilder.build();
     }
 
-    private PreBatchTransformOperator generatePreBatchTransform(
+    private BatchPreTransformOperator generatePreBatchTransform(
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns) {
 
-        PreBatchTransformOperator.Builder preBatchTransformFunctionBuilder =
-                PreBatchTransformOperator.newBuilder();
+        BatchPreTransformOperator.Builder preBatchTransformFunctionBuilder =
+                BatchPreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             preBatchTransformFunctionBuilder.addTransform(
                     transform.getSourceTable(),

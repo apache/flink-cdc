@@ -74,16 +74,17 @@ public class PartitioningTranslator {
                     .map(new PostPartitionProcessor(), new EventTypeInfo())
                     .name("BatchPostPartition")
                     .setParallelism(downstreamParallelism);
+        } else {
+            return input.transform(
+                            "PrePartition",
+                            new PartitioningEventTypeInfo(),
+                            new RegularPrePartitionOperator(
+                                    schemaOperatorID, downstreamParallelism, hashFunctionProvider))
+                    .setParallelism(upstreamParallelism)
+                    .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
+                    .map(new PostPartitionProcessor(), new EventTypeInfo())
+                    .name("PostPartition");
         }
-        return input.transform(
-                        "PrePartition",
-                        new PartitioningEventTypeInfo(),
-                        new RegularPrePartitionOperator(
-                                schemaOperatorID, downstreamParallelism, hashFunctionProvider))
-                .setParallelism(upstreamParallelism)
-                .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
-                .map(new PostPartitionProcessor(), new EventTypeInfo())
-                .name("PostPartition");
     }
 
     public DataStream<PartitioningEvent> translateDistributed(

@@ -467,8 +467,3 @@ pipeline:
 | openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
 | openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
 | openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
-
-# 已知的限制
-* 目前，transform 不能与路由规则一起使用。这将会在未来版本中支持。
-* 计算列不能引用没有出现在最终投影结果中的被裁剪的列。这将在将来的版本中解决。
-* 正则匹配不同schema的表不支持。如果需要，需要编写多个规则。
