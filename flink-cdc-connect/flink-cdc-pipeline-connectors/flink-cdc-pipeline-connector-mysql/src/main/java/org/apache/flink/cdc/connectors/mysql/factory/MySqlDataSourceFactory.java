@@ -497,18 +497,24 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         distributionFactorLower));
     }
 
+    private static final String DOT_PLACEHOLDER = "_$dot_placeholder$_";
+
     /**
      * Currently, The supported regular syntax is not exactly the same in {@link Selectors} and
      * {@link Tables.TableFilter}.
      *
      * <p>The main distinction are :
      *
-     * <p>1) {@link Selectors} use `,` to split table names and {@link Tables.TableFilter} use use
+     * <p>1) {@link Selectors} use {@code ,} to split table names and {@link Tables.TableFilter} use
      * `|` to split table names.
      *
-     * <p>2) If there is a need to use a dot (.) in a regular expression to match any character, it
-     * is necessary to escape the dot with a backslash, refer to {@link
+     * <p>2) If there is a need to use a dot ({@code .}) in a regular expression to match any
+     * character, it is necessary to escape the dot with a backslash, refer to {@link
      * MySqlDataSourceOptions#TABLES}.
+     *
+     * <p>3) The unescaped {@code .} is used as the separator of database and table name. When
+     * converting to Debezium style, it is expected to be escaped to match the dot ({@code .})
+     * literally instead of the meta-character.
      */
     private String validateTableAndReturnDebeziumStyle(String tables) {
         // MySQL table names are not allowed to have `,` character.
@@ -521,7 +527,24 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                             + " was enabled.");
         }
 
-        return tables.replace("\\.", ".");
+        // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
+        // In our table matching syntax, `\\.` means RegEx token matcher and `.` means database &
+        // table name separator.
+        // On the contrary, while we're matching TableId string, `\\.` means matching the "dot"
+        // literal and `.` is the meta-character.
+
+        // Step 1: escape the dot with a backslash, but keep it as a placeholder (like `$`).
+        // For example, `db\.*.tbl\.*` => `db$*.tbl$*`
+        String unescapedTables = tables.replace("\\.", DOT_PLACEHOLDER);
+
+        // Step 2: replace all remaining dots (`.`) to quoted version (`\.`), as a separator between
+        // database and table names.
+        // For example, `db$*.tbl$*` => `db$*\.tbl$*`
+        String unescapedTablesWithDbTblSeparator = unescapedTables.replace(".", "\\.");
+
+        // Step 3: restore placeholder to normal RegEx matcher (`.`)
+        // For example, `db$*\.tbl$*` => `db.*\.tbl.*`
+        return unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
