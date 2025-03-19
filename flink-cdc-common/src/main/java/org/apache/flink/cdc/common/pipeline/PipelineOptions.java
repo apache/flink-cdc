@@ -49,7 +49,7 @@ public class PipelineOptions {
             ConfigOptions.key("batch-mode.enabled")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Enabled batch mode of the pipeline");
+                    .withDescription("Run pipeline job in batch mode instead of streaming mode");
 
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
             ConfigOptions.key("schema.change.behavior")

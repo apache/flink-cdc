@@ -112,10 +112,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaChangeBehavior schemaChangeBehavior =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
-        boolean isBatchMode = false;
-        if (pipelineDefConfig.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
-            isBatchMode = true;
+        boolean isBatchMode = pipelineDefConfig.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED);
+        if (isBatchMode) {
             env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        } else {
+            env.setRuntimeMode(RuntimeExecutionMode.STREAMING);
         }
 
         // Initialize translators

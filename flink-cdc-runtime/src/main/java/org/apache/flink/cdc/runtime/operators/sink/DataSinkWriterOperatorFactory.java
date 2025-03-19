@@ -81,7 +81,8 @@ public class DataSinkWriterOperatorFactory<CommT>
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
         if (isBatchMode) {
             return DataBatchSinkWriterOperator.class;
+        } else {
+            return DataSinkWriterOperator.class;
         }
-        return DataSinkWriterOperator.class;
     }
 }

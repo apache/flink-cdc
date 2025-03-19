@@ -139,19 +139,6 @@ public class SchemaDerivator {
     public static Set<Schema> reverseLookupDependingUpstreamSchemas(
             final TableIdRouter tableIdRouter,
             final TableId evolvedTableId,
-            final Set<TableId> allOriginalTables,
-            final Schema originalSchema) {
-        return reverseLookupDependingUpstreamTables(
-                        tableIdRouter, evolvedTableId, allOriginalTables)
-                .stream()
-                .map(utid -> originalSchema)
-                .collect(Collectors.toSet());
-    }
-
-    /** For an evolved table ID, reverse lookup all upstream schemas that needs to be fit in. */
-    public static Set<Schema> reverseLookupDependingUpstreamSchemas(
-            final TableIdRouter tableIdRouter,
-            final TableId evolvedTableId,
             final Table<TableId, Integer, Schema> upstreamSchemaTable) {
         return reverseLookupDependingUpstreamTables(
                         tableIdRouter, evolvedTableId, upstreamSchemaTable)
@@ -382,18 +369,10 @@ public class SchemaDerivator {
             if (toBeMergedSchemas.isEmpty()) {
                 continue;
             }
-            Schema mergedSchema = null;
-            for (Schema toBeMergedSchema : toBeMergedSchemas) {
-                if (mergedSchema == null) {
-                    mergedSchema = toBeMergedSchema;
-                    continue;
-                }
-                mergedSchema =
-                        SchemaMergingUtils.getLeastCommonSchema(mergedSchema, toBeMergedSchema);
-            }
+            Schema mergedSchema = SchemaMergingUtils.getCommonSchema(toBeMergedSchemas);
 
             for (TableId tableId : sourceTables) {
-                List<TableId> sinkTableIds = router.calculateRoute(tableId);
+                List<TableId> sinkTableIds = router.route(tableId);
                 for (TableId sinkTableId : sinkTableIds) {
                     sinkTableIdToSchemaMap.put(sinkTableId, mergedSchema);
                 }

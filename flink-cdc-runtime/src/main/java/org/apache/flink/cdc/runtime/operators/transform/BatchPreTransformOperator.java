@@ -54,7 +54,7 @@ import java.util.stream.Collectors;
  * in batch mode. There is no need to consider the task failover scenario in batch mode, as it
  * should be re - emitted from the source.
  */
-public class PreBatchTransformOperator extends AbstractStreamOperator<Event>
+public class BatchPreTransformOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -68,18 +68,18 @@ public class PreBatchTransformOperator extends AbstractStreamOperator<Event>
     private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
     private Map<TableId, Boolean> hasAsteriskMap;
 
-    public static PreBatchTransformOperator.Builder newBuilder() {
-        return new PreBatchTransformOperator.Builder();
+    public static BatchPreTransformOperator.Builder newBuilder() {
+        return new BatchPreTransformOperator.Builder();
     }
 
-    /** Builder of {@link PreBatchTransformOperator}. */
+    /** Builder of {@link BatchPreTransformOperator}. */
     public static class Builder {
         private final List<TransformRule> transformRules = new ArrayList<>();
 
         private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
                 new ArrayList<>();
 
-        public PreBatchTransformOperator.Builder addTransform(
+        public BatchPreTransformOperator.Builder addTransform(
                 String tableInclusions, @Nullable String projection, @Nullable String filter) {
             transformRules.add(
                     new TransformRule(
@@ -94,7 +94,7 @@ public class PreBatchTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
-        public PreBatchTransformOperator.Builder addTransform(
+        public BatchPreTransformOperator.Builder addTransform(
                 String tableInclusions,
                 @Nullable String projection,
                 @Nullable String filter,
@@ -116,18 +116,18 @@ public class PreBatchTransformOperator extends AbstractStreamOperator<Event>
             return this;
         }
 
-        public PreBatchTransformOperator.Builder addUdfFunctions(
+        public BatchPreTransformOperator.Builder addUdfFunctions(
                 List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
             this.udfFunctions.addAll(udfFunctions);
             return this;
         }
 
-        public PreBatchTransformOperator build() {
-            return new PreBatchTransformOperator(transformRules, udfFunctions);
+        public BatchPreTransformOperator build() {
+            return new BatchPreTransformOperator(transformRules, udfFunctions);
         }
     }
 
-    private PreBatchTransformOperator(
+    private BatchPreTransformOperator(
             List<TransformRule> transformRules,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();

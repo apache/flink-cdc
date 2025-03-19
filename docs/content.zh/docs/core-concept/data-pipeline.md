@@ -116,3 +116,4 @@ under the License.
 | name            | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。 | optional          |
 | parallelism     | pipeline的全局并发度，默认值是1。                 | optional          |
 | local-time-zone | 作业级别的本地时区。                            | optional          |
+| batch-mode.enabled | 仅使用批处理模式来同步当前快照数据。                    | optional          |
