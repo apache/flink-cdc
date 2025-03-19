@@ -182,7 +182,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         }
     }
 
-    protected static String getServerId(int parallelism) {
+    protected String getServerId(int parallelism) {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         return serverId + "-" + (serverId + parallelism);
