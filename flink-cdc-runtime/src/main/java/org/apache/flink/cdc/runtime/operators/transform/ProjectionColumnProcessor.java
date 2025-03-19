@@ -98,14 +98,15 @@ public class ProjectionColumnProcessor {
         try {
             return expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
-            LOG.error(
-                    "Table:{} column:{} projection:{} column name map:{} execute failed. {}",
-                    tableInfo.getName(),
-                    projectionColumn.getColumnName(),
-                    projectionColumn.getScriptExpression(),
-                    projectionColumn.getColumnNameMap(),
+            throw new RuntimeException(
+                    String.format(
+                            "Failed to evaluate projection expression `%s` for column `%s` in table `%s`.\n"
+                                    + "\tColumn name map: {%s}",
+                            projectionColumn.getScriptExpression(),
+                            projectionColumn.getColumnName(),
+                            tableInfo.getName(),
+                            projectionColumn.getColumnNameMapAsString()),
                     e);
-            throw new RuntimeException(e);
         }
     }
 

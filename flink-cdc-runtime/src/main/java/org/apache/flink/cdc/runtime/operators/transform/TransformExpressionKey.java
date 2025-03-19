@@ -107,4 +107,21 @@ public class TransformExpressionKey implements Serializable {
     public int hashCode() {
         return Objects.hash(expression, argumentNames, argumentClasses, returnClass, columnNameMap);
     }
+
+    @Override
+    public String toString() {
+        return "TransformExpressionKey{"
+                + "expression='"
+                + expression
+                + '\''
+                + ", argumentNames="
+                + argumentNames
+                + ", argumentClasses="
+                + argumentClasses
+                + ", returnClass="
+                + returnClass
+                + ", columnNameMap="
+                + columnNameMap
+                + '}';
+    }
 }
