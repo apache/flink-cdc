@@ -201,7 +201,7 @@ public class MySqlSource<T>
         validator.validate();
 
         final MySqlSplitAssigner splitAssigner;
-        // In batch mode, only split snapshots.
+        // In snapshot-only startup option, only split snapshots.
         if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
