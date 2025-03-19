@@ -76,7 +76,7 @@ public class OceanBaseUtils {
                             .setOrdinalPosition(i)
                             .setDefaultValue(column.getDefaultValueExpression())
                             .setColumnComment(column.getComment());
-            toOceanBaseDataType(column, isPrimaryKeys, builder);
+            toOceanBaseDataType(column, builder);
             oceanBaseColumns.add(builder.build());
         }
 
@@ -98,10 +98,8 @@ public class OceanBaseUtils {
     }
 
     /** Convert CDC data type to OceanBase data type. */
-    public static void toOceanBaseDataType(
-            Column cdcColumn, boolean isPrimaryKeys, OceanBaseColumn.Builder builder) {
-        CdcDataTypeTransformer dataTypeTransformer =
-                new CdcDataTypeTransformer(isPrimaryKeys, builder);
+    public static void toOceanBaseDataType(Column cdcColumn, OceanBaseColumn.Builder builder) {
+        CdcDataTypeTransformer dataTypeTransformer = new CdcDataTypeTransformer(builder);
         cdcColumn.getType().accept(dataTypeTransformer);
     }
 
@@ -121,13 +119,11 @@ public class OceanBaseUtils {
     public static final String DECIMAL = "DECIMAL";
     public static final String CHAR = "CHAR";
     public static final String VARCHAR = "VARCHAR";
-    public static final String STRING = "STRING";
     public static final String DATE = "DATE";
     public static final String DATETIME = "DATETIME";
     public static final String TIMESTAMP = "TIMESTAMP";
     public static final String TIME = "TIME";
-    public static final String JSON = "JSON";
-    public static final String TEXT = "TEXT";
+    public static final String LONGTEXT = "LONGTEXT";
     public static final String LONGBLOB = "LONGBLOB";
 
     /** Max size of char type of OceanBase. */
@@ -139,15 +135,19 @@ public class OceanBaseUtils {
     /** The max VARBINARY column length is 1048576. */
     public static final int MAX_VARBINARY_SIZE = 1048576;
 
+    /** Max precision of time type of OceanBase. */
+    public static final int MAX_TIME_PRECISION = 6;
+
+    /** Max precision of timestamp and datetime types of OceanBase MySQL mode. */
+    public static final int MAX_DATETIME_PRECISION = 6;
+
     /** Transforms CDC {@link DataType} to OceanBase data type. */
     public static class CdcDataTypeTransformer
             extends DataTypeDefaultVisitor<OceanBaseColumn.Builder> {
 
         private final OceanBaseColumn.Builder builder;
-        private final boolean isPrimaryKeys;
 
-        public CdcDataTypeTransformer(boolean isPrimaryKeys, OceanBaseColumn.Builder builder) {
-            this.isPrimaryKeys = isPrimaryKeys;
+        public CdcDataTypeTransformer(OceanBaseColumn.Builder builder) {
             this.builder = builder;
         }
 
@@ -188,7 +188,9 @@ public class OceanBaseUtils {
 
         @Override
         public OceanBaseColumn.Builder visit(BinaryType binaryType) {
+            int length = binaryType.getLength();
             builder.setDataType(BINARY);
+            builder.setColumnSize(length);
             builder.setNullable(binaryType.isNullable());
             return builder;
         }
@@ -196,17 +198,13 @@ public class OceanBaseUtils {
         @Override
         public OceanBaseColumn.Builder visit(VarBinaryType bytesType) {
             int length = bytesType.getLength();
-
-            // The max VARBINARY column length is 1048576.
+            builder.setColumnSize(length);
+            builder.setNullable(bytesType.isNullable());
             if (length <= MAX_VARBINARY_SIZE) {
                 builder.setDataType(VARBINARY);
-                builder.setColumnSize(length);
-                builder.setNullable(bytesType.isNullable());
             } else {
                 builder.setDataType(LONGBLOB);
-                builder.setNullable(bytesType.isNullable());
             }
-
             return builder;
         }
 
@@ -236,14 +234,15 @@ public class OceanBaseUtils {
         @Override
         public OceanBaseColumn.Builder visit(CharType charType) {
             int length = charType.getLength();
+            builder.setNullable(charType.isNullable());
+            builder.setColumnSize(length);
             if (length <= MAX_CHAR_SIZE) {
                 builder.setDataType(CHAR);
-                builder.setNullable(charType.isNullable());
-                builder.setColumnSize(length);
-            } else {
+            } else if (length <= MAX_VARCHAR_SIZE) {
                 builder.setDataType(VARCHAR);
-                builder.setNullable(charType.isNullable());
-                builder.setColumnSize(Math.min(length, MAX_VARCHAR_SIZE));
+            } else {
+                builder.setDataType(LONGTEXT);
+                builder.setDefaultValue(null);
             }
             return builder;
         }
@@ -251,14 +250,12 @@ public class OceanBaseUtils {
         @Override
         public OceanBaseColumn.Builder visit(VarCharType varCharType) {
             int length = varCharType.getLength();
-            builder.setDataType(VARCHAR);
             builder.setNullable(varCharType.isNullable());
-            builder.setColumnSize(Math.min(length, MAX_VARCHAR_SIZE));
-
-            // case for string type to avoid row size too large
-            if (varCharType.getLength() > MAX_VARCHAR_SIZE) {
-                builder.setDataType(TEXT);
-                // A text column can't have a default value in OceanBase.
+            builder.setColumnSize(length);
+            if (length <= MAX_VARCHAR_SIZE) {
+                builder.setDataType(VARCHAR);
+            } else {
+                builder.setDataType(LONGTEXT);
                 builder.setDefaultValue(null);
             }
             return builder;
@@ -275,8 +272,7 @@ public class OceanBaseUtils {
         public OceanBaseColumn.Builder visit(TimeType timeType) {
             builder.setDataType(TIME);
             builder.setNullable(timeType.isNullable());
-            builder.setColumnSize(
-                    Math.min(timeType.getPrecision(), TimestampType.DEFAULT_PRECISION));
+            builder.setColumnSize(Math.min(timeType.getPrecision(), MAX_TIME_PRECISION));
             return builder;
         }
 
@@ -289,8 +285,7 @@ public class OceanBaseUtils {
         public OceanBaseColumn.Builder visit(TimestampType timestampType) {
             builder.setDataType(DATETIME);
             builder.setNullable(timestampType.isNullable());
-            builder.setColumnSize(
-                    Math.min(timestampType.getPrecision(), TimestampType.DEFAULT_PRECISION));
+            builder.setColumnSize(Math.min(timestampType.getPrecision(), MAX_DATETIME_PRECISION));
             return builder;
         }
 
@@ -299,7 +294,7 @@ public class OceanBaseUtils {
             builder.setDataType(TIMESTAMP);
             builder.setNullable(zonedTimestampType.isNullable());
             builder.setColumnSize(
-                    Math.min(zonedTimestampType.getPrecision(), TimestampType.DEFAULT_PRECISION));
+                    Math.min(zonedTimestampType.getPrecision(), MAX_DATETIME_PRECISION));
             return builder;
         }
 
@@ -308,9 +303,7 @@ public class OceanBaseUtils {
             builder.setDataType(TIMESTAMP);
             builder.setNullable(localZonedTimestampType.isNullable());
             builder.setColumnSize(
-                    Math.min(
-                            localZonedTimestampType.getPrecision(),
-                            TimestampType.DEFAULT_PRECISION));
+                    Math.min(localZonedTimestampType.getPrecision(), MAX_DATETIME_PRECISION));
             return builder;
         }
 

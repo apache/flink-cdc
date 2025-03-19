@@ -51,13 +51,10 @@ public class OceanBaseColumn implements Serializable {
      */
     @Nullable private final Integer columnSize;
 
-    /**
-     * The number of fractional digits for numeric data. This is null for other data types.
-     * NUMBER_SCALE in information_schema.COLUMNS.
-     */
+    /** The number of fractional digits for numeric data. This is null for other data types. */
     @Nullable private final Integer numericScale;
 
-    /** The column comment. COLUMN_COMMENT in information_schema.COLUMNS. */
+    /** The column comment. */
     @Nullable private final String columnComment;
 
     private OceanBaseColumn(
