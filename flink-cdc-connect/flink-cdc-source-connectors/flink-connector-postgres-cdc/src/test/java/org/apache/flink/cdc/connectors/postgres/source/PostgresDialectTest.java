@@ -56,13 +56,13 @@ public class PostgresDialectTest extends PostgresTestBase {
         // get table named 'customer.customers' from customDatabase which is actual in
         // inventoryDatabase
         PostgresSourceConfigFactory configFactoryOfCustomDatabase =
-                getMockPostgresSourceConfigFactory(customDatabase, "customer", "customers", 10);
+                getMockPostgresSourceConfigFactory(customDatabase, "customer", "Customers", 10);
         PostgresDialect dialectOfcustomDatabase =
                 new PostgresDialect(configFactoryOfCustomDatabase.create(0));
         List<TableId> tableIdsOfcustomDatabase =
                 dialectOfcustomDatabase.discoverDataCollections(
                         configFactoryOfCustomDatabase.create(0));
-        Assert.assertEquals(tableIdsOfcustomDatabase.get(0).toString(), "customer.customers");
+        Assert.assertEquals("customer.Customers", tableIdsOfcustomDatabase.get(0).toString());
 
         // get table named 'inventory.products' from customDatabase which is actual in
         // inventoryDatabase

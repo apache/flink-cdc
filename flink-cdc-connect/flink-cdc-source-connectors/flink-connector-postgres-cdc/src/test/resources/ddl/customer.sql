@@ -18,15 +18,15 @@ CREATE SCHEMA customer;
 SET search_path TO customer;
 
 -- Create and populate our users using a single insert with many rows
-CREATE TABLE customers (
-  id INTEGER NOT NULL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+CREATE TABLE "Customers" (
+  "Id" INTEGER NOT NULL PRIMARY KEY,
+  "Name" VARCHAR(255) NOT NULL DEFAULT 'flink',
   address VARCHAR(1024),
   phone_number VARCHAR(512)
 );
-ALTER TABLE customers REPLICA IDENTITY FULL;
+ALTER TABLE "Customers" REPLICA IDENTITY FULL;
 
-INSERT INTO customers
+INSERT INTO "Customers"
 VALUES (101,'user_1','Shanghai','123567891234'),
        (102,'user_2','Shanghai','123567891234'),
        (103,'user_3','Shanghai','123567891234'),
@@ -51,8 +51,8 @@ VALUES (101,'user_1','Shanghai','123567891234'),
 
 -- table has same name prefix with 'customers.*'
 CREATE TABLE customers_1 (
-  id INTEGER NOT NULL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  "Id" INTEGER NOT NULL PRIMARY KEY,
+  "Name" VARCHAR(255) NOT NULL DEFAULT 'flink',
   address VARCHAR(1024),
   phone_number VARCHAR(512)
 );
@@ -82,8 +82,8 @@ VALUES (101,'user_1','Shanghai','123567891234'),
        (2000,'user_21','Shanghai','123567891234');
 
 CREATE TABLE customers_no_pk (
-   id INTEGER NOT NULL,
-   name VARCHAR(255) NOT NULL DEFAULT 'flink',
+   "Id" INTEGER NOT NULL,
+   "Name" VARCHAR(255) NOT NULL DEFAULT 'flink',
    address VARCHAR(1024),
    phone_number VARCHAR(512)
 );
