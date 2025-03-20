@@ -24,18 +24,16 @@ import org.apache.flink.client.deployment.application.ApplicationConfiguration;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.client.program.ClusterClientProvider;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.kubernetes.KubernetesClusterClientFactory;
 import org.apache.flink.kubernetes.KubernetesClusterDescriptor;
 import org.apache.flink.kubernetes.configuration.KubernetesConfigOptions;
-import org.apache.flink.kubernetes.configuration.KubernetesDeploymentTarget;
 
 import org.apache.commons.cli.CommandLine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,9 +45,11 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
 
     @Override
     public PipelineExecution.ExecutionInfo deploy(
-            CommandLine commandLine, Configuration flinkConfig, List<Path> additionalJars) {
+            CommandLine commandLine,
+            Configuration flinkConfig,
+            List<Path> additionalJars,
+            Path flinkHome) {
         LOG.info("Submitting application in 'Flink K8S Application Mode'.");
-        flinkConfig.set(DeploymentOptions.TARGET, KubernetesDeploymentTarget.APPLICATION.getName());
         List<String> jars = new ArrayList<>();
         if (flinkConfig.get(PipelineOptions.JARS) == null) {
             // must be added cdc dist jar by default docker container path
@@ -61,7 +61,7 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
         flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
         flinkConfig.set(
                 ApplicationConfiguration.APPLICATION_MAIN_CLASS,
-                "org.apache.flink.cdc.cli.CliFrontend");
+                "org.apache.flink.cdc.cli.CliExecutor");
         KubernetesClusterClientFactory kubernetesClusterClientFactory =
                 new KubernetesClusterClientFactory();
         KubernetesClusterDescriptor descriptor =
