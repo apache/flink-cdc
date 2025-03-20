@@ -95,13 +95,14 @@ public class TransformFilterProcessor {
             return (Boolean)
                     expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
-            LOG.error(
-                    "Table:{} filter:{} column name map:{} execute failed. {}",
-                    tableInfo.getName(),
-                    transformFilter.getExpression(),
-                    transformFilter.getColumnNameMap(),
+            throw new RuntimeException(
+                    String.format(
+                            "Failed to evaluate filtering expression `%s` for table `%s`.\n"
+                                    + "\tColumn name map: {%s}",
+                            transformFilter.getScriptExpression(),
+                            tableInfo.getName(),
+                            transformFilter.getColumnNameMapAsString()),
                     e);
-            throw new RuntimeException(e);
         }
     }
 

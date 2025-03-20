@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Class {@code DataChangeEvent} represents the data change events of external systems, such as
@@ -206,6 +207,21 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         }
         stringBuilder.append(")");
         return stringBuilder.toString();
+    }
+
+    public String toReadableString(Function<RecordData, ?> extractor) {
+        return "DataChangeEvent{"
+                + "tableId="
+                + tableId
+                + ", before="
+                + extractor.apply(before)
+                + ", after="
+                + extractor.apply(after)
+                + ", op="
+                + op
+                + ", meta="
+                + describeMeta()
+                + '}';
     }
 
     @Override

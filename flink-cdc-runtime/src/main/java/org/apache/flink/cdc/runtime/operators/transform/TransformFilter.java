@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import java.io.Serializable;
@@ -69,6 +70,10 @@ public class TransformFilter implements Serializable {
 
     public Map<String, String> getColumnNameMap() {
         return columnNameMap;
+    }
+
+    public String getColumnNameMapAsString() {
+        return TransformException.prettyPrintColumnNameMap(getColumnNameMap());
     }
 
     public static Optional<TransformFilter> of(
