@@ -45,6 +45,12 @@ public class PipelineOptions {
                     .defaultValue(1)
                     .withDescription("Parallelism of the pipeline");
 
+    public static final ConfigOption<Boolean> PIPELINE_BATCH_MODE_ENABLED =
+            ConfigOptions.key("batch-mode.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Run pipeline job in batch mode instead of streaming mode");
+
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
             ConfigOptions.key("schema.change.behavior")
                     .enumType(SchemaChangeBehavior.class)
