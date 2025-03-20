@@ -131,7 +131,6 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                         .withFileSystemBind(warehouse, warehouse)
                         .withLogConsumer(taskManagerConsumer);
         Startables.deepStart(Stream.of(taskManager)).join();
-        runInContainerAsRoot(taskManager, "chmod", "0777", "-R", sharedVolume.toString());
         LOG.info("TaskManager is started.");
         inventoryDatabase.createAndInitialize();
     }
@@ -159,8 +158,6 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: iceberg\n"
-                                + "  sink.compaction.enabled: true\n"
-                                + "  sink.compaction.commit.interval: 1\n"
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.type: hadoop\n"
                                 + "\n"
