@@ -1,0 +1,252 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Flink CDC Base Workflow
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: "Jdk versions to test against."
+        required: false
+        type: string
+        default: "['8']"
+      flink-version:
+        description: "Flink versions to test against."
+        required: false
+        type: string
+        default: "['generic']"
+      module:
+        description: "Flink CDC module to test against."
+        required: true
+        type: string
+      parallelism:
+        description: "Flink parallelism."
+        required: false
+        type: number
+        default: 4
+      custom-maven-parameter:
+        description: "Custom maven parameter."
+        required: false
+        type: string
+
+env:
+  MODULES_CORE: "\
+  flink-cdc-cli,\
+  flink-cdc-common,\
+  flink-cdc-composer,\
+  flink-cdc-runtime,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base"
+
+  MODULES_PIPELINE_CONNECTORS: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute"
+
+  MODULES_MYSQL: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
+
+  MODULES_POSTGRES: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc"
+
+  MODULES_ORACLE: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
+
+  MODULES_MONGODB: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc"
+
+  MODULES_SQLSERVER: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
+
+  MODULES_TIDB: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
+
+  MODULES_OCEANBASE: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
+
+  MODULES_DB2: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
+
+  MODULES_VITESS: "\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
+
+  MODULES_PIPELINE_E2E: "\
+  flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
+
+  MODULES_SOURCE_E2E: "\
+  flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
+
+jobs:
+  compile_and_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: ${{ fromJSON(inputs.flink-version) }}
+    steps:
+      - run: echo "Running CI pipeline for JDK version ${{ matrix.java-version }}"
+      - name: Clean up disk space
+        run: |
+          set -euo pipefail
+
+          echo "Disk space before cleanup"
+          df -h 
+
+          echo "Cleaning up disk space"
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+
+          echo "Disk space after cleanup"
+          df -h
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Set JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Set Maven 3.8.6
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: 3.8.6
+
+      - name: Compile and test
+        timeout-minutes: 60
+        run: |
+          . .github/workflows/utils.sh
+          jvm_timezone=$(random_timezone)
+          echo "JVM timezone is set to $jvm_timezone"
+          set -o pipefail
+
+          case ${{ inputs.module }} in
+              ("core")
+               modules=${{ env.MODULES_CORE }}
+              ;;
+              ("pipeline_connectors")
+               modules=${{ env.MODULES_PIPELINE_CONNECTORS }}
+              ;;
+              ("mysql")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("postgres")
+               modules=${{ env.MODULES_POSTGRES }}
+              ;;
+              ("oracle")
+               modules=${{ env.MODULES_ORACLE }}
+              ;;
+              ("mongodb6")
+               modules=${{ env.MODULES_MONGODB }}
+              ;;
+              ("mongodb7")
+               modules=${{ env.MODULES_MONGODB }}
+              ;;
+              ("sqlserver")
+               modules=${{ env.MODULES_SQLSERVER }}
+              ;;
+              ("tidb")
+               modules=${{ env.MODULES_TIDB }}
+              ;;
+              ("oceanbase")
+               modules=${{ env.MODULES_OCEANBASE }}
+              ;;
+              ("db2")
+               modules=${{ env.MODULES_DB2 }}
+              ;;
+              ("vitess")
+               modules=${{ env.MODULES_VITESS }}
+              ;;
+              ("pipeline_e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
+               modules=${{ env.MODULES_PIPELINE_E2E }}
+              ;;
+              ("source_e2e")
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_SOURCE_E2E }}"
+               modules=${{ env.MODULES_SOURCE_E2E }}
+              ;;
+          esac
+          
+          if [ ${{ inputs.module }} != "pipeline_e2e" ] && [ ${{ inputs.module }} != "source_e2e" ]; then
+            compile_modules=$modules
+          fi
+          
+          build_maven_parameter=""
+
+          if [ ${{ inputs.module }} == "mongodb6" ]; then
+            build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
+          elif [ ${{ inputs.module }} == "mongodb7" ]; then
+            build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
+          fi
+          
+          if [ ! -z "${{ matrix.flink-version }}" ]; then
+            build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }-DspecifiedFlinkVersion=${{ matrix.flink-version }}"
+          fi
+          
+          build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }${{ inputs.custom-maven-parameter }}"
+          
+          mvn --no-snapshot-updates -B -DskipTests -pl $compile_modules -am install && mvn --no-snapshot-updates -B $build_maven_parameter -pl $modules -DspecifiedParallelism=${{ inputs.parallelism }} -Duser.timezone=$jvm_timezone verify
+
+      - name: Print JVM thread dumps when cancelled
+        if: ${{ failure() }}
+        run: |
+          echo "$OSTYPE"
+          if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v sudo &> /dev/null; then
+            echo "Setting up JVM thread dumps"
+            curl -s -L -o /tmp/jattach https://github.com/apangin/jattach/releases/download/v2.1/jattach
+            if command -v sha256sum &> /dev/null; then
+              sha256sum -c <(echo "07885fdc782e02e7302c6d190f54c3930afa10a38140365adf54076ec1086a8e  /tmp/jattach") || exit 1
+            fi
+            chmod +x /tmp/jattach
+            for java_pid in $(sudo pgrep java); do
+              echo "----------------------- pid $java_pid -----------------------"
+              echo "command line: $(sudo cat /proc/$java_pid/cmdline | xargs -0 echo)"
+              sudo /tmp/jattach $java_pid jcmd VM.command_line || true
+              sudo /tmp/jattach $java_pid jcmd "Thread.print -l"
+              sudo /tmp/jattach $java_pid jcmd GC.heap_info || true
+            done
+          else
+            for java_pid in $(jps -q -J-XX:+PerfDisableSharedMem); do
+              echo "----------------------- pid $java_pid -----------------------"
+              jcmd $java_pid VM.command_line || true
+              jcmd $java_pid Thread.print -l
+              jcmd $java_pid GC.heap_info || true
+            done
+          fi
+          exit 0

@@ -25,7 +25,11 @@ import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitI
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.table.types.logical.RowType;
 
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.debezium.data.Envelope;
+import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
@@ -50,6 +54,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
@@ -82,12 +88,7 @@ public class RecordUtils {
     }
 
     public static Struct getStructContainsChunkKey(SourceRecord record) {
-        // If the table has primary keys, chunk key is in the record key struct
-        if (record.key() != null) {
-            return (Struct) record.key();
-        }
-
-        // If the table doesn't have primary keys, chunk key is in the after struct for insert or
+        // Use chunk key in the after struct for insert or
         // the before struct for delete/update
         Envelope.Operation op = Envelope.operationFor(record);
         Struct value = (Struct) record.value();
@@ -109,9 +110,9 @@ public class RecordUtils {
         if (isDataChangeRecord(binlogRecord)) {
             Struct value = (Struct) binlogRecord.value();
             if (value != null) {
-                Struct keyStruct = getStructContainsChunkKey(binlogRecord);
+                Struct chunkKeyStruct = getStructContainsChunkKey(binlogRecord);
                 if (splitKeyRangeContains(
-                        getSplitKey(splitBoundaryType, nameAdjuster, keyStruct),
+                        getSplitKey(splitBoundaryType, nameAdjuster, chunkKeyStruct),
                         splitStart,
                         splitEnd)) {
                     boolean hasPrimaryKey = binlogRecord.key() != null;
@@ -124,7 +125,7 @@ public class RecordUtils {
                                     snapshotRecords,
                                     binlogRecord,
                                     hasPrimaryKey
-                                            ? keyStruct
+                                            ? (Struct) binlogRecord.key()
                                             : createReadOpValue(
                                                     binlogRecord, Envelope.FieldName.AFTER),
                                     false);
@@ -152,7 +153,7 @@ public class RecordUtils {
                             upsertBinlog(
                                     snapshotRecords,
                                     binlogRecord,
-                                    hasPrimaryKey ? keyStruct : structFromAfter,
+                                    hasPrimaryKey ? (Struct) binlogRecord.key() : structFromAfter,
                                     false);
                             break;
                         case DELETE:
@@ -160,7 +161,7 @@ public class RecordUtils {
                                     snapshotRecords,
                                     binlogRecord,
                                     hasPrimaryKey
-                                            ? keyStruct
+                                            ? (Struct) binlogRecord.key()
                                             : createReadOpValue(
                                                     binlogRecord, Envelope.FieldName.BEFORE),
                                     true);
@@ -389,6 +390,40 @@ public class RecordUtils {
         return new TableId(dbName, null, tableName);
     }
 
+    public static SourceRecord setTableId(
+            SourceRecord dataRecord, TableId originalTableId, TableId tableId) {
+        Struct value = (Struct) dataRecord.value();
+        Document historyRecordDocument;
+        try {
+            historyRecordDocument = getHistoryRecord(dataRecord).document();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        HistoryRecord newHistoryRecord =
+                new HistoryRecord(
+                        historyRecordDocument.set(
+                                HistoryRecord.Fields.DDL_STATEMENTS,
+                                historyRecordDocument
+                                        .get(HistoryRecord.Fields.DDL_STATEMENTS)
+                                        .asString()
+                                        .replace(originalTableId.table(), tableId.table())));
+
+        Struct newSource =
+                value.getStruct(Envelope.FieldName.SOURCE)
+                        .put(DATABASE_NAME_KEY, tableId.catalog())
+                        .put(TABLE_NAME_KEY, tableId.table());
+        return dataRecord.newRecord(
+                dataRecord.topic(),
+                dataRecord.kafkaPartition(),
+                dataRecord.keySchema(),
+                dataRecord.key(),
+                dataRecord.valueSchema(),
+                value.put(Envelope.FieldName.SOURCE, newSource)
+                        .put(HISTORY_RECORD_FIELD, newHistoryRecord.toString()),
+                dataRecord.timestamp(),
+                dataRecord.headers());
+    }
+
     public static boolean isTableChangeRecord(SourceRecord dataRecord) {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
@@ -493,5 +528,76 @@ public class RecordUtils {
             return Optional.of(WatermarkKind.valueOf(value.getString(WATERMARK_KIND)));
         }
         return Optional.empty();
+    }
+
+    /**
+     * This utility method checks if given source record is a gh-ost/pt-osc initiated schema change
+     * event by checking the "alter" ddl.
+     */
+    public static boolean isOnLineSchemaChangeEvent(SourceRecord record) {
+        if (!isSchemaChangeEvent(record)) {
+            return false;
+        }
+        Struct value = (Struct) record.value();
+        ObjectMapper mapper = new ObjectMapper();
+        try {
+            // There will be these schema change events generated in total during one transaction.
+            //
+            // gh-ost:
+            // DROP TABLE IF EXISTS `db`.`_tb1_gho`
+            // DROP TABLE IF EXISTS `db`.`_tb1_del`
+            // DROP TABLE IF EXISTS `db`.`_tb1_ghc`
+            // create /* gh-ost */ table `db`.`_tb1_ghc` ...
+            // create /* gh-ost */ table `db`.`_tb1_gho` like `db`.`tb1`
+            // alter /* gh-ost */ table `db`.`_tb1_gho` add column c varchar(255)
+            // create /* gh-ost */ table `db`.`_tb1_del` ...
+            // DROP TABLE IF EXISTS `db`.`_tb1_del`
+            // rename /* gh-ost */ table `db`.`tb1` to `db`.`_tb1_del`
+            // rename /* gh-ost */ table `db`.`_tb1_gho` to `db`.`tb1`
+            // DROP TABLE IF EXISTS `db`.`_tb1_ghc`
+            // DROP TABLE IF EXISTS `db`.`_tb1_del`
+            //
+            // pt-osc:
+            // CREATE TABLE `db`.`_test_tb1_new`
+            // ALTER TABLE `db`.`_test_tb1_new` add column c varchar(50)
+            // CREATE TRIGGER `pt_osc_db_test_tb1_del`...
+            // CREATE TRIGGER `pt_osc_db_test_tb1_upd`...
+            // CREATE TRIGGER `pt_osc_db_test_tb1_ins`...
+            // ANALYZE TABLE `db`.`_test_tb1_new` /* pt-online-schema-change */
+            // RENAME TABLE `db`.`test_tb1` TO `db`.`_test_tb1_old`, `db`.`_test_tb1_new` TO
+            // `db`.`test_tb1`
+            // DROP TABLE IF EXISTS `_test_tb1_old` /* generated by server */
+            // DROP TRIGGER IF EXISTS `db`.`pt_osc_db_test_tb1_del`
+            // DROP TRIGGER IF EXISTS `db`.`pt_osc_db_test_tb1_upd`
+            // DROP TRIGGER IF EXISTS `db`.`pt_osc_db_test_tb1_ins`
+            //
+            // Among all these, we only need the "ALTER" one that happens on the `_gho`/`_new`
+            // table.
+            String ddl =
+                    mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
+                            .get(HistoryRecord.Fields.DDL_STATEMENTS)
+                            .asText()
+                            .toLowerCase();
+            if (ddl.startsWith("alter")) {
+                String tableName =
+                        value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY);
+                return OSC_TABLE_ID_PATTERN.matcher(tableName).matches();
+            }
+
+            return false;
+        } catch (JsonProcessingException e) {
+            return false;
+        }
+    }
+
+    private static final Pattern OSC_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
+
+    /** This utility method peels out gh-ost/pt-osc mangled tableId to the original one. */
+    public static TableId peelTableId(TableId tableId) {
+        Matcher matchingResult = OSC_TABLE_ID_PATTERN.matcher(tableId.table());
+        if (matchingResult.matches()) {
+            return new TableId(tableId.catalog(), tableId.schema(), matchingResult.group(1));
+        }
+        return tableId;
     }
 }

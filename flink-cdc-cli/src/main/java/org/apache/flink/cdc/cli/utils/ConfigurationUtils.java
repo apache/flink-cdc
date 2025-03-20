@@ -18,11 +18,17 @@
 package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.client.deployment.executors.LocalExecutor;
+import org.apache.flink.client.deployment.executors.RemoteExecutor;
+
+import org.apache.commons.cli.CommandLine;
 
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.apache.flink.cdc.cli.CliFrontendOptions.TARGET;
 
 /** Utilities for handling {@link Configuration}. */
 public class ConfigurationUtils {
@@ -61,5 +67,24 @@ public class ConfigurationUtils {
                 });
 
         return flattenedMap;
+    }
+
+    public static boolean isDeploymentMode(CommandLine commandLine) {
+        String target = commandLine.getOptionValue(TARGET);
+        return target != null
+                && !target.equalsIgnoreCase(LocalExecutor.NAME)
+                && !target.equalsIgnoreCase(RemoteExecutor.NAME);
+    }
+
+    public static Class<?> getClaimModeClass() {
+        try {
+            return Class.forName("org.apache.flink.core.execution.RestoreMode");
+        } catch (ClassNotFoundException ignored) {
+            try {
+                return Class.forName("org.apache.flink.runtime.jobgraph.RestoreMode");
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

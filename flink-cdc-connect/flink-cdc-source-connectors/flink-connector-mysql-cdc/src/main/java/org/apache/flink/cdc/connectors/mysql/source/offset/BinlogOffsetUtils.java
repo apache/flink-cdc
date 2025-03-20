@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql.source.offset;
 
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 
 import io.debezium.connector.mysql.MySqlConnection;
 
@@ -45,13 +46,14 @@ public class BinlogOffsetUtils {
      * </ul>
      */
     public static BinlogOffset initializeEffectiveOffset(
-            BinlogOffset offset, MySqlConnection connection) {
+            BinlogOffset offset, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
         BinlogOffsetKind offsetKind = offset.getOffsetKind();
         switch (offsetKind) {
             case EARLIEST:
                 return BinlogOffset.ofBinlogFilePosition("", 0);
             case TIMESTAMP:
-                return DebeziumUtils.findBinlogOffset(offset.getTimestampSec() * 1000, connection);
+                return DebeziumUtils.findBinlogOffset(
+                        offset.getTimestampSec() * 1000, connection, mySqlSourceConfig);
             case LATEST:
                 return DebeziumUtils.currentBinlogOffset(connection);
             default:

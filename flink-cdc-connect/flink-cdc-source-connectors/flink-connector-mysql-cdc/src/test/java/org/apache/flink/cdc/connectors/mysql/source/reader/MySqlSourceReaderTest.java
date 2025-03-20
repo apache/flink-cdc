@@ -99,6 +99,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isH
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
 import static org.apache.flink.util.Preconditions.checkState;
 import static org.junit.Assert.assertEquals;
@@ -149,23 +150,11 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
             snapshotSplits =
                     Collections.singletonList(
                             new MySqlSnapshotSplit(
-                                    tableId0,
-                                    tableId0 + ":0",
-                                    splitType,
-                                    null,
-                                    null,
-                                    null,
-                                    tableSchemas));
+                                    tableId0, 0, splitType, null, null, null, tableSchemas));
             toRemoveSplits =
                     Collections.singletonList(
                             new MySqlSnapshotSplit(
-                                    tableId1,
-                                    tableId1 + ":0",
-                                    splitType,
-                                    null,
-                                    null,
-                                    null,
-                                    tableSchemas));
+                                    tableId1, 0, splitType, null, null, null, tableSchemas));
         }
 
         // Step 1: start source reader and assign snapshot splits
@@ -254,7 +243,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     Arrays.asList(
                             new MySqlSnapshotSplit(
                                     tableId,
-                                    tableId + ":0",
+                                    0,
                                     splitType,
                                     null,
                                     new Integer[] {200},
@@ -262,7 +251,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                                     tableSchemas),
                             new MySqlSnapshotSplit(
                                     tableId,
-                                    tableId + ":1",
+                                    1,
                                     splitType,
                                     new Integer[] {200},
                                     new Integer[] {1500},
@@ -270,7 +259,7 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                                     tableSchemas),
                             new MySqlSnapshotSplit(
                                     tableId,
-                                    tableId + ":2",
+                                    2,
                                     splitType,
                                     new Integer[] {1500},
                                     null,
@@ -416,7 +405,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         tableNames.stream().map(TableId::parse).collect(Collectors.toList()),
-                        false);
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
         List<MySqlSplit> splits = new ArrayList<>();
         MySqlSnapshotSplit split = (MySqlSnapshotSplit) assigner.getNext().get();
@@ -471,7 +461,8 @@ public class MySqlSourceReaderTest extends MySqlSourceTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         Collections.singletonList(TableId.parse(tableName)),
-                        false);
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
         MySqlSnapshotSplit snapshotSplit = (MySqlSnapshotSplit) assigner.getNext().get();
         // should contain only one split

@@ -24,21 +24,21 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Definition
-**Data Source** is used to access metadata and read the changed data from external systems.   
-A Data Source can read data from multiple tables simultaneously.
+# 定义
+**Data Source** 是 用来访问元数据以及从外部系统读取变更数据的组件。
+一个 Data Source 可以同时访问多个表。
 
-# Parameters
-To describe a data source, the follows are required:
+# 参数
+为了定义一个 Data Source，需要提供以下参数：
 
-| parameter                     | meaning                                                                                             | optional/required |
-|-------------------------------|-----------------------------------------------------------------------------------------------------|-------------------|
-| type                          | The type of the source, such as mysql.                                                              | required          |
-| name                          | The name of the source, which is user-defined (a default value provided).                           | optional          |
-| configurations of Data Source | Configurations to build the Data Source e.g. connection configurations and source table properties. | optional          |
+| 参数                            | 含义                                | optional/required |
+|-------------------------------|-----------------------------------|-------------------|
+| type                          | source 的类型，例如 mysql。              | required          |
+| name                          | source 的名称，允许用户配置 (提供了一个默认值)。     | optional          |
+| configurations of Data Source | 用于构建 source 组件的配置，例如连接参数或者表属性的配置。 | optional          |
 
-# Example
-We could use yaml files to define a mysql source:
+# 示例
+我们可以使用yaml文件来定义一个mysql source：
 ```yaml
 source:
     type: mysql

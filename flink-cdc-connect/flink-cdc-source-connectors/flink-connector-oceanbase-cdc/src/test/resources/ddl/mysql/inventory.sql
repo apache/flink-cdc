@@ -17,9 +17,6 @@
 -- DATABASE:  inventory
 -- ----------------------------------------------------------------------------------------------------------------
 
-CREATE DATABASE IF NOT EXISTS inventory;
-USE inventory;
-
 DROP TABLE IF EXISTS products;
 CREATE TABLE products
 (

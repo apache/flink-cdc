@@ -32,6 +32,20 @@ limitations under the License.
             <destName>flink-cdc-dist-${revision}.jar</destName>
             <fileMode>0644</fileMode>
         </file>
+
+        <!-- copy license -->
+        <file>
+            <source>../LICENSE</source>
+            <outputDirectory/>
+            <fileMode>0644</fileMode>
+        </file>
+
+        <!-- copy oss notice -->
+        <file>
+            <source>../NOTICE</source>
+            <outputDirectory/>
+            <fileMode>0644</fileMode>
+        </file>
     </files>
 
     <fileSets>

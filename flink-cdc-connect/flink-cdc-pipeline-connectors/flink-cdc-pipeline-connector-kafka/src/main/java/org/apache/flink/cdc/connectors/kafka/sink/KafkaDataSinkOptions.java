@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.kafka.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.description.Description;
 import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
 import org.apache.flink.connector.base.DeliveryGuarantee;
 
@@ -29,11 +30,31 @@ public class KafkaDataSinkOptions {
     // Prefix for Kafka specific properties.
     public static final String PROPERTIES_PREFIX = "properties.";
 
+    public static final String DELIMITER_TABLE_MAPPINGS = ";";
+
+    public static final String DELIMITER_SELECTOR_TOPIC = ":";
+
     public static final ConfigOption<DeliveryGuarantee> DELIVERY_GUARANTEE =
             key("sink.delivery-guarantee")
                     .enumType(DeliveryGuarantee.class)
                     .defaultValue(DeliveryGuarantee.AT_LEAST_ONCE)
                     .withDescription("Optional delivery guarantee when committing.");
+
+    public static final ConfigOption<PartitionStrategy> PARTITION_STRATEGY =
+            key("partition.strategy")
+                    .enumType(PartitionStrategy.class)
+                    .defaultValue(PartitionStrategy.ALL_TO_ZERO)
+                    .withDescription(
+                            "Defines the strategy for sending record to kafka topic, "
+                                    + "available options are `all-to-zero` and `hash-by-key`, default option is `all-to-zero`.");
+
+    public static final ConfigOption<KeyFormat> KEY_FORMAT =
+            key("key.format")
+                    .enumType(KeyFormat.class)
+                    .defaultValue(KeyFormat.JSON)
+                    .withDescription(
+                            "Defines the format identifier for encoding key data, "
+                                    + "available options are `csv` and `json`, default option is `json`.");
 
     public static final ConfigOption<JsonSerializationType> VALUE_FORMAT =
             key("value.format")
@@ -63,4 +84,20 @@ public class KafkaDataSinkOptions {
                     .defaultValue("")
                     .withDescription(
                             "custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'.");
+
+    public static final ConfigOption<String> SINK_TABLE_ID_TO_TOPIC_MAPPING =
+            key("sink.tableId-to-topic.mapping")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by ")
+                                    .text(DELIMITER_TABLE_MAPPINGS)
+                                    .text(
+                                            ", separate upstream tableId selectors and downstream Kafka topic by ")
+                                    .text(DELIMITER_SELECTOR_TOPIC)
+                                    .text(
+                                            ". For example, we can set 'sink.tableId-to-topic.mappingg' like 'mydb.mytable1:topic1;mydb.mytable2:topic2'.")
+                                    .build());
 }

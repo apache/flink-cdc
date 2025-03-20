@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDisp
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlSnapshotSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -66,6 +67,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
  * range.
@@ -92,6 +96,17 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             new StoppableChangeEventSourceContext();
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
+
+    public SnapshotSplitReader(
+            MySqlSourceConfig sourceConfig, int subtaskId, SnapshotPhaseHooks hooks) {
+        this(
+                new StatefulTaskContext(
+                        sourceConfig,
+                        createBinaryClient(sourceConfig.getDbzConfiguration()),
+                        createMySqlConnection(sourceConfig)),
+                subtaskId,
+                hooks);
+    }
 
     public SnapshotSplitReader(
             StatefulTaskContext statefulTaskContext, int subtaskId, SnapshotPhaseHooks hooks) {
@@ -148,7 +163,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         // Step 2: read binlog events between low and high watermark and backfill
                         // changes into snapshot
                         backfill(snapshotResult, sourceContext);
-
                     } catch (Exception e) {
                         setReadException(e);
                     } finally {
@@ -378,14 +392,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     public void close() {
         try {
             stopCurrentTask();
-            if (statefulTaskContext.getConnection() != null) {
-                statefulTaskContext.getConnection().close();
-            }
-            if (statefulTaskContext.getBinaryLogClient() != null) {
-                statefulTaskContext.getBinaryLogClient().disconnect();
-            }
-            if (statefulTaskContext.getDatabaseSchema() != null) {
-                statefulTaskContext.getDatabaseSchema().close();
+            if (statefulTaskContext != null) {
+                statefulTaskContext.close();
             }
             if (executorService != null) {
                 executorService.shutdown();

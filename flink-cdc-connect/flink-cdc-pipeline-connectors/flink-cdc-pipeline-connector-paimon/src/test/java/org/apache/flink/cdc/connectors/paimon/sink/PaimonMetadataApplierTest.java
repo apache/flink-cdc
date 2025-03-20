@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
@@ -86,6 +87,7 @@ public class PaimonMetadataApplierTest {
         }
         catalogOptions.setString("metastore", metastore);
         catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
         this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         this.catalog.dropDatabase(TEST_DATABASE, true, true);
     }
@@ -94,7 +96,7 @@ public class PaimonMetadataApplierTest {
     @ValueSource(strings = {"filesystem", "hive"})
     public void testApplySchemaChange(String metastore)
             throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         CreateTableEvent createTableEvent =
@@ -122,7 +124,10 @@ public class PaimonMetadataApplierTest {
         addedColumns.add(
                 new AddColumnEvent.ColumnWithPosition(
                         Column.physicalColumn(
-                                "col3", org.apache.flink.cdc.common.types.DataTypes.STRING())));
+                                "col3",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING(),
+                                null,
+                                "col3DefValue")));
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(TableId.parse("test.table1"), addedColumns);
         metadataApplier.applySchemaChange(addColumnEvent);
@@ -134,6 +139,12 @@ public class PaimonMetadataApplierTest {
                                 new DataField(2, "col3", DataTypes.STRING())));
         Assertions.assertEquals(
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
+
+        Assertions.assertEquals(
+                "col3DefValue",
+                catalog.getTable(Identifier.fromString("test.table1"))
+                        .options()
+                        .get("fields.col3.default-value"));
 
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newcol2");
@@ -176,13 +187,109 @@ public class PaimonMetadataApplierTest {
                                 new DataField(2, "newcol3", DataTypes.STRING())));
         Assertions.assertEquals(
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
+
+        // Create table with partition column.
+        createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table_with_partition"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .physicalColumn(
+                                        "dt",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .primaryKey("col1")
+                                .partitionKey("dt")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(0, "col1", DataTypes.STRING().notNull()),
+                                new DataField(1, "col2", DataTypes.INT()),
+                                new DataField(2, "dt", DataTypes.INT().notNull())));
+        Table tableWithPartition =
+                catalog.getTable(Identifier.fromString("test.table_with_partition"));
+        Assertions.assertEquals(tableSchema, tableWithPartition.rowType());
+        Assertions.assertEquals(Arrays.asList("col1", "dt"), tableWithPartition.primaryKeys());
+        // Create table with upper case.
+        catalogOptions.setString("allow-upper-case", "true");
+        metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table_with_upper_case"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "COL1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2", org.apache.flink.cdc.common.types.DataTypes.INT())
+                                .primaryKey("COL1")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(0, "COL1", DataTypes.STRING().notNull()),
+                                new DataField(1, "col2", DataTypes.INT())));
+        Assertions.assertEquals(
+                tableSchema,
+                catalog.getTable(Identifier.fromString("test.table_with_upper_case")).rowType());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    public void testCreateTableWithoutPrimaryKey(String metastore)
+            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table1"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .physicalColumn(
+                                        "col3",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .physicalColumn(
+                                        "col4",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        Table table = catalog.getTable(Identifier.fromString("test.table1"));
+        RowType tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(0, "col1", DataTypes.STRING().notNull()),
+                                new DataField(1, "col2", DataTypes.STRING()),
+                                new DataField(2, "col3", DataTypes.STRING()),
+                                new DataField(3, "col4", DataTypes.STRING())));
+        Assertions.assertEquals(tableSchema, table.rowType());
+        Assertions.assertEquals(new ArrayList<>(), table.primaryKeys());
+        Assertions.assertEquals(new ArrayList<>(), table.partitionKeys());
+        Assertions.assertEquals("-1", table.options().get("bucket"));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithOptions(String metastore)
             throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -216,10 +323,10 @@ public class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "col2", DataTypes.STRING()),
-                                new DataField(2, "col3", DataTypes.STRING()),
-                                new DataField(3, "col4", DataTypes.STRING())));
+                                new DataField(2, "col3", DataTypes.STRING().notNull()),
+                                new DataField(3, "col4", DataTypes.STRING().notNull())));
         Assertions.assertEquals(tableSchema, table.rowType());
-        Assertions.assertEquals(Collections.singletonList("col1"), table.primaryKeys());
+        Assertions.assertEquals(Arrays.asList("col1", "col3", "col4"), table.primaryKeys());
         Assertions.assertEquals(Arrays.asList("col3", "col4"), table.partitionKeys());
         Assertions.assertEquals("-1", table.options().get("bucket"));
     }
@@ -228,7 +335,7 @@ public class PaimonMetadataApplierTest {
     @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithAllDataTypes(String metastore)
             throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException {
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         CreateTableEvent createTableEvent =
@@ -338,7 +445,7 @@ public class PaimonMetadataApplierTest {
     @ValueSource(strings = {"filesystem", "hive"})
     public void testAddColumnWithPosition(String metastore)
             throws Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException,
-                    Catalog.TableNotExistException {
+                    Catalog.TableNotExistException, SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
 
@@ -377,6 +484,13 @@ public class PaimonMetadataApplierTest {
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());
 
         addedColumns.clear();
+
+        addedColumns.add(
+                AddColumnEvent.before(
+                        Column.physicalColumn(
+                                "col4_first_before",
+                                org.apache.flink.cdc.common.types.DataTypes.STRING()),
+                        "col1"));
         addedColumns.add(
                 AddColumnEvent.first(
                         Column.physicalColumn(
@@ -405,13 +519,14 @@ public class PaimonMetadataApplierTest {
         tableSchema =
                 new RowType(
                         Arrays.asList(
-                                new DataField(3, "col4_first", DataTypes.STRING()),
+                                new DataField(4, "col4_first", DataTypes.STRING()),
+                                new DataField(3, "col4_first_before", DataTypes.STRING()),
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
-                                new DataField(5, "col6_before", DataTypes.STRING()),
+                                new DataField(6, "col6_before", DataTypes.STRING()),
                                 new DataField(1, "col2", DataTypes.INT()),
-                                new DataField(6, "col7_after", DataTypes.STRING()),
+                                new DataField(7, "col7_after", DataTypes.STRING()),
                                 new DataField(2, "col3", DataTypes.STRING()),
-                                new DataField(4, "col5_last", DataTypes.STRING())));
+                                new DataField(5, "col5_last", DataTypes.STRING())));
 
         Assertions.assertEquals(
                 tableSchema, catalog.getTable(Identifier.fromString("test.table1")).rowType());

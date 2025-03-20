@@ -115,13 +115,14 @@ public class KafkaUtil {
      * @throws KafkaException
      */
     public static List<ConsumerRecord<byte[], byte[]>> drainAllRecordsFromTopic(
-            String topic, Properties properties, boolean committed) throws KafkaException {
+            String topic, Properties properties, boolean committed, Set<Integer> partitions)
+            throws KafkaException {
         final Properties consumerConfig = new Properties();
         consumerConfig.putAll(properties);
         consumerConfig.put(
                 ConsumerConfig.ISOLATION_LEVEL_CONFIG,
                 committed ? "read_committed" : "read_uncommitted");
-        return drainAllRecordsFromTopic(topic, consumerConfig);
+        return drainAllRecordsFromTopic(topic, consumerConfig, partitions);
     }
 
     /**
@@ -137,13 +138,17 @@ public class KafkaUtil {
      * @throws KafkaException
      */
     public static List<ConsumerRecord<byte[], byte[]>> drainAllRecordsFromTopic(
-            String topic, Properties properties) throws KafkaException {
+            String topic, Properties properties, Set<Integer> partitions) throws KafkaException {
         final Properties consumerConfig = new Properties();
         consumerConfig.putAll(properties);
         consumerConfig.put("key.deserializer", ByteArrayDeserializer.class.getName());
         consumerConfig.put("value.deserializer", ByteArrayDeserializer.class.getName());
         try (KafkaConsumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerConfig)) {
             Set<TopicPartition> topicPartitions = getAllPartitions(consumer, topic);
+            if (!partitions.isEmpty()) {
+                topicPartitions.removeIf(
+                        topicPartition -> !partitions.contains(topicPartition.partition()));
+            }
             Map<TopicPartition, Long> endOffsets = consumer.endOffsets(topicPartitions);
             consumer.assign(topicPartitions);
             consumer.seekToBeginning(topicPartitions);

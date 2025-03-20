@@ -19,12 +19,13 @@ package org.apache.flink.cdc.runtime.operators.sink;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.runtime.operators.schema.SchemaOperator;
-import org.apache.flink.cdc.runtime.operators.schema.coordinator.SchemaRegistry;
-import org.apache.flink.cdc.runtime.operators.schema.event.FlushSuccessEvent;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaRequest;
-import org.apache.flink.cdc.runtime.operators.schema.event.GetSchemaResponse;
-import org.apache.flink.cdc.runtime.operators.schema.event.SinkWriterRegisterEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.common.event.SinkWriterRegisterEvent;
+import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.util.SerializedValue;
@@ -32,11 +33,11 @@ import org.apache.flink.util.SerializedValue;
 import java.io.IOException;
 import java.util.Optional;
 
-import static org.apache.flink.cdc.runtime.operators.schema.event.CoordinationResponseUtils.unwrap;
+import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 
 /**
- * Client for {@link DataSinkWriterOperator} interact with {@link SchemaRegistry} when table schema
- * evolution happened.
+ * Client for {@link DataSinkWriterOperator} interact with Schema Registry (Could be distributed or
+ * regular) when table schema evolution happened.
  */
 public class SchemaEvolutionClient {
 
@@ -51,27 +52,40 @@ public class SchemaEvolutionClient {
         this.schemaOperatorID = schemaOperatorID;
     }
 
-    /** send {@link SinkWriterRegisterEvent} to {@link SchemaRegistry}. */
+    /** send {@link SinkWriterRegisterEvent} to Schema Registry. */
     public void registerSubtask(int subtask) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
                 schemaOperatorID, new SerializedValue<>(new SinkWriterRegisterEvent(subtask)));
     }
 
-    /** send {@link FlushSuccessEvent} to {@link SchemaRegistry}. */
-    public void notifyFlushSuccess(int subtask, TableId tableId) throws IOException {
+    /** send {@link FlushSuccessEvent} to Schema Registry. */
+    public void notifyFlushSuccess(int subtask, int sourceSubTaskId) throws IOException {
         toCoordinator.sendOperatorEventToCoordinator(
-                schemaOperatorID, new SerializedValue<>(new FlushSuccessEvent(subtask, tableId)));
+                schemaOperatorID,
+                new SerializedValue<>(new FlushSuccessEvent(subtask, sourceSubTaskId)));
     }
 
-    public Optional<Schema> getLatestSchema(TableId tableId) throws Exception {
-        GetSchemaResponse getSchemaResponse =
+    public Optional<Schema> getLatestEvolvedSchema(TableId tableId) throws Exception {
+        GetEvolvedSchemaResponse getEvolvedSchemaResponse =
                 unwrap(
                         toCoordinator
                                 .sendRequestToCoordinator(
                                         schemaOperatorID,
                                         new SerializedValue<>(
-                                                GetSchemaRequest.ofLatestSchema(tableId)))
+                                                GetEvolvedSchemaRequest.ofLatestSchema(tableId)))
                                 .get());
-        return getSchemaResponse.getSchema();
+        return getEvolvedSchemaResponse.getSchema();
+    }
+
+    public Optional<Schema> getLatestOriginalSchema(TableId tableId) throws Exception {
+        GetOriginalSchemaResponse getOriginalSchemaResponse =
+                unwrap(
+                        toCoordinator
+                                .sendRequestToCoordinator(
+                                        schemaOperatorID,
+                                        new SerializedValue<>(
+                                                GetOriginalSchemaRequest.ofLatestSchema(tableId)))
+                                .get());
+        return getOriginalSchemaResponse.getSchema();
     }
 }

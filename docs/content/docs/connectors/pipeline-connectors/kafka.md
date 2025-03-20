@@ -86,6 +86,20 @@ Pipeline Connector Options
       <td>The name of the sink.</td>
     </tr>
     <tr>
+      <td>partition.strategy</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Defines the strategy for sending record to kafka topic, available options are `all-to-zero`(sending all records to 0 partition) and `hash-by-key`(distributing all records by hash of primary keys), default option is `all-to-zero`. </td>
+    </tr>
+    <tr>
+      <td>key.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Defines the format identifier for encoding key data, available options are `csv` and `json`, default option is `json`. </td>
+    </tr>
+    <tr>
       <td>value.format</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
@@ -127,6 +141,13 @@ Pipeline Connector Options
       <td>String</td>
       <td>custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'. </td>
     </tr>
+    <tr>
+      <td>sink.tableId-to-topic.mapping</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by `;`, separate upstream tableId and downstream Kafka topic by `:`, For example, we can set `sink.tableId-to-topic.mapping` like `mydb.mytable1:topic1;mydb.mytable2:topic2`. </td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -137,6 +158,47 @@ Usage Notes
 * The written topic of Kafka will be `namespace.schemaName.tableName` string of TableId，this can be changed using route function of pipeline.
 
 * If the written topic of Kafka is not existed, we will create one automatically.
+
+### Output Format
+For different built-in `value.format` options, the output format is different:
+#### debezium-json
+Refer to [Debezium docs](https://debezium.io/documentation/reference/1.9/connectors/mysql.html), debezium-json format will contains `before`,`after`,`op`,`source` elements, but `ts_ms` is not included in `source`.    
+An output example is:
+```json
+{
+  "before": null,
+  "after": {
+    "col1": "1",
+    "col2": "1"
+  },
+  "op": "c",
+  "source": {
+    "db": "default_namespace",
+    "table": "table1"
+  }
+}
+```
+
+#### canal-json
+Refer to [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata), canal-json format will contains `old`,`data`,`type`,`database`,`table`,`pkNames` elements, but `ts` is not included.      
+An output example is:
+```json
+{
+    "old": null,
+    "data": [
+        {
+            "col1": "1",
+            "col2": "1"
+        }
+    ],
+    "type": "INSERT",
+    "database": "default_schema",
+    "table": "table1",
+    "pkNames": [
+        "col1"
+    ]
+}
+```
 
 Data Type Mapping
 ----------------

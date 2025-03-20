@@ -38,9 +38,16 @@ public abstract class Column implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    protected static final String FIELD_FORMAT_WITH_DESCRIPTION = "%s %s '%s'";
+    protected static final String FIELD_FORMAT_WITH_DESCRIPTION_NO_DEFAULT_VALUE_EXPRESSION =
+            "%s %s '%s'";
 
-    protected static final String FIELD_FORMAT_NO_DESCRIPTION = "%s %s";
+    protected static final String FIELD_FORMAT_NO_DESCRIPTION_WITH_DEFAULT_VALUE_EXPRESSION =
+            "%s %s '%s'";
+
+    protected static final String FIELD_FORMAT_WITH_DESCRIPTION_WITH_DEFAULT_VALUE_EXPRESSION =
+            "%s %s '%s' '%s'";
+
+    protected static final String FIELD_FORMAT_NO_DESCRIPTION_NO_DEFAULT_VALUE_EXPRESSION = "%s %s";
 
     protected final String name;
 
@@ -48,10 +55,29 @@ public abstract class Column implements Serializable {
 
     protected final @Nullable String comment;
 
+    /**
+     * Save the literal value of the column's default value, For uncertain functions such as UUID(),
+     * the value is null, For the current time function such as CURRENT_TIMESTAMP(), the value is
+     * Unix Epoch time(1970-01-01 00:00:00).
+     */
+    protected final @Nullable String defaultValueExpression;
+
     protected Column(String name, DataType type, @Nullable String comment) {
         this.name = name;
         this.type = type;
         this.comment = comment;
+        this.defaultValueExpression = null;
+    }
+
+    protected Column(
+            String name,
+            DataType type,
+            @Nullable String comment,
+            @Nullable String defaultValueExpression) {
+        this.name = name;
+        this.type = type;
+        this.comment = comment;
+        this.defaultValueExpression = defaultValueExpression;
     }
 
     /** Returns the name of this column. */
@@ -69,17 +95,41 @@ public abstract class Column implements Serializable {
         return comment;
     }
 
+    @Nullable
+    public String getDefaultValueExpression() {
+        return defaultValueExpression;
+    }
+
     /** Returns a string that summarizes this column for printing to a console. */
     public String asSummaryString() {
         if (comment == null) {
-            return String.format(
-                    FIELD_FORMAT_NO_DESCRIPTION, escapeIdentifier(name), type.asSummaryString());
+            if (defaultValueExpression == null) {
+                return String.format(
+                        FIELD_FORMAT_NO_DESCRIPTION_NO_DEFAULT_VALUE_EXPRESSION,
+                        escapeIdentifier(name),
+                        type.asSummaryString());
+            } else {
+                return String.format(
+                        FIELD_FORMAT_NO_DESCRIPTION_WITH_DEFAULT_VALUE_EXPRESSION,
+                        escapeIdentifier(name),
+                        type.asSummaryString(),
+                        defaultValueExpression);
+            }
         } else {
-            return String.format(
-                    FIELD_FORMAT_WITH_DESCRIPTION,
-                    escapeIdentifier(name),
-                    type.asSummaryString(),
-                    escapeSingleQuotes(comment));
+            if (defaultValueExpression == null) {
+                return String.format(
+                        FIELD_FORMAT_WITH_DESCRIPTION_NO_DEFAULT_VALUE_EXPRESSION,
+                        escapeIdentifier(name),
+                        type.asSummaryString(),
+                        escapeSingleQuotes(comment));
+            } else {
+                return String.format(
+                        FIELD_FORMAT_WITH_DESCRIPTION_WITH_DEFAULT_VALUE_EXPRESSION,
+                        escapeIdentifier(name),
+                        type.asSummaryString(),
+                        escapeSingleQuotes(comment),
+                        defaultValueExpression);
+            }
         }
     }
 
@@ -103,17 +153,27 @@ public abstract class Column implements Serializable {
         Column column = (Column) o;
         return name.equals(column.name)
                 && type.equals(column.type)
-                && Objects.equals(comment, column.comment);
+                && Objects.equals(comment, column.comment)
+                && Objects.equals(defaultValueExpression, column.defaultValueExpression);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, type, comment);
+        return Objects.hash(name, type, comment, defaultValueExpression);
     }
 
     @Override
     public String toString() {
         return asSummaryString();
+    }
+
+    /** Creates a physical column. */
+    public static PhysicalColumn physicalColumn(
+            String name,
+            DataType type,
+            @Nullable String comment,
+            @Nullable String defaultValueExpression) {
+        return new PhysicalColumn(name, type, comment, defaultValueExpression);
     }
 
     /** Creates a physical column. */

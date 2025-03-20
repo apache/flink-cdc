@@ -148,7 +148,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             splitColumn =
                     ChunkUtils.getChunkKeyColumn(
                             currentSplittingTable, sourceConfig.getChunkKeyColumns());
-            splitType = ChunkUtils.getChunkKeyColumnType(splitColumn);
+            splitType =
+                    ChunkUtils.getChunkKeyColumnType(
+                            splitColumn, sourceConfig.isTreatTinyInt1AsBoolean());
             minMaxOfSplitColumn =
                     StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
@@ -314,8 +316,15 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 break;
             }
         }
-        // add the ending split
-        splits.add(ChunkRange.of(chunkStart, null));
+        // add the unbounded split
+        // assign unbounded split first, both the largest and smallest unbounded chunks are
+        // completed
+        // in the first two splits
+        if (sourceConfig.isAssignUnboundedChunkFirst()) {
+            splits.add(0, ChunkRange.of(chunkStart, null));
+        } else {
+            splits.add(ChunkRange.of(chunkStart, null));
+        }
         return splits;
     }
 
@@ -369,13 +378,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         Map<TableId, TableChange> schema = new HashMap<>();
         schema.put(tableId, mySqlSchema.getTableSchema(partition, jdbc, tableId));
         return new MySqlSnapshotSplit(
-                tableId,
-                splitId(tableId, chunkId),
-                splitKeyType,
-                splitStart,
-                splitEnd,
-                null,
-                schema);
+                tableId, chunkId, splitKeyType, splitStart, splitEnd, null, schema);
     }
 
     // ------------------------------------------------------------------------------------------
@@ -391,7 +394,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             Object max,
             int chunkSize,
             long approximateRowCnt) {
-        if (!isEvenlySplitColumn(splitColumn)) {
+        if (!isEvenlySplitColumn(splitColumn, sourceConfig.isTreatTinyInt1AsBoolean())) {
             return -1;
         }
         final double distributionFactorUpper = sourceConfig.getDistributionFactorUpper();
@@ -416,8 +419,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
     }
 
     /** Checks whether split column is evenly distributed across its range. */
-    private static boolean isEvenlySplitColumn(Column splitColumn) {
-        DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn);
+    private static boolean isEvenlySplitColumn(Column splitColumn, boolean tinyInt1isBit) {
+        DataType flinkType = MySqlTypeUtils.fromDbzColumn(splitColumn, tinyInt1isBit);
         LogicalTypeRoot typeRoot = flinkType.getLogicalType().getTypeRoot();
 
         // currently, we only support the optimization that split column with type BIGINT, INT,
@@ -453,10 +456,6 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 max,
                 approximateRowCnt);
         return distributionFactor;
-    }
-
-    private static String splitId(TableId tableId, int chunkId) {
-        return tableId.toString() + ":" + chunkId;
     }
 
     private static void maySleep(int count, TableId tableId) {

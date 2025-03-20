@@ -22,10 +22,8 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
-import org.apache.flink.cdc.runtime.operators.transform.TransformSchemaOperator;
 
 import org.junit.After;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -42,8 +40,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.IntStream;
 
-/** E2e tests for the {@link TransformSchemaOperator}. */
+/** E2e tests for routing features. */
 @RunWith(Parameterized.class)
 public class RouteE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(RouteE2eITCase.class);
@@ -56,6 +55,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final long EVENT_DEFAULT_TIMEOUT = 60000L;
+    protected static final int TEST_TABLE_NUMBER = 100;
 
     @ClassRule
     public static final MySqlContainer MYSQL =
@@ -73,6 +73,9 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
 
     protected final UniqueDatabase routeTestDatabase =
             new UniqueDatabase(MYSQL, "route_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
+    protected final UniqueDatabase extremeRouteTestDatabase =
+            new UniqueDatabase(MYSQL, "extreme_route_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
     @Before
     public void before() throws Exception {
@@ -155,11 +158,12 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -222,7 +226,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
                 "RenameColumnEvent{tableId=%s.TABLEBETA, nameMapping={VERSION=VERSION_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[10002, 15], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VARCHAR(19)}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, typeMapping={VERSION=VARCHAR(19)}, oldTypeMapping={VERSION=VARCHAR(17)}}",
                 "RenameColumnEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}");
@@ -249,13 +253,14 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: %s.ALL\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -302,11 +307,11 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         generateSchemaChanges();
 
         validateResult(
-                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
-                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=AFTER, existedColumnName=NAME}]}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[10002, null, null, 15], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.ALL, nameMapping={VERSION=STRING}}",
+                "AlterColumnTypeEvent{tableId=%s.ALL, typeMapping={VERSION=STRING}, oldTypeMapping={VERSION=VARCHAR(17)}}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[10003, null, null, Fluorite], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[10004, null, null, null], op=INSERT, meta=()}");
     }
@@ -332,13 +337,14 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.ALPHABET\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -395,11 +401,11 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         generateSchemaChanges();
 
         validateResult(
-                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
-                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=AFTER, existedColumnName=NAME}]}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10002, null, null, 15], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VARCHAR(19)}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, typeMapping={VERSION=VARCHAR(19)}, oldTypeMapping={VERSION=VARCHAR(17)}}",
                 "RenameColumnEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}",
@@ -429,7 +435,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.BETAGAMM\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -437,7 +443,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -499,13 +506,13 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
         generateSchemaChanges();
 
         validateResult(
-                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
-                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
-                "AddColumnEvent{tableId=NEW_%s.BETAGAMM, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=AFTER, existedColumnName=NAME}]}",
+                "AddColumnEvent{tableId=NEW_%s.BETAGAMM, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[10002, null, null, 15], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[10002, null, 15], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=NEW_%s.BETAGAMM, nameMapping={VERSION=STRING}}",
+                "AlterColumnTypeEvent{tableId=NEW_%s.BETAGAMM, typeMapping={VERSION=STRING}, oldTypeMapping={VERSION=VARCHAR(17)}}",
                 "DataChangeEvent{tableId=NEW_%s.BETAGAMM, before=[], after=[10003, null, Fluorite], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}",
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[10004], op=INSERT, meta=()}");
@@ -536,7 +543,7 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "    sink-table: NEW_%s.TABLEC\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: 1",
+                                + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -546,7 +553,8 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        routeTestDatabase.getDatabaseName());
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -617,25 +625,304 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
                 "RenameColumnEvent{tableId=%s.TABLEBETA, nameMapping={VERSION=VERSION_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[10002, 15], op=INSERT, meta=()}",
-                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VARCHAR(19)}}",
+                "AlterColumnTypeEvent{tableId=%s.TABLEGAMMA, typeMapping={VERSION=VARCHAR(19)}, oldTypeMapping={VERSION=VARCHAR(17)}}",
                 "RenameColumnEvent{tableId=%s.TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
                 "DataChangeEvent{tableId=%s.TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
                 "DropColumnEvent{tableId=%s.TABLEDELTA, droppedColumnNames=[VERSION]}",
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[10004], op=INSERT, meta=()}");
     }
 
+    @Test
+    public void testMergeTableRouteWithTransform() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    projection: \\*, 'extras' AS EXTRAS\n"
+                                + "route:\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    sink-table: %s.ALL\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        routeTestDatabase.getDatabaseName(),
+                        routeTestDatabase.getDatabaseName(),
+                        routeTestDatabase.getDatabaseName(),
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`EXTRAS` STRING}, primaryKeys=ID, options=()}",
+                        routeTestDatabase.getDatabaseName()));
+
+        validateResult(
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1008, 8, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1009, 8.1, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1010, 10, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[1011, 11, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2011, 11, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2012, 12, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2013, 13, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[2014, 14, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3015, Amber, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3016, Black, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3017, Cyan, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3018, Denim, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4019, Yosemite, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4020, El Capitan, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4021, Sierra, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4022, High Sierra, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4023, Mojave, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[4024, Catalina, extras], op=INSERT, meta=()}");
+
+        LOG.info("Begin incremental reading stage.");
+
+        // generate binlogs
+        generateIncrementalChanges();
+
+        validateResult(
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3007, 7, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[2014, 14, extras], after=[2014, 2014, extras], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[3019, Emerald, extras], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[4024, Catalina, extras], after=[], op=DELETE, meta=()}");
+
+        LOG.info("Begin schema changing stage.");
+        generateSchemaChanges();
+
+        validateResult(
+                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=EXTRAS}]}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10001, 12, extras, Derrida], op=INSERT, meta=()}",
+                "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`VERSION_EX` VARCHAR(17), position=AFTER, existedColumnName=NAME}]}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10002, null, extras, null, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=%s.ALL, typeMapping={VERSION=STRING}, oldTypeMapping={VERSION=VARCHAR(17)}}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10003, null, extras, null, Fluorite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.ALL, before=[], after=[10004, null, extras, null, null], op=INSERT, meta=()}");
+    }
+
+    @Test
+    public void testReplacementSymbol() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "route:\n"
+                                + "  - source-table: %s.\\.*\n"
+                                + "    sink-table: NEW_%s.NEW_<>\n"
+                                + "    replace-symbol: <>\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        routeTestDatabase.getDatabaseName(),
+                        routeTestDatabase.getDatabaseName(),
+                        routeTestDatabase.getDatabaseName(),
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        routeTestDatabase.getDatabaseName()));
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        routeTestDatabase.getDatabaseName()));
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        routeTestDatabase.getDatabaseName()));
+        waitUntilSpecificEvent(
+                String.format(
+                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                        routeTestDatabase.getDatabaseName()));
+
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1008, 8], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1010, 10], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEBETA, before=[], after=[2011, 11], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEBETA, before=[], after=[2012, 12], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEBETA, before=[], after=[2013, 13], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEBETA, before=[], after=[2014, 14], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, before=[], after=[3015, Amber], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, before=[], after=[3016, Black], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, before=[], after=[3017, Cyan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, before=[], after=[3018, Denim], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4019, Yosemite], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4020, El Capitan], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4021, Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
+
+        LOG.info("Begin incremental reading stage.");
+
+        generateIncrementalChanges();
+
+        validateResult(
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[3007, 7], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEBETA, before=[2014, 14], after=[2014, 2014], op=UPDATE, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, before=[], after=[3019, Emerald], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
+
+        generateSchemaChanges();
+        validateResult(
+                "AddColumnEvent{tableId=NEW_%s.NEW_TABLEALPHA, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[10001, 12, Derrida], op=INSERT, meta=()}",
+                "RenameColumnEvent{tableId=NEW_%s.NEW_TABLEBETA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEBETA, before=[], after=[10002, 15], op=INSERT, meta=()}",
+                "AlterColumnTypeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, typeMapping={VERSION=VARCHAR(19)}, oldTypeMapping={VERSION=VARCHAR(17)}}",
+                "RenameColumnEvent{tableId=NEW_%s.NEW_TABLEGAMMA, nameMapping={VERSION=VERSION_EX}}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEGAMMA, before=[], after=[10003, Fluorite], op=INSERT, meta=()}",
+                "DropColumnEvent{tableId=NEW_%s.NEW_TABLEDELTA, droppedColumnNames=[VERSION]}",
+                "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[10004], op=INSERT, meta=()}");
+    }
+
+    @Test
+    public void testExtremeMergeTableRoute() throws Exception {
+        final String databaseName = extremeRouteTestDatabase.getDatabaseName();
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                MYSQL.getJdbcUrl(), MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute(String.format("CREATE DATABASE %s;", databaseName));
+            stat.execute(String.format("USE %s;", databaseName));
+            for (int i = 1; i <= TEST_TABLE_NUMBER; i++) {
+                stat.execute(String.format("DROP TABLE IF EXISTS TABLE%d;", i));
+                stat.execute(
+                        String.format(
+                                "CREATE TABLE TABLE%d (ID INT NOT NULL PRIMARY KEY,VERSION VARCHAR(17));",
+                                i));
+                stat.execute(String.format("INSERT INTO TABLE%d VALUES (%d, 'No.%d');", i, i, i));
+            }
+        } catch (SQLException e) {
+            LOG.error("Initialize table failed.", e);
+            throw e;
+        }
+        LOG.info("Table initialized successfully.");
+
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: values\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        databaseName,
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+
+        // In single parallelism mode, sink will not print out the "subTaskId>" prefix.
+        String prefix = parallelism > 1 ? "> " : "";
+
+        LOG.info("Verifying CreateTableEvents...");
+        validateResult(
+                180_000L,
+                IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
+                        .mapToObj(
+                                i ->
+                                        String.format(
+                                                prefix
+                                                        + "CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                                                databaseName,
+                                                i))
+                        .toArray(String[]::new));
+
+        LOG.info("Verifying DataChangeEvents...");
+        validateResult(
+                180_000L,
+                IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
+                        .mapToObj(
+                                i ->
+                                        String.format(
+                                                prefix
+                                                        + "DataChangeEvent{tableId=%s.TABLE%d, before=[], after=[%d, No.%d], op=INSERT, meta=()}",
+                                                databaseName,
+                                                i,
+                                                i,
+                                                i))
+                        .toArray(String[]::new));
+        extremeRouteTestDatabase.dropDatabase();
+    }
+
     private void validateResult(String... expectedEvents) throws Exception {
+        validateResult(EVENT_DEFAULT_TIMEOUT, expectedEvents);
+    }
+
+    private void validateResult(long timeout, String... expectedEvents) throws Exception {
         for (String event : expectedEvents) {
-            waitUntilSpecificEvent(String.format(event, routeTestDatabase.getDatabaseName()));
+            waitUntilSpecificEvent(
+                    timeout, String.format(event, routeTestDatabase.getDatabaseName()));
         }
     }
 
     private void waitUntilSpecificEvent(String event) throws Exception {
+        waitUntilSpecificEvent(EVENT_DEFAULT_TIMEOUT, event);
+    }
+
+    private void waitUntilSpecificEvent(long timeout, String event) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + EVENT_DEFAULT_TIMEOUT;
+        long endTimeout = System.currentTimeMillis() + timeout;
         while (System.currentTimeMillis() < endTimeout) {
             String stdout = taskManagerConsumer.toUtf8String();
-            if (stdout.contains(event)) {
+            if (stdout.contains(event + "\n")) {
                 result = true;
                 break;
             }
@@ -648,9 +935,5 @@ public class RouteE2eITCase extends PipelineTestEnvironment {
                             + " from stdout: "
                             + taskManagerConsumer.toUtf8String());
         }
-    }
-
-    private void assertNotExists(String event) {
-        Assert.assertFalse(taskManagerConsumer.toUtf8String().contains(event));
     }
 }

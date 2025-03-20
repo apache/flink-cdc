@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -80,6 +81,7 @@ public class IncrementalSourceEnumerator
     private Boundedness boundedness;
 
     @Nullable protected Integer streamSplitTaskId = null;
+    private boolean isStreamSplitUpdateRequestAlreadySent = false;
 
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
@@ -187,7 +189,7 @@ public class IncrementalSourceEnumerator
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
         LOG.info("Closing enumerator...");
         splitAssigner.close();
     }
@@ -271,10 +273,12 @@ public class IncrementalSourceEnumerator
     }
 
     private void requestStreamSplitUpdateIfNeed() {
-        if (isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
+        if (!isStreamSplitUpdateRequestAlreadySent
+                && isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
             // If enumerator knows which reader is assigned stream split, just send to this reader,
             // nor sends to all registered readers.
             if (streamSplitTaskId != null) {
+                isStreamSplitUpdateRequestAlreadySent = true;
                 LOG.info(
                         "The enumerator requests subtask {} to update the stream split after newly added table.",
                         streamSplitTaskId);
@@ -282,6 +286,7 @@ public class IncrementalSourceEnumerator
                         streamSplitTaskId, new StreamSplitUpdateRequestEvent());
             } else {
                 for (int reader : getRegisteredReader()) {
+                    isStreamSplitUpdateRequestAlreadySent = true;
                     LOG.info(
                             "The enumerator requests subtask {} to update the stream split after newly added table.",
                             reader);

@@ -172,8 +172,7 @@ pipeline:
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> MySQL CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset" 和 "timestamp"。
-           请查阅 <a href="#a-name-id-002-a">启动模式</a> 章节了解更多详细信息。</td>
+         合法的模式为 "initial"，"earliest-offset"，"latest-offset"，"specific-offset"，"timestamp" 和 ""snapshot"。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.file</td>
@@ -195,6 +194,13 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>在 "specific-offset" 启动模式下，启动位点的 GTID 集合。</td>
+    </tr>
+    <tr>
+      <td>scan.startup.timestamp-millis</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>在 "timestamp" 启动模式下，启动位点的毫秒时间戳。</td>
     </tr>
     <tr>
       <td>scan.startup.specific-offset.skip-events</td>
@@ -262,6 +268,70 @@ pipeline:
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。<br>
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
+    <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
+    </tr>
+    <tr>
+      <td>scan.binlog.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>在 binlog 读取阶段，是否读取新增表的表结构变更和数据变更，默认值是 false。 <br>
+          scan.newly-added-table.enabled 和 scan.binlog.newly-added-table.enabled 参数的不同在于: <br>
+          scan.newly-added-table.enabled: 在作业重启后，对新增表的全量和增量数据进行读取; <br>
+          scan.binlog.newly-added-table.enabled: 只在 binlog 读取阶段读取新增表的增量数据。
+      </td>
+    </tr>
+    <tr>
+      <td>scan.parse.online.schema.changes.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
+        这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
+        <br>
+        这是一项实验性功能。
+      </td>
+    </tr>
+    <tr>
+      <td>include-comments.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用同步表、字段注释特性，默认关闭。注意：开启此特性将会对内存使用产生影响。</td>
+    </tr>
+    <tr>
+      <td>treat-tinyint1-as-boolean.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否将TINYINT(1)类型当做Boolean类型处理，默认true。</td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这是一项实验特性，默认为 false。
+      </td>
+    </tr>
+    <tr>
+      <td>metadata.list</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>String</td>
+      <td>
+        可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -274,6 +344,7 @@ pipeline:
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 binlog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
 - `specific-offset`：跳过快照阶段，从指定的 binlog 位点开始读取。位点可通过 binlog 文件名和位置指定，或者在 GTID 在集群上启用时通过 GTID 集合指定。
 - `timestamp`：跳过快照阶段，从指定的时间戳开始读取 binlog 事件。
+- `snapshot`: 只进行快照阶段，跳过增量阶段，快照阶段读取结束后退出。
 
 例如，可以在 YAML 配置文件中这样指定启动模式：
 
@@ -284,12 +355,33 @@ source:
   scan.startup.mode: latest-offset                      # Start from latest offset
   scan.startup.mode: specific-offset                    # Start from specific offset
   scan.startup.mode: timestamp                          # Start from timestamp
+  scan.startup.mode: snapshot                          # Read snapshot only
   scan.startup.specific-offset.file: 'mysql-bin.000003' # Binlog filename under specific offset startup mode
   scan.startup.specific-offset.pos: 4                   # Binlog position under specific offset mode
   scan.startup.specific-offset.gtid-set: 24DA167-...    # GTID set under specific offset startup mode
   scan.startup.timestamp-millis: 1667232000000          # Timestamp under timestamp startup mode
   # ...
 ```
+
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 MySQL，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
 
 ## 数据类型映射
 
@@ -367,7 +459,10 @@ source:
         DOUBLE UNSIGNED ZEROFILL<br>
         DOUBLE PRECISION<br>
         DOUBLE PRECISION UNSIGNED<br>
-        DOUBLE PRECISION UNSIGNED ZEROFILL
+        DOUBLE PRECISION UNSIGNED ZEROFILL<br>
+        FLOAT(p, s)<br>
+        REAL(p, s)<br>
+        DOUBLE(p, s)
       </td>
       <td>DOUBLE</td>
       <td></td>

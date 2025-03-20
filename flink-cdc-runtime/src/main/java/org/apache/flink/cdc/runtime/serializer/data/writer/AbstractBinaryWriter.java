@@ -27,11 +27,14 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinaryFormat;
+import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinarySegmentUtils;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
+import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
@@ -103,12 +106,16 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeArray(int pos, ArrayData input, ArrayDataSerializer serializer) {
-        throw new UnsupportedOperationException("Not support array data.");
+        BinaryArrayData binary = serializer.toBinaryArray(input);
+        writeSegmentsToVarLenPart(
+                pos, binary.getSegments(), binary.getOffset(), binary.getSizeInBytes());
     }
 
     @Override
-    public void writeMap(int pos, MapData input, TypeSerializer<MapData> serializer) {
-        throw new UnsupportedOperationException("Not support map data.");
+    public void writeMap(int pos, MapData input, MapDataSerializer serializer) {
+        BinaryMapData binary = serializer.toBinaryMap(input);
+        writeSegmentsToVarLenPart(
+                pos, binary.getSegments(), binary.getOffset(), binary.getSizeInBytes());
     }
 
     private DataOutputViewStreamWrapper getOutputView() {
@@ -138,8 +145,6 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeDecimal(int pos, DecimalData value, int precision) {
-        assert value == null || (value.precision() == precision);
-
         if (DecimalData.isCompact(precision)) {
             assert value != null;
             writeLong(pos, value.toUnscaledLong());
@@ -173,46 +178,38 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
 
     @Override
     public void writeTimestamp(int pos, TimestampData value, int precision) {
-        if (TimestampData.isCompact(precision)) {
-            writeLong(pos, value.getMillisecond());
+        // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
+        ensureCapacity(8);
+
+        if (value == null) {
+            setNullBit(pos);
+            // zero-out the bytes
+            segment.putLong(cursor, 0L);
+            setOffsetAndSize(pos, cursor, 0);
         } else {
-            // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
-            ensureCapacity(8);
-
-            if (value == null) {
-                setNullBit(pos);
-                // zero-out the bytes
-                segment.putLong(cursor, 0L);
-                setOffsetAndSize(pos, cursor, 0);
-            } else {
-                segment.putLong(cursor, value.getMillisecond());
-                setOffsetAndSize(pos, cursor, value.getNanoOfMillisecond());
-            }
-
-            cursor += 8;
+            segment.putLong(cursor, value.getMillisecond());
+            setOffsetAndSize(pos, cursor, value.getNanoOfMillisecond());
         }
+
+        cursor += 8;
     }
 
     @Override
     public void writeLocalZonedTimestamp(int pos, LocalZonedTimestampData value, int precision) {
-        if (LocalZonedTimestampData.isCompact(precision)) {
-            writeLong(pos, value.getEpochMillisecond());
+        // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
+        ensureCapacity(8);
+
+        if (value == null) {
+            setNullBit(pos);
+            // zero-out the bytes
+            segment.putLong(cursor, 0L);
+            setOffsetAndSize(pos, cursor, 0);
         } else {
-            // store the nanoOfMillisecond in fixed-length part as offset and nanoOfMillisecond
-            ensureCapacity(8);
-
-            if (value == null) {
-                setNullBit(pos);
-                // zero-out the bytes
-                segment.putLong(cursor, 0L);
-                setOffsetAndSize(pos, cursor, 0);
-            } else {
-                segment.putLong(cursor, value.getEpochMillisecond());
-                setOffsetAndSize(pos, cursor, value.getEpochNanoOfMillisecond());
-            }
-
-            cursor += 8;
+            segment.putLong(cursor, value.getEpochMillisecond());
+            setOffsetAndSize(pos, cursor, value.getEpochNanoOfMillisecond());
         }
+
+        cursor += 8;
     }
 
     @Override

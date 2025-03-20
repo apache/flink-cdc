@@ -172,15 +172,17 @@ public class DataTypeUtils {
                         ? org.apache.flink.table.api.DataTypes.ARRAY(
                                 toFlinkDataType(children.get(0)))
                         : org.apache.flink.table.api.DataTypes.ARRAY(
-                                toFlinkDataType(children.get(0)).notNull());
+                                        toFlinkDataType(children.get(0)))
+                                .notNull();
             case MAP:
                 Preconditions.checkState(children != null && children.size() > 1);
                 return type.isNullable()
                         ? org.apache.flink.table.api.DataTypes.MAP(
                                 toFlinkDataType(children.get(0)), toFlinkDataType(children.get(1)))
                         : org.apache.flink.table.api.DataTypes.MAP(
-                                toFlinkDataType(children.get(0)),
-                                toFlinkDataType(children.get(1)).notNull());
+                                        toFlinkDataType(children.get(0)),
+                                        toFlinkDataType(children.get(1)))
+                                .notNull();
             case ROW:
                 Preconditions.checkState(!CollectionUtil.isNullOrEmpty(children));
                 RowType rowType = (RowType) type;

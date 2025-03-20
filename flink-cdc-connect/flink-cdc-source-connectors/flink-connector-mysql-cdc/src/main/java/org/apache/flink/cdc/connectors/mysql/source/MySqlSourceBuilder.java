@@ -254,6 +254,15 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * Whether to use legacy json format. The default value is true, which means there is no
+     * whitespace before value and after comma in json format.
+     */
+    public MySqlSourceBuilder<T> useLegacyJsonFormat(boolean useLegacyJsonFormat) {
+        this.configFactory.useLegacyJsonFormat(useLegacyJsonFormat);
+        return this;
+    }
+
+    /**
      * Whether to close idle readers at the end of the snapshot phase. This feature depends on
      * FLIP-147: Support Checkpoints After Tasks Finished. The flink version is required to be
      * greater than or equal to 1.14, and the configuration <code>
@@ -265,6 +274,21 @@ public class MySqlSourceBuilder<T> {
      */
     public MySqlSourceBuilder<T> closeIdleReaders(boolean closeIdleReaders) {
         this.configFactory.closeIdleReaders(closeIdleReaders);
+        return this;
+    }
+
+    /** Whether to parse gh-ost utility generated schema change events. Defaults to false. */
+    public MySqlSourceBuilder<T> parseOnLineSchemaChanges(boolean parseOnLineSchemaChanges) {
+        this.configFactory.parseOnLineSchemaChanges(parseOnLineSchemaChanges);
+        return this;
+    }
+
+    /**
+     * Whether the {@link MySqlSource} should assign the unbounded chunks first or not during
+     * snapshot reading phase.
+     */
+    public MySqlSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
         return this;
     }
 

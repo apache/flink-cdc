@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.connectors.sqlserver;
 
+import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
+import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceConfigFactory;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
@@ -47,9 +49,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertNotNull;
+import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Utility class for sqlserver tests. */
-public class SqlServerTestBase extends AbstractTestBase {
+public class SqlServerTestBase extends AbstractTestBaseJUnit4 {
     private static final Logger LOG = LoggerFactory.getLogger(SqlServerTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
@@ -215,11 +218,26 @@ public class SqlServerTestBase extends AbstractTestBase {
     protected static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;
             }
         }
+    }
+
+    public static SqlServerSourceConfigFactory getConfigFactory(
+            String databaseName, String[] captureTables, int splitSize) {
+        return (SqlServerSourceConfigFactory)
+                new SqlServerSourceConfigFactory()
+                        .hostname(SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getHost())
+                        .port(
+                                SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getMappedPort(
+                                        MS_SQL_SERVER_PORT))
+                        .username(SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getUsername())
+                        .password(SqlServerSourceTestBase.MSSQL_SERVER_CONTAINER.getPassword())
+                        .databaseList(databaseName)
+                        .tableList(captureTables)
+                        .splitSize(splitSize);
     }
 }

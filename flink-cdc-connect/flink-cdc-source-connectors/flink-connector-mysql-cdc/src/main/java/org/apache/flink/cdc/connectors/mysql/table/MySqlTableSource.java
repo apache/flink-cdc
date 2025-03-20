@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.table;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
@@ -35,6 +36,9 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.RowType;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.time.Duration;
@@ -46,9 +50,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.debezium.config.CommonConnectorConfig.TOMBSTONES_ON_DELETE;
+import static io.debezium.connector.mysql.MySqlConnectorConfig.SNAPSHOT_MODE;
+import static io.debezium.engine.DebeziumEngine.OFFSET_FLUSH_INTERVAL_MS_PROP;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
@@ -56,6 +64,13 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * description.
  */
 public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadata {
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlTableSource.class);
+    private final Set<String> exceptDbzProperties =
+            Stream.of(
+                            SNAPSHOT_MODE.name(),
+                            OFFSET_FLUSH_INTERVAL_MS_PROP,
+                            TOMBSTONES_ON_DELETE.name())
+                    .collect(Collectors.toSet());
 
     private final ResolvedSchema physicalSchema;
     private final int port;
@@ -83,6 +98,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final Duration heartbeatInterval;
     private final String chunkKeyColumn;
     final boolean skipSnapshotBackFill;
+    final boolean parseOnlineSchemaChanges;
+    private final boolean useLegacyJsonFormat;
+    private final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -120,7 +138,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             Properties jdbcProperties,
             Duration heartbeatInterval,
             @Nullable String chunkKeyColumn,
-            boolean skipSnapshotBackFill) {
+            boolean skipSnapshotBackFill,
+            boolean parseOnlineSchemaChanges,
+            boolean useLegacyJsonFormat,
+            boolean assignUnboundedChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -144,12 +165,15 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.jdbcProperties = jdbcProperties;
+        this.parseOnlineSchemaChanges = parseOnlineSchemaChanges;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
         this.skipSnapshotBackFill = skipSnapshotBackFill;
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     @Override
@@ -196,7 +220,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .connectTimeout(connectTimeout)
                             .connectMaxRetries(connectMaxRetries)
                             .connectionPoolSize(connectionPoolSize)
-                            .debeziumProperties(dbzProperties)
+                            .debeziumProperties(getParallelDbzProperties(dbzProperties))
                             .startupOptions(startupOptions)
                             .deserializer(deserializer)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
@@ -205,6 +229,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
                             .skipSnapshotBackfill(skipSnapshotBackFill)
+                            .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
+                            .useLegacyJsonFormat(useLegacyJsonFormat)
+                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -290,7 +317,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         jdbcProperties,
                         heartbeatInterval,
                         chunkKeyColumn,
-                        skipSnapshotBackFill);
+                        skipSnapshotBackFill,
+                        parseOnlineSchemaChanges,
+                        useLegacyJsonFormat,
+                        assignUnboundedChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -332,7 +362,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(jdbcProperties, that.jdbcProperties)
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
-                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill);
+                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill)
+                && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
+                && useLegacyJsonFormat == that.useLegacyJsonFormat
+                && assignUnboundedChunkFirst == that.assignUnboundedChunkFirst;
     }
 
     @Override
@@ -365,11 +398,32 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 jdbcProperties,
                 heartbeatInterval,
                 chunkKeyColumn,
-                skipSnapshotBackFill);
+                skipSnapshotBackFill,
+                parseOnlineSchemaChanges,
+                useLegacyJsonFormat,
+                assignUnboundedChunkFirst);
     }
 
     @Override
     public String asSummaryString() {
         return "MySQL-CDC";
+    }
+
+    @VisibleForTesting
+    Properties getDbzProperties() {
+        return dbzProperties;
+    }
+
+    @VisibleForTesting
+    Properties getParallelDbzProperties(Properties dbzProperties) {
+        Properties newDbzProperties = new Properties(dbzProperties);
+        for (String key : dbzProperties.stringPropertyNames()) {
+            if (exceptDbzProperties.contains(key)) {
+                LOG.warn("Cannot override debezium option {}.", key);
+            } else {
+                newDbzProperties.put(key, dbzProperties.get(key));
+            }
+        }
+        return newDbzProperties;
     }
 }

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus;
 import org.apache.flink.cdc.connectors.base.source.assigner.SplitAssigner;
 import org.apache.flink.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
+import org.apache.flink.cdc.connectors.base.source.meta.events.StreamSplitAssignedEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
@@ -83,6 +84,9 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
 
     @Override
     public void handleSourceEvent(int subtaskId, SourceEvent sourceEvent) {
+        if (sourceEvent instanceof StreamSplitAssignedEvent && this.receiveOffsetCommitAck) {
+            this.receiveOffsetCommitAck = false;
+        }
         if (sourceEvent instanceof OffsetCommitAckEvent) {
             if (streamSplitTaskId != null && streamSplitTaskId == subtaskId) {
                 this.receiveOffsetCommitAck = true;

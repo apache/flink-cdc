@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset.ofEarliest;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -166,7 +167,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             assertTrue(
                     ExceptionUtils.findThrowableWithMessage(
                                     t,
-                                    "Chunk key column 'errorCol' doesn't exist in the primary keys [card_no,level] of the table")
+                                    "Chunk key column 'errorCol' doesn't exist in the columns [card_no,level,name,note] of the table")
                             .isPresent());
         }
     }
@@ -417,6 +418,51 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testAssignTableWithoutPrimaryKeyWithChunkKeyColumn() {
+        String tableWithoutPrimaryKey = "customers_no_pk";
+        List<String> expected =
+                Arrays.asList(
+                        "customers_no_pk null [462]",
+                        "customers_no_pk [462] [823]",
+                        "customers_no_pk [823] [1184]",
+                        "customers_no_pk [1184] [1545]",
+                        "customers_no_pk [1545] [1906]",
+                        "customers_no_pk [1906] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {tableWithoutPrimaryKey},
+                        "id");
+        assertEquals(expected, splits);
+    }
+
+    @Test
+    public void testAssignTableWithPrimaryKeyWithChunkKeyColumnNotInPrimaryKey() {
+        String tableWithoutPrimaryKey = "customers";
+        List<String> expected =
+                Arrays.asList(
+                        "customers null [user_12]",
+                        "customers [user_12] [user_15]",
+                        "customers [user_15] [user_18]",
+                        "customers [user_18] [user_20]",
+                        "customers [user_20] [user_4]",
+                        "customers [user_4] [user_7]",
+                        "customers [user_7] null");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {tableWithoutPrimaryKey},
+                        "name");
+        assertEquals(expected, splits);
+    }
+
+    @Test
     public void testEnumerateTablesLazily() {
         final MySqlSourceConfig configuration =
                 getConfig(
@@ -430,7 +476,11 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        configuration, DEFAULT_PARALLELISM, new ArrayList<>(), false);
+                        configuration,
+                        DEFAULT_PARALLELISM,
+                        new ArrayList<>(),
+                        false,
+                        getMySqlSplitEnumeratorContext());
 
         assertTrue(assigner.needToDiscoveryTables());
         assigner.open();
@@ -439,7 +489,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testScanNewlyAddedTableStartFromCheckpoint() {
+    public void testScanNewlyAddedTableStartFromInitialAssigningFinishedCheckpoint() {
         List<String> expected =
                 Arrays.asList(
                         "customers_sparse_dist [109] null",
@@ -447,7 +497,24 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "customers_even_dist [10] [18]",
                         "customers_even_dist [18] null",
                         "customer_card_single_line null null");
-        assertEquals(expected, getTestAssignSnapshotSplitsFromCheckpoint());
+        assertEquals(
+                expected,
+                getTestAssignSnapshotSplitsFromCheckpoint(
+                        AssignerStatus.INITIAL_ASSIGNING_FINISHED));
+    }
+
+    @Test
+    public void testScanNewlyAddedTableStartFromNewlyAddedAssigningSnapshotFinishedCheckpoint() {
+        List<String> expected =
+                Arrays.asList(
+                        "customers_sparse_dist [109] null",
+                        "customers_even_dist null [10]",
+                        "customers_even_dist [10] [18]",
+                        "customers_even_dist [18] null");
+        assertEquals(
+                expected,
+                getTestAssignSnapshotSplitsFromCheckpoint(
+                        AssignerStatus.NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED));
     }
 
     private List<String> getTestAssignSnapshotSplits(
@@ -487,11 +554,15 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         .collect(Collectors.toList());
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        configuration, DEFAULT_PARALLELISM, remainingTables, false);
+                        configuration,
+                        DEFAULT_PARALLELISM,
+                        remainingTables,
+                        false,
+                        getMySqlSplitEnumeratorContext());
         return getSplitsFromAssigner(assigner);
     }
 
-    private List<String> getTestAssignSnapshotSplitsFromCheckpoint() {
+    private List<String> getTestAssignSnapshotSplitsFromCheckpoint(AssignerStatus assignerStatus) {
         TableId newTable =
                 TableId.parse(customerDatabase.getDatabaseName() + ".customer_card_single_line");
         TableId processedTable =
@@ -514,7 +585,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
 
         RowType splitKeyType =
                 ChunkUtils.getChunkKeyColumnType(
-                        Column.editor().name("id").type("INT").jdbcType(4).create());
+                        Column.editor().name("id").type("INT").jdbcType(4).create(), true);
         List<MySqlSchemalessSnapshotSplit> remainingSplits =
                 Arrays.asList(
                         new MySqlSchemalessSnapshotSplit(
@@ -574,13 +645,17 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         assignedSplits,
                         new HashMap<>(),
                         splitFinishedOffsets,
-                        AssignerStatus.INITIAL_ASSIGNING,
+                        assignerStatus,
                         remainingTables,
                         false,
                         true,
                         ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         final MySqlSnapshotSplitAssigner assigner =
-                new MySqlSnapshotSplitAssigner(configuration, DEFAULT_PARALLELISM, checkpoint);
+                new MySqlSnapshotSplitAssigner(
+                        configuration,
+                        DEFAULT_PARALLELISM,
+                        checkpoint,
+                        getMySqlSplitEnumeratorContext());
         return getSplitsFromAssigner(assigner);
     }
 

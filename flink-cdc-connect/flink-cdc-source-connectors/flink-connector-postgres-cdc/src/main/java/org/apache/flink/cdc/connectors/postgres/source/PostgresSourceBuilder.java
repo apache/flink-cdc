@@ -199,12 +199,6 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
-    /** Whether the {@link PostgresIncrementalSource} should output the schema changes or not. */
-    public PostgresSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
-        this.configFactory.includeSchemaChanges(includeSchemaChanges);
-        return this;
-    }
-
     /** Specifies the startup options. */
     public PostgresSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);
@@ -280,6 +274,15 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether the {@link PostgresSourceEnumerator} should assign the unbounded chunks first or not
+     * during snapshot reading phase.
+     */
+    public PostgresSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
     /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
     public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
         this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);
@@ -331,14 +334,16 @@ public class PostgresSourceBuilder<T> {
                                     remainingTables,
                                     isTableIdCaseSensitive,
                                     dataSourceDialect,
-                                    offsetFactory);
+                                    offsetFactory,
+                                    enumContext);
                 } catch (Exception e) {
                     throw new FlinkRuntimeException(
                             "Failed to discover captured tables for enumerator", e);
                 }
             } else {
                 splitAssigner =
-                        new StreamSplitAssigner(sourceConfig, dataSourceDialect, offsetFactory);
+                        new StreamSplitAssigner(
+                                sourceConfig, dataSourceDialect, offsetFactory, enumContext);
             }
 
             return new PostgresSourceEnumerator(
@@ -362,14 +367,16 @@ public class PostgresSourceBuilder<T> {
                                 enumContext.currentParallelism(),
                                 (HybridPendingSplitsState) checkpoint,
                                 dataSourceDialect,
-                                offsetFactory);
+                                offsetFactory,
+                                enumContext);
             } else if (checkpoint instanceof StreamPendingSplitsState) {
                 splitAssigner =
                         new StreamSplitAssigner(
                                 sourceConfig,
                                 (StreamPendingSplitsState) checkpoint,
                                 dataSourceDialect,
-                                offsetFactory);
+                                offsetFactory,
+                                enumContext);
             } else {
                 throw new UnsupportedOperationException(
                         "Unsupported restored PendingSplitsState: " + checkpoint);
@@ -395,7 +402,6 @@ public class PostgresSourceBuilder<T> {
             final SourceReaderMetrics sourceReaderMetrics =
                     new SourceReaderMetrics(readerContext.metricGroup());
 
-            sourceReaderMetrics.registerMetrics();
             IncrementalSourceReaderContext incrementalSourceReaderContext =
                     new IncrementalSourceReaderContext(readerContext);
             Supplier<IncrementalSourceSplitReader<JdbcSourceConfig>> splitReaderSupplier =

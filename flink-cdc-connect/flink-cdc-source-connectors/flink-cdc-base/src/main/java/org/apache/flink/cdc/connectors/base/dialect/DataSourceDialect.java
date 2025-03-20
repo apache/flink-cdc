@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.base.dialect;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -27,6 +28,8 @@ import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +40,7 @@ import java.util.Map;
  * @param <C> The source config of data source.
  */
 @Experimental
-public interface DataSourceDialect<C extends SourceConfig> extends Serializable {
+public interface DataSourceDialect<C extends SourceConfig> extends Serializable, Closeable {
 
     /** Get the name of dialect. */
     String getName();
@@ -62,7 +65,10 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable 
     boolean isDataCollectionIdCaseSensitive(C sourceConfig);
 
     /** Returns the {@link ChunkSplitter} which used to split collection to splits. */
+    @Deprecated
     ChunkSplitter createChunkSplitter(C sourceConfig);
+
+    ChunkSplitter createChunkSplitter(C sourceConfig, ChunkSplitterState chunkSplitterState);
 
     /** The fetch task used to fetch data of a snapshot split or stream split. */
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);
@@ -78,4 +84,7 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable 
 
     /** Check if the tableId is included in SourceConfig. */
     boolean isIncludeDataCollection(C sourceConfig, TableId tableId);
+
+    @Override
+    default void close() throws IOException {}
 }

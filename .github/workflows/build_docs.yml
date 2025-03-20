@@ -54,8 +54,8 @@ jobs:
       matrix:
         branch:
           - master
-          - release-3.0
-          - release-3.1
+          - release-3.3
+          - release-3.2
 
     steps:
       - uses: actions/checkout@v3
@@ -69,8 +69,8 @@ jobs:
           echo "flink_branch=${currentBranch}" >> ${GITHUB_ENV}
           
           if [ "${currentBranch}" = "master" ]; then
-          echo "flink_alias=release-3.2" >> ${GITHUB_ENV}
-          elif [ "${currentBranch}" = "release-3.1" ]; then
+          echo "flink_alias=release-3.4" >> ${GITHUB_ENV}
+          elif [ "${currentBranch}" = "release-3.3" ]; then
           echo "flink_alias=stable" >> ${GITHUB_ENV}
           fi
 

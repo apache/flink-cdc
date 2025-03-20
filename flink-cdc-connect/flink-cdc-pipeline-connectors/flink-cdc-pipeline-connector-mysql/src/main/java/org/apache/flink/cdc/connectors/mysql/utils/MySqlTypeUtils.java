@@ -107,10 +107,11 @@ public class MySqlTypeUtils {
     private static final String MULTIPOLYGON = "MULTIPOLYGON";
     private static final String MULTILINESTRING = "MULTILINESTRING";
     private static final String UNKNOWN = "UNKNOWN";
+    private static final int FLOAT_LENGTH_UNSPECIFIED_FLAG = -1;
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
-    public static DataType fromDbzColumn(Column column) {
-        DataType dataType = convertFromColumn(column);
+    public static DataType fromDbzColumn(Column column, boolean tinyInt1isBit) {
+        DataType dataType = convertFromColumn(column, tinyInt1isBit);
         if (column.isOptional()) {
             return dataType;
         } else {
@@ -122,7 +123,7 @@ public class MySqlTypeUtils {
      * Returns a corresponding Flink data type from a debezium {@link Column} with nullable always
      * be true.
      */
-    private static DataType convertFromColumn(Column column) {
+    private static DataType convertFromColumn(Column column, boolean tinyInt1isBit) {
         String typeName = column.typeName();
         switch (typeName) {
             case BIT:
@@ -137,7 +138,9 @@ public class MySqlTypeUtils {
                 // user should not use tinyint(1) to store number although jdbc url parameter
                 // tinyInt1isBit=false can help change the return value, it's not a general way
                 // btw: mybatis and mysql-connector-java map tinyint(1) to boolean by default
-                return column.length() == 1 ? DataTypes.BOOLEAN() : DataTypes.TINYINT();
+                return (column.length() == 1 && tinyInt1isBit)
+                        ? DataTypes.BOOLEAN()
+                        : DataTypes.TINYINT();
             case TINYINT_UNSIGNED:
             case TINYINT_UNSIGNED_ZEROFILL:
             case SMALLINT:
@@ -164,7 +167,12 @@ public class MySqlTypeUtils {
             case FLOAT:
             case FLOAT_UNSIGNED:
             case FLOAT_UNSIGNED_ZEROFILL:
-                return DataTypes.FLOAT();
+                if (column.length() != FLOAT_LENGTH_UNSPECIFIED_FLAG) {
+                    // For FLOAT types with length provided explicitly, treat it like DOUBLE
+                    return DataTypes.DOUBLE();
+                } else {
+                    return DataTypes.FLOAT();
+                }
             case REAL:
             case REAL_UNSIGNED:
             case REAL_UNSIGNED_ZEROFILL:
@@ -236,7 +244,7 @@ public class MySqlTypeUtils {
                 return DataTypes.ARRAY(DataTypes.STRING());
             default:
                 throw new UnsupportedOperationException(
-                        String.format("Don't support MySQL type '%s' yet.", typeName));
+                        String.format("MySQL type '%s' is not supported yet.", typeName));
         }
     }
 

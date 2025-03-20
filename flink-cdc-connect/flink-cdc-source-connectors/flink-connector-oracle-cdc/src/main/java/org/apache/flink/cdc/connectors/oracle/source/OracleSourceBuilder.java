@@ -243,6 +243,21 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link OracleIncrementalSource} should scan the newly added tables or not. */
+    public OracleSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
+        this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
+    /**
+     * Whether the {@link OracleIncrementalSource} should assign the unbounded chunks first or not
+     * during snapshot reading phase.
+     */
+    public OracleSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
     /**
      * Build the {@link OracleIncrementalSource}.
      *

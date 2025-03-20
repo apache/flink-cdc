@@ -42,6 +42,8 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
     private final DataTypeSerializer dataTypeSerializer = new DataTypeSerializer();
     private final StringSerializer stringSerializer = StringSerializer.INSTANCE;
 
+    private static final int CURRENT_VERSION = 2;
+
     @Override
     public boolean isImmutableType() {
         return false;
@@ -57,7 +59,8 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
         return Column.physicalColumn(
                 stringSerializer.copy(from.getName()),
                 dataTypeSerializer.copy(from.getType()),
-                stringSerializer.copy(from.getComment()));
+                stringSerializer.copy(from.getComment()),
+                stringSerializer.copy(from.getDefaultValueExpression()));
     }
 
     @Override
@@ -75,14 +78,37 @@ public class PhysicalColumnSerializer extends TypeSerializerSingleton<PhysicalCo
         stringSerializer.serialize(record.getName(), target);
         dataTypeSerializer.serialize(record.getType(), target);
         stringSerializer.serialize(record.getComment(), target);
+        stringSerializer.serialize(record.getDefaultValueExpression(), target);
     }
 
     @Override
     public PhysicalColumn deserialize(DataInputView source) throws IOException {
-        String name = stringSerializer.deserialize(source);
-        DataType dataType = dataTypeSerializer.deserialize(source);
-        String comment = stringSerializer.deserialize(source);
-        return Column.physicalColumn(name, dataType, comment);
+        return deserialize(CURRENT_VERSION, source);
+    }
+
+    public PhysicalColumn deserialize(int version, DataInputView source) throws IOException {
+        switch (version) {
+            case 0:
+            case 1:
+                {
+                    String name = stringSerializer.deserialize(source);
+                    DataType dataType = dataTypeSerializer.deserialize(source);
+                    String comment = stringSerializer.deserialize(source);
+                    return Column.physicalColumn(name, dataType, comment);
+                }
+            case 2:
+                {
+                    String name = stringSerializer.deserialize(source);
+                    DataType dataType = dataTypeSerializer.deserialize(source);
+                    String comment = stringSerializer.deserialize(source);
+                    String defaultValue = stringSerializer.deserialize(source);
+                    return Column.physicalColumn(name, dataType, comment, defaultValue);
+                }
+            default:
+                {
+                    throw new IOException("Unrecognized serialization version " + version);
+                }
+        }
     }
 
     @Override

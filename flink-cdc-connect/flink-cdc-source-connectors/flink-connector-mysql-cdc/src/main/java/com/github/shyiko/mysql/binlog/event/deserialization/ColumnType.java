@@ -56,6 +56,11 @@ public enum ColumnType {
     DATETIME_V2(18),
     TIME_V2(19),
     TYPED_ARRAY(20),
+    // TYPED_ARRAY enum value has been changed from 244 to 20 in MySQL 8.0.18. Since the JSON_ARRAY
+    // cast syntax was not added before MySQL 8.0.16, and the TYPED_ARRAY enum has been fixed in
+    // MySQL 8.0.18, so the only affected version is 8.0.17.
+    // https://github.com/mysql/mysql-server/commit/9082b6a820f3948fd563cc32a050f5e8775f2855#diff-b9bac49e04a17ad0503e56a4c53d979c90eb64618387d20b9ea2cf1dbf47e5e7L25
+    TYPED_ARRAY_OLD(244),
     JSON(245),
     NEWDECIMAL(246),
     ENUM(247),

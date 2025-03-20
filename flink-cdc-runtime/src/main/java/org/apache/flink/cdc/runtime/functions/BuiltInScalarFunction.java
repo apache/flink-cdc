@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.runtime.functions;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.table.functions.BuiltInFunctionDefinition;
 
 import org.apache.calcite.sql.SqlFunction;
 import org.apache.calcite.sql.SqlFunctionCategory;
@@ -31,27 +30,16 @@ import org.apache.calcite.sql.validate.SqlMonotonicity;
 
 import javax.annotation.Nullable;
 
-import java.util.Optional;
 import java.util.function.Function;
 
-import static org.apache.flink.table.functions.BuiltInFunctionDefinition.DEFAULT_VERSION;
-import static org.apache.flink.table.functions.BuiltInFunctionDefinition.qualifyFunctionName;
-import static org.apache.flink.table.functions.BuiltInFunctionDefinition.validateFunction;
-import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * This is the case when the operator has a special parsing syntax or uses other Calcite-specific
- * features that are not exposed via {@link BuiltInFunctionDefinition} yet.
- *
- * <p>Note: Try to keep usages of this class to a minimum and use Flink's {@link
- * BuiltInFunctionDefinition} stack instead.
- *
- * <p>For simple functions, use the provided builder. Otherwise, this class can also be extended.
+ * features that are not exposed via {@link SqlFunction} yet.
  */
 @Internal
 public class BuiltInScalarFunction extends SqlFunction {
-
-    private final @Nullable Integer version;
 
     private final boolean isDeterministic;
 
@@ -61,7 +49,6 @@ public class BuiltInScalarFunction extends SqlFunction {
 
     protected BuiltInScalarFunction(
             String name,
-            int version,
             SqlKind kind,
             @Nullable SqlReturnTypeInference returnTypeInference,
             @Nullable SqlOperandTypeInference operandTypeInference,
@@ -77,11 +64,9 @@ public class BuiltInScalarFunction extends SqlFunction {
                 operandTypeInference,
                 operandTypeChecker,
                 checkNotNull(category));
-        this.version = isInternal ? null : version;
         this.isDeterministic = isDeterministic;
         this.isInternal = isInternal;
         this.monotonicity = monotonicity;
-        validateFunction(name, version, isInternal);
     }
 
     protected BuiltInScalarFunction(
@@ -93,7 +78,6 @@ public class BuiltInScalarFunction extends SqlFunction {
             SqlFunctionCategory category) {
         this(
                 name,
-                DEFAULT_VERSION,
                 kind,
                 returnTypeInference,
                 operandTypeInference,
@@ -107,18 +91,6 @@ public class BuiltInScalarFunction extends SqlFunction {
     /** Builder for configuring and creating instances of {@link BuiltInScalarFunction}. */
     public static Builder newBuilder() {
         return new Builder();
-    }
-
-    public final Optional<Integer> getVersion() {
-        return Optional.ofNullable(version);
-    }
-
-    public String getQualifiedName() {
-        if (isInternal) {
-            return getName();
-        }
-        assert version != null;
-        return qualifyFunctionName(getName(), version);
     }
 
     @Override
@@ -144,8 +116,6 @@ public class BuiltInScalarFunction extends SqlFunction {
 
         private String name;
 
-        private int version = DEFAULT_VERSION;
-
         private SqlKind kind = SqlKind.OTHER_FUNCTION;
 
         private SqlReturnTypeInference returnTypeInference;
@@ -163,15 +133,8 @@ public class BuiltInScalarFunction extends SqlFunction {
         private Function<SqlOperatorBinding, SqlMonotonicity> monotonicity =
                 call -> SqlMonotonicity.NOT_MONOTONIC;
 
-        /** @see BuiltInFunctionDefinition.Builder#name(String) */
         public Builder name(String name) {
             this.name = name;
-            return this;
-        }
-
-        /** @see BuiltInFunctionDefinition.Builder#version(int) */
-        public Builder version(int version) {
-            this.version = version;
             return this;
         }
 
@@ -205,7 +168,6 @@ public class BuiltInScalarFunction extends SqlFunction {
             return this;
         }
 
-        /** @see BuiltInFunctionDefinition.Builder#internal() */
         public Builder internal() {
             this.isInternal = true;
             return this;
@@ -224,7 +186,6 @@ public class BuiltInScalarFunction extends SqlFunction {
         public BuiltInScalarFunction build() {
             return new BuiltInScalarFunction(
                     name,
-                    version,
                     kind,
                     returnTypeInference,
                     operandTypeInference,

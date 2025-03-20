@@ -42,22 +42,26 @@ public class PipelineOptions {
     public static final ConfigOption<Integer> PIPELINE_PARALLELISM =
             ConfigOptions.key("parallelism")
                     .intType()
-                    .noDefaultValue()
+                    .defaultValue(1)
                     .withDescription("Parallelism of the pipeline");
 
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
             ConfigOptions.key("schema.change.behavior")
                     .enumType(SchemaChangeBehavior.class)
-                    .defaultValue(SchemaChangeBehavior.EVOLVE)
+                    .defaultValue(SchemaChangeBehavior.LENIENT)
                     .withDescription(
                             Description.builder()
                                     .text("Behavior for handling schema change events. ")
                                     .linebreak()
                                     .add(
                                             ListElement.list(
+                                                    text("IGNORE: Drop all schema change events."),
+                                                    text(
+                                                            "LENIENT: Apply schema changes to downstream tolerantly, and keeps executing if applying fails."),
+                                                    text(
+                                                            "TRY_EVOLVE: Apply schema changes to downstream, but keeps executing if applying fails."),
                                                     text(
                                                             "EVOLVE: Apply schema changes to downstream. This requires sink to support handling schema changes."),
-                                                    text("IGNORE: Drop all schema change events."),
                                                     text(
                                                             "EXCEPTION: Throw an exception to terminate the sync pipeline.")))
                                     .build());

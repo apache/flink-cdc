@@ -26,6 +26,11 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
     <name>flink-cdc-pipeline-connector-doris</name>
 
+    <properties>
+        <doris.connector.version>24.0.1</doris.connector.version>
+        <mysql.connector.version>8.0.26</mysql.connector.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -44,7 +49,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.doris</groupId>
             <artifactId>flink-doris-connector-${flink.major.version}</artifactId>
-            <version>1.6.0</version>
+            <version>${doris.connector.version}</version>
         </dependency>
 
         <dependency>
@@ -80,13 +85,13 @@ limitations under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>jdbc</artifactId>
-            <version>1.18.3</version>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>mysql</groupId>
             <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.26</version>
+            <version>${mysql.connector.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -108,6 +113,7 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.plugin.version}</version>
                 <executions>
                     <execution>
                         <id>shade-flink</id>

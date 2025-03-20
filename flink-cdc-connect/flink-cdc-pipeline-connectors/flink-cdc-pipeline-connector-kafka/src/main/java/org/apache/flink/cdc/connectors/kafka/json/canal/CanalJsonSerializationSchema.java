@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
+import org.apache.flink.cdc.connectors.kafka.utils.JsonRowDataSerializationSchemaUtils;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
@@ -73,6 +74,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
 
     private final boolean encodeDecimalAsPlainNumber;
 
+    private final boolean ignoreNullFields;
+
     private final ZoneId zoneId;
 
     private InitializationContext context;
@@ -82,19 +85,21 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             JsonFormatOptions.MapNullKeyMode mapNullKeyMode,
             String mapNullKeyLiteral,
             ZoneId zoneId,
-            boolean encodeDecimalAsPlainNumber) {
+            boolean encodeDecimalAsPlainNumber,
+            boolean ignoreNullFields) {
         this.timestampFormat = timestampFormat;
         this.mapNullKeyMode = mapNullKeyMode;
         this.mapNullKeyLiteral = mapNullKeyLiteral;
         this.encodeDecimalAsPlainNumber = encodeDecimalAsPlainNumber;
         this.zoneId = zoneId;
         jsonSerializers = new HashMap<>();
+        this.ignoreNullFields = ignoreNullFields;
     }
 
     @Override
     public void open(InitializationContext context) {
         this.context = context;
-        reuseGenericRowData = new GenericRowData(3);
+        reuseGenericRowData = new GenericRowData(6);
     }
 
     @Override
@@ -114,12 +119,13 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             LogicalType rowType =
                     DataTypeUtils.toFlinkDataType(schema.toRowDataType()).getLogicalType();
             JsonRowDataSerializationSchema jsonSerializer =
-                    new JsonRowDataSerializationSchema(
+                    JsonRowDataSerializationSchemaUtils.createSerializationSchema(
                             createJsonRowType(fromLogicalToDataType(rowType)),
                             timestampFormat,
                             mapNullKeyMode,
                             mapNullKeyLiteral,
-                            encodeDecimalAsPlainNumber);
+                            encodeDecimalAsPlainNumber,
+                            ignoreNullFields);
             try {
                 jsonSerializer.open(context);
             } catch (Exception e) {
@@ -127,11 +133,23 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             }
             jsonSerializers.put(
                     schemaChangeEvent.tableId(),
-                    new TableSchemaInfo(schema, jsonSerializer, zoneId));
+                    new TableSchemaInfo(
+                            schemaChangeEvent.tableId(), schema, jsonSerializer, zoneId));
             return null;
         }
 
         DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
+        reuseGenericRowData.setField(
+                3, StringData.fromString(dataChangeEvent.tableId().getSchemaName()));
+        reuseGenericRowData.setField(
+                4, StringData.fromString(dataChangeEvent.tableId().getTableName()));
+        reuseGenericRowData.setField(
+                5,
+                new GenericArrayData(
+                        jsonSerializers.get(dataChangeEvent.tableId()).getSchema().primaryKeys()
+                                .stream()
+                                .map(StringData::fromString)
+                                .toArray()));
         try {
             switch (dataChangeEvent.op()) {
                 case INSERT:
@@ -142,7 +160,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                     new RowData[] {
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
-                                                .getRowDataFromRecordData((dataChangeEvent.after()))
+                                                .getRowDataFromRecordData(
+                                                        dataChangeEvent.after(), false)
                                     }));
                     reuseGenericRowData.setField(2, OP_INSERT);
                     return jsonSerializers
@@ -150,16 +169,16 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                             .getSerializationSchema()
                             .serialize(reuseGenericRowData);
                 case DELETE:
+                    reuseGenericRowData.setField(0, null);
                     reuseGenericRowData.setField(
-                            0,
+                            1,
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
                                                 .getRowDataFromRecordData(
-                                                        (dataChangeEvent.before()))
+                                                        dataChangeEvent.before(), false)
                                     }));
-                    reuseGenericRowData.setField(1, null);
                     reuseGenericRowData.setField(2, OP_DELETE);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())
@@ -174,7 +193,7 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
                                                 .getRowDataFromRecordData(
-                                                        (dataChangeEvent.before()))
+                                                        dataChangeEvent.before(), false)
                                     }));
                     reuseGenericRowData.setField(
                             1,
@@ -182,7 +201,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                     new RowData[] {
                                         jsonSerializers
                                                 .get(dataChangeEvent.tableId())
-                                                .getRowDataFromRecordData((dataChangeEvent.after()))
+                                                .getRowDataFromRecordData(
+                                                        dataChangeEvent.after(), false)
                                     }));
                     reuseGenericRowData.setField(2, OP_UPDATE);
                     return jsonSerializers
@@ -200,14 +220,20 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
         }
     }
 
+    /**
+     * Refer to <a
+     * href="https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata">Canal
+     * | Apache Flink</a> for more details.
+     */
     private static RowType createJsonRowType(DataType databaseSchema) {
-        // Canal JSON contains other information, e.g. "database", "ts"
-        // but we don't need them
         return (RowType)
                 DataTypes.ROW(
                                 DataTypes.FIELD("old", DataTypes.ARRAY(databaseSchema)),
                                 DataTypes.FIELD("data", DataTypes.ARRAY(databaseSchema)),
-                                DataTypes.FIELD("type", DataTypes.STRING()))
+                                DataTypes.FIELD("type", DataTypes.STRING()),
+                                DataTypes.FIELD("database", DataTypes.STRING()),
+                                DataTypes.FIELD("table", DataTypes.STRING()),
+                                DataTypes.FIELD("pkNames", DataTypes.ARRAY(DataTypes.STRING())))
                         .getLogicalType();
     }
 }

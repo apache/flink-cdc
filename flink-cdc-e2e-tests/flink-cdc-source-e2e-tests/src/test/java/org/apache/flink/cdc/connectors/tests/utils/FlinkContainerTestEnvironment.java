@@ -61,6 +61,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -120,11 +121,13 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
 
     @Parameterized.Parameters(name = "flinkVersion: {0}")
     public static List<String> getFlinkVersion() {
-        return Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.0");
+        String flinkVersion = System.getProperty("specifiedFlinkVersion");
+        if (flinkVersion != null) {
+            return Collections.singletonList(flinkVersion);
+        } else {
+            return Arrays.asList("1.19.2", "1.20.1");
+        }
     }
-
-    private static final List<String> FLINK_VERSION_WITH_SCALA_212 =
-            Arrays.asList("1.16.3", "1.17.2", "1.18.1", "1.19.0");
 
     @Before
     public void before() {
@@ -138,7 +141,6 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("jobmanager")
                         .withNetwork(NETWORK)
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
                         .withExposedPorts(JOB_MANAGER_REST_PORT)
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
@@ -146,7 +148,6 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
         taskManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
                         .withCommand("taskmanager")
-                        .withExtraHost("host.docker.internal", "host-gateway")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
                         .withEnv("FLINK_PROPERTIES", flinkProperties)
@@ -185,7 +186,8 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                             dockerClient.removeContainerCmd(container.getId()).exec();
                         });
 
-        // List all images and remove the ones that are not flink、mysql、testcontainers related.
+        // List all images and remove the ones that are not Flink, MySQL, and TestContainers
+        // related.
         dockerClient.listImagesCmd().exec().stream()
                 .filter(
                         image ->
@@ -309,10 +311,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     }
 
     private String getFlinkDockerImageTag() {
-        if (FLINK_VERSION_WITH_SCALA_212.contains(flinkVersion)) {
-            return String.format("flink:%s-scala_2.12", flinkVersion);
-        }
-        return String.format("flink:%s-scala_2.11", flinkVersion);
+        return String.format("flink:%s-scala_2.12", flinkVersion);
     }
 
     protected String getJdbcConnectorResourceName() {

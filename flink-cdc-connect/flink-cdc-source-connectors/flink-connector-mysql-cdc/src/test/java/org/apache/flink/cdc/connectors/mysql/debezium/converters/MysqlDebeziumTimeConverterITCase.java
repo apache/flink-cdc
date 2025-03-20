@@ -154,7 +154,7 @@ public class MysqlDebeziumTimeConverterITCase {
 
     private void validTimestampValue(List<String> result) throws JsonProcessingException {
         ObjectMapper mapper = new ObjectMapper();
-        String[] timestampValues = new String[] {"14:23:00", "00:00:00", "00:00:00"};
+        String[] timestampValues = new String[] {"14:23:00", "00:00:00", "00:00:00", "15:04:00"};
         for (String after : result) {
             JsonNode jsonNode = mapper.readTree(after);
             Assert.assertEquals(
@@ -232,7 +232,8 @@ public class MysqlDebeziumTimeConverterITCase {
                 new String[] {
                     "+I[1, 14:23:00, 2023-04-01 14:24:00, 2023-04-01, 14:25:00]",
                     "+I[3, 00:00:00, null, null, 00:01:20]",
-                    "+I[2, 00:00:00, null, null, 00:00:00]"
+                    "+I[2, 00:00:00, null, null, 00:00:00]",
+                    "+I[4, 15:04:00, null, null, 00:01:10]"
                 };
 
         List<String> expectedSnapshotData = new ArrayList<>(Arrays.asList(snapshotForSingleTable));
@@ -275,6 +276,19 @@ public class MysqlDebeziumTimeConverterITCase {
     }
 
     private String buildMySqlConfigWithTimezone(String timezone) {
+        // JVM timezone is in "GMT+XX:XX" or "GMT-XX:XX" format
+        // while MySQL configuration file requires "+XX:XX" or "-XX:XX"
+        if (timezone.startsWith("GMT")) {
+            timezone = timezone.substring(3);
+        }
+
+        // But if we run JVM with -Duser.timezone=GMT+0:00, the timezone String will be set to "GMT"
+        // (without redundant offset part). We can't pass an empty string to MySQL, or it will
+        // panic.
+        if (timezone.isEmpty()) {
+            timezone = "UTC";
+        }
+
         try {
             File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
             Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));
@@ -283,7 +297,8 @@ public class MysqlDebeziumTimeConverterITCase {
                             + "binlog_format = row\n"
                             + "log_bin = mysql-bin\n"
                             + "server-id = 223344\n"
-                            + "binlog_row_image = FULL\n";
+                            + "binlog_row_image = FULL\n"
+                            + "sql_mode = ALLOW_INVALID_DATES,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\n";
             String timezoneConf = "default-time_zone = '" + timezone + "'\n";
             Files.write(
                     cnf,

@@ -79,6 +79,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
     private final String chunkKeyColumn;
     private final boolean closeIdleReaders;
     private final boolean skipSnapshotBackfill;
+    private final boolean scanNewlyAddedTableEnabled;
+    private final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -113,7 +115,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
             double distributionFactorLower,
             @Nullable String chunkKeyColumn,
             boolean closeIdleReaders,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean scanNewlyAddedTableEnabled,
+            boolean assignUnboundedChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.url = url;
         this.port = port;
@@ -139,6 +143,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
         this.chunkKeyColumn = chunkKeyColumn;
         this.closeIdleReaders = closeIdleReaders;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     @Override
@@ -187,6 +193,8 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .chunkKeyColumn(chunkKeyColumn)
+                            .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .build();
 
             return SourceProvider.of(oracleChangeEventSource);
@@ -252,7 +260,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                         distributionFactorLower,
                         chunkKeyColumn,
                         closeIdleReaders,
-                        skipSnapshotBackfill);
+                        skipSnapshotBackfill,
+                        scanNewlyAddedTableEnabled,
+                        assignUnboundedChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -291,7 +301,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 && Objects.equals(distributionFactorLower, that.distributionFactorLower)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders)
-                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill);
+                && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
+                && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
     }
 
     @Override
@@ -321,7 +333,9 @@ public class OracleTableSource implements ScanTableSource, SupportsReadingMetada
                 distributionFactorLower,
                 chunkKeyColumn,
                 closeIdleReaders,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                scanNewlyAddedTableEnabled,
+                assignUnboundedChunkFirst);
     }
 
     @Override

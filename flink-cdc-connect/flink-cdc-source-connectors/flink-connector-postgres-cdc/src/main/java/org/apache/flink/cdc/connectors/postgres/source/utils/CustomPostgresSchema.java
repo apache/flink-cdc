@@ -34,7 +34,10 @@ import io.debezium.util.Clock;
 
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -56,7 +59,7 @@ public class CustomPostgresSchema {
         // read schema from cache first
         if (!schemasByTableId.containsKey(tableId)) {
             try {
-                readTableSchema(tableId);
+                readTableSchema(Collections.singletonList(tableId));
             } catch (SQLException e) {
                 throw new FlinkRuntimeException("Failed to read table schema", e);
             }
@@ -64,22 +67,51 @@ public class CustomPostgresSchema {
         return schemasByTableId.get(tableId);
     }
 
-    private TableChange readTableSchema(TableId tableId) throws SQLException {
+    public Map<TableId, TableChange> getTableSchema(List<TableId> tableIds) {
+        // read schema from cache first
+        Map<TableId, TableChange> tableChanges = new HashMap();
+
+        List<TableId> unMatchTableIds = new ArrayList<>();
+        for (TableId tableId : tableIds) {
+            if (schemasByTableId.containsKey(tableId)) {
+                tableChanges.put(tableId, schemasByTableId.get(tableId));
+            } else {
+                unMatchTableIds.add(tableId);
+            }
+        }
+
+        if (!unMatchTableIds.isEmpty()) {
+            try {
+                readTableSchema(tableIds);
+            } catch (SQLException e) {
+                throw new FlinkRuntimeException("Failed to read table schema", e);
+            }
+            for (TableId tableId : unMatchTableIds) {
+                if (schemasByTableId.containsKey(tableId)) {
+                    tableChanges.put(tableId, schemasByTableId.get(tableId));
+                } else {
+                    throw new FlinkRuntimeException(
+                            String.format("Failed to read table schema of table %s", tableId));
+                }
+            }
+        }
+        return tableChanges;
+    }
+
+    private List<TableChange> readTableSchema(List<TableId> tableIds) throws SQLException {
+        List<TableChange> tableChanges = new ArrayList<>();
 
         final PostgresOffsetContext offsetContext =
                 PostgresOffsetContext.initialContext(dbzConfig, jdbcConnection, Clock.SYSTEM);
 
         PostgresPartition partition = new PostgresPartition(dbzConfig.getLogicalName());
 
-        // set the events to populate proper sourceInfo into offsetContext
-        offsetContext.event(tableId, Instant.now());
-
         Tables tables = new Tables();
         try {
             jdbcConnection.readSchema(
                     tables,
                     dbzConfig.databaseName(),
-                    tableId.schema(),
+                    null,
                     dbzConfig.getTableFilters().dataCollectionFilter(),
                     null,
                     false);
@@ -87,22 +119,27 @@ public class CustomPostgresSchema {
             throw new FlinkRuntimeException("Failed to read schema", e);
         }
 
-        Table table = Objects.requireNonNull(tables.forTable(tableId));
+        for (TableId tableId : tableIds) {
+            Table table = Objects.requireNonNull(tables.forTable(tableId));
+            // set the events to populate proper sourceInfo into offsetContext
+            offsetContext.event(tableId, Instant.now());
 
-        // TODO: check whether we always set isFromSnapshot = true
-        SchemaChangeEvent schemaChangeEvent =
-                SchemaChangeEvent.ofCreate(
-                        partition,
-                        offsetContext,
-                        dbzConfig.databaseName(),
-                        tableId.schema(),
-                        null,
-                        table,
-                        true);
+            // TODO: check whether we always set isFromSnapshot = true
+            SchemaChangeEvent schemaChangeEvent =
+                    SchemaChangeEvent.ofCreate(
+                            partition,
+                            offsetContext,
+                            dbzConfig.databaseName(),
+                            tableId.schema(),
+                            null,
+                            table,
+                            true);
 
-        for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {
-            this.schemasByTableId.put(tableId, tableChange);
+            for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {
+                this.schemasByTableId.put(tableId, tableChange);
+            }
+            tableChanges.add(this.schemasByTableId.get(tableId));
         }
-        return this.schemasByTableId.get(tableId);
+        return tableChanges;
     }
 }

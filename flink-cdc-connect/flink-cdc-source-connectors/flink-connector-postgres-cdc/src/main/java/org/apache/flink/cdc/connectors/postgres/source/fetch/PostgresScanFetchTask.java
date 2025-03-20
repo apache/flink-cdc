@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
@@ -28,6 +27,7 @@ import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.connector.postgresql.PostgresEventDispatcher;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
@@ -53,7 +53,9 @@ import org.slf4j.LoggerFactory;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static io.debezium.connector.postgresql.PostgresObjectUtils.waitForReplicationSlotReady;
 import static io.debezium.connector.postgresql.Utils.refreshSchema;
@@ -100,7 +102,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                         ctx.getDbzConnectorConfig(),
                         ctx.getDatabaseSchema(),
                         ctx.getOffsetContext(),
-                        ctx.getDispatcher(),
+                        ctx.getEventDispatcher(),
                         ctx.getSnapshotChangeEventSourceMetrics(),
                         snapshotSplit);
 
@@ -133,8 +135,8 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                         ctx.getDbzConnectorConfig(),
                         ctx.getSnapShotter(),
                         ctx.getConnection(),
-                        ctx.getDispatcher(),
-                        ctx.getPostgresDispatcher(),
+                        ctx.getEventDispatcher(),
+                        ctx.getWaterMarkDispatcher(),
                         ctx.getErrorHandler(),
                         ctx.getTaskContext().getClock(),
                         ctx.getDatabaseSchema(),
@@ -213,7 +215,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
 
         private final PostgresConnection jdbcConnection;
         private final PostgresConnectorConfig connectorConfig;
-        private final JdbcSourceEventDispatcher<PostgresPartition> dispatcher;
+        private final PostgresEventDispatcher<TableId> eventDispatcher;
         private final SnapshotSplit snapshotSplit;
         private final PostgresOffsetContext offsetContext;
         private final PostgresSchema databaseSchema;
@@ -225,7 +227,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 PostgresConnectorConfig connectorConfig,
                 PostgresSchema databaseSchema,
                 PostgresOffsetContext previousOffset,
-                JdbcSourceEventDispatcher dispatcher,
+                PostgresEventDispatcher<TableId> eventDispatcher,
                 SnapshotProgressListener snapshotProgressListener,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
@@ -233,7 +235,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
             this.connectorConfig = connectorConfig;
             this.snapshotProgressListener = snapshotProgressListener;
             this.databaseSchema = databaseSchema;
-            this.dispatcher = dispatcher;
+            this.eventDispatcher = eventDispatcher;
             this.snapshotSplit = snapshotSplit;
             this.offsetContext = previousOffset;
             this.clock = Clock.SYSTEM;
@@ -258,7 +260,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         private void createDataEvents(PostgresSnapshotContext snapshotContext, TableId tableId)
                 throws InterruptedException {
             EventDispatcher.SnapshotReceiver<PostgresPartition> snapshotReceiver =
-                    dispatcher.getSnapshotChangeEventReceiver();
+                    eventDispatcher.getSnapshotChangeEventReceiver();
             LOG.info("Snapshotting table {}", tableId);
             createDataEventsForTable(
                     snapshotContext,
@@ -280,12 +282,18 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     snapshotSplit.splitId(),
                     table.id());
 
+            List<String> uuidFields =
+                    snapshotSplit.getSplitKeyType().getFieldNames().stream()
+                            .filter(field -> table.columnWithName(field).typeName().equals("uuid"))
+                            .collect(Collectors.toList());
+
             final String selectSql =
                     PostgresQueryUtils.buildSplitScanQuery(
                             snapshotSplit.getTableId(),
                             snapshotSplit.getSplitKeyType(),
                             snapshotSplit.getSplitStart() == null,
-                            snapshotSplit.getSplitEnd() == null);
+                            snapshotSplit.getSplitEnd() == null,
+                            uuidFields);
             LOG.debug(
                     "For split '{}' of table {} using select statement: '{}'",
                     snapshotSplit.splitId(),
@@ -329,7 +337,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                     SnapshotChangeRecordEmitter<PostgresPartition> emitter =
                             new SnapshotChangeRecordEmitter<>(
                                     snapshotContext.partition, snapshotContext.offset, row, clock);
-                    dispatcher.dispatchSnapshotEvent(
+                    eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition, table.id(), emitter, snapshotReceiver);
                 }
                 LOG.info(

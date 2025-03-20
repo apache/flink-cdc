@@ -21,7 +21,7 @@ import org.apache.flink.cdc.connectors.postgres.source.PostgresConnectionPoolFac
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.test.util.AbstractTestBase;
+import org.apache.flink.test.util.AbstractTestBaseJUnit4;
 import org.apache.flink.types.Row;
 
 import io.debezium.config.Configuration;
@@ -63,7 +63,7 @@ import static org.junit.Assert.assertTrue;
  * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables wal
  * log.
  */
-public abstract class PostgresTestBase extends AbstractTestBase {
+public abstract class PostgresTestBase extends AbstractTestBaseJUnit4 {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
     public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     public static final String DEFAULT_DB = "postgres";
@@ -169,11 +169,11 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     protected void waitForSinkResult(String sinkName, List<String> expected)
             throws InterruptedException {
-        List<String> actual = TestValuesTableFactory.getResults(sinkName);
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings(sinkName);
         actual = actual.stream().sorted().collect(Collectors.toList());
         while (actual.size() != expected.size() || !actual.equals(expected)) {
             actual =
-                    TestValuesTableFactory.getResults(sinkName).stream()
+                    TestValuesTableFactory.getResultsAsStrings(sinkName).stream()
                             .sorted()
                             .collect(Collectors.toList());
             Thread.sleep(1000);
@@ -189,7 +189,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

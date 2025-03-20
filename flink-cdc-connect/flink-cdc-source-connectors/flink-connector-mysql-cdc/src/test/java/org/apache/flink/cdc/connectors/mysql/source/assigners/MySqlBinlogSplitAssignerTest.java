@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
 import org.junit.Test;
 
+import java.io.IOException;
 import java.time.ZoneId;
 import java.util.Optional;
 
@@ -40,36 +41,36 @@ import static org.junit.Assert.assertTrue;
 public class MySqlBinlogSplitAssignerTest {
 
     @Test
-    public void testStartFromEarliest() {
+    public void testStartFromEarliest() throws IOException {
         checkAssignedBinlogOffset(StartupOptions.earliest(), BinlogOffset.ofEarliest());
     }
 
     @Test
-    public void testStartFromLatestOffset() {
+    public void testStartFromLatestOffset() throws IOException {
         checkAssignedBinlogOffset(StartupOptions.latest(), BinlogOffset.ofLatest());
     }
 
     @Test
-    public void testStartFromTimestamp() {
+    public void testStartFromTimestamp() throws IOException {
         checkAssignedBinlogOffset(
                 StartupOptions.timestamp(15213000L), BinlogOffset.ofTimestampSec(15213L));
     }
 
     @Test
-    public void testStartFromBinlogFile() {
+    public void testStartFromBinlogFile() throws IOException {
         checkAssignedBinlogOffset(
                 StartupOptions.specificOffset("foo-file", 15213),
                 BinlogOffset.ofBinlogFilePosition("foo-file", 15213L));
     }
 
     @Test
-    public void testStartFromGtidSet() {
+    public void testStartFromGtidSet() throws IOException {
         checkAssignedBinlogOffset(
                 StartupOptions.specificOffset("foo-gtid"), BinlogOffset.ofGtidSet("foo-gtid"));
     }
 
     private void checkAssignedBinlogOffset(
-            StartupOptions startupOptions, BinlogOffset expectedOffset) {
+            StartupOptions startupOptions, BinlogOffset expectedOffset) throws IOException {
         // Set starting from the given option
         MySqlBinlogSplitAssigner assigner = new MySqlBinlogSplitAssigner(getConfig(startupOptions));
         // Get splits from assigner

@@ -133,6 +133,8 @@ public class OracleSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectMaxRetries,
                 connectionPoolSize,
                 chunkKeyColumn,
-                skipSnapshotBackfill);
+                skipSnapshotBackfill,
+                scanNewlyAddedTableEnabled,
+                assignUnboundedChunkFirst);
     }
 }

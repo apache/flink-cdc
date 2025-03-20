@@ -24,7 +24,6 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.serializer.InternalSerializers;
-import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryRecordDataWriter;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryWriter;
 
@@ -51,16 +50,15 @@ public class BinaryRecordDataGenerator {
                 dataTypes,
                 Arrays.stream(dataTypes)
                         .map(InternalSerializers::create)
-                        .map(NullableSerializerWrapper::new)
                         .toArray(TypeSerializer[]::new));
     }
 
     public BinaryRecordDataGenerator(DataType[] dataTypes, TypeSerializer[] serializers) {
         checkArgument(
                 dataTypes.length == serializers.length,
-                String.format(
-                        "The types and serializers must have the same length. But types is %d and serializers is %d",
-                        dataTypes.length, serializers.length));
+                "The types and serializers must have the same length. But types is %s and serializers is %s",
+                dataTypes.length,
+                serializers.length);
 
         this.dataTypes = dataTypes;
         this.serializers = serializers;
@@ -77,9 +75,9 @@ public class BinaryRecordDataGenerator {
     public BinaryRecordData generate(Object[] rowFields) {
         checkArgument(
                 dataTypes.length == rowFields.length,
-                String.format(
-                        "The types and values must have the same length. But types is %d and values is %d",
-                        dataTypes.length, rowFields.length));
+                "The types and values must have the same length. But types is %s and values is %s",
+                dataTypes.length,
+                rowFields.length);
 
         reuseWriter.reset();
         for (int i = 0; i < dataTypes.length; i++) {

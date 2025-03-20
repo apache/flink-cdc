@@ -160,7 +160,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
                         "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -239,7 +239,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+U(110,jacket2,null,0.5000000000)",
                         "+U(111,scooter,null,5.1700000000)",
                         "-D(111,scooter,null,5.1700000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -324,7 +324,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+U(110,jacket,new water resistent white wind breaker,0.5000000000)",
                         "+U(111,scooter,Big 2-wheel scooter ,5.1700000000)",
                         "-D(111,scooter,Big 2-wheel scooter ,5.1700000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -397,7 +397,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(inventory,products,109,spare tire,24 inch spare tire,22.2000000000)",
                         "+U(inventory,products,106,hammer,18oz carpenter hammer,1.0000000000)",
                         "-U(inventory,products,106,hammer,16oz carpenter's hammer,1.0000000000)");
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -534,7 +534,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})",
                         "+U(1,127,255,32767,65535,8388607,16777215,2147483647,4294967295,2147483647,9223372036854775807,18446744073709551615,Hello World,abc,123.102,123.102,404.4443,123.4567,346,34567892.1,false,true,true,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22,[101, 26, -17, -65, -67, 8, 57, 15, 72, -17, -65, -67, -17, -65, -67, -17, -65, -67, 54, -17, -65, -67, 62, 123, 116, 0],[4, 4, 4, 4, 4, 4, 4, 4],text,[16],[16],[16],[16],2021,red,[a, b],{\"key1\":\"value1\"})");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -614,7 +614,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
                         "+I(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:00:22)",
                         "+U(1,2020-07-17,18:00:22,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17T18:33:22)");
 
-        List<String> actual = TestValuesTableFactory.getRawResults("sink");
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertEqualsInAnyOrder(expected, actual);
         result.getJobClient().get().cancel().get();
     }
@@ -629,7 +629,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     private static int sinkSize(String sinkName) {
         synchronized (TestValuesTableFactory.class) {
             try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
+                return TestValuesTableFactory.getRawResultsAsStrings(sinkName).size();
             } catch (IllegalArgumentException e) {
                 // job is not started yet
                 return 0;

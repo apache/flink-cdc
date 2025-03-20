@@ -422,7 +422,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
                                     "+I[%s, 417022095255614379, China, %s, %s West Town address 3]",
                                     captureTableThisRound, cityName, cityName)));
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 2: make wal log data for all tables before this round(also includes this round),
             // test whether only this round table's data is captured.
@@ -449,7 +450,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             // step 3: assert fetched wal log data in this round
             waitForSinkSize("sink", fetchedDataList.size());
 
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             // step 4: trigger savepoint
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
@@ -521,7 +523,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
                         () -> sleepMs(100));
             }
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
@@ -556,7 +559,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             JobClient jobClient = tableResult.getJobClient().get();
 
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 3: make wal log data for all tables
             List<String> expectedWalLogDataThisRound = new ArrayList<>();
@@ -590,7 +594,7 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             }
 
             if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM
-                    && TestValuesTableFactory.getRawResults("sink").size()
+                    && TestValuesTableFactory.getRawResultsAsStrings("sink").size()
                             > fetchedDataList.size()) {
                 PostgresTestUtils.triggerFailover(
                         failoverType,
@@ -602,7 +606,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             fetchedDataList.addAll(expectedWalLogDataThisRound);
             // step 4: assert fetched wal log data in this round
             waitForSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getRawResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
 
             // step 5: trigger savepoint
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
@@ -716,7 +721,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
             PostgresTestUtils.waitForUpsertSinkSize("sink", fetchedDataList.size());
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 3: make some wal log data for this round
             makeFirstPartWalLogForAddressTable(getConnection(), newlyAddedTable);
@@ -757,7 +763,8 @@ public class NewlyAddedTableITCase extends PostgresTestBase {
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
             Thread.sleep(1000);
-            assertEqualsInAnyOrder(fetchedDataList, TestValuesTableFactory.getResults("sink"));
+            assertEqualsInAnyOrder(
+                    fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 
             // step 6: trigger savepoint
             if (round != captureAddressTables.length - 1) {

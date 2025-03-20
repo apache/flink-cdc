@@ -46,6 +46,16 @@ public class CliFrontendOptions {
                     .desc("JARs to be submitted together with the pipeline")
                     .build();
 
+    public static final Option TARGET =
+            Option.builder("t")
+                    .longOpt("target")
+                    .hasArg()
+                    .desc(
+                            "The deployment target for the execution. This can take one of the following values "
+                                    + "local/remote/yarn-session/yarn-application/kubernetes-session/kubernetes"
+                                    + "-application")
+                    .build();
+
     public static final Option USE_MINI_CLUSTER =
             Option.builder()
                     .longOpt("use-mini-cluster")
@@ -84,6 +94,17 @@ public class CliFrontendOptions {
                                     + "program that was part of the program when the savepoint was triggered.")
                     .build();
 
+    public static final Option FLINK_CONFIG =
+            Option.builder("D")
+                    .required(false)
+                    .numberOfArgs(2)
+                    .valueSeparator('=')
+                    .argName("Session dynamic flink config key=val")
+                    .desc(
+                            "Allows specifying multiple flink generic configuration options. The available"
+                                    + "options can be found at https://nightlies.apache.org/flink/flink-docs-stable/ops/config.html")
+                    .build();
+
     public static Options initializeOptions() {
         return new Options()
                 .addOption(HELP)
@@ -91,8 +112,11 @@ public class CliFrontendOptions {
                 .addOption(FLINK_HOME)
                 .addOption(GLOBAL_CONFIG)
                 .addOption(USE_MINI_CLUSTER)
+                .addOption(TARGET)
+                .addOption(USE_MINI_CLUSTER)
                 .addOption(SAVEPOINT_PATH_OPTION)
                 .addOption(SAVEPOINT_CLAIM_MODE)
-                .addOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION);
+                .addOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION)
+                .addOption(FLINK_CONFIG);
     }
 }

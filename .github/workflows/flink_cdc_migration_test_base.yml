@@ -1,0 +1,135 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Migration Tests
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        description: "Jdk versions to test against, passed as a JSON array string."
+        required: false
+        type: string
+        default: "['8']"
+      flink-version:
+        description: "Flink versions to test against, passed as a JSON array string."
+        required: true
+        type: string
+
+jobs:
+  migration_test_ut:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: ${{ fromJSON(inputs.flink-version) }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: temurin
+      - name: Compile snapshot CDC version
+        run: mvn --no-snapshot-updates -B install -DskipTests
+      - name: Run migration tests
+        run: cd flink-cdc-migration-tests && mvn clean verify
+
+  pipeline_migration_test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: ${{ fromJSON(inputs.flink-version) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: temurin
+          cache: maven
+      - name: Install dependencies
+        run: gem install terminal-table
+      - name: Prepare CDC versions
+        run: CDC_SOURCE_HOME=$PWD ruby tools/mig-test/prepare_libs.rb
+      - name: Prepare Flink distro
+        run: wget https://dlcdn.apache.org/flink/flink-${{ matrix.flink-version }}/flink-${{ matrix.flink-version }}-bin-scala_2.12.tgz && tar -xzvf flink-${{ matrix.flink-version }}-bin-scala_2.12.tgz
+        working-directory: ./tools/mig-test
+      - name: Patch Flink configs
+        run: FLINK_HOME=./flink-${{ matrix.flink-version }}/ ruby misc/patch_flink_conf.rb
+        working-directory: ./tools/mig-test
+      - name: Start containers
+        run: cd conf && docker compose up -d
+        working-directory: ./tools/mig-test
+      - name: Run migration tests
+        run: FLINK_HOME=./flink-${{ matrix.flink-version }}/ ruby run_migration_test.rb ${{ matrix.flink-version }}
+        working-directory: ./tools/mig-test
+      - name: Stop containers
+        if: always()
+        run: cd conf && docker compose down
+        working-directory: ./tools/mig-test
+
+  data_stream_migration_test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: ${{ fromJSON(inputs.java-version) }}
+        flink-version: [ '1.19.2', '1.20.1' ]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0
+          bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: temurin
+          cache: maven
+      - name: Install dependencies
+        run: gem install terminal-table
+      - name: Prepare CDC versions
+        run: CDC_SOURCE_HOME=$PWD ruby tools/mig-test/prepare_libs.rb
+      - name: Prepare Flink distro
+        run: wget https://dlcdn.apache.org/flink/flink-${{ matrix.flink-version }}/flink-${{ matrix.flink-version }}-bin-scala_2.12.tgz && tar -xzvf flink-${{ matrix.flink-version }}-bin-scala_2.12.tgz
+        working-directory: ./tools/mig-test
+      - name: Patch Flink configs
+        run: FLINK_HOME=./flink-${{ matrix.flink-version }}/ ruby misc/patch_flink_conf.rb
+        working-directory: ./tools/mig-test
+      - name: Compile Dummy DataStream Jobs
+        run: cd datastream && ruby compile_jobs.rb
+        working-directory: ./tools/mig-test
+      - name: Start containers
+        run: cd conf && docker compose up -d
+        working-directory: ./tools/mig-test
+      - name: Run migration tests
+        run: cd datastream && FLINK_HOME=../flink-${{ matrix.flink-version }}/ ruby run_migration_test.rb
+        working-directory: ./tools/mig-test
+      - name: Stop containers
+        if: always()
+        run: cd conf && docker compose down
+        working-directory: ./tools/mig-test

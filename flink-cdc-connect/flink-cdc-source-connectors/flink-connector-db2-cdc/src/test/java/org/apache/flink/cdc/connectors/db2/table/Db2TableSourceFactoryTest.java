@@ -118,7 +118,9 @@ public class Db2TableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         false,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
         assertEquals(expectedSource, actualSource);
     }
 
@@ -128,6 +130,7 @@ public class Db2TableSourceFactoryTest {
         options.put("port", "50000");
         options.put("server-time-zone", "Asia/Shanghai");
         options.put("debezium.snapshot.mode", "schema_only");
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(options, SCHEMA);
         Properties dbzProperties = new Properties();
@@ -157,7 +160,8 @@ public class Db2TableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         false,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        true);
         assertEquals(expectedSource, actualSource);
     }
 
@@ -245,7 +249,9 @@ public class Db2TableSourceFactoryTest {
                                 .defaultValue(),
                         null,
                         false,
-                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue());
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
+                        JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                                .defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("op_ts", "database_name", "table_name", "schema_name");

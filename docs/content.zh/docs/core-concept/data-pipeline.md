@@ -24,23 +24,23 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Definition
-Since events in Flink CDC flow from the upstream to the downstream in a pipeline manner, the whole ETL task is referred as a **Data Pipeline**.
+# 定义
+由于在 Flink CDC 中，事件从上游流转到下游遵循 Pipeline 的模式，因此整个 ETL 作业也被称为 **Data Pipeline**。
 
-# Parameters
-A pipeline corresponds to a chain of operators in Flink.   
-To describe a Data Pipeline, the following parts are required:
+# 参数
+一个 pipeline 包含着 Flink 的一组算子链。
+为了描述 Data Pipeline，我们需要定义以下部分：
 - [source]({{< ref "docs/core-concept/data-source" >}})
 - [sink]({{< ref "docs/core-concept/data-sink" >}})
 - [pipeline](#pipeline-configurations)
 
-the following parts are optional:
+下面 是 Data Pipeline 的一些可选配置：
 - [route]({{< ref "docs/core-concept/route" >}})
 - [transform]({{< ref "docs/core-concept/transform" >}})
 
-# Example
-## Only required
-We could use following yaml file to define a concise Data Pipeline describing synchronize all tables under MySQL app_db database to Doris :
+# 示例
+## 只包含必须部分
+我们可以使用以下 yaml 文件来定义一个简单的 Data Pipeline 来同步 MySQL app_db 数据库下的所有表到 Doris：
 
 ```yaml
    source:
@@ -62,8 +62,8 @@ We could use following yaml file to define a concise Data Pipeline describing sy
      parallelism: 2
 ```
 
-## With optional
-We could use following yaml file to define a complicated Data Pipeline describing synchronize all tables under MySQL app_db database to Doris and give specific target database name ods_db and specific target table name prefix ods_ :
+## 包含可选部分
+我们可以使用以下 yaml 文件来定义一个复杂的 Data Pipeline 来同步 MySQL app_db 数据库下的所有表到 Doris，并给目标数据库名 ods_db 和目标表名前缀 ods_：
 
 ```yaml
    source:
@@ -79,24 +79,40 @@ We could use following yaml file to define a complicated Data Pipeline describin
      fenodes: 127.0.0.1:8030
      username: root
      password: ""
+
+   transform:
+     - source-table: adb.web_order01
+       projection: \*, format('%S', product_name) as product_name
+       filter: addone(id) > 10 AND order_id > 100
+       description: project fields and filter
+     - source-table: adb.web_order02
+       projection: \*, format('%S', product_name) as product_name
+       filter: addone(id) > 20 AND order_id > 200
+       description: project fields and filter
+
    route:
      - source-table: app_db.orders
        sink-table: ods_db.ods_orders
      - source-table: app_db.shipments
        sink-table: ods_db.ods_shipments
      - source-table: app_db.products
-       sink-table: ods_db.ods_products  
+       sink-table: ods_db.ods_products
 
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
+     user-defined-function:
+       - name: addone
+         classpath: com.example.functions.AddOneFunctionClass
+       - name: format
+         classpath: com.example.functions.FormatFunctionClass
 ```
 
-# Pipeline Configurations
-The following config options of Data Pipeline level are supported:
+# Pipeline 配置
+下面 是 Data Pipeline 的一些可选配置：
 
-| parameter       | meaning                                                                                 | optional/required |
-|-----------------|-----------------------------------------------------------------------------------------|-------------------|
-| name            | The name of the pipeline, which will be submitted to the Flink cluster as the job name. | optional          |
-| parallelism     | The global parallelism of the pipeline.                                                 | required          |
-| local-time-zone | The local time zone defines current session time zone id.                               | optional          |
+| 参数              | 含义                                    | optional/required |
+|-----------------|---------------------------------------|-------------------|
+| name            | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。 | optional          |
+| parallelism     | pipeline的全局并发度，默认值是1。                 | optional          |
+| local-time-zone | 作业级别的本地时区。                            | optional          |

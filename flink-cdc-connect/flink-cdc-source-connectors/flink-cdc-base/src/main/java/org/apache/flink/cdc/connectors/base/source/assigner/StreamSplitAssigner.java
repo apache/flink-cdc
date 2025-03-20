@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.base.source.assigner;
 
+import org.apache.flink.api.connector.source.SourceSplit;
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
@@ -27,10 +29,9 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,7 +43,6 @@ import java.util.Optional;
 /** Assigner for stream split. */
 public class StreamSplitAssigner implements SplitAssigner {
 
-    private static final Logger LOG = LoggerFactory.getLogger(StreamSplitAssigner.class);
     private static final String STREAM_SPLIT_ID = "stream-split";
 
     private final SourceConfig sourceConfig;
@@ -52,32 +52,53 @@ public class StreamSplitAssigner implements SplitAssigner {
     private final DataSourceDialect dialect;
     private final OffsetFactory offsetFactory;
 
+    private final SplitEnumeratorContext<? extends SourceSplit> enumeratorContext;
+    private SourceEnumeratorMetrics enumeratorMetrics;
+
     public StreamSplitAssigner(
-            SourceConfig sourceConfig, DataSourceDialect dialect, OffsetFactory offsetFactory) {
-        this(sourceConfig, false, dialect, offsetFactory);
+            SourceConfig sourceConfig,
+            DataSourceDialect dialect,
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
+        this(sourceConfig, false, dialect, offsetFactory, enumeratorContext);
     }
 
     public StreamSplitAssigner(
             SourceConfig sourceConfig,
             StreamPendingSplitsState checkpoint,
             DataSourceDialect dialect,
-            OffsetFactory offsetFactory) {
-        this(sourceConfig, checkpoint.isStreamSplitAssigned(), dialect, offsetFactory);
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
+        this(
+                sourceConfig,
+                checkpoint.isStreamSplitAssigned(),
+                dialect,
+                offsetFactory,
+                enumeratorContext);
     }
 
     private StreamSplitAssigner(
             SourceConfig sourceConfig,
             boolean isStreamSplitAssigned,
             DataSourceDialect dialect,
-            OffsetFactory offsetFactory) {
+            OffsetFactory offsetFactory,
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
         this.isStreamSplitAssigned = isStreamSplitAssigned;
         this.dialect = dialect;
         this.offsetFactory = offsetFactory;
+        this.enumeratorContext = enumeratorContext;
     }
 
     @Override
-    public void open() {}
+    public void open() {
+        this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
+        if (isStreamSplitAssigned) {
+            enumeratorMetrics.enterStreamReading();
+        } else {
+            enumeratorMetrics.exitStreamReading();
+        }
+    }
 
     @Override
     public Optional<SourceSplitBase> getNext() {
@@ -85,6 +106,7 @@ public class StreamSplitAssigner implements SplitAssigner {
             return Optional.empty();
         } else {
             isStreamSplitAssigned = true;
+            enumeratorMetrics.enterStreamReading();
             return Optional.of(createStreamSplit());
         }
     }
@@ -108,6 +130,7 @@ public class StreamSplitAssigner implements SplitAssigner {
     public void addSplits(Collection<SourceSplitBase> splits) {
         // we don't store the split, but will re-create stream split later
         isStreamSplitAssigned = false;
+        enumeratorMetrics.exitStreamReading();
     }
 
     @Override
@@ -137,7 +160,9 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     @Override
-    public void close() {}
+    public void close() throws IOException {
+        dialect.close();
+    }
 
     // ------------------------------------------------------------------------------------------
 

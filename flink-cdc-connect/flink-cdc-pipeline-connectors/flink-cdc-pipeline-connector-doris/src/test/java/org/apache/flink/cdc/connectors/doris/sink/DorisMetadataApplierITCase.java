@@ -20,17 +20,24 @@ package org.apache.flink.cdc.connectors.doris.sink;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
@@ -38,6 +45,7 @@ import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -45,16 +53,18 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.BENODES;
@@ -63,6 +73,7 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PA
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_BATCH_MODE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_DELETE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
+import static org.junit.Assert.fail;
 
 /** IT tests for {@link DorisMetadataApplier}. */
 @RunWith(Parameterized.class)
@@ -192,6 +203,21 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         tableId, Collections.singletonMap("name", DataTypes.VARCHAR(19))));
     }
 
+    private List<Event> generateAlterColumnTypeWithDefaultValueEvents(TableId tableId) {
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null, "2.71828"))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null, "Alice"))
+                        .primaryKey("id")
+                        .build();
+
+        return Arrays.asList(
+                new CreateTableEvent(tableId, schema),
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("name", DataTypes.VARCHAR(19))));
+    }
+
     private List<Event> generateNarrowingAlterColumnTypeEvents(TableId tableId) {
         Schema schema =
                 Schema.newBuilder()
@@ -233,10 +259,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         .column(new PhysicalColumn("string", DataTypes.STRING(), "String"))
                         .column(new PhysicalColumn("decimal", DataTypes.DECIMAL(17, 7), "Decimal"))
                         .column(new PhysicalColumn("date", DataTypes.DATE(), "Date"))
-                        // Doris sink doesn't support TIME type yet.
-                        // .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
-                        // .column(new PhysicalColumn("time_3", DataTypes.TIME(3), "Time With
-                        // Precision"))
+                        // Doris sink doesn't support TIME type ，thus convert TIME to STRING
+                        .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
+                        .column(
+                                new PhysicalColumn(
+                                        "time_3", DataTypes.TIME(3), "Time With Precision"))
+                        .column(
+                                new PhysicalColumn(
+                                        "time_6", DataTypes.TIME(6), "Time With Precision"))
                         .column(new PhysicalColumn("timestamp", DataTypes.TIMESTAMP(), "Timestamp"))
                         .column(
                                 new PhysicalColumn(
@@ -295,6 +325,9 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         "string | TEXT | Yes | false | null",
                         "decimal | DECIMAL(17, 7) | Yes | false | null",
                         "date | DATE | Yes | false | null",
+                        "time | TEXT | Yes | false | null",
+                        "time_3 | TEXT | Yes | false | null",
+                        "time_6 | TEXT | Yes | false | null",
                         "timestamp | DATETIME(6) | Yes | false | null",
                         "timestamp_3 | DATETIME(3) | Yes | false | null",
                         "timestamptz | DATETIME(6) | Yes | false | null",
@@ -367,7 +400,6 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
     }
 
     @Test
-    @Ignore("AlterColumnType is yet to be supported until we close FLINK-35072.")
     public void testDorisAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -386,6 +418,25 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
+    @Test
+    public void testDorisAlterColumnTypeWithDefaultValue() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        runJobWithEvents(generateAlterColumnTypeWithDefaultValueEvents(tableId));
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "number | DOUBLE | Yes | false | 2.71828",
+                        "name | VARCHAR(57) | Yes | false | Alice");
+
+        assertEqualsInOrder(expected, actual);
+    }
+
     @Test(expected = JobExecutionException.class)
     public void testDorisNarrowingAlterColumnType() throws Exception {
         TableId tableId =
@@ -395,8 +446,90 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         runJobWithEvents(generateNarrowingAlterColumnTypeEvents(tableId));
     }
 
+    @Test
+    public void testDorisTruncateTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> preparationTestingEvents =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
+        runJobWithEvents(preparationTestingEvents);
+        waitAndVerify(
+                tableId,
+                3,
+                Arrays.asList("1 | 2.3 | Alice", "2 | 3.4 | Bob"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+
+        List<Event> truncateTestingEvents =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        new TruncateTableEvent(tableId),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 3, 4.5, "Cecily")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 4, 5.6, "Derrida")));
+        runJobWithEvents(truncateTestingEvents);
+        waitAndVerify(
+                tableId,
+                3,
+                Arrays.asList("3 | 4.5 | Cecily", "4 | 5.6 | Derrida"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+    }
+
+    @Test
+    public void testDorisDropTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> preparationTestingEvents =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, schema),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
+                        DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
+        runJobWithEvents(preparationTestingEvents);
+
+        waitAndVerify(
+                tableId,
+                3,
+                Arrays.asList("1 | 2.3 | Alice", "2 | 3.4 | Bob"),
+                DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
+
+        runJobWithEvents(
+                Arrays.asList(new CreateTableEvent(tableId, schema), new DropTableEvent(tableId)));
+
+        SQLSyntaxErrorException thrown =
+                Assertions.assertThrows(
+                        SQLSyntaxErrorException.class, () -> fetchTableContent(tableId, 3));
+        Assertions.assertTrue(
+                thrown.getMessage()
+                        .contains(
+                                String.format(
+                                        "errCode = 2, detailMessage = Unknown table '%s'",
+                                        tableId.getTableName())));
+    }
+
     private void runJobWithEvents(List<Event> events) throws Exception {
-        DataStream<Event> stream = env.fromCollection(events, TypeInformation.of(Event.class));
+        DataStream<Event> stream =
+                env.fromCollection(events, TypeInformation.of(Event.class)).setParallelism(1);
 
         Configuration config =
                 new Configuration()
@@ -417,16 +550,21 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
                         "$$_schema_operator_$$",
-                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
+                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
+                        "UTC");
 
         OperatorIDGenerator schemaOperatorIDGenerator =
                 new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
 
         stream =
-                schemaOperatorTranslator.translate(
+                schemaOperatorTranslator.translateRegular(
                         stream,
                         DEFAULT_PARALLELISM,
-                        dorisSink.getMetadataApplier(),
+                        dorisSink
+                                .getMetadataApplier()
+                                .setAcceptedSchemaEvolutionTypes(
+                                        Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                                                .collect(Collectors.toSet())),
                         new ArrayList<>());
 
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
@@ -437,5 +575,39 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 schemaOperatorIDGenerator.generate());
 
         env.execute("Doris Schema Evolution Test");
+    }
+
+    BinaryRecordData generate(Schema schema, Object... fields) {
+        return (new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0])))
+                .generate(
+                        Arrays.stream(fields)
+                                .map(
+                                        e ->
+                                                (e instanceof String)
+                                                        ? BinaryStringData.fromString((String) e)
+                                                        : e)
+                                .toArray());
+    }
+
+    private void waitAndVerify(
+            TableId tableId, int numberOfColumns, List<String> expected, long timeoutMilliseconds)
+            throws Exception {
+        long timeout = System.currentTimeMillis() + timeoutMilliseconds;
+        while (System.currentTimeMillis() < timeout) {
+            List<String> actual = fetchTableContent(tableId, numberOfColumns);
+            if (expected.stream()
+                    .sorted()
+                    .collect(Collectors.toList())
+                    .equals(actual.stream().sorted().collect(Collectors.toList()))) {
+                return;
+            }
+            LOG.info(
+                    "Content of {} isn't ready.\nExpected: {}\nActual: {}",
+                    tableId,
+                    expected,
+                    actual);
+            Thread.sleep(1000L);
+        }
+        fail(String.format("Failed to verify content of %s.", tableId));
     }
 }

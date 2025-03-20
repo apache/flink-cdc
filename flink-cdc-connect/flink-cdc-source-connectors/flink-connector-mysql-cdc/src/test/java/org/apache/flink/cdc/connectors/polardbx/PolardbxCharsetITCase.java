@@ -167,8 +167,8 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         testName,
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
