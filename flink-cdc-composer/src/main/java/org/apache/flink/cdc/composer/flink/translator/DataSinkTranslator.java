@@ -168,7 +168,7 @@ public class DataSinkTranslator {
                 inputStream.transform(
                         SINK_WRITER_PREFIX + sinkName,
                         typeInformation,
-                        new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
+                        new DataSinkWriterOperatorFactory<>(sink, isBatchMode, schemaOperatorID));
 
         DataStream<CommittableMessage<CommT>> preCommitted = written;
         if (sink instanceof WithPreCommitTopology) {
