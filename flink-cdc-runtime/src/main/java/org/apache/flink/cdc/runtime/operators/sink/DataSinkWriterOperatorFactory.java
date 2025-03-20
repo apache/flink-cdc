@@ -39,12 +39,6 @@ public class DataSinkWriterOperatorFactory<CommT>
     private final boolean isBatchMode;
     private final OperatorID schemaOperatorID;
 
-    public DataSinkWriterOperatorFactory(Sink<Event> sink, OperatorID schemaOperatorID) {
-        this.sink = sink;
-        this.isBatchMode = false;
-        this.schemaOperatorID = schemaOperatorID;
-    }
-
     public DataSinkWriterOperatorFactory(
             Sink<Event> sink, boolean isBatchMode, OperatorID schemaOperatorID) {
         this.sink = sink;
