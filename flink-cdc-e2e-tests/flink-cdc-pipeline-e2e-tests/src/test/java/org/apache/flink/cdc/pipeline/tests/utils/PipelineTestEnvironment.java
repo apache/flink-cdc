@@ -17,9 +17,12 @@
 
 package org.apache.flink.cdc.pipeline.tests.utils;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.client.deployment.StandaloneClusterId;
 import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.configuration.Configuration;
@@ -48,7 +51,9 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.FrameConsumerResultCallback;
 import org.testcontainers.containers.output.OutputFrame;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.MountableFile;
 
@@ -60,11 +65,15 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -73,6 +82,7 @@ import static org.apache.flink.util.Preconditions.checkState;
 /** Test environment running pipeline job on Flink containers. */
 @RunWith(Parameterized.class)
 public abstract class PipelineTestEnvironment extends TestLogger {
+
     private static final Logger LOG = LoggerFactory.getLogger(PipelineTestEnvironment.class);
 
     @Parameterized.Parameter public String flinkVersion;
@@ -89,6 +99,30 @@ public abstract class PipelineTestEnvironment extends TestLogger {
             return 4;
         }
     }
+
+    // ------------------------------------------------------------------------------------------
+    // MySQL Variables (we always use MySQL as the data source for easier verifying)
+    // ------------------------------------------------------------------------------------------
+    protected static final String MYSQL_TEST_USER = "mysqluser";
+    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
+    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
+    protected static final Duration EVENT_WAITING_TIMEOUT = Duration.ofMinutes(3);
+    protected static final Duration STARTUP_WAITING_TIMEOUT = Duration.ofMinutes(5);
+
+    @ClassRule public static final Network NETWORK = Network.newNetwork();
+
+    @ClassRule
+    public static final MySqlContainer MYSQL =
+            (MySqlContainer)
+                    new MySqlContainer(MySqlVersion.V8_0)
+                            .withConfigurationOverride("docker/mysql/my.cnf")
+                            .withSetupSQL("docker/mysql/setup.sql")
+                            .withDatabaseName("flink-test")
+                            .withUsername("flinkuser")
+                            .withPassword("flinkpw")
+                            .withNetwork(NETWORK)
+                            .withNetworkAliases("mysql")
+                            .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables
@@ -113,8 +147,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false",
                     "restart-strategy.type: off");
     public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
-
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
 
     @Rule public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -167,6 +199,9 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         Startables.deepStart(Stream.of(taskManager)).join();
         runInContainerAsRoot(taskManager, "chmod", "0777", "-R", sharedVolume.toString());
         LOG.info("TaskManager is started.");
+
+        TarballFetcher.fetchLatest(jobManager);
+        LOG.info("CDC executables deployed.");
     }
 
     @After
@@ -193,40 +228,79 @@ public abstract class PipelineTestEnvironment extends TestLogger {
      *
      * <p><b>NOTE:</b> You should not use {@code '\t'}.
      */
-    public void submitPipelineJob(String pipelineJob, Path... jars)
-            throws IOException, InterruptedException {
-        for (Path jar : jars) {
-            jobManager.copyFileToContainer(
-                    MountableFile.forHostPath(jar), "/tmp/flinkCDC/lib/" + jar.getFileName());
+    public JobID submitPipelineJob(String pipelineJob, Path... jars) throws Exception {
+        return submitPipelineJob(
+                TarballFetcher.CdcVersion.SNAPSHOT, pipelineJob, null, false, jars);
+    }
+
+    public JobID submitPipelineJob(
+            TarballFetcher.CdcVersion version,
+            String pipelineJob,
+            @Nullable String savepointPath,
+            boolean allowNonRestoredState,
+            Path... jars)
+            throws Exception {
+
+        // Prepare external JAR dependencies
+        List<Path> paths = new ArrayList<>(Arrays.asList(jars));
+        List<String> containerPaths = new ArrayList<>();
+        paths.add(TestUtils.getResource("mysql-driver.jar"));
+
+        for (Path jar : paths) {
+            String containerPath = version.workDir() + "/lib/" + jar.getFileName();
+            jobManager.copyFileToContainer(MountableFile.forHostPath(jar), containerPath);
+            containerPaths.add(containerPath);
         }
-        jobManager.copyFileToContainer(
-                MountableFile.forHostPath(
-                        TestUtils.getResource("flink-cdc.sh", "flink-cdc-dist", "src"), 755),
-                "/tmp/flinkCDC/bin/flink-cdc.sh");
-        jobManager.copyFileToContainer(
-                MountableFile.forHostPath(
-                        TestUtils.getResource("flink-cdc.yaml", "flink-cdc-dist", "src"), 755),
-                "/tmp/flinkCDC/conf/flink-cdc.yaml");
-        jobManager.copyFileToContainer(
-                MountableFile.forHostPath(TestUtils.getResource("flink-cdc-dist.jar")),
-                "/tmp/flinkCDC/lib/flink-cdc-dist.jar");
-        Path script = temporaryFolder.newFile().toPath();
-        Files.write(script, pipelineJob.getBytes());
-        jobManager.copyFileToContainer(
-                MountableFile.forHostPath(script), "/tmp/flinkCDC/conf/pipeline.yaml");
+
+        // Attach default MySQL and Values connectors
+        containerPaths.add(version.workDir() + "/lib/mysql-cdc-pipeline-connector.jar");
+        containerPaths.add(version.workDir() + "/lib/values-cdc-pipeline-connector.jar");
+
         StringBuilder sb = new StringBuilder();
-        for (Path jar : jars) {
-            sb.append(" --jar /tmp/flinkCDC/lib/").append(jar.getFileName());
+        for (String containerPath : containerPaths) {
+            sb.append(" --jar ").append(containerPath);
         }
+
+        jobManager.copyFileToContainer(
+                Transferable.of(pipelineJob), version.workDir() + "/conf/pipeline.yaml");
+
         String commands =
-                "/tmp/flinkCDC/bin/flink-cdc.sh /tmp/flinkCDC/conf/pipeline.yaml --flink-home /opt/flink"
+                version.workDir()
+                        + "/bin/flink-cdc.sh "
+                        + version.workDir()
+                        + "/conf/pipeline.yaml --flink-home /opt/flink"
                         + sb;
+
+        if (savepointPath != null) {
+            commands += " --from-savepoint " + savepointPath;
+            if (allowNonRestoredState) {
+                commands += " --allow-nonRestored-state";
+            }
+        }
+        LOG.info("Execute command: {}", commands);
         ExecResult execResult = jobManager.execInContainer("bash", "-c", commands);
         LOG.info(execResult.getStdout());
         LOG.error(execResult.getStderr());
         if (execResult.getExitCode() != 0) {
             throw new AssertionError("Failed when submitting the pipeline job.");
         }
+        return execResult
+                .getStdout()
+                .lines()
+                .filter(line -> line.startsWith("Job ID: "))
+                .findFirst()
+                .map(line -> line.split(": ")[1])
+                .map(JobID::fromHexString)
+                .orElse(null);
+    }
+
+    public String cancelJob(JobID jobID) throws Exception {
+        String savepointPath = "/tmp/cdc/savepoint/sp-" + new Random().nextInt();
+        jobManager.execInContainer(
+                "bash",
+                "-c",
+                "flink stop " + jobID.toHexString() + " --savepointPath " + savepointPath);
+        return savepointPath;
     }
 
     /**
@@ -331,5 +405,47 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         assert url != null;
         Path path = new File(url.getFile()).toPath();
         return Files.readAllLines(path);
+    }
+
+    protected void validateResult(String... expectedEvents) throws Exception {
+        validateResult(Function.identity(), expectedEvents);
+    }
+
+    protected void validateResult(Function<String, String> mapper, String... expectedEvents)
+            throws Exception {
+        validateResult(
+                taskManagerConsumer, Stream.of(expectedEvents).map(mapper).toArray(String[]::new));
+    }
+
+    protected void validateResult(ToStringConsumer consumer, String... expectedEvents)
+            throws Exception {
+        for (String event : expectedEvents) {
+            waitUntilSpecificEvent(consumer, event);
+        }
+    }
+
+    protected void waitUntilSpecificEvent(String event) throws Exception {
+        waitUntilSpecificEvent(taskManagerConsumer, event);
+    }
+
+    protected void waitUntilSpecificEvent(ToStringConsumer consumer, String event)
+            throws Exception {
+        boolean result = false;
+        long endTimeout = System.currentTimeMillis() + EVENT_WAITING_TIMEOUT.toMillis();
+        while (System.currentTimeMillis() < endTimeout) {
+            String stdout = consumer.toUtf8String();
+            if (stdout.contains(event + "\n")) {
+                result = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
+        if (!result) {
+            throw new TimeoutException(
+                    "failed to get specific event: "
+                            + event
+                            + " from stdout: "
+                            + consumer.toUtf8String());
+        }
     }
 }
