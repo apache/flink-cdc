@@ -187,6 +187,9 @@ public class StreamSplitAssigner implements SplitAssigner {
                                 startupOptions.specificOffsetFile,
                                 startupOptions.specificOffsetPos.longValue());
                 break;
+            case COMMITTED_OFFSETS:
+                startingOffset = dialect.displayCommittedOffset(sourceConfig);
+                break;
             default:
                 throw new IllegalStateException(
                         "Unsupported startup mode " + startupOptions.startupMode);

@@ -41,6 +41,7 @@ import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
 import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.connector.postgresql.connection.PostgresConnectionUtils;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -134,6 +135,17 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             return currentOffset((PostgresConnection) jdbc);
+
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(e);
+        }
+    }
+
+    public Offset displayCommittedOffset(JdbcSourceConfig sourceConfig) {
+
+        try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+            return PostgresConnectionUtils.committedOffset(
+                    (PostgresConnection) jdbc, getSlotName(), getPluginName());
 
         } catch (SQLException e) {
             throw new FlinkRuntimeException(e);
