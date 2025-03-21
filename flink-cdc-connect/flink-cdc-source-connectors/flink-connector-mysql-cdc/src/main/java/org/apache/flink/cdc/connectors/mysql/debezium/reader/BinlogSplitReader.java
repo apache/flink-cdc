@@ -89,6 +89,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private final StoppableChangeEventSourceContext changeEventSourceContext =
             new StoppableChangeEventSourceContext();
     private final boolean isParsingOnLineSchemaChanges;
+    private final boolean isBackfillSkipped;
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
@@ -110,6 +111,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.pureBinlogPhaseTables = new HashSet<>();
         this.isParsingOnLineSchemaChanges =
                 statefulTaskContext.getSourceConfig().isParseOnLineSchemaChanges();
+        this.isBackfillSkipped = statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill();
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -257,6 +259,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
+                // if backfill skipped, don't need to filter
+                if (isBackfillSkipped) {
+                    return true;
+                }
                 RowType splitKeyType =
                         ChunkUtils.getChunkKeyColumnType(
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
