@@ -19,42 +19,43 @@ package org.apache.flink.cdc.connectors.tidb.table.utils;
 
 import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.tikv.common.TiConfiguration;
 
 import java.util.HashMap;
 
-import static org.junit.Assert.assertEquals;
-
 /** Unit test for {@link UriHostMapping}. * */
-public class UriHostMappingTest {
+class UriHostMappingTest {
 
     @Test
-    public void uriHostMappingTest() {
+    void uriHostMappingTest() {
         final TiConfiguration tiConf =
                 TDBSourceOptions.getTiConfiguration(
                         "http://0.0.0.0:2347", "host1:1;host2:2;host3:3", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
-        assertEquals(uriHostMapping.getHostMapping().size(), 3);
-        assertEquals(uriHostMapping.getHostMapping().get("host1"), "1");
+        Assertions.assertThat(uriHostMapping.getHostMapping())
+                .hasSize(3)
+                .containsEntry("host1", "1");
     }
 
     @Test
-    public void uriHostMappingEmpty() {
+    void uriHostMappingEmpty() {
         final TiConfiguration tiConf =
                 TDBSourceOptions.getTiConfiguration("http://0.0.0.0:2347", "", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
-        assertEquals(uriHostMapping.getHostMapping(), null);
+        Assertions.assertThat(uriHostMapping.getHostMapping()).isNull();
     }
 
     @Test
-    public void uriHostMappingError() {
-        try {
-            final TiConfiguration tiConf =
-                    TDBSourceOptions.getTiConfiguration(
-                            "http://0.0.0.0:2347", "host1=1;host2=2;host3=3", new HashMap<>());
-        } catch (IllegalArgumentException e) {
-            assertEquals(e.getMessage(), "Invalid host mapping string: host1=1;host2=2;host3=3");
-        }
+    void uriHostMappingError() {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                TDBSourceOptions.getTiConfiguration(
+                                        "http://0.0.0.0:2347",
+                                        "host1=1;host2=2;host3=3",
+                                        new HashMap<>()))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid host mapping string: host1=1;host2=2;host3=3");
     }
 }

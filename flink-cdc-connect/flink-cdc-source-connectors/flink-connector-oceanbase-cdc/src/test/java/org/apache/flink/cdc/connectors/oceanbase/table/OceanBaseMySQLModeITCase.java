@@ -24,23 +24,26 @@ import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseMySQLCdcMetadata;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.UniqueDatabase;
+import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.Connection;
 import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -48,7 +51,8 @@ import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.creat
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
 
 /** Integration tests for OceanBase MySQL mode table source. */
-public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
+@Testcontainers
+class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -56,14 +60,14 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    private static final Network NETWORK = Network.newNetwork();
 
-    @ClassRule
-    public static final OceanBaseContainer OB_SERVER =
+    @Container
+    private static final OceanBaseContainer OB_SERVER =
             createOceanBaseContainerForCDC().withNetwork(NETWORK);
 
-    @ClassRule
-    public static final LogProxyContainer LOG_PROXY =
+    @Container
+    private static final LogProxyContainer LOG_PROXY =
             createLogProxyContainer().withNetwork(NETWORK);
 
     private static final OceanBaseCdcMetadata METADATA =
@@ -77,14 +81,14 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         return METADATA;
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.enableCheckpointing(1000);
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500);
     }
 
-    @After
+    @AfterEach
     public void after() {
         if (inventoryDatabase != null) {
             inventoryDatabase.dropDatabase();
@@ -117,7 +121,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testTableList() throws Exception {
+    void testTableList() throws Exception {
         inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
         inventoryDatabase.createAndInitialize("mysql");
         waitForTableInitialization();
@@ -223,7 +227,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testMetadataColumns() throws Exception {
+    void testMetadataColumns() throws Exception {
         inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
         inventoryDatabase.createAndInitialize("mysql");
         waitForTableInitialization();
@@ -306,7 +310,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testAllDataTypes() throws Exception {
+    void testAllDataTypes() throws Exception {
         String serverTimeZone = "+00:00";
         setGlobalTimeZone(serverTimeZone);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
@@ -490,16 +494,16 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testTimezoneBerlin() throws Exception {
+    void testTimezoneBerlin() throws Exception {
         testTimeDataTypes("+02:00");
     }
 
     @Test
-    public void testTimezoneShanghai() throws Exception {
+    void testTimezoneShanghai() throws Exception {
         testTimeDataTypes("+08:00");
     }
 
-    public void testTimeDataTypes(String serverTimeZone) throws Exception {
+    void testTimeDataTypes(String serverTimeZone) throws Exception {
         setGlobalTimeZone(serverTimeZone);
         tEnv.getConfig().setLocalTimeZone(ZoneId.of(serverTimeZone));
 
@@ -574,7 +578,7 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testSnapshotOnly() throws Exception {
+    void testSnapshotOnly() throws Exception {
         inventoryDatabase = new UniqueDatabase(OB_SERVER, "inventory");
         inventoryDatabase.createAndInitialize("mysql");
         waitForTableInitialization();
@@ -628,9 +632,17 @@ public class OceanBaseMySQLModeITCase extends OceanBaseTestBase {
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
         assertContainsInAnyOrder(expected, actual);
 
-        while (result.getJobClient().get().getJobStatus().get().equals(JobStatus.RUNNING)) {
-            Thread.sleep(100);
-            // Waiting for job to finish (SNAPSHOT job will end spontaneously)
+        try {
+            while (result.getJobClient()
+                    .map(JobClient::getJobStatus)
+                    .map(CompletableFuture::join)
+                    .orElse(JobStatus.FINISHED)
+                    .equals(JobStatus.RUNNING)) {
+                Thread.sleep(100);
+                // Waiting for job to finish (SNAPSHOT job will end spontaneously)
+            }
+        } catch (IllegalStateException e) {
+            // It's fine if miniCluster has been shut down
         }
     }
 }

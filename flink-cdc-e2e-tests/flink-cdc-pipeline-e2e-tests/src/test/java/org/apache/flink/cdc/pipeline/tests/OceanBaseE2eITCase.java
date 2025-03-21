@@ -28,18 +28,13 @@ import org.apache.flink.util.function.FunctionWithException;
 import org.apache.flink.util.function.SupplierWithException;
 
 import org.apache.commons.text.StringEscapeUtils;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -52,11 +47,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** OceanBase flink cdc pipeline connector sink integrate test. */
-@RunWith(Parameterized.class)
-public class OceanBaseE2eITCase extends PipelineTestEnvironment {
+class OceanBaseE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -68,8 +65,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
     private static final String MYSQL_TEST_TABLE_NAME = "products";
 
-    @ClassRule
-    public static final MySqlContainer MYSQL =
+    @Container
+    static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
                                     MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
@@ -82,33 +79,33 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                             .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
+    @Container
+    static final OceanBaseContainer OB_SERVER =
+            OceanBaseTestUtils.createOceanBaseContainerForJdbc()
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases("oceanbase")
+                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+
     public final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(
                     MYSQL, "mysql_2_oceanbase_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
     private final String uniqueDatabaseName = mysqlInventoryDatabase.getDatabaseName();
 
-    @ClassRule
-    public static final OceanBaseContainer OB_SERVER =
-            OceanBaseTestUtils.createOceanBaseContainerForJdbc()
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases("oceanbase")
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         mysqlInventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         mysqlInventoryDatabase.dropDatabase();
     }
 
     @Test
-    public void testSyncWholeDatabase() throws Exception {
+    void testSyncWholeDatabase() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -145,9 +142,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
         waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 9);
         List<String> originList = queryTable(MYSQL_TEST_TABLE_NAME, false);
-        MatcherAssert.assertThat(
-                originList,
-                Matchers.containsInAnyOrder(
+        assertThat(originList)
+                .containsExactlyInAnyOrderElementsOf(
                         Stream.of(
                                         "101,scooter,Small 2-wheel scooter,3.14,red,{\"key1\": \"value1\"},{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
                                         "102,car battery,12V car battery,8.1,white,{\"key2\": \"value2\"},{\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
@@ -159,18 +155,15 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                         "108,jacket,water resistent black wind breaker,0.1,null,null,null",
                                         "109,spare tire,24 inch spare tire,22.2,null,null,null")
                                 .map(StringEscapeUtils::unescapeJava)
-                                .toArray()));
+                                .collect(Collectors.toList()));
         // validate table of customers
         List<String> customerList = queryTable("customers", false);
-        MatcherAssert.assertThat(
-                customerList,
-                Matchers.containsInAnyOrder(
-                        Stream.of(
-                                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
-                                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
-                                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
-                                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11")
-                                .toArray()));
+        assertThat(customerList)
+                .containsExactlyInAnyOrder(
+                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11");
 
         // generate binlogs
         String mysqlJdbcUrl =
@@ -201,9 +194,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
         waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 10);
         List<String> updateList = queryTable(MYSQL_TEST_TABLE_NAME, false);
-        MatcherAssert.assertThat(
-                updateList,
-                Matchers.containsInAnyOrder(
+        assertThat(updateList)
+                .containsExactlyInAnyOrderElementsOf(
                         Stream.of(
                                         "101,scooter,Small 2-wheel scooter,3.14,red,{\"key1\": \"value1\"},{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0},null",
                                         "102,car battery,12V car battery,8.1,white,{\"key2\": \"value2\"},{\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0},null",
@@ -216,7 +208,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                         "109,spare tire,24 inch spare tire,22.2,null,null,null,null",
                                         "110,jacket,new water resistent white wind breaker,0.5,null,null,null,1")
                                 .map(StringEscapeUtils::unescapeJava)
-                                .toArray()));
+                                .collect(Collectors.toList()));
 
         dropDatabase(getConnection(false), uniqueDatabaseName);
     }
@@ -233,7 +225,7 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                 Thread.sleep(100);
             }
         }
-        Assert.assertEquals(expectedCount, tableRowsCount);
+        assertThat(tableRowsCount).isEqualTo(expectedCount);
     }
 
     private List<String> queryTable(String tableName, boolean isMySQL) throws SQLException {

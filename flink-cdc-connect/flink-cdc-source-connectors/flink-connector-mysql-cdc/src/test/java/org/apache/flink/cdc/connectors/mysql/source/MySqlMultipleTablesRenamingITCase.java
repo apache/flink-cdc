@@ -39,9 +39,9 @@ import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFacto
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
 
 import io.debezium.connector.mysql.MySqlConnection;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +62,7 @@ import java.util.UUID;
  * Integration tests for handling schema changes regard to renaming multiple tables within a single
  * statement.
  */
-public class MySqlMultipleTablesRenamingITCase extends MySqlSourceTestBase {
+class MySqlMultipleTablesRenamingITCase extends MySqlSourceTestBase {
     private static final Logger LOG =
             LoggerFactory.getLogger(MySqlMultipleTablesRenamingITCase.class);
 
@@ -73,14 +73,14 @@ public class MySqlMultipleTablesRenamingITCase extends MySqlSourceTestBase {
 
     private MySqlConnection connection;
 
-    @Before
+    @BeforeEach
     public void prepare() throws Exception {
         connection = getConnection();
         customDatabase.createAndInitialize();
         flushLogs();
     }
 
-    @After
+    @AfterEach
     public void tearDown() throws Exception {
         customDatabase.dropDatabase();
         connection.close();
@@ -108,7 +108,7 @@ public class MySqlMultipleTablesRenamingITCase extends MySqlSourceTestBase {
      * during schema updates.
      */
     @Test
-    public void testRenameTablesWithinSingleStatement() throws Exception {
+    void testRenameTablesWithinSingleStatement() throws Exception {
         // Build Flink job
         StreamExecutionEnvironment env = getExecutionEnvironment();
         MySqlSource<String> source = getSourceBuilder().build();

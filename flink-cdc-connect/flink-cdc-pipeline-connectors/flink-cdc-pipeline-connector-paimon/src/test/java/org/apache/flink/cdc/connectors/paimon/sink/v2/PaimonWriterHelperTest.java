@@ -40,7 +40,7 @@ import org.apache.paimon.data.InternalMap;
 import org.apache.paimon.data.NestedRow;
 import org.apache.paimon.data.Timestamp;
 import org.apache.paimon.types.RowKind;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -51,10 +51,10 @@ import java.util.List;
 import java.util.Map;
 
 /** Tests for {@link PaimonWriterHelper}. */
-public class PaimonWriterHelperTest {
+class PaimonWriterHelperTest {
 
     @Test
-    public void testConvertEventToGenericRowOfAllDataTypes() {
+    void testConvertEventToGenericRowOfAllDataTypes() {
         RowType rowType =
                 RowType.of(
                         DataTypes.BOOLEAN(),
@@ -113,38 +113,38 @@ public class PaimonWriterHelperTest {
                 DataChangeEvent.insertEvent(TableId.parse("database.table"), recordData);
         GenericRow genericRow =
                 PaimonWriterHelper.convertEventToGenericRow(dataChangeEvent, fieldGetters);
-        Assertions.assertEquals(
-                GenericRow.ofKind(
-                        RowKind.INSERT,
-                        true,
-                        new byte[] {1, 2},
-                        new byte[] {3, 4},
-                        new byte[] {5, 6, 7},
-                        (byte) 1,
-                        (short) 2,
-                        3,
-                        4L,
-                        5.1f,
-                        6.2,
-                        Decimal.fromBigDecimal(new BigDecimal("7.123"), 6, 3),
-                        BinaryString.fromString("test1"),
-                        BinaryString.fromString("test2"),
-                        BinaryString.fromString("test3"),
-                        100,
-                        200,
-                        300,
-                        Timestamp.fromSQLTimestamp(
-                                java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
-                        Timestamp.fromSQLTimestamp(
-                                java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
-                        Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
-                        Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
-                        null),
-                genericRow);
+        Assertions.assertThat(genericRow)
+                .isEqualTo(
+                        GenericRow.ofKind(
+                                RowKind.INSERT,
+                                true,
+                                new byte[] {1, 2},
+                                new byte[] {3, 4},
+                                new byte[] {5, 6, 7},
+                                (byte) 1,
+                                (short) 2,
+                                3,
+                                4L,
+                                5.1f,
+                                6.2,
+                                Decimal.fromBigDecimal(new BigDecimal("7.123"), 6, 3),
+                                BinaryString.fromString("test1"),
+                                BinaryString.fromString("test2"),
+                                BinaryString.fromString("test3"),
+                                100,
+                                200,
+                                300,
+                                Timestamp.fromSQLTimestamp(
+                                        java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
+                                Timestamp.fromSQLTimestamp(
+                                        java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
+                                Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
+                                Timestamp.fromInstant(Instant.parse("2023-01-01T00:00:00.000Z")),
+                                null));
     }
 
     @Test
-    public void testConvertEventToGenericRowOfDataChangeTypes() {
+    void testConvertEventToGenericRowOfDataChangeTypes() {
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING())
@@ -164,23 +164,23 @@ public class PaimonWriterHelperTest {
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, recordData);
         GenericRow genericRow =
                 PaimonWriterHelper.convertEventToGenericRow(dataChangeEvent, fieldGetters);
-        Assertions.assertEquals(genericRow.getRowKind(), RowKind.INSERT);
+        Assertions.assertThat(genericRow.getRowKind()).isEqualTo(RowKind.INSERT);
 
         dataChangeEvent = DataChangeEvent.deleteEvent(tableId, recordData);
         genericRow = PaimonWriterHelper.convertEventToGenericRow(dataChangeEvent, fieldGetters);
-        Assertions.assertEquals(genericRow.getRowKind(), RowKind.DELETE);
+        Assertions.assertThat(genericRow.getRowKind()).isEqualTo(RowKind.DELETE);
 
         dataChangeEvent = DataChangeEvent.updateEvent(tableId, recordData, recordData);
         genericRow = PaimonWriterHelper.convertEventToGenericRow(dataChangeEvent, fieldGetters);
-        Assertions.assertEquals(genericRow.getRowKind(), RowKind.INSERT);
+        Assertions.assertThat(genericRow.getRowKind()).isEqualTo(RowKind.INSERT);
 
         dataChangeEvent = DataChangeEvent.replaceEvent(tableId, recordData, null);
         genericRow = PaimonWriterHelper.convertEventToGenericRow(dataChangeEvent, fieldGetters);
-        Assertions.assertEquals(genericRow.getRowKind(), RowKind.INSERT);
+        Assertions.assertThat(genericRow.getRowKind()).isEqualTo(RowKind.INSERT);
     }
 
     @Test
-    public void testConvertEventToGenericRowWithNestedRow() {
+    void testConvertEventToGenericRowWithNestedRow() {
         // Define the inner row type with an integer and a map
         RowType innerRowType =
                 RowType.of(DataTypes.INT(), DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()));
@@ -231,16 +231,14 @@ public class PaimonWriterHelperTest {
         NestedRow innerRow = (NestedRow) genericRow.getField(0);
         NestedRow nestedRow = (NestedRow) innerRow.getRow(0, 2);
         int actual = nestedRow.getRow(0, 2).getInt(0); // 42
-        Assertions.assertEquals(42, actual);
+        Assertions.assertThat(actual).isEqualTo(42);
         Map<BinaryString, BinaryString> expectedMap = new HashMap<>();
         expectedMap.put(BinaryString.fromString("key1"), BinaryString.fromString("value1"));
         expectedMap.put(BinaryString.fromString("key2"), BinaryString.fromString("value2"));
         InternalMap internalMap = nestedRow.getMap(1);
         Map<BinaryString, BinaryString> extractedMap = extractMap(internalMap);
 
-        for (Map.Entry<BinaryString, BinaryString> entry : expectedMap.entrySet()) {
-            Assertions.assertEquals(entry.getValue(), extractedMap.get(entry.getKey()));
-        }
+        Assertions.assertThat(extractedMap).containsAllEntriesOf(expectedMap);
     }
 
     private static Map<BinaryString, BinaryString> extractMap(InternalMap internalMap) {

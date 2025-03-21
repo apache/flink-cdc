@@ -37,7 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** A test for the {@link SchemaChangeEventSerializer}. */
-public class SchemaChangeEventSerializerTest extends SerializerTestBase<SchemaChangeEvent> {
+class SchemaChangeEventSerializerTest extends SerializerTestBase<SchemaChangeEvent> {
     @Override
     protected TypeSerializer<SchemaChangeEvent> createSerializer() {
         return SchemaChangeEventSerializer.INSTANCE;
