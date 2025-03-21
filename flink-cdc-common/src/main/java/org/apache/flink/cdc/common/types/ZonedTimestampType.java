@@ -86,18 +86,13 @@ public final class ZonedTimestampType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new ZonedTimestampType(isNullable, precision);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, precision);
-    }
-
-    @Override
-    public String asSummaryString() {
-        return asSerializableString();
     }
 
     @Override

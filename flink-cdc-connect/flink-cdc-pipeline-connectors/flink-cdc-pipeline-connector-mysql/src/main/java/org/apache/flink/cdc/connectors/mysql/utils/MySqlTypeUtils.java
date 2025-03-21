@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.JdbcRawDataType;
 
 import io.debezium.relational.Column;
 
@@ -112,6 +113,14 @@ public class MySqlTypeUtils {
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column, boolean tinyInt1isBit) {
         DataType dataType = convertFromColumn(column, tinyInt1isBit);
+        // We don't need to record the raw type of elements in nested structures separately, here
+        // we just set the overall raw type after instantiation.
+        dataType.setRawDataType(
+                new JdbcRawDataType(
+                        column.jdbcType(),
+                        column.typeName(),
+                        column.length(),
+                        column.scale().orElse(null)));
         if (column.isOptional()) {
             return dataType;
         } else {
