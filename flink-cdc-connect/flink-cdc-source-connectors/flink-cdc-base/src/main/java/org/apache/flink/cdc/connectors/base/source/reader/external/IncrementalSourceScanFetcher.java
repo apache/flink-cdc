@@ -131,7 +131,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         List<DataChangeEvent> batch = queue.poll();
         final List<SourceRecord> records = new ArrayList<>();
         for (DataChangeEvent event : batch) {
-            if (isHighWatermarkEvent(event.getRecord())) {
+            if (isEndWatermarkEvent(event.getRecord())) {
                 hasNextElement.set(false);
                 break;
             }

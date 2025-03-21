@@ -69,7 +69,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
-import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
@@ -299,7 +298,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         List<DataChangeEvent> batch = queue.poll();
         final List<SourceRecord> records = new ArrayList<>();
         for (DataChangeEvent event : batch) {
-            if (isHighWatermarkEvent(event.getRecord())) {
+            if (RecordUtils.isEndWatermarkEvent(event.getRecord())) {
                 hasNextElement.set(false);
                 break;
             }
@@ -330,7 +329,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                     continue;
                 }
 
-                if (highWatermark == null && isHighWatermarkEvent(record)) {
+                if (highWatermark == null && RecordUtils.isHighWatermarkEvent(record)) {
                     highWatermark = record;
                     // snapshot events capture end and begin to capture binlog events
                     reachBinlogStart = true;
