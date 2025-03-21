@@ -19,8 +19,6 @@ package org.apache.flink.cdc.pipeline.tests;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
@@ -29,8 +27,6 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -57,31 +53,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 /** End-to-end tests for mysql cdc to Doris pipeline job. */
-@RunWith(Parameterized.class)
 public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToDorisE2eITCase.class);
-
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
-    public static final Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(240);
-    public static final Duration DEFAULT_RESULT_VERIFY_TIMEOUT = Duration.ofSeconds(30);
-
-    @ClassRule
-    public static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases("mysql");
 
     @ClassRule
     public static final DorisContainer DORIS =
@@ -104,13 +77,13 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         new LogMessageWaitStrategy()
                 .withRegEx(".*get heartbeat from FE.*")
                 .withTimes(1)
-                .withStartupTimeout(DEFAULT_STARTUP_TIMEOUT)
+                .withStartupTimeout(STARTUP_WAITING_TIMEOUT)
                 .waitUntilReady(DORIS);
 
         while (!checkBackendAvailability()) {
             try {
                 if (System.currentTimeMillis() - startWaitingTimestamp
-                        > DEFAULT_STARTUP_TIMEOUT.toMillis()) {
+                        > STARTUP_WAITING_TIMEOUT.toMillis()) {
                     throw new RuntimeException("Doris backend startup timed out.");
                 }
                 LOG.info("Waiting for backends to be available");
@@ -197,10 +170,8 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                         DORIS.getUsername(),
                         DORIS.getPassword(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, dorisCdcConnector);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -826,7 +797,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 "SELECT * FROM " + tableName,
                 columnCount,
                 expected,
-                DEFAULT_RESULT_VERIFY_TIMEOUT.toMillis(),
+                EVENT_WAITING_TIMEOUT.toMillis(),
                 true);
     }
 
@@ -837,7 +808,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                 "DESCRIBE " + tableName,
                 5,
                 expected,
-                DEFAULT_RESULT_VERIFY_TIMEOUT.toMillis(),
+                EVENT_WAITING_TIMEOUT.toMillis(),
                 false);
     }
 

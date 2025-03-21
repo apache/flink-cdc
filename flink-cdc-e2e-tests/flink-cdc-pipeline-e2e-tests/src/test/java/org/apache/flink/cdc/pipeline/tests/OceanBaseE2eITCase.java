@@ -18,8 +18,6 @@
 package org.apache.flink.cdc.pipeline.tests;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
@@ -35,8 +33,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -55,32 +51,10 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /** OceanBase flink cdc pipeline connector sink integrate test. */
-@RunWith(Parameterized.class)
 public class OceanBaseE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseE2eITCase.class);
 
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-
     private static final String MYSQL_TEST_TABLE_NAME = "products";
-
-    @ClassRule
-    public static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     public final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(
@@ -136,10 +110,8 @@ public class OceanBaseE2eITCase extends PipelineTestEnvironment {
                         getJdbcUrlInContainer("test", "oceanbase"),
                         OB_SERVER.getUsername(),
                         OB_SERVER.getPassword());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path oceanbaseCdcJar = TestUtils.getResource("oceanbase-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, oceanbaseCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, oceanbaseCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 

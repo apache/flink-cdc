@@ -20,8 +20,6 @@ package org.apache.flink.cdc.pipeline.tests;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.kafka.sink.KafkaUtil;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
@@ -41,12 +39,9 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.shaded.org.apache.commons.lang3.StringUtils;
 
@@ -76,18 +71,8 @@ import static org.apache.flink.util.DockerImageVersions.KAFKA;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc to Kafka pipeline job. */
-@RunWith(Parameterized.class)
 public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlToKafkaE2eITCase.class);
-
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
-    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     private static AdminClient admin;
     private static final String INTER_CONTAINER_KAFKA_ALIAS = "kafka";
@@ -96,20 +81,6 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private TableId table;
     private String topic;
     private KafkaConsumer<byte[], byte[]> consumer;
-
-    @ClassRule
-    public static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     @ClassRule
     public static final KafkaContainer KAFKA_CONTAINER =
@@ -180,10 +151,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         mysqlInventoryDatabase.getDatabaseName(),
                         topic,
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -256,10 +225,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         mysqlInventoryDatabase.getDatabaseName(),
                         topic,
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -307,7 +274,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private void waitUntilSpecificEventCount(
             List<ConsumerRecord<byte[], byte[]>> actualEvent, int expectedCount) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + MysqlToKafkaE2eITCase.EVENT_WAITING_TIMEOUT;
+        long endTimeout =
+                System.currentTimeMillis() + MysqlToKafkaE2eITCase.EVENT_WAITING_TIMEOUT.toMillis();
         while (System.currentTimeMillis() < endTimeout) {
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofSeconds(1));
             records.forEach(actualEvent::add);
