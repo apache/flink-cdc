@@ -469,15 +469,8 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
                 break;
             }
         }
-        // add the unbounded split
-        // assign unbounded split first, both the largest and smallest unbounded chunks are
-        // completed
-        // in the first two splits
-        if (sourceConfig.isAssignUnboundedChunkFirst()) {
-            splits.add(0, ChunkRange.of(chunkStart, null));
-        } else {
-            splits.add(ChunkRange.of(chunkStart, null));
-        }
+        // add the ending split
+        splits.add(ChunkRange.of(chunkStart, null));
         return splits;
     }
 

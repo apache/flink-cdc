@@ -289,6 +289,19 @@ public class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testReadSingleTableWithSingleParallelismAndUnboundedChunkFirst() throws Exception {
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled", "true"));
+    }
+
+    @Test
     public void testDebeziumSlotDropOnStop() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
