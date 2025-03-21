@@ -182,6 +182,25 @@ pipeline:
         查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table 的属性</a></td> 
       </td>
     </tr>
+    <tr>
+      <td>table.create.auto-partition.properties.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>创建自动分区表的配置。<br/>
+        当前仅支持DATE/DATETIME类型列的AUTO RANGE PARTITION，分区函数为<code>date_trunc</code>，且Doris版本必须大于2.1.6，查看更多关于 <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris自动分区</a><br/>
+        支持的属性有：<br/>
+        <code> table.create.auto-partition.properties.include</code>包含的经过route后的表集合，用逗号分隔，支持正则表达式；<br/>
+        <code> table.create.auto-partition.properties.exclude</code>排除的经过route后的表集合，用逗号分隔，支持正则表达式；<br/>
+        <code> table.create.auto-partition.properties.default-partition-key</code>默认分区键；<br/>
+        <code> table.create.auto-partition.properties.default-partition-unit</code>默认分区单位；<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-key</code>特定表的分区键，如未配置取默认分区键；<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-unit</code>特定表的分区单位，如未配置取默认分区单位。<br/>
+        注意：<br/>
+        1: 如果分区键不为DATE/DATETIME类型，则不会创建分区表。<br/>
+        2: Doris AUTO RANGE PARTITION不支持NULLABLE列作为分区列，如果您配置的分区键的值为空或者表创建完成后新增了NULLABLE分区列，系统将自动填充默认值（DATE类型为<code>1970-01-01</code>，DATETIME类型为<code>1970-01-01 00:00:00</code>），请选择合适的分区键。
+      </td> 
+    </tr>
     </tbody>
 </table>
 </div>
