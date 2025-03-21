@@ -86,33 +86,4 @@ public class MySqlChunkSplitterTest {
         assertEquals(ChunkRange.of(2147483637, 2147483647), res.get(1));
         assertEquals(ChunkRange.of(2147483647, null), res.get(2));
     }
-
-    @Test
-    public void testSplitEvenlySizedChunksEndingFirst() {
-        MySqlSourceConfig sourceConfig =
-                new MySqlSourceConfigFactory()
-                        .startupOptions(StartupOptions.initial())
-                        .databaseList("")
-                        .tableList("")
-                        .hostname("")
-                        .username("")
-                        .password("")
-                        .serverTimeZone(ZoneId.of("UTC").toString())
-                        .assignUnboundedChunkFirst(true)
-                        .createConfig(0);
-        MySqlChunkSplitter splitter = new MySqlChunkSplitter(null, sourceConfig);
-
-        List<ChunkRange> res =
-                splitter.splitEvenlySizedChunks(
-                        new TableId("catalog", "db", "tab"),
-                        Integer.MAX_VALUE - 20,
-                        Integer.MAX_VALUE,
-                        20,
-                        10,
-                        10);
-        assertEquals(3, res.size());
-        assertEquals(ChunkRange.of(null, 2147483637), res.get(1));
-        assertEquals(ChunkRange.of(2147483637, 2147483647), res.get(2));
-        assertEquals(ChunkRange.of(2147483647, null), res.get(0));
-    }
 }

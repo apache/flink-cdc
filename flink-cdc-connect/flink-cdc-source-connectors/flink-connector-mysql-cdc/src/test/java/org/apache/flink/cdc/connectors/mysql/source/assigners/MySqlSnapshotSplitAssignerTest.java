@@ -472,6 +472,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         new String[] {"customers_even_dist"},
                         "id",
+                        false,
                         false);
 
         final MySqlSnapshotSplitAssigner assigner =
@@ -517,6 +518,27 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         AssignerStatus.NEWLY_ADDED_ASSIGNING_SNAPSHOT_FINISHED));
     }
 
+    @Test
+    public void testSplitEvenlySizedChunksEndingFirst() {
+        List<String> expected =
+                Arrays.asList(
+                        "shopping_cart [KIND_100] null",
+                        "shopping_cart null [KIND_007]",
+                        "shopping_cart [KIND_007] [KIND_008]",
+                        "shopping_cart [KIND_008] [KIND_009]",
+                        "shopping_cart [KIND_009] [KIND_100]");
+        List<String> splits =
+                getTestAssignSnapshotSplits(
+                        customerDatabase,
+                        4,
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                        CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                        new String[] {"shopping_cart"},
+                        "product_kind",
+                        true);
+        assertEquals(expected, splits);
+    }
+
     private List<String> getTestAssignSnapshotSplits(
             int splitSize,
             double distributionFactorUpper,
@@ -538,6 +560,24 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             double distributionFactorLower,
             String[] captureTables,
             String chunkKeyColumn) {
+        return getTestAssignSnapshotSplits(
+                database,
+                splitSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                captureTables,
+                chunkKeyColumn,
+                false);
+    }
+
+    private List<String> getTestAssignSnapshotSplits(
+            UniqueDatabase database,
+            int splitSize,
+            double distributionFactorUpper,
+            double distributionFactorLower,
+            String[] captureTables,
+            String chunkKeyColumn,
+            boolean assignUnboundedChunkFirst) {
         MySqlSourceConfig configuration =
                 getConfig(
                         database,
@@ -546,7 +586,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         distributionFactorLower,
                         captureTables,
                         chunkKeyColumn,
-                        false);
+                        false,
+                        assignUnboundedChunkFirst);
         List<TableId> remainingTables =
                 Arrays.stream(captureTables)
                         .map(t -> database.getDatabaseName() + "." + t)
@@ -578,7 +619,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         captureTables,
                         null,
-                        true);
+                        true,
+                        false);
         List<TableId> remainingTables = new ArrayList<>();
         List<TableId> alreadyProcessedTables = new ArrayList<>();
         alreadyProcessedTables.add(processedTable);
@@ -695,7 +737,8 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
             double distributionLower,
             String[] captureTables,
             String chunkKeyColumn,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled,
+            boolean assignUnboundedChunkFirst) {
         Map<ObjectPath, String> chunkKeys = new HashMap<>();
         for (String table : captureTables) {
             chunkKeys.put(new ObjectPath(database.getDatabaseName(), table), chunkKeyColumn);
@@ -719,6 +762,7 @@ public class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                 .serverTimeZone(ZoneId.of("UTC").toString())
                 .chunkKeyColumn(chunkKeys)
                 .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                 .createConfig(0);
     }
 }
