@@ -17,9 +17,6 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
-import org.apache.flink.cdc.common.test.utils.TestUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
@@ -29,11 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.output.ToStringConsumer;
-import org.testcontainers.junit.jupiter.Container;
 
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -41,36 +34,11 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /** E2e tests for Schema Evolution cases. */
 class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG =
             LoggerFactory.getLogger(SchemaEvolvingTransformE2eITCase.class);
-
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
-
-    @Container
-    public static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     protected final UniqueDatabase schemaEvolveDatabase =
             new UniqueDatabase(MYSQL, "schema_evolve", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
@@ -247,15 +215,9 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         schemaEvolveDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
         // Submitting job should fail given an unknown schema change behavior configuration
-        Assertions.assertThatThrownBy(
-                        () ->
-                                submitPipelineJob(
-                                        pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar))
+        Assertions.assertThatThrownBy(() -> submitPipelineJob(pipelineJob))
                 .isExactlyInstanceOf(AssertionError.class);
     }
 
@@ -331,10 +293,7 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
                         dbName,
                         behavior,
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         validateSnapshotData(dbName, mergeTable ? "merged" : "members");
@@ -373,33 +332,29 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
             stmt.execute("DROP TABLE members;");
         }
 
-        List<String> expectedTmEvents =
+        String[] expectedTmEvents =
                 expectedTaskManagerEvents.stream()
                         .map(s -> String.format(s, dbName, dbName))
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        validateResult(expectedTmEvents, taskManagerConsumer);
+        validateResult(taskManagerConsumer, expectedTmEvents);
 
-        List<String> expectedJmEvents =
+        String[] expectedJmEvents =
                 expectedJobManagerEvents.stream()
                         .map(s -> String.format(s, dbName, dbName, dbName))
-                        .collect(Collectors.toList());
+                        .toArray(String[]::new);
 
-        validateResult(expectedJmEvents, jobManagerConsumer);
+        validateResult(jobManagerConsumer, expectedJmEvents);
     }
 
     private void validateSnapshotData(String dbName, String tableName) throws Exception {
-        List<String> expected =
-                Stream.of(
-                                "CreateTableEvent{tableId=%s.%s, schema=columns={`uid` STRING,`id` INT NOT NULL,`name` VARCHAR(17),`age` INT,`id_square` INT,`tag` STRING}, primaryKeys=id, options=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1009 -> Bob, 1009, Bob, 20, -1018081, age >= 20], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1008 -> Alice, 1008, Alice, 21, -1016064, age >= 20], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1011 -> Derrida, 1011, Derrida, 18, 1022121, age < 20], op=INSERT, meta=()}",
-                                "DataChangeEvent{tableId=%s.%s, before=[], after=[1010 -> Carol, 1010, Carol, 19, 1020100, age < 20], op=INSERT, meta=()}")
-                        .map(s -> String.format(s, dbName, tableName))
-                        .collect(Collectors.toList());
-
-        validateResult(expected, taskManagerConsumer);
+        validateResult(
+                s -> String.format(s, dbName, tableName),
+                "CreateTableEvent{tableId=%s.%s, schema=columns={`uid` STRING,`id` INT NOT NULL,`name` VARCHAR(17),`age` INT,`id_square` INT,`tag` STRING}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.%s, before=[], after=[1009 -> Bob, 1009, Bob, 20, -1018081, age >= 20], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.%s, before=[], after=[1008 -> Alice, 1008, Alice, 21, -1016064, age >= 20], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.%s, before=[], after=[1011 -> Derrida, 1011, Derrida, 18, 1022121, age < 20], op=INSERT, meta=()}",
+                "DataChangeEvent{tableId=%s.%s, before=[], after=[1010 -> Carol, 1010, Carol, 19, 1020100, age < 20], op=INSERT, meta=()}");
     }
 
     private void waitForIncrementalStage(String dbName, String tableName, Statement stmt)
@@ -408,37 +363,9 @@ class SchemaEvolvingTransformE2eITCase extends PipelineTestEnvironment {
 
         // Ensure we change schema after incremental stage
         waitUntilSpecificEvent(
+                taskManagerConsumer,
                 String.format(
                         "DataChangeEvent{tableId=%s.%s, before=[], after=[0 -> __fence__, 0, __fence__, 0, 0, age < 20], op=INSERT, meta=()}",
-                        dbName, tableName),
-                taskManagerConsumer);
-    }
-
-    private void validateResult(List<String> expectedEvents, ToStringConsumer consumer)
-            throws Exception {
-        for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, consumer);
-        }
-    }
-
-    private void waitUntilSpecificEvent(String event, ToStringConsumer consumer) throws Exception {
-        boolean result = false;
-        long endTimeout =
-                System.currentTimeMillis() + SchemaEvolvingTransformE2eITCase.EVENT_WAITING_TIMEOUT;
-        while (System.currentTimeMillis() < endTimeout) {
-            String stdout = consumer.toUtf8String();
-            if (stdout.contains(event + "\n")) {
-                result = true;
-                break;
-            }
-            Thread.sleep(1000);
-        }
-        if (!result) {
-            throw new TimeoutException(
-                    "failed to get specific event: "
-                            + event
-                            + " from stdout: "
-                            + consumer.toUtf8String());
-        }
+                        dbName, tableName));
     }
 }
