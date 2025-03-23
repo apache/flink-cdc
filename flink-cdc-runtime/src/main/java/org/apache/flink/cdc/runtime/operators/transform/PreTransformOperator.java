@@ -275,22 +275,23 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        TableId tableId = null;
-        Schema schemaBefore = null;
-        Schema schemaAfter = null;
-
-        if (event instanceof ChangeEvent) {
-            tableId = ((ChangeEvent) event).tableId();
-            PreTransformChangeInfo info = preTransformChangeInfoMap.get(tableId);
-            if (info != null) {
-                schemaBefore = info.getSourceSchema();
-                schemaAfter = info.getPreTransformedSchema();
-            }
-        }
 
         try {
             processEvent(event);
         } catch (Exception e) {
+            TableId tableId = null;
+            Schema schemaBefore = null;
+            Schema schemaAfter = null;
+
+            if (event instanceof ChangeEvent) {
+                tableId = ((ChangeEvent) event).tableId();
+                PreTransformChangeInfo info = preTransformChangeInfoMap.get(tableId);
+                if (info != null) {
+                    schemaBefore = info.getSourceSchema();
+                    schemaAfter = info.getPreTransformedSchema();
+                }
+            }
+
             throw new TransformException(
                     "pre-transform", event, tableId, schemaBefore, schemaAfter, e);
         }

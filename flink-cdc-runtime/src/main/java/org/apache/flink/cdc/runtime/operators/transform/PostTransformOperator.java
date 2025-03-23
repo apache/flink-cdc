@@ -246,23 +246,23 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
-        TableId tableId = null;
-        Schema schemaBefore = null;
-        Schema schemaAfter = null;
-
-        if (event instanceof ChangeEvent) {
-            tableId = ((ChangeEvent) event).tableId();
-
-            PostTransformChangeInfo info = postTransformChangeInfoMap.get(tableId);
-            if (info != null) {
-                schemaBefore = info.getPreTransformedSchema();
-                schemaAfter = info.getPostTransformedSchema();
-            }
-        }
 
         try {
             processEvent(event);
         } catch (Exception e) {
+            TableId tableId = null;
+            Schema schemaBefore = null;
+            Schema schemaAfter = null;
+
+            if (event instanceof ChangeEvent) {
+                tableId = ((ChangeEvent) event).tableId();
+
+                PostTransformChangeInfo info = postTransformChangeInfoMap.get(tableId);
+                if (info != null) {
+                    schemaBefore = info.getPreTransformedSchema();
+                    schemaAfter = info.getPostTransformedSchema();
+                }
+            }
             throw new TransformException(
                     "post-transform", event, tableId, schemaBefore, schemaAfter, e);
         }
