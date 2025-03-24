@@ -526,6 +526,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                             + SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED
                             + " was enabled.");
         }
+        LOG.info("Rewriting CDC style table capture list: {}", tables);
 
         // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
         // In our table matching syntax, `\\.` means RegEx token matcher and `.` means database &
@@ -536,15 +537,21 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         // Step 1: escape the dot with a backslash, but keep it as a placeholder (like `$`).
         // For example, `db\.*.tbl\.*` => `db$*.tbl$*`
         String unescapedTables = tables.replace("\\.", DOT_PLACEHOLDER);
+        LOG.info("Expression after unescaping dots as RegEx meta-character: {}", unescapedTables);
 
         // Step 2: replace all remaining dots (`.`) to quoted version (`\.`), as a separator between
         // database and table names.
         // For example, `db$*.tbl$*` => `db$*\.tbl$*`
         String unescapedTablesWithDbTblSeparator = unescapedTables.replace(".", "\\.");
+        LOG.info("Re-escaping dots as TableId delimiter: {}", unescapedTablesWithDbTblSeparator);
 
         // Step 3: restore placeholder to normal RegEx matcher (`.`)
         // For example, `db$*\.tbl$*` => `db.*\.tbl.*`
-        return unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
+        String debeziumStyleTableCaptureList =
+                unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
+        LOG.info("Final Debezium-style table capture list: {}", debeziumStyleTableCaptureList);
+
+        return debeziumStyleTableCaptureList;
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
