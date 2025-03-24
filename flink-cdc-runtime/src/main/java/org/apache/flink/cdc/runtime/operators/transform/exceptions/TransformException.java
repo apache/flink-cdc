@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/** A general {@link RuntimeException} thrown during transform failure. */
+/** A generic {@link RuntimeException} thrown during transform failure. */
 public class TransformException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
