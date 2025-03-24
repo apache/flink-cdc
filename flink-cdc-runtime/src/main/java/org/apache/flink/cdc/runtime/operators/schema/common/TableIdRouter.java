@@ -77,7 +77,7 @@ public class TableIdRouter {
         return routingCache.getUnchecked(sourceTableId);
     }
 
-    public List<TableId> calculateRoute(TableId sourceTableId) {
+    private List<TableId> calculateRoute(TableId sourceTableId) {
         List<TableId> routedTableIds =
                 routes.stream()
                         .filter(route -> route.f0.isMatch(sourceTableId))
