@@ -67,6 +67,8 @@ public abstract class PostgresTestBase extends AbstractTestBaseJUnit4 {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
     public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     public static final String DEFAULT_DB = "postgres";
+    public static final String TEST_USER = "postgres";
+    public static final String TEST_PASSWORD = "postgres";
 
     // use newer version of postgresql image to support pgoutput plugin
     // when testing postgres 13, only 13-alpine supports both amd64 and arm64
@@ -76,8 +78,8 @@ public abstract class PostgresTestBase extends AbstractTestBaseJUnit4 {
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
                     .withDatabaseName(DEFAULT_DB)
-                    .withUsername("postgres")
-                    .withPassword("postgres")
+                    .withUsername(TEST_USER)
+                    .withPassword(TEST_PASSWORD)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
                     .withCommand(
                             "postgres",
