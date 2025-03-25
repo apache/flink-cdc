@@ -68,7 +68,7 @@ class MySqlBinlogSplitTest {
                         0,
                         false);
         String expectedTables = "[catalog1.table1, catalog2.table2]";
-        Assert.assertEquals(expectedTables, binlogSplit.getTables());
+        Assertions.assertThat(binlogSplit.getTables()).isEqualTo(expectedTables);
 
         // case 1: only include table1
         Tables.TableFilter currentTableFilter = tableId -> tableId.table().equals("table1");
@@ -79,7 +79,7 @@ class MySqlBinlogSplitTest {
                 mySqlBinlogSplit.getTableSchemas();
         Assertions.assertThat(filterTableSchemas).hasSize(1).containsEntry(tableId1, tableChange1);
         String expectedTables1 = "[catalog1.table1]";
-        Assert.assertEquals(expectedTables1, mySqlBinlogSplit.getTables());
+        Assertions.assertThat(mySqlBinlogSplit.getTables()).isEqualTo(expectedTables1);
 
         // case 2: include all tables
         currentTableFilter = tableId -> tableId.table().startsWith("table");
@@ -92,11 +92,11 @@ class MySqlBinlogSplitTest {
                 .containsEntry(tableId1, tableChange1)
                 .containsEntry(tableId2, tableChange2);
         String expectedTables2 = "[catalog1.table1, catalog2.table2]";
-        Assert.assertEquals(expectedTables2, mySqlBinlogSplit.getTables());
+        Assertions.assertThat(mySqlBinlogSplit.getTables()).isEqualTo(expectedTables2);
     }
 
     @Test
-    public void testTruncatedTablesForLog() {
+    void testTruncatedTablesForLog() {
         Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
 
         // mock table1
@@ -145,7 +145,7 @@ class MySqlBinlogSplitTest {
                         0,
                         false);
         String expectedTables = "[catalog1.table1, catalog2.table2, catalog3.table3]";
-        Assert.assertEquals(expectedTables, binlogSplit.getTables());
+        Assertions.assertThat(binlogSplit.getTables()).isEqualTo(expectedTables);
     }
 
     /** A mock implementation for {@link Table} which is used for unit tests. */
