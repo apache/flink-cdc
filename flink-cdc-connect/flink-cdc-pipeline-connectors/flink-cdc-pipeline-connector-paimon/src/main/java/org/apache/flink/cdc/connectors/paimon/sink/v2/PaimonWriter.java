@@ -40,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -97,29 +96,31 @@ public class PaimonWriter<InputT>
 
     @Override
     public Collection<MultiTableCommittable> prepareCommit() {
-        List<MultiTableCommittable> committables = new ArrayList<>();
-        writes.entrySet().parallelStream()
-                .forEach(
-                        entry -> {
-                            Identifier key = entry.getKey();
-                            StoreSinkWrite write = entry.getValue();
-                            boolean waitCompaction = true;
-                            try {
-                                long startTime = System.currentTimeMillis();
-                                committables.addAll(
+        long startTime = System.currentTimeMillis();
+        List<MultiTableCommittable> committables =
+                writes.entrySet()
+                        .parallelStream()
+                        .flatMap(
+                                entry -> {
+                                    try {
                                         // here we set it to lastCheckpointId+1 to
-                                        // avoid prepareCommit the same checkpointId with the first round.
-                                        write.prepareCommit(waitCompaction, lastCheckpointId + 1).stream()
+                                        // avoid prepareCommit the same checkpointId with the first
+                                        // round.
+                                        return entry.getValue()
+                                                .prepareCommit(true, lastCheckpointId + 1).stream()
                                                 .map(
                                                         committable ->
-                                                                MultiTableCommittable.fromCommittable(key, committable))
-                                                .collect(Collectors.toList()));
-                                LOG.debug("Spend {} ms to prepareCommit for {}", System.currentTimeMillis() - startTime, key);
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        });
+                                                                MultiTableCommittable
+                                                                        .fromCommittable(
+                                                                                entry.getKey(),
+                                                                                committable));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })
+                        .collect(Collectors.toList());
         lastCheckpointId++;
+        LOG.debug("Spend {} ms to prepareCommit", System.currentTimeMillis() - startTime);
         return committables;
     }
 
