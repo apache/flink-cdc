@@ -23,13 +23,13 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.base.options.SourceOptions;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
-import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.table.api.ValidationException;
@@ -38,10 +38,13 @@ import org.apache.flink.table.data.RowData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -72,7 +75,9 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.USERNAME;
+import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
+import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.PROPERTIES_PREFIX;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** A {@link Factory} to create {@link PostgresDataSource}. */
@@ -85,6 +90,9 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
 
     @Override
     public DataSource createDataSource(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(PROPERTIES_PREFIX, DEBEZIUM_OPTIONS_PREFIX);
+
         final Configuration config = context.getFactoryConfiguration();
         String hostname = config.get(HOSTNAME);
         int port = config.get(PG_PORT);
@@ -121,14 +129,13 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         validateDistributionFactorLower(distributionFactorLower);
 
         Map<String, String> configMap = config.toMap();
-        String firstTable = tables.split(",")[0];
-        TableId tableId = TableId.parse(firstTable);
+        Optional<String> databaseName = getValidateDatabaseName(tables);
 
         PostgresSourceConfigFactory configFactory =
                 PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                         .hostname(hostname)
                         .port(port)
-                        .database(tableId.getNamespace())
+                        .database(databaseName.get())
                         .schemaList(".*")
                         .tableList(".*")
                         .username(username)
@@ -151,8 +158,10 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .getConfigFactory();
 
+        List<TableId> tableIds = PostgresSchemaUtils.listTables(configFactory.create(0), null);
+
         Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
-        List<String> capturedTables = getTableList(configFactory.create(0), selectors);
+        List<String> capturedTables = getTableList(tableIds, selectors);
         if (capturedTables.isEmpty()) {
             throw new IllegalArgumentException(
                     "Cannot find any table by the option 'tables' = " + tables);
@@ -160,7 +169,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         if (tablesExclude != null) {
             Selectors selectExclude =
                     new Selectors.SelectorsBuilder().includeTables(tablesExclude).build();
-            List<String> excludeTables = getTableList(configFactory.create(0), selectExclude);
+            List<String> excludeTables = getTableList(tableIds, selectExclude);
             if (!excludeTables.isEmpty()) {
                 capturedTables.removeAll(excludeTables);
             }
@@ -215,8 +224,8 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
     }
 
     private static List<String> getTableList(
-            PostgresSourceConfig sourceConfig, Selectors selectors) {
-        return PostgresSchemaUtils.listTables(sourceConfig, null).stream()
+            @Nullable List<TableId> tableIdList, Selectors selectors) {
+        return tableIdList.stream()
                 .filter(selectors::isMatch)
                 .map(TableId::toString)
                 .collect(Collectors.toList());
@@ -282,5 +291,85 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /**
+     * Get the database name
+     *
+     * @param tables Table name list, format is "db.schema.table,db.schema.table,..." Each table
+     *     name consists of three parts separated by ".", which are database name, schema name, and
+     *     table name.
+     * @return Database name if found, otherwise returns Optional.empty()
+     * @throws IllegalArgumentException If the input parameter is null or does not match the
+     *     expected format, or if database names are inconsistent
+     */
+    private Optional<String> getValidateDatabaseName(String tables) {
+        // Input validation
+        if (tables == null || tables.trim().isEmpty()) {
+            throw new IllegalArgumentException("Parameter tables cannot be null or empty");
+        }
+
+        // Split table name list
+        String[] tableNames = tables.split(",");
+        String dbName = null;
+
+        for (String tableName : tableNames) {
+            // Trim whitespace and split table name
+            String trimmedTableName = tableName.trim();
+            if (!trimmedTableName.contains(".")) {
+                continue; // Skip table names that do not match the expected format
+            }
+
+            String[] tableNameParts =
+                    trimmedTableName.split(
+                            "(?<!\\\\)\\.", -1); // Use -1 to avoid ignoring trailing empty elements
+
+            checkState(
+                    tableNameParts.length == 3,
+                    String.format(
+                            "Tables format must db.schema.table, can not 'tables' = %s",
+                            TABLES.key()));
+            if (tableNameParts.length == 3) {
+                String currentDbName = tableNameParts[0];
+
+                checkState(
+                        isValidPostgresDbName(currentDbName),
+                        String.format(
+                                "The value of option %s does not conform to PostgresSQL database name naming conventions",
+                                TABLES.key()));
+                if (dbName == null) {
+                    dbName = currentDbName;
+                } else {
+                    checkState(
+                            !dbName.equals(currentDbName),
+                            String.format(
+                                    "The value of option %s all table names must have the same database name",
+                                    TABLES.key()));
+                }
+            }
+        }
+
+        // If no valid table name is found, return Optional.empty()
+        return Optional.ofNullable(dbName);
+    }
+
+    /**
+     * Validate if the database name conforms to PostgreSQL naming conventions
+     *
+     * @param dbName Database name
+     * @return true if valid, otherwise false
+     */
+    private boolean isValidPostgresDbName(String dbName) {
+        // PostgreSQL database name conventions:
+        // 1. Length does not exceed 63 characters
+        // 2. Can contain letters, numbers, underscores, and dollar signs
+        // 3. Cannot start with a dollar sign
+        if (dbName == null || dbName.length() > 63) {
+            return false;
+        }
+        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
+            return false;
+        }
+        return true;
     }
 }
