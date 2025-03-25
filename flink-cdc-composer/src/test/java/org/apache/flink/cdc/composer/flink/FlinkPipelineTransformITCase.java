@@ -2479,9 +2479,9 @@ class FlinkPipelineTransformITCase {
                                 + "for table\n"
                                 + "\tdefault_namespace.default_schema.mytable1\n"
                                 + "from schema\n"
-                                + "\t(Unknown)\n"
+                                + "\tcolumns={`name` STRING}, primaryKeys=id, options=()\n"
                                 + "to schema\n"
-                                + "\t(Unknown).")
+                                + "\tcolumns={`name` STRING}, primaryKeys=id, options=().")
                 .rootCause()
                 .isExactlyInstanceOf(IllegalStateException.class)
                 .hasMessage("Unable to find column \"id\" which is defined as primary key");
@@ -2544,9 +2544,9 @@ class FlinkPipelineTransformITCase {
                                 + "for table\n"
                                 + "\tdefault_namespace.default_schema.mytable1\n"
                                 + "from schema\n"
-                                + "\t(Unknown)\n"
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=()\n"
                                 + "to schema\n"
-                                + "\t(Unknown).")
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=().")
                 .rootCause()
                 .isExactlyInstanceOf(IllegalStateException.class)
                 .hasMessage(
