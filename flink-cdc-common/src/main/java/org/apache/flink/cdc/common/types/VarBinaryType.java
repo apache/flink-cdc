@@ -65,12 +65,12 @@ public final class VarBinaryType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new VarBinaryType(isNullable, length);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         if (length == MAX_LENGTH) {
             return withNullability(MAX_FORMAT);
         }

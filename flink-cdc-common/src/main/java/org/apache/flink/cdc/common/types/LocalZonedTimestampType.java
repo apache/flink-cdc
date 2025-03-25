@@ -82,18 +82,19 @@ public final class LocalZonedTimestampType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new LocalZonedTimestampType(isNullable, precision);
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, precision);
     }
 
     @Override
     public String asSummaryString() {
-        return withNullability(SUMMARY_FORMAT, precision);
+        return withNullability(SUMMARY_FORMAT, precision)
+                + (getRawDataType() == null ? "" : " " + getRawDataType());
     }
 
     @Override

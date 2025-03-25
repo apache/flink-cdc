@@ -19,6 +19,8 @@ package org.apache.flink.cdc.common.types;
 
 import org.apache.flink.cdc.common.utils.Preconditions;
 
+import javax.annotation.Nullable;
+
 import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +34,8 @@ public abstract class DataType implements Serializable {
     private final boolean isNullable;
 
     private final DataTypeRoot typeRoot;
+
+    @Nullable private RawDataType rawDataType;
 
     public DataType(boolean isNullable, DataTypeRoot typeRoot) {
         this.isNullable = isNullable;
@@ -48,6 +52,15 @@ public abstract class DataType implements Serializable {
      */
     public DataTypeRoot getTypeRoot() {
         return typeRoot;
+    }
+
+    public void setRawDataType(@Nullable RawDataType rawDataType) {
+        this.rawDataType = rawDataType;
+    }
+
+    @Nullable
+    public RawDataType getRawDataType() {
+        return rawDataType;
     }
 
     /**
@@ -93,7 +106,7 @@ public abstract class DataType implements Serializable {
      * @param isNullable the intended nullability of the copied type
      * @return a deep copy
      */
-    public abstract DataType copy(boolean isNullable);
+    protected abstract DataType copy(boolean isNullable);
 
     /**
      * Returns a deep copy of this type. It requires an implementation of {@link #copy(boolean)}.
@@ -101,16 +114,39 @@ public abstract class DataType implements Serializable {
      * @return a deep copy
      */
     public final DataType copy() {
-        return copy(isNullable);
+        return copy(isNullable, rawDataType);
     }
 
     /**
-     * Returns a string that fully serializes this instance. The serialized string can be used for
-     * transmitting or persisting a type.
+     * Returns a deep copy of this type with possibly different nullability and raw data type. It
+     * requires an implementation of {@link #copy(boolean)}.
+     *
+     * @param isNullable the intended nullability of the copied type
+     * @param rawDataType the intended raw data type of the copied type
+     * @return a deep copy
+     */
+    public final DataType copy(boolean isNullable, RawDataType rawDataType) {
+        DataType dataType = copy(isNullable);
+        dataType.setRawDataType(rawDataType);
+        return dataType;
+    }
+
+    /**
+     * Returns a string that fully serializes this instance except for the raw type.
      *
      * @return detailed string for transmission or persistence
      */
-    public abstract String asSerializableString();
+    protected abstract String asSerializableString();
+
+    /**
+     * Returns a string that fully serializes this instance, including the raw type. The serialized
+     * string can be used for transmitting or persisting a type.
+     *
+     * @return detailed string for transmission or persistence
+     */
+    public String asSerializableStringWithRawDataType() {
+        return asSerializableString() + (rawDataType == null ? "" : " " + rawDataType);
+    }
 
     /**
      * Returns a string that summarizes this type for printing to a console. An implementation might
@@ -121,7 +157,7 @@ public abstract class DataType implements Serializable {
      * @return summary string of this type for debugging purposes
      */
     public String asSummaryString() {
-        return asSerializableString();
+        return asSerializableStringWithRawDataType();
     }
 
     public abstract List<DataType> getChildren();
@@ -142,20 +178,22 @@ public abstract class DataType implements Serializable {
             return false;
         }
         DataType that = (DataType) o;
-        return isNullable == that.isNullable && typeRoot == that.typeRoot;
+        return isNullable == that.isNullable
+                && typeRoot == that.typeRoot
+                && Objects.equals(rawDataType, that.rawDataType);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(isNullable, typeRoot);
+        return Objects.hash(isNullable, typeRoot, rawDataType);
     }
 
     public DataType notNull() {
-        return copy(false);
+        return copy(false, rawDataType);
     }
 
     public DataType nullable() {
-        return copy(true);
+        return copy(true, rawDataType);
     }
 
     // --------------------------------------------------------------------------------------------

@@ -53,7 +53,7 @@ public final class ArrayType extends DataType {
     }
 
     @Override
-    public DataType copy(boolean isNullable) {
+    protected DataType copy(boolean isNullable) {
         return new ArrayType(isNullable, elementType.copy());
     }
 
@@ -63,7 +63,7 @@ public final class ArrayType extends DataType {
     }
 
     @Override
-    public String asSerializableString() {
+    protected String asSerializableString() {
         return withNullability(FORMAT, elementType.asSerializableString());
     }
 
