@@ -278,6 +278,111 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
     }
 
     @Test
+    public void testStartupFromCommittedOffset() throws Exception {
+        if (!parallelismSnapshot) {
+            return;
+        }
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'slot.name' = '%s',"
+                                + " 'scan.startup.mode' = 'committed-offset'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products",
+                        parallelismSnapshot,
+                        getSlotName());
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE debezium_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult firstRunResult =
+                tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        // wait for the source startup, we don't have a better way to wait it, use sleep
+        // for now
+        Thread.sleep(10000L);
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'first','first description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'second','second description',0.2);");
+        }
+
+        waitForSinkSize("sink", 2);
+
+        String[] firstRunExpected =
+                new String[] {
+                    "110,first,first description,0.100", "111,second,second description,0.200"
+                };
+
+        List<String> firstRunActual = TestValuesTableFactory.getResultsAsStrings("sink");
+        assertThat(firstRunActual, containsInAnyOrder(firstRunExpected));
+
+        firstRunResult.getJobClient().get().cancel().get();
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'third','third description',0.3);");
+        }
+
+        TableResult secondRunResult =
+                tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        Thread.sleep(10000L);
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'fourth','fourth description',0.4);");
+        }
+
+        waitForSinkSize("sink", 4);
+
+        String[] secondRunExpected =
+                new String[] {
+                    "110,first,first description,0.100",
+                    "111,second,second description,0.200",
+                    "112,third,third description,0.300",
+                    "113,fourth,fourth description,0.400"
+                };
+
+        List<String> secondRunActual = TestValuesTableFactory.getResultsAsStrings("sink");
+        assertThat(secondRunActual, containsInAnyOrder(secondRunExpected));
+
+        secondRunResult.getJobClient().get().cancel().get();
+    }
+
+    @Test
     public void testExceptionForReplicaIdentity() throws Exception {
         initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
