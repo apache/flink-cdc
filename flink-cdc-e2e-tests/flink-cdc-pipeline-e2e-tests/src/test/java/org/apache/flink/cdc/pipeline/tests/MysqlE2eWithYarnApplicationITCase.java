@@ -23,15 +23,16 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestOnYarnEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 import java.io.File;
@@ -49,7 +50,6 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc pipeline job. */
-// @RunWith(Parameterized.class)
 public class MysqlE2eWithYarnApplicationITCase extends PipelineTestOnYarnEnvironment {
     private static final Logger LOG =
             LoggerFactory.getLogger(MysqlE2eWithYarnApplicationITCase.class);
@@ -61,7 +61,7 @@ public class MysqlE2eWithYarnApplicationITCase extends PipelineTestOnYarnEnviron
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -78,17 +78,22 @@ public class MysqlE2eWithYarnApplicationITCase extends PipelineTestOnYarnEnviron
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @BeforeClass
+    @BeforeAll
     public static void setup() {
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(MYSQL)).join();
+        LOG.info("Containers are started.");
+        LOG.info("Starting up MiniYARNCluster...");
         startMiniYARNCluster();
+        LOG.info("MiniYARNCluster are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         mysqlInventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         mysqlInventoryDatabase.dropDatabase();
     }

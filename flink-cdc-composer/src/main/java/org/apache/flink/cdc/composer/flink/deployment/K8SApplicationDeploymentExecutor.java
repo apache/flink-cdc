@@ -39,9 +39,10 @@ import java.util.List;
 
 /** deploy flink cdc job by native k8s application mode. */
 public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecutor {
-
     private static final Logger LOG =
             LoggerFactory.getLogger(K8SApplicationDeploymentExecutor.class);
+
+    private static final String APPLICATION_MAIN_CLASS = "org.apache.flink.cdc.cli.CliExecutor";
 
     @Override
     public PipelineExecution.ExecutionInfo deploy(
@@ -59,9 +60,7 @@ public class K8SApplicationDeploymentExecutor implements PipelineDeploymentExecu
         // set the default cdc latest docker image
         flinkConfig.set(KubernetesConfigOptions.CONTAINER_IMAGE, "flink/flink-cdc:latest");
         flinkConfig.set(ApplicationConfiguration.APPLICATION_ARGS, commandLine.getArgList());
-        flinkConfig.set(
-                ApplicationConfiguration.APPLICATION_MAIN_CLASS,
-                "org.apache.flink.cdc.cli.CliExecutor");
+        flinkConfig.set(ApplicationConfiguration.APPLICATION_MAIN_CLASS, APPLICATION_MAIN_CLASS);
         KubernetesClusterClientFactory kubernetesClusterClientFactory =
                 new KubernetesClusterClientFactory();
         KubernetesClusterDescriptor descriptor =

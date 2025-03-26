@@ -69,7 +69,7 @@ public class CliExecutor {
         // Create Submit Executor to deployment flink cdc job Or Run Flink CDC Job
         String deploymentTargetStr = getDeploymentTarget();
         ComposeDeployment deploymentTarget =
-                ComposeDeployment.getDeploymentFromName(getDeploymentTarget());
+                ComposeDeployment.getDeploymentFromName(deploymentTargetStr);
         switch (deploymentTarget) {
             case KUBERNETES_APPLICATION:
                 return deployWithApplicationComposer(new K8SApplicationDeploymentExecutor());
