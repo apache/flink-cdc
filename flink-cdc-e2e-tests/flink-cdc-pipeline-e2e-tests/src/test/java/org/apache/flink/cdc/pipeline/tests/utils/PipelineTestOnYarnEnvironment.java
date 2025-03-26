@@ -180,9 +180,7 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
                 LOG.info("Waiting for Nodemanagers to connect");
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
-            LOG.error("setup failure", ex);
-            fail("");
+            fail("setup failure", ex);
         }
     }
 
