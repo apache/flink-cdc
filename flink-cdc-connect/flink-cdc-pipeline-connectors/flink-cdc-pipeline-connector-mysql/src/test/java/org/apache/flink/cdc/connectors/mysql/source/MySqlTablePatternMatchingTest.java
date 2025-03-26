@@ -32,9 +32,9 @@ import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 
 import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import javax.annotation.Nullable;
 
@@ -63,7 +63,7 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.loopCheck;
 
 /** Test cases for matching MySQL source tables. */
-public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
+class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
 
     private final PrintStream standardOut = System.out;
 
@@ -77,18 +77,18 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                     Tuple2.of("db3", "tbl3"),
                     Tuple2.of("db4", "tbl4"));
 
-    @BeforeClass
-    public static void initializeDatabase() throws Exception {
+    @BeforeAll
+    static void initializeDatabase() throws Exception {
         initializeMySqlTables(TEST_TABLES);
     }
 
-    @AfterClass
-    public static void tearDownDatabase() throws Exception {
+    @AfterAll
+    static void tearDownDatabase() throws Exception {
         tearDownMySqlTables(TEST_TABLES);
     }
 
     @Test
-    public void testWildcardMatching() throws Exception {
+    void testWildcardMatching() throws Exception {
         Assertions.assertThat(testGenericTableMatching("\\.*.\\.*", null, false))
                 .containsExactlyInAnyOrder(
                         "db.tbl1",
@@ -104,7 +104,7 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingDatabases() throws Exception {
+    void testWildcardMatchingDatabases() throws Exception {
         Assertions.assertThat(testGenericTableMatching("\\.*.tbl[3-4]", null, false))
                 .containsExactlyInAnyOrder("db.tbl3", "db.tbl4", "db3.tbl3", "db4.tbl4");
 
@@ -113,7 +113,7 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingTables() throws Exception {
+    void testWildcardMatchingTables() throws Exception {
         Assertions.assertThat(testGenericTableMatching("db.\\.*", null, false))
                 .containsExactlyInAnyOrder("db.tbl1", "db.tbl2", "db.tbl3", "db.tbl4");
 
@@ -122,7 +122,7 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingPartialDatabases() throws Exception {
+    void testWildcardMatchingPartialDatabases() throws Exception {
         // `db.` matches `db2`, `db3`, `db4` but not `db`
         Assertions.assertThat(testGenericTableMatching("db\\..\\.*", null, false))
                 .containsExactlyInAnyOrder("db2.tbl2", "db3.tbl3", "db4.tbl4");
@@ -132,33 +132,33 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingWithExclusion() throws Exception {
+    void testWildcardMatchingWithExclusion() throws Exception {
         Assertions.assertThat(testGenericTableMatching("\\.*.\\.*", "db.tbl3", false))
                 .containsExactlyInAnyOrder(
                         "db.tbl1", "db.tbl2", "db.tbl4", "db2.tbl2", "db3.tbl3", "db4.tbl4");
     }
 
     @Test
-    public void testWildcardMatchingDatabasesWithExclusion() throws Exception {
+    void testWildcardMatchingDatabasesWithExclusion() throws Exception {
         Assertions.assertThat(testGenericTableMatching("\\.*.tbl[3-4]", "db.tbl[3-4]", false))
                 .containsExactlyInAnyOrder("db3.tbl3", "db4.tbl4");
     }
 
     @Test
-    public void testWildcardMatchingTablesWithExclusion() throws Exception {
+    void testWildcardMatchingTablesWithExclusion() throws Exception {
         Assertions.assertThat(testGenericTableMatching("db.\\.*", "db.tbl4", false))
                 .containsExactlyInAnyOrder("db.tbl1", "db.tbl2", "db.tbl3");
     }
 
     @Test
-    public void testWildcardMatchingPartialDatabasesWithExclusion() throws Exception {
+    void testWildcardMatchingPartialDatabasesWithExclusion() throws Exception {
         // `db.` matches `db2`, `db3`, `db4` but not `db`
         Assertions.assertThat(testGenericTableMatching("db\\..\\.*", "db3.\\.*", false))
                 .containsExactlyInAnyOrder("db2.tbl2", "db4.tbl4");
     }
 
     @Test
-    public void testWildcardMatchingRealTables() throws Exception {
+    void testWildcardMatchingRealTables() throws Exception {
         String[] expected =
                 new String[] {
                     "CreateTableEvent{tableId=db.tbl1, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
@@ -185,7 +185,7 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingDatabasesRealTables() throws Exception {
+    void testWildcardMatchingDatabasesRealTables() throws Exception {
         String[] expected =
                 new String[] {
                     "CreateTableEvent{tableId=db.tbl3, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
@@ -208,7 +208,7 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingTablesRealTables() throws Exception {
+    void testWildcardMatchingTablesRealTables() throws Exception {
         String[] expected =
                 new String[] {
                     "CreateTableEvent{tableId=db.tbl1, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
@@ -229,7 +229,7 @@ public class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testWildcardMatchingPartialDatabasesRealTables() throws Exception {
+    void testWildcardMatchingPartialDatabasesRealTables() throws Exception {
         String[] expected =
                 new String[] {
                     "CreateTableEvent{tableId=db2.tbl2, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
