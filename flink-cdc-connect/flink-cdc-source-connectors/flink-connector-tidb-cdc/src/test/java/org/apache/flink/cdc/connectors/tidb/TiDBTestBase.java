@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
-import org.apache.flink.test.util.AbstractTestBaseJUnit4;
+import org.apache.flink.test.util.AbstractTestBase;
 
 import com.alibaba.dcm.DnsCacheManipulator;
 import org.apache.commons.lang3.RandomUtils;
@@ -53,7 +53,7 @@ import java.util.stream.Stream;
 import static org.junit.Assert.assertNotNull;
 
 /** Utility class for tidb tests. */
-public class TiDBTestBase extends AbstractTestBaseJUnit4 {
+public class TiDBTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBTestBase.class);
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 

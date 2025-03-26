@@ -17,7 +17,8 @@
 
 package org.apache.flink.cdc.connectors.tidb.table.utils;
 
-import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
+import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions;
+import org.apache.flink.cdc.connectors.tidb.utils.UriHostMapping;
 
 import org.junit.Test;
 import org.tikv.common.TiConfiguration;
@@ -32,7 +33,7 @@ public class UriHostMappingTest {
     @Test
     public void uriHostMappingTest() {
         final TiConfiguration tiConf =
-                TDBSourceOptions.getTiConfiguration(
+                TiDBSourceOptions.getTiConfiguration(
                         "http://0.0.0.0:2347", "host1:1;host2:2;host3:3", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
         assertEquals(uriHostMapping.getHostMapping().size(), 3);
@@ -42,7 +43,7 @@ public class UriHostMappingTest {
     @Test
     public void uriHostMappingEmpty() {
         final TiConfiguration tiConf =
-                TDBSourceOptions.getTiConfiguration("http://0.0.0.0:2347", "", new HashMap<>());
+                TiDBSourceOptions.getTiConfiguration("http://0.0.0.0:2347", "", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
         assertEquals(uriHostMapping.getHostMapping(), null);
     }
@@ -51,7 +52,7 @@ public class UriHostMappingTest {
     public void uriHostMappingError() {
         try {
             final TiConfiguration tiConf =
-                    TDBSourceOptions.getTiConfiguration(
+                    TiDBSourceOptions.getTiConfiguration(
                             "http://0.0.0.0:2347", "host1=1;host2=2;host3=3", new HashMap<>());
         } catch (IllegalArgumentException e) {
             assertEquals(e.getMessage(), "Invalid host mapping string: host1=1;host2=2;host3=3");
