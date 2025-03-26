@@ -24,7 +24,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 /** A test for the {@link MetadataColumnSerializer}. */
-public class MetadataColumnSerializerTest extends SerializerTestBase<MetadataColumn> {
+class MetadataColumnSerializerTest extends SerializerTestBase<MetadataColumn> {
     @Override
     protected TypeSerializer<MetadataColumn> createSerializer() {
         return MetadataColumnSerializer.INSTANCE;

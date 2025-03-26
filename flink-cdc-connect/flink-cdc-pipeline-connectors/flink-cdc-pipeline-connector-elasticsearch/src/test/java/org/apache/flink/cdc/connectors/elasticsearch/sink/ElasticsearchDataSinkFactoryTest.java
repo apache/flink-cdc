@@ -42,7 +42,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Tests for {@link ElasticsearchDataSinkFactory}. */
-public class ElasticsearchDataSinkFactoryTest {
+class ElasticsearchDataSinkFactoryTest {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(ElasticsearchDataSinkFactoryTest.class);
@@ -72,8 +72,6 @@ public class ElasticsearchDataSinkFactoryTest {
             LOG.info("Testing missing required option: {}", requiredKey);
 
             Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
-
-                    // Assertions to check for missing required option
                     .isInstanceOf(ValidationException.class)
                     .hasMessageContaining(
                             String.format(
@@ -99,7 +97,6 @@ public class ElasticsearchDataSinkFactoryTest {
 
         LOG.info("Testing unsupported option");
 
-        // Assertions to check for unsupported options
         Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(

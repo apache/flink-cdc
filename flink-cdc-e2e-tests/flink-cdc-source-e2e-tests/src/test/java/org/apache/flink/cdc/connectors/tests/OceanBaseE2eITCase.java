@@ -26,10 +26,11 @@ import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseMySQLCdcMeta
 import org.apache.flink.cdc.connectors.oceanbase.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -43,7 +44,8 @@ import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.creat
 import static org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils.createOceanBaseContainerForCDC;
 
 /** End-to-end tests for oceanbase-cdc connector uber jar. */
-public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
+@Testcontainers
+class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final String INTER_CONTAINER_OB_SERVER_ALIAS = "oceanbase";
     private static final String INTER_CONTAINER_LOG_PROXY_ALIAS = "oblogproxy";
@@ -51,13 +53,13 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
     private static final Path obCdcJar = TestUtils.getResource("oceanbase-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
-    @ClassRule
+    @Container
     public static final OceanBaseContainer OB_SERVER =
             createOceanBaseContainerForCDC()
                     .withNetwork(NETWORK)
                     .withNetworkAliases(INTER_CONTAINER_OB_SERVER_ALIAS);
 
-    @ClassRule
+    @Container
     public static final LogProxyContainer LOG_PROXY =
             createLogProxyContainer()
                     .withNetwork(NETWORK)
@@ -69,14 +71,14 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
     protected final UniqueDatabase obInventoryDatabase =
             new UniqueDatabase(OB_SERVER, "oceanbase_inventory");
 
-    @Before
+    @BeforeEach
     public void before() {
         super.before();
 
         obInventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
 
@@ -84,7 +86,7 @@ public class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     @Test
-    public void testOceanBaseCDC() throws Exception {
+    void testOceanBaseCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
                         "SET 'execution.checkpointing.interval' = '3s';",

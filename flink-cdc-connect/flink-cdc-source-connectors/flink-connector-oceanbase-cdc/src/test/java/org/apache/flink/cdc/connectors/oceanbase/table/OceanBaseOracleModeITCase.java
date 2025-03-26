@@ -26,8 +26,8 @@ import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -35,8 +35,8 @@ import java.util.Arrays;
 import java.util.List;
 
 /** Integration tests for OceanBase Oracle mode table source. */
-@Ignore("Test ignored before oceanbase-xe docker image is available")
-public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
+@Disabled("Test ignored before oceanbase-xe docker image is available")
+class OceanBaseOracleModeITCase extends OceanBaseTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -59,7 +59,7 @@ public class OceanBaseOracleModeITCase extends OceanBaseTestBase {
     }
 
     @Test
-    public void testAllDataTypes() throws Exception {
+    void testAllDataTypes() throws Exception {
         initializeTable("column_type_test");
 
         String schema = metadata().getDatabase();

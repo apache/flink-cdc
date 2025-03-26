@@ -29,12 +29,10 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.lifecycle.Startables;
@@ -48,8 +46,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
 
-/** Integration tests for MySQL shardding tables. */
-@RunWith(Parameterized.class)
+/** Integration tests for MySQL sharding tables. */
 public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
 
     private static final Logger LOG =
@@ -75,34 +72,21 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    // enable the incrementalSnapshot (i.e: The new source MySqlParallelSource)
-    private final boolean incrementalSnapshot;
-
-    public MySqlConnectorShardingTableITCase(boolean incrementalSnapshot) {
-        this.incrementalSnapshot = incrementalSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {false}, new Object[] {true}};
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
-    public void before() {
+    public void setup(boolean incrementalSnapshot) {
         TestValuesTableFactory.clearAllData();
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
@@ -112,8 +96,10 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    @Test
-    public void testShardingTablesWithTinyInt1() throws Exception {
+    @ParameterizedTest(name = "incrementalSnapshot = {0}")
+    @ValueSource(booleans = {true, false})
+    public void testShardingTablesWithTinyInt1(boolean incrementalSnapshot) throws Exception {
+        setup(incrementalSnapshot);
         fullTypesMySql57Database.createAndInitialize();
         try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -154,8 +140,8 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
                         fullTypesMySql57Database.getDatabaseName(),
                         "sharding_table_.*",
                         incrementalSnapshot,
-                        getServerId(),
-                        getSplitSize());
+                        getServerId(incrementalSnapshot),
+                        getSplitSize(incrementalSnapshot));
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " `id` BIGINT NOT NULL,"
@@ -201,8 +187,11 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testShardingTablesWithInconsistentSchema() throws Exception {
+    @ParameterizedTest(name = "incrementalSnapshot = {0}")
+    @ValueSource(booleans = {true, false})
+    public void testShardingTablesWithInconsistentSchema(boolean incrementalSnapshot)
+            throws Exception {
+        setup(incrementalSnapshot);
         userDatabase1.createAndInitialize();
         userDatabase2.createAndInitialize();
         String sourceDDL =
@@ -237,8 +226,8 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
                                 userDatabase1.getDatabaseName(), userDatabase2.getDatabaseName()),
                         "user_table_.*",
                         incrementalSnapshot,
-                        getServerId(),
-                        getSplitSize());
+                        getServerId(incrementalSnapshot),
+                        getSplitSize(incrementalSnapshot));
         tEnv.executeSql(sourceDDL);
 
         // async submit job
@@ -275,7 +264,7 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
 
     // ------------------------------------------------------------------------------------
 
-    private String getServerId() {
+    private String getServerId(boolean incrementalSnapshot) {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         if (incrementalSnapshot) {
@@ -284,14 +273,14 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
         return String.valueOf(serverId);
     }
 
-    protected String getServerId(int base) {
+    protected String getServerId(int base, boolean incrementalSnapshot) {
         if (incrementalSnapshot) {
             return base + "-" + (base + DEFAULT_PARALLELISM);
         }
         return String.valueOf(base);
     }
 
-    private int getSplitSize() {
+    private int getSplitSize(boolean incrementalSnapshot) {
         if (incrementalSnapshot) {
             // test parallel read
             return 4;

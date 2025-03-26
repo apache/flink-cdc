@@ -35,9 +35,9 @@ import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -63,12 +63,9 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 /** Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}. */
-public class MongoDBTableFactoryTest {
+class MongoDBTableFactoryTest {
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
                     Arrays.asList(
@@ -127,7 +124,7 @@ public class MongoDBTableFactoryTest {
             SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -159,11 +156,11 @@ public class MongoDBTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
                         SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("scheme", MONGODB_SRV_SCHEME);
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
@@ -214,11 +211,11 @@ public class MongoDBTableFactoryTest {
                         true,
                         true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
+    void testMetadataColumns() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -260,7 +257,7 @@ public class MongoDBTableFactoryTest {
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
 
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
 
         ScanTableSource.ScanRuntimeProvider provider =
                 mongoDBSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
@@ -271,19 +268,15 @@ public class MongoDBTableFactoryTest {
     }
 
     @Test
-    public void testValidation() {
+    void testValidation() {
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
-
-            createTableSource(SCHEMA, properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("unknown", "abc");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
     }
 
     private Map<String, String> getAllOptions() {
