@@ -117,7 +117,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testSingleSplitSingleTable(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -175,7 +177,9 @@ class FlinkPipelineComposerLenientITCase {
     @EnumSource
     void testSingleSplitSingleTableWithDefaultValue(ValuesDataSink.SinkApi sinkApi)
             throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -234,7 +238,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testSingleSplitMultipleTables(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -301,7 +307,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testMultiSplitsSingleTable(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -345,7 +353,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testTransform(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -406,7 +416,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testOpTypeMetadataColumn(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -467,7 +479,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testTransformTwice(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -536,7 +550,9 @@ class FlinkPipelineComposerLenientITCase {
 
     @Test
     void testOneToOneRouting() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -609,7 +625,9 @@ class FlinkPipelineComposerLenientITCase {
 
     @Test
     void testIdenticalOneToOneRouting() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -682,7 +700,9 @@ class FlinkPipelineComposerLenientITCase {
 
     @Test
     void testMergingWithRoute() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -877,7 +897,9 @@ class FlinkPipelineComposerLenientITCase {
 
     @Test
     void testTransformMergingWithRoute() throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
@@ -1085,7 +1107,9 @@ class FlinkPipelineComposerLenientITCase {
     @ParameterizedTest
     @EnumSource
     void testRouteWithReplaceSymbol(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        FlinkPipelineComposer composer =
+                FlinkPipelineComposer.ofMiniCluster(
+                        new org.apache.flink.configuration.Configuration());
 
         // Setup value source
         Configuration sourceConfig = new Configuration();
