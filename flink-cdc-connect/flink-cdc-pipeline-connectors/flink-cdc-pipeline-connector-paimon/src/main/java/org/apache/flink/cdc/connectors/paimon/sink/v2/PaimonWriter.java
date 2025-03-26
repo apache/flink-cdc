@@ -36,9 +36,10 @@ import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.utils.ExecutorThreadFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +51,8 @@ import java.util.stream.Collectors;
 /** A {@link Sink} to write {@link DataChangeEvent} to Paimon storage. */
 public class PaimonWriter<InputT>
         implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PaimonWriter.class);
 
     // use `static` because Catalog is unSerializable.
     private static Catalog catalog;
@@ -92,22 +95,32 @@ public class PaimonWriter<InputT>
     }
 
     @Override
-    public Collection<MultiTableCommittable> prepareCommit() throws IOException {
-        List<MultiTableCommittable> committables = new ArrayList<>();
-        for (Map.Entry<Identifier, StoreSinkWrite> entry : writes.entrySet()) {
-            Identifier key = entry.getKey();
-            StoreSinkWrite write = entry.getValue();
-            boolean waitCompaction = true;
-            committables.addAll(
-                    // here we set it to lastCheckpointId+1 to
-                    // avoid prepareCommit the same checkpointId with the first round.
-                    write.prepareCommit(waitCompaction, lastCheckpointId + 1).stream()
-                            .map(
-                                    committable ->
-                                            MultiTableCommittable.fromCommittable(key, committable))
-                            .collect(Collectors.toList()));
-        }
+    public Collection<MultiTableCommittable> prepareCommit() {
+        long startTime = System.currentTimeMillis();
+        List<MultiTableCommittable> committables =
+                writes.entrySet()
+                        .parallelStream()
+                        .flatMap(
+                                entry -> {
+                                    try {
+                                        // here we set it to lastCheckpointId+1 to
+                                        // avoid prepareCommit the same checkpointId with the first
+                                        // round.
+                                        return entry.getValue()
+                                                .prepareCommit(true, lastCheckpointId + 1).stream()
+                                                .map(
+                                                        committable ->
+                                                                MultiTableCommittable
+                                                                        .fromCommittable(
+                                                                                entry.getKey(),
+                                                                                committable));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })
+                        .collect(Collectors.toList());
         lastCheckpointId++;
+        LOG.debug("Spend {} ms to prepareCommit", System.currentTimeMillis() - startTime);
         return committables;
     }
 
