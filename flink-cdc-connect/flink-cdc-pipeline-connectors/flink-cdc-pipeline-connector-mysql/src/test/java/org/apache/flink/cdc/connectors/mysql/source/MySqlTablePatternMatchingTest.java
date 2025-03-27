@@ -78,17 +78,17 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                     Tuple2.of("db4", "tbl4"));
 
     @BeforeAll
-    static void initializeDatabase() throws Exception {
+    static void initializeDatabase() {
         initializeMySqlTables(TEST_TABLES);
     }
 
     @AfterAll
-    static void tearDownDatabase() throws Exception {
+    static void tearDownDatabase() {
         tearDownMySqlTables(TEST_TABLES);
     }
 
     @Test
-    void testWildcardMatching() throws Exception {
+    void testWildcardMatching() {
         Assertions.assertThat(testGenericTableMatching("\\.*.\\.*", null, false))
                 .containsExactlyInAnyOrder(
                         "db.tbl1",
@@ -104,7 +104,7 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    void testWildcardMatchingDatabases() throws Exception {
+    void testWildcardMatchingDatabases() {
         Assertions.assertThat(testGenericTableMatching("\\.*.tbl[3-4]", null, false))
                 .containsExactlyInAnyOrder("db.tbl3", "db.tbl4", "db3.tbl3", "db4.tbl4");
 
@@ -113,7 +113,7 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    void testWildcardMatchingTables() throws Exception {
+    void testWildcardMatchingTables() {
         Assertions.assertThat(testGenericTableMatching("db.\\.*", null, false))
                 .containsExactlyInAnyOrder("db.tbl1", "db.tbl2", "db.tbl3", "db.tbl4");
 
@@ -122,7 +122,7 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    void testWildcardMatchingPartialDatabases() throws Exception {
+    void testWildcardMatchingPartialDatabases() {
         // `db.` matches `db2`, `db3`, `db4` but not `db`
         Assertions.assertThat(testGenericTableMatching("db\\..\\.*", null, false))
                 .containsExactlyInAnyOrder("db2.tbl2", "db3.tbl3", "db4.tbl4");
@@ -132,29 +132,38 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
-    void testWildcardMatchingWithExclusion() throws Exception {
+    void testWildcardMatchingWithExclusion() {
         Assertions.assertThat(testGenericTableMatching("\\.*.\\.*", "db.tbl3", false))
                 .containsExactlyInAnyOrder(
                         "db.tbl1", "db.tbl2", "db.tbl4", "db2.tbl2", "db3.tbl3", "db4.tbl4");
     }
 
     @Test
-    void testWildcardMatchingDatabasesWithExclusion() throws Exception {
+    void testWildcardMatchingDatabasesWithExclusion() {
         Assertions.assertThat(testGenericTableMatching("\\.*.tbl[3-4]", "db.tbl[3-4]", false))
                 .containsExactlyInAnyOrder("db3.tbl3", "db4.tbl4");
     }
 
     @Test
-    void testWildcardMatchingTablesWithExclusion() throws Exception {
+    void testWildcardMatchingTablesWithExclusion() {
         Assertions.assertThat(testGenericTableMatching("db.\\.*", "db.tbl4", false))
                 .containsExactlyInAnyOrder("db.tbl1", "db.tbl2", "db.tbl3");
     }
 
     @Test
-    void testWildcardMatchingPartialDatabasesWithExclusion() throws Exception {
+    void testWildcardMatchingPartialDatabasesWithExclusion() {
         // `db.` matches `db2`, `db3`, `db4` but not `db`
         Assertions.assertThat(testGenericTableMatching("db\\..\\.*", "db3.\\.*", false))
                 .containsExactlyInAnyOrder("db2.tbl2", "db4.tbl4");
+    }
+
+    @Test
+    void testMatchingTablesWithMultipleRules() {
+        Assertions.assertThat(testGenericTableMatching("db.tbl1,db2.tbl\\.*,db3.tbl3", null, false))
+                .containsExactlyInAnyOrder("db.tbl1", "db2.tbl2", "db3.tbl3");
+
+        Assertions.assertThat(testGenericTableMatching("db.tbl1,db2.tbl\\.*,db3.tbl3", null, true))
+                .containsExactlyInAnyOrder("db\\.tbl1|db2\\.tbl.*|db3\\.tbl3");
     }
 
     @Test
@@ -177,10 +186,10 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                     "DataChangeEvent{tableId=db4.tbl4, before=[], after=[17], op=INSERT, meta=()}"
                 };
 
-        Assertions.assertThat(testRealWorldTableMatching("\\.*.\\.*", null, false, expected.length))
+        Assertions.assertThat(getRealWorldMatchedTables("\\.*.\\.*", null, false, expected.length))
                 .containsExactlyInAnyOrder(expected);
 
-        Assertions.assertThat(testRealWorldTableMatching("\\.*.\\.*", null, true, expected.length))
+        Assertions.assertThat(getRealWorldMatchedTables("\\.*.\\.*", null, true, expected.length))
                 .containsExactlyInAnyOrder(expected);
     }
 
@@ -199,11 +208,11 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                 };
 
         Assertions.assertThat(
-                        testRealWorldTableMatching("\\.*.tbl[3-4]", null, false, expected.length))
+                        getRealWorldMatchedTables("\\.*.tbl[3-4]", null, false, expected.length))
                 .containsExactlyInAnyOrder(expected);
 
         Assertions.assertThat(
-                        testRealWorldTableMatching("\\.*.tbl[3-4]", null, true, expected.length))
+                        getRealWorldMatchedTables("\\.*.tbl[3-4]", null, true, expected.length))
                 .containsExactlyInAnyOrder(expected);
     }
 
@@ -221,10 +230,10 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                     "DataChangeEvent{tableId=db.tbl4, before=[], after=[17], op=INSERT, meta=()}"
                 };
 
-        Assertions.assertThat(testRealWorldTableMatching("db.\\.*", null, false, expected.length))
+        Assertions.assertThat(getRealWorldMatchedTables("db.\\.*", null, false, expected.length))
                 .containsExactlyInAnyOrder(expected);
 
-        Assertions.assertThat(testRealWorldTableMatching("db.\\.*", null, true, expected.length))
+        Assertions.assertThat(getRealWorldMatchedTables("db.\\.*", null, true, expected.length))
                 .containsExactlyInAnyOrder(expected);
     }
 
@@ -241,16 +250,37 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                 };
 
         // `db.` matches `db2`, `db3`, `db4` but not `db`
-        Assertions.assertThat(
-                        testRealWorldTableMatching("db\\..\\.*", null, false, expected.length))
+        Assertions.assertThat(getRealWorldMatchedTables("db\\..\\.*", null, false, expected.length))
                 .containsExactlyInAnyOrder(expected);
 
-        Assertions.assertThat(testRealWorldTableMatching("db\\..\\.*", null, true, expected.length))
+        Assertions.assertThat(getRealWorldMatchedTables("db\\..\\.*", null, true, expected.length))
                 .containsExactlyInAnyOrder(expected);
     }
 
-    private static void initializeMySqlTables(List<Tuple2<String, String>> tableNames)
-            throws Exception {
+    @Test
+    void testMultipleRulesWithRealTables() throws Exception {
+        String[] expected =
+                new String[] {
+                    "CreateTableEvent{tableId=db.tbl1, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
+                    "DataChangeEvent{tableId=db.tbl1, before=[], after=[17], op=INSERT, meta=()}",
+                    "CreateTableEvent{tableId=db2.tbl2, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
+                    "DataChangeEvent{tableId=db2.tbl2, before=[], after=[17], op=INSERT, meta=()}",
+                    "CreateTableEvent{tableId=db3.tbl3, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
+                    "DataChangeEvent{tableId=db3.tbl3, before=[], after=[17], op=INSERT, meta=()}"
+                };
+
+        Assertions.assertThat(
+                        getRealWorldMatchedTables(
+                                "db.tbl1,db2.tbl\\.*,db3.tbl3", null, false, expected.length))
+                .containsExactlyInAnyOrder(expected);
+
+        Assertions.assertThat(
+                        getRealWorldMatchedTables(
+                                "db.tbl1,db2.tbl\\.*,db3.tbl3", null, true, expected.length))
+                .containsExactlyInAnyOrder(expected);
+    }
+
+    private static void initializeMySqlTables(List<Tuple2<String, String>> tableNames) {
         tableNames.forEach(
                 tableName -> {
                     try (Connection connection =
@@ -276,8 +306,7 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
                 });
     }
 
-    private static void tearDownMySqlTables(List<Tuple2<String, String>> tableNames)
-            throws Exception {
+    private static void tearDownMySqlTables(List<Tuple2<String, String>> tableNames) {
         tableNames.forEach(
                 tableName -> {
                     try (Connection connection =
@@ -295,8 +324,9 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     private List<String> testGenericTableMatching(
-            String tablesConfig, @Nullable String tablesExclude, boolean scanBinlogNewlyAddedTable)
-            throws Exception {
+            String tablesConfig,
+            @Nullable String tablesExclude,
+            boolean scanBinlogNewlyAddedTable) {
         Map<String, String> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
@@ -340,7 +370,7 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
         }
     }
 
-    private List<String> testRealWorldTableMatching(
+    private List<String> getRealWorldMatchedTables(
             String tables,
             @Nullable String tablesExclude,
             boolean scanBinlogNewlyAddedTable,
