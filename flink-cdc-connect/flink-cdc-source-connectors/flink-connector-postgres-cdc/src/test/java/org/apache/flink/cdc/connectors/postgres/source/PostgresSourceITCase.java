@@ -286,9 +286,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testReadSingleTableWithSingleParallelismAndSkipBackfill(String scanStartupMode)
+    @Test
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill()
             throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
