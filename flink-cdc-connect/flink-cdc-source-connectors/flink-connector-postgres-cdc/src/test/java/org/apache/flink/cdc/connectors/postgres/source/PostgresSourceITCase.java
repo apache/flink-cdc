@@ -287,8 +287,7 @@ class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
-    void testReadSingleTableWithSingleParallelismAndSkipBackfill()
-            throws Exception {
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
