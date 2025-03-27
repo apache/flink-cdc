@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -2749,10 +2750,18 @@ class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(new CreateTableEvent(CAST_TABLEID, CAST_SCHEMA)));
         Assertions.assertThatThrownBy(
-                        () -> {
-                            transform.processElement(new StreamRecord<>(insertEvent1));
-                        })
-                .isExactlyInstanceOf(RuntimeException.class)
+                        () -> transform.processElement(new StreamRecord<>(insertEvent1)))
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessageContaining(
+                        "Failed to post-transform with\n"
+                                + "\tDataChangeEvent{tableId=my_company.my_branch.data_cast, before=null, after={col1: STRING NOT NULL -> 1, castInt: INT -> null, castBoolean: BOOLEAN -> null, castTinyint: TINYINT -> null, castSmallint: SMALLINT -> null, castBigint: BIGINT -> null, castFloat: FLOAT -> 1.0, castDouble: DOUBLE -> null, castChar: STRING -> null, castVarchar: STRING -> null, castDecimal: DECIMAL(4, 2) -> null, castTimestamp: TIMESTAMP(3) -> null}, op=INSERT, meta=()}\n"
+                                + "for table\n"
+                                + "\tmy_company.my_branch.data_cast\n"
+                                + "from schema\n"
+                                + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=().")
+                .cause()
                 .hasRootCauseInstanceOf(DateTimeParseException.class)
                 .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
         transformFunctionEventEventOperatorTestHarness.close();
@@ -2850,6 +2859,17 @@ class PostTransformOperatorTest {
                         () -> {
                             transform.processElement(new StreamRecord<>(createTableEvent));
                         })
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessageContaining(
+                        "Failed to post-transform with\n"
+                                + "\tCreateTableEvent{tableId=my_company.my_branch.compare_table, schema=columns={`col1` STRING NOT NULL,`numerical_equal` BOOLEAN,`string_equal` BOOLEAN,`time_equal` BOOLEAN,`timestamp_equal` BOOLEAN,`date_equal` BOOLEAN}, primaryKeys=col1, options=()}\n"
+                                + "for table\n"
+                                + "\tmy_company.my_branch.compare_table\n"
+                                + "from schema\n"
+                                + "\t(Unknown)\n"
+                                + "to schema\n"
+                                + "\t(Unknown).")
+                .cause()
                 .isExactlyInstanceOf(CalciteContextException.class)
                 .hasRootCauseInstanceOf(SqlValidatorException.class)
                 .hasRootCauseMessage(

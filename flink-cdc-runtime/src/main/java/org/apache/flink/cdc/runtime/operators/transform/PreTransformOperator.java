@@ -37,6 +37,7 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -274,6 +275,29 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
+
+        try {
+            processEvent(event);
+        } catch (Exception e) {
+            TableId tableId = null;
+            Schema schemaBefore = null;
+            Schema schemaAfter = null;
+
+            if (event instanceof ChangeEvent) {
+                tableId = ((ChangeEvent) event).tableId();
+                PreTransformChangeInfo info = preTransformChangeInfoMap.get(tableId);
+                if (info != null) {
+                    schemaBefore = info.getSourceSchema();
+                    schemaAfter = info.getPreTransformedSchema();
+                }
+            }
+
+            throw new TransformException(
+                    "pre-transform", event, tableId, schemaBefore, schemaAfter, e);
+        }
+    }
+
+    private void processEvent(Event event) {
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             // CreateTableEvent from Source Contains the latest schema,
