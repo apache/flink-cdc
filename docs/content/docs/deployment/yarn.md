@@ -157,6 +157,11 @@ To submit a job to a Flink Yarn Application cluster using the CLI:
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
 ````
+Or resuming Flink-CDC job from Savepoint:
+```bash
+cd /path/flink-cdc-*
+./bin/flink-cdc.sh -t yarn-application -s hdfs:///flink/savepoint-1537 -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
+```
 After successful submission, the return information is as follows:
 ```bash
 Pipeline has been submitted to cluster.

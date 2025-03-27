@@ -155,6 +155,11 @@ Yarn Application 模式是 Yarn 集群上运行 Flink 作业的推荐模式。�
 cd /path/flink-cdc-*
 ./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
 ```
+或者从savepoint恢复Flink-CDC作业：
+```bash
+cd /path/flink-cdc-*
+./bin/flink-cdc.sh -t yarn-application -s hdfs:///flink/savepoint-1537 -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
+```
 提交成功将返回如下信息：
 ```bash
 Pipeline has been submitted to cluster.
