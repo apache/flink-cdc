@@ -263,19 +263,18 @@ class PostgresSourceITCase extends PostgresTestBase {
     @ValueSource(strings = {"initial", "latest-offset"})
     void testConsumingTableWithoutPrimaryKey(String scanStartupMode) throws Exception {
         if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
-            try {
-                testPostgresParallelSource(
-                        1,
-                        scanStartupMode,
-                        PostgresTestUtils.FailoverType.NONE,
-                        PostgresTestUtils.FailoverPhase.NEVER,
-                        new String[] {"customers_no_pk"},
-                        RestartStrategies.noRestart());
-            } catch (Exception e) {
-                Assertions.assertThat(e)
-                        .hasMessageContaining(
-                                "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
-            }
+            Assertions.assertThatThrownBy(
+                            () -> {
+                                testPostgresParallelSource(
+                                        1,
+                                        scanStartupMode,
+                                        PostgresTestUtils.FailoverType.NONE,
+                                        PostgresTestUtils.FailoverPhase.NEVER,
+                                        new String[] {"customers_no_pk"},
+                                        RestartStrategies.noRestart());
+                            })
+                    .hasMessageContaining(
+                            "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         } else {
             testPostgresParallelSource(
                     1,

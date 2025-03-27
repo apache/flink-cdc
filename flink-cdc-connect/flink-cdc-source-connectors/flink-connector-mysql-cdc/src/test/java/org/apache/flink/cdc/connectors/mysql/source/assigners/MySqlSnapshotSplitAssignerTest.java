@@ -395,17 +395,16 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     void testTableWithoutPrimaryKey() {
         String tableWithoutPrimaryKey = "customers_no_pk";
 
-        try {
-            getTestAssignSnapshotSplits(
-                    4,
-                    CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
-                    CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                    new String[] {tableWithoutPrimaryKey});
-        } catch (Throwable t) {
-            Assertions.assertThat(t)
-                    .hasMessageContaining(
-                            "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
-        }
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            getTestAssignSnapshotSplits(
+                                    4,
+                                    CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                                    CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                                    new String[] {tableWithoutPrimaryKey});
+                        })
+                .hasMessageContaining(
+                        "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
     }
 
     @Test
