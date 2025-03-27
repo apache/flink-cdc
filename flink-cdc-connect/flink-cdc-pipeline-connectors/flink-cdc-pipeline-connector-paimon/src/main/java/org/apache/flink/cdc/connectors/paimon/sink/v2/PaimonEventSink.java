@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketAssignOperator;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapper;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChangeEvent;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperEventTypeInfo;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.FlushEventAlignmentOperator;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -64,7 +65,15 @@ public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTo
                 // All Events after BucketAssignOperator are decorated with BucketWrapper.
                 .partitionCustom(
                         (bucket, numPartitions) -> bucket % numPartitions,
-                        (event) -> ((BucketWrapper) event).getBucket())
+                        (event) -> {
+                            if (event instanceof BucketWrapperChangeEvent) {
+                                // Add hash of tableId to avoid data skew.
+                                return ((BucketWrapperChangeEvent) event).getBucket()
+                                        + ((BucketWrapperChangeEvent) event).tableId().hashCode();
+                            } else {
+                                return ((BucketWrapper) event).getBucket();
+                            }
+                        })
                 // Avoid disorder of FlushEvent and DataChangeEvent.
                 .transform(
                         "FlushEventAlignment",
