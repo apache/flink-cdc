@@ -252,9 +252,8 @@ class OceanBaseE2eITCase extends PipelineTestEnvironment {
 
         waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 9);
         List<String> originList = queryTable(MYSQL_TEST_TABLE_NAME, false);
-        MatcherAssert.assertThat(
-                originList,
-                Matchers.containsInAnyOrder(
+        assertThat(originList)
+                .containsExactlyInAnyOrderElementsOf(
                         Stream.of(
                                         "101,scooter,Small 2-wheel scooter,3.14,red,{\"key1\": \"value1\"},{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
                                         "102,car battery,12V car battery,8.1,white,{\"key2\": \"value2\"},{\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
@@ -266,18 +265,15 @@ class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                         "108,jacket,water resistent black wind breaker,0.1,null,null,null",
                                         "109,spare tire,24 inch spare tire,22.2,null,null,null")
                                 .map(StringEscapeUtils::unescapeJava)
-                                .toArray()));
+                                .collect(Collectors.toList()));
         // validate table of customers
         List<String> customerList = queryTable("customers", false);
-        MatcherAssert.assertThat(
-                customerList,
-                Matchers.containsInAnyOrder(
-                        Stream.of(
-                                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
-                                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
-                                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
-                                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11")
-                                .toArray()));
+        assertThat(customerList)
+                .containsExactlyInAnyOrder(
+                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11");
     }
 
     private void waitingAndAssertTableCount(String tableName, boolean isMySQL, int expectedCount)
