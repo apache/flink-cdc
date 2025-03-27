@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   license_check:
+    if: github.repository == 'apache/flink-cdc'
     name: License Check
     runs-on: ubuntu-latest
     steps:
@@ -47,6 +48,7 @@ jobs:
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
   ut:
+    if: github.repository == 'apache/flink-cdc'
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +59,7 @@ jobs:
       java-version: "[11]"
       module: ${{ matrix.module }}
   pipeline_e2e:
+    if: github.repository == 'apache/flink-cdc'
     strategy:
       fail-fast: false
       matrix:
@@ -69,6 +72,7 @@ jobs:
       module: pipeline_e2e
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
+    if: github.repository == 'apache/flink-cdc'
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
@@ -76,6 +80,7 @@ jobs:
       flink-version: "['1.19.2', '1.20.1']"
       module: source_e2e
   migration_test:
+    if: github.repository == 'apache/flink-cdc'
     name: Migration Tests
     uses: ./.github/workflows/flink_cdc_migration_test_base.yml
     with:
