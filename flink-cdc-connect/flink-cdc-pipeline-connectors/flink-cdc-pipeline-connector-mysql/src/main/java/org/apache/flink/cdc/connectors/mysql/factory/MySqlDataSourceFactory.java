@@ -517,16 +517,12 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
      * literally instead of the meta-character.
      */
     private String validateTableAndReturnDebeziumStyle(String tables) {
-        // MySQL table names are not allowed to have `,` character.
-        if (tables.contains(",")) {
-            throw new IllegalArgumentException(
-                    "the `,` in "
-                            + tables
-                            + " is not supported when "
-                            + SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED
-                            + " was enabled.");
-        }
         LOG.info("Rewriting CDC style table capture list: {}", tables);
+
+        // In CDC-style table matching, table names could be separated by `,` character.
+        // Convert it to `|` as it's standard RegEx syntax.
+        tables = tables.replace(",", "|");
+        LOG.info("Expression after replacing comma with vert separator: {}", tables);
 
         // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
         // In our table matching syntax, `\\.` means RegEx token matcher and `.` means database &
