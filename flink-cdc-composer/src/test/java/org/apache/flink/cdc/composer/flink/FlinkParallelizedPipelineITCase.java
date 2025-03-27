@@ -985,6 +985,7 @@ class FlinkParallelizedPipelineITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, exception);
         PipelineDef pipelineDef =
                 new PipelineDef(
+                        null,
                         sourceDef,
                         sinkDef,
                         traits == SourceTraits.MERGING ? ROUTING_RULES : Collections.emptyList(),
