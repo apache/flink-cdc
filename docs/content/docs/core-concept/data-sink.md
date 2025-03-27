@@ -35,6 +35,7 @@ To describe a data sink, the follows are required:
 |-----------------------------|-------------------------------------------------------------------------------------------------|-------------------|
 | type                        | The type of the sink, such as doris or starrocks.                                               | required          |
 | name                        | The name of the sink, which is user-defined (a default value provided).                         | optional          |
+| parallelism                 | The parallelism of the sink (or will use `pipeline.parallelism`).                               | optional          |
 | configurations of Data Sink | Configurations to build the Data Sink e.g. connection configurations and sink table properties. | optional          |
 
 # Example
