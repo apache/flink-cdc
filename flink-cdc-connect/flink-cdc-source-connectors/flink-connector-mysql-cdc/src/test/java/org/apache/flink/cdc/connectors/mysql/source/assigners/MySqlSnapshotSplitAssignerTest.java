@@ -403,7 +403,7 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                                     CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                                     new String[] {tableWithoutPrimaryKey});
                         })
-                .hasMessageContaining(
+                .hasStackTraceContaining(
                         "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
     }
 

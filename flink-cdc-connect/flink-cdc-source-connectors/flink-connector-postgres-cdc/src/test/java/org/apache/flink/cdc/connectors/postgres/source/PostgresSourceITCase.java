@@ -273,7 +273,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                         new String[] {"customers_no_pk"},
                                         RestartStrategies.noRestart());
                             })
-                    .hasMessageContaining(
+                    .hasStackTraceContaining(
                             "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         } else {
             testPostgresParallelSource(
