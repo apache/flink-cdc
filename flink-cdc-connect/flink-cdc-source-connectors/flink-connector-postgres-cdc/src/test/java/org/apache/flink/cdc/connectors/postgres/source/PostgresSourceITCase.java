@@ -52,6 +52,7 @@ import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -285,9 +286,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testReadSingleTableWithSingleParallelismAndSkipBackfill(String scanStartupMode)
+    @Test
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill()
             throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
@@ -364,9 +364,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         optionalJobClient.get().cancel().get();
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testSnapshotOnlyModeWithDMLPostHighWaterMark(String scanStartupMode) throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -397,9 +396,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testSnapshotOnlyModeWithDMLPreHighWaterMark(String scanStartupMode) throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded
         List<String> records =
                 testBackfillWhenWritingEvents(
