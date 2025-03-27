@@ -22,9 +22,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** General test utilities. */
@@ -58,30 +57,23 @@ public class TestUtils {
         }
 
         try (Stream<Path> dependencyResources = Files.walk(path)) {
-            final List<Path> matchingResources =
+            Optional<Path> jarPath =
                     dependencyResources
                             .filter(
                                     jar ->
                                             Pattern.compile(resourceNameRegex)
                                                     .matcher(jar.toAbsolutePath().toString())
                                                     .find())
-                            .collect(Collectors.toList());
-            switch (matchingResources.size()) {
-                case 0:
-                    throw new RuntimeException(
-                            new FileNotFoundException(
-                                    String.format(
-                                            "No resource file could be found that matches the pattern %s. "
-                                                    + "This could mean that the test module must be rebuilt via maven.",
-                                            resourceNameRegex)));
-                case 1:
-                    return matchingResources.get(0);
-                default:
-                    throw new RuntimeException(
-                            new IOException(
-                                    String.format(
-                                            "Multiple resource files were found matching the pattern %s. Matches=%s",
-                                            resourceNameRegex, matchingResources)));
+                            .findFirst();
+            if (jarPath.isPresent()) {
+                return jarPath.get();
+            } else {
+                throw new RuntimeException(
+                        new FileNotFoundException(
+                                String.format(
+                                        "No resource file could be found that matches the pattern %s. "
+                                                + "This could mean that the test module must be rebuilt via maven.",
+                                        resourceNameRegex)));
             }
         } catch (final IOException ioe) {
             throw new RuntimeException("Could not search for resource resource files.", ioe);
