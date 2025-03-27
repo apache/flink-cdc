@@ -69,12 +69,17 @@ public class PostgresQueryUtils {
         // https://stackoverflow.com/questions/7943233/fast-way-to-discover-the-row-count-of-a-table-in-postgresql
         // NOTE: it requires ANALYZE or VACUUM to be run first in PostgreSQL.
         final String query =
-                String.format(
-                        "SELECT reltuples::bigint FROM pg_class WHERE oid = to_regclass('%s')",
-                        tableId.toString());
-
-        return jdbc.queryAndMap(
+                "SELECT reltuples::bigint"
+                        + " FROM pg_class c"
+                        + " JOIN pg_namespace n ON n.oid = c.relnamespace"
+                        + " WHERE n.nspname = ?"
+                        + " AND c.relname = ?";
+        return jdbc.prepareQueryAndMap(
                 query,
+                ps -> {
+                    ps.setString(1, tableId.schema());
+                    ps.setString(2, tableId.table());
+                },
                 rs -> {
                     if (!rs.next()) {
                         throw new SQLException(
@@ -244,8 +249,8 @@ public class PostgresQueryUtils {
         }
     }
 
-    public static String quote(String dbOrTableName) {
-        return "\"" + dbOrTableName + "\"";
+    public static String quote(String name) {
+        return "\"" + name.replace("\"", "\"\"") + "\"";
     }
 
     private static String quoteForMinMax(Column column) {
@@ -292,7 +297,7 @@ public class PostgresQueryUtils {
                 fieldNamesIt.hasNext(); ) {
             String fieldName = fieldNamesIt.next();
             boolean isUUID = uuidFields.contains(fieldName);
-            sql.append(fieldName).append(predicate).append(castParam(isUUID));
+            sql.append(quote(fieldName)).append(predicate).append(castParam(isUUID));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" AND ");
             }
@@ -303,7 +308,7 @@ public class PostgresQueryUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append(fieldNamesIt.next());
+            sql.append(quote(fieldNamesIt.next()));
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
@@ -315,7 +320,7 @@ public class PostgresQueryUtils {
         StringBuilder sql = new StringBuilder();
         for (Iterator<String> fieldNamesIt = pkRowType.getFieldNames().iterator();
                 fieldNamesIt.hasNext(); ) {
-            sql.append("MAX(" + fieldNamesIt.next() + ")");
+            sql.append("MAX(" + quote(fieldNamesIt.next()) + ")");
             if (fieldNamesIt.hasNext()) {
                 sql.append(" , ");
             }
