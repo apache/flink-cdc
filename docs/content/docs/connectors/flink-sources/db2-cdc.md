@@ -436,6 +436,32 @@ There are two places that need to be taken care of.
 * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
 * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
 
+#### Warning
+
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` can lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+
+#### Problem Scenario
+
+- **Table Structure:**
+  - **Primary Key:** `id`
+  - **Chunk Key Column:** `pid` (Not a primary key)
+
+- **Snapshot Splits:**
+  - **Split 0:** `1 < pid <= 3`
+  - **Split 1:** `3 < pid <= 5`
+
+- **Operation:**
+  - Two different subtasks are reading Split 0 and Split 1 concurrently.
+  - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+
+- **Result:**
+  - **Split 0:** Contains the record `[id=0, pid=2]`
+  - **Split 1:** Contains the record `[id=0, pid=4]`
+
+Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+
+
+
 Data Type Mapping
 ----------------
 
