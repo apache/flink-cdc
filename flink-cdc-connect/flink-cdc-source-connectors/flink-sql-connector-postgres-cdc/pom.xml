@@ -57,6 +57,7 @@ limitations under the License.
                                     <include>io.debezium:debezium-core</include>
                                     <include>io.debezium:debezium-connector-postgres</include>
                                     <include>org.apache.flink:flink-cdc-base</include>
+                                    <include>org.apache.flink:flink-cdc-common</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-connector-postgres-cdc</include>
                                     <include>com.zaxxer:HikariCP</include>
