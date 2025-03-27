@@ -27,7 +27,7 @@ limitations under the License.
     <name>flink-cdc-pipeline-connector-doris</name>
 
     <properties>
-        <doris.connector.version>24.0.1</doris.connector.version>
+        <doris.connector.version>24.1.0</doris.connector.version>
         <mysql.connector.version>8.0.26</mysql.connector.version>
     </properties>
 
