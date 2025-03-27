@@ -17,7 +17,10 @@
 
 package org.apache.flink.cdc.connectors.base.options;
 
+import org.apache.flink.util.CollectionUtil;
+
 import java.io.Serializable;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -30,13 +33,14 @@ public final class StartupOptions implements Serializable {
     public final String specificOffsetFile;
     public final Integer specificOffsetPos;
     public final Long startupTimestampMillis;
+    public final Map<String, String> offset;
 
     /**
      * Performs an initial snapshot on the monitored database tables upon first startup, and
      * continue to read the latest change log.
      */
     public static StartupOptions initial() {
-        return new StartupOptions(StartupMode.INITIAL, null, null, null);
+        return new StartupOptions(StartupMode.INITIAL, null, null, null, null);
     }
 
     /**
@@ -44,7 +48,7 @@ public final class StartupOptions implements Serializable {
      * read the change log anymore .
      */
     public static StartupOptions snapshot() {
-        return new StartupOptions(StartupMode.SNAPSHOT, null, null, null);
+        return new StartupOptions(StartupMode.SNAPSHOT, null, null, null, null);
     }
 
     /**
@@ -53,7 +57,7 @@ public final class StartupOptions implements Serializable {
      * change log is guaranteed to contain the entire history of the database.
      */
     public static StartupOptions earliest() {
-        return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null);
+        return new StartupOptions(StartupMode.EARLIEST_OFFSET, null, null, null, null);
     }
 
     /**
@@ -61,7 +65,7 @@ public final class StartupOptions implements Serializable {
      * the end of the change log which means only have the changes since the connector was started.
      */
     public static StartupOptions latest() {
-        return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null);
+        return new StartupOptions(StartupMode.LATEST_OFFSET, null, null, null, null);
     }
 
     /**
@@ -70,7 +74,11 @@ public final class StartupOptions implements Serializable {
      */
     public static StartupOptions specificOffset(String specificOffsetFile, int specificOffsetPos) {
         return new StartupOptions(
-                StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null);
+                StartupMode.SPECIFIC_OFFSETS, specificOffsetFile, specificOffsetPos, null, null);
+    }
+
+    public static StartupOptions specificOffset(Map<String, String> offset) {
+        return new StartupOptions(StartupMode.SPECIFIC_OFFSETS, null, null, null, offset);
     }
 
     /**
@@ -83,18 +91,20 @@ public final class StartupOptions implements Serializable {
      * @param startupTimestampMillis timestamp for the startup offsets, as milliseconds from epoch.
      */
     public static StartupOptions timestamp(long startupTimestampMillis) {
-        return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis);
+        return new StartupOptions(StartupMode.TIMESTAMP, null, null, startupTimestampMillis, null);
     }
 
     private StartupOptions(
             StartupMode startupMode,
             String specificOffsetFile,
             Integer specificOffsetPos,
-            Long startupTimestampMillis) {
+            Long startupTimestampMillis,
+            Map<String, String> offset) {
         this.startupMode = startupMode;
         this.specificOffsetFile = specificOffsetFile;
         this.specificOffsetPos = specificOffsetPos;
         this.startupTimestampMillis = startupTimestampMillis;
+        this.offset = offset;
 
         switch (startupMode) {
             case INITIAL:
@@ -103,8 +113,10 @@ public final class StartupOptions implements Serializable {
             case LATEST_OFFSET:
                 break;
             case SPECIFIC_OFFSETS:
-                checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");
-                checkNotNull(specificOffsetPos, "specificOffsetPos shouldn't be null");
+                if (CollectionUtil.isNullOrEmpty(offset)) {
+                    checkNotNull(specificOffsetFile, "specificOffsetFile shouldn't be null");
+                    checkNotNull(specificOffsetPos, "specificOffsetPos shouldn't be null");
+                }
                 break;
             case TIMESTAMP:
                 checkNotNull(startupTimestampMillis, "startupTimestampMillis shouldn't be null");
@@ -112,6 +124,10 @@ public final class StartupOptions implements Serializable {
             default:
                 throw new UnsupportedOperationException(startupMode + " mode is not supported.");
         }
+    }
+
+    public Map<String, String> getOffset() {
+        return offset;
     }
 
     public boolean isStreamOnly() {
@@ -137,12 +153,13 @@ public final class StartupOptions implements Serializable {
         return startupMode == that.startupMode
                 && Objects.equals(specificOffsetFile, that.specificOffsetFile)
                 && Objects.equals(specificOffsetPos, that.specificOffsetPos)
-                && Objects.equals(startupTimestampMillis, that.startupTimestampMillis);
+                && Objects.equals(startupTimestampMillis, that.startupTimestampMillis)
+                && Objects.equals(offset, that.offset);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
-                startupMode, specificOffsetFile, specificOffsetPos, startupTimestampMillis);
+                startupMode, specificOffsetFile, specificOffsetPos, startupTimestampMillis, offset);
     }
 }
