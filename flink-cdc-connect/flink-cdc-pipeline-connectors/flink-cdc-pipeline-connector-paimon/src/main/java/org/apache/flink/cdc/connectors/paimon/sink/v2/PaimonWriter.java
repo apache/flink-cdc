@@ -107,7 +107,7 @@ public class PaimonWriter<InputT>
                                         // avoid prepareCommit the same checkpointId with the first
                                         // round.
                                         return entry.getValue()
-                                                .prepareCommit(true, lastCheckpointId + 1).stream()
+                                                .prepareCommit(false, lastCheckpointId + 1).stream()
                                                 .map(
                                                         committable ->
                                                                 MultiTableCommittable
@@ -155,13 +155,17 @@ public class PaimonWriter<InputT>
                     writes.computeIfAbsent(
                             tableId,
                             id -> {
+                                boolean waitCompaction =
+                                        Boolean.parseBoolean(
+                                                table.options()
+                                                        .getOrDefault("deletion-vectors.enabled", "false"));
                                 StoreSinkWriteImpl storeSinkWrite =
                                         new StoreSinkWriteImpl(
                                                 table,
                                                 commitUser,
                                                 ioManager,
                                                 false,
-                                                false,
+                                                waitCompaction,
                                                 true,
                                                 memoryPoolFactory,
                                                 metricGroup);
