@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class JdbcSinkConfigTest {
     private static final String TEST_HOSTNAME = "localhost";
     private static final int TEST_PORT = 5432;
+    private static final String TEST_CONN_URL = "jdbc:mysql://" + TEST_HOSTNAME + ":" + TEST_PORT;
     private static final String TEST_USERNAME = "admin";
     private static final String TEST_PASSWORD = "password";
     private static final String TEST_TABLE = "testtable";
@@ -45,8 +46,7 @@ class JdbcSinkConfigTest {
     void setUp() {
         builder =
                 new JdbcSinkConfig.Builder<>()
-                        .hostname(TEST_HOSTNAME)
-                        .port(TEST_PORT)
+                        .connUrl(TEST_CONN_URL)
                         .username(TEST_USERNAME)
                         .password(TEST_PASSWORD)
                         .table(TEST_TABLE)
@@ -62,8 +62,7 @@ class JdbcSinkConfigTest {
     void testJdbcSinkConfigBuilder() {
         JdbcSinkConfig config = builder.build();
 
-        assertThat(config.getHostname()).isEqualTo(TEST_HOSTNAME);
-        assertThat(config.getPort()).isEqualTo(TEST_PORT);
+        assertThat(config.getConnUrl()).isEqualTo(TEST_CONN_URL);
         assertThat(config.getUsername()).isEqualTo(TEST_USERNAME);
         assertThat(config.getPassword()).isEqualTo(TEST_PASSWORD);
         assertThat(config.getTable()).isEqualTo(TEST_TABLE);

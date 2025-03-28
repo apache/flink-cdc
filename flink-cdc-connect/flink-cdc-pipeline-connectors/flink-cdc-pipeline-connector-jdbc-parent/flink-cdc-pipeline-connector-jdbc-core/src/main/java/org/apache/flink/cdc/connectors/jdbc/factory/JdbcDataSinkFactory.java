@@ -45,12 +45,10 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.CONNECTION_POOL_SIZE;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.CONNECT_TIMEOUT;
-import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.DIALECT;
+import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.CONN_URL;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.DRIVER_CLASS_NAME;
-import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.JDBC_PROPERTIES_PROP_PREFIX;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.PASSWORD;
-import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.PORT;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.WRITE_BATCH_SIZE;
@@ -67,11 +65,32 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
         FactoryHelper.createFactoryHelper(this, context)
                 .validateExcept(JDBC_PROPERTIES_PROP_PREFIX);
 
-        String dialect = context.getFactoryConfiguration().get(DIALECT);
+        // Construct JdbcSinkConfig from FactoryConfigurations
+        final Configuration config = context.getFactoryConfiguration();
+        JdbcSinkConfig.Builder<?> builder = new JdbcSinkConfig.Builder<>();
 
         List<JdbcSinkDialectFactory<JdbcSinkConfig>> dialectFactories =
                 discoverDialectFactories(getClass().getClassLoader());
+        config.getOptional(CONN_URL).ifPresent(builder::connUrl);
+        config.getOptional(USERNAME).ifPresent(builder::username);
+        config.getOptional(PASSWORD).ifPresent(builder::password);
 
+        builder.serverTimeZone(config.getOptional(SERVER_TIME_ZONE).orElse("UTC"));
+        builder.connectTimeout(config.get(CONNECT_TIMEOUT));
+        builder.connectionPoolSize(config.get(CONNECTION_POOL_SIZE));
+        builder.connectMaxRetries(config.get(CONNECT_MAX_RETRIES));
+        builder.writeBatchSize(config.get(WRITE_BATCH_SIZE));
+        builder.driverClassName(config.get(DRIVER_CLASS_NAME));
+
+        Properties properties = new Properties();
+        Map<String, String> jdbcProperties =
+                JdbcSinkOptions.getPropertiesByPrefix(config, JDBC_PROPERTIES_PROP_PREFIX);
+        properties.putAll(jdbcProperties);
+        builder.jdbcProperties(properties);
+        JdbcSinkConfig jdbcSinkConfig = builder.build();
+
+        // Discover corresponding factory
+        String dialect = jdbcSinkConfig.getDialect();
         JdbcSinkDialectFactory<JdbcSinkConfig> dialectFactory =
                 dialectFactories.stream()
                         .filter(d -> dialect.equalsIgnoreCase(d.identifier()))
@@ -88,33 +107,11 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
                                                                                 ::identifier)
                                                                 .collect(Collectors.toList())));
 
-        final Configuration config = context.getFactoryConfiguration();
-        JdbcSinkConfig.Builder<?> builder = new JdbcSinkConfig.Builder<>();
-
-        config.getOptional(HOSTNAME).ifPresent(builder::hostname);
-        config.getOptional(PORT).ifPresent(builder::port);
-        config.getOptional(USERNAME).ifPresent(builder::username);
-        config.getOptional(PASSWORD).ifPresent(builder::password);
-
-        builder.serverTimeZone(config.getOptional(SERVER_TIME_ZONE).orElse("UTC"));
-        builder.connectTimeout(config.get(CONNECT_TIMEOUT));
-        builder.connectionPoolSize(config.get(CONNECTION_POOL_SIZE));
-        builder.connectMaxRetries(config.get(CONNECT_MAX_RETRIES));
-        builder.writeBatchSize(config.get(WRITE_BATCH_SIZE));
-        builder.driverClassName(config.get(DRIVER_CLASS_NAME));
-
-        Properties properties = new Properties();
-        Map<String, String> jdbcProperties =
-                JdbcSinkOptions.getPropertiesByPrefix(config, JDBC_PROPERTIES_PROP_PREFIX);
-        properties.putAll(jdbcProperties);
-        builder.jdbcProperties(properties);
-
         if (LOG.isInfoEnabled()) {
             OptionUtils.printOptions(
                     IDENTIFIER, ConfigurationUtils.hideSensitiveValues(config.toMap()));
         }
 
-        JdbcSinkConfig jdbcSinkConfig = builder.build();
         return new JdbcDataSink(dialectFactory.createDialect(jdbcSinkConfig), jdbcSinkConfig);
     }
 
@@ -126,9 +123,7 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(DIALECT);
-        options.add(HOSTNAME);
-        options.add(PORT);
+        options.add(CONN_URL);
         options.add(USERNAME);
         options.add(PASSWORD);
         return options;

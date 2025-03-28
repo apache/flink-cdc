@@ -38,7 +38,6 @@ public class JdbcDataSink implements DataSink, Serializable {
     private final JdbcSinkConfig sinkConfig;
 
     public JdbcDataSink(JdbcSinkDialect dialect, JdbcSinkConfig sinkConfig) {
-        sinkConfig.setConnUrl(dialect);
         this.dialect = dialect;
         this.sinkConfig = sinkConfig;
     }

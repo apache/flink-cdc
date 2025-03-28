@@ -27,24 +27,11 @@ import java.util.Map;
 
 /** Configurations for JDBC data source. */
 public class JdbcSinkOptions {
-    public static final ConfigOption<String> DIALECT =
-            ConfigOptions.key("dialect")
+    public static final ConfigOption<String> CONN_URL =
+            ConfigOptions.key("conn.url")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription(
-                            "The variant of the JDBC data sink dialects. Currently, only `mysql` is supported for now.");
-
-    public static final ConfigOption<String> HOSTNAME =
-            ConfigOptions.key("hostname")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("IP address or hostname of the Jdbc database server.");
-
-    public static final ConfigOption<Integer> PORT =
-            ConfigOptions.key("port")
-                    .intType()
-                    .defaultValue(3306)
-                    .withDescription("Integer port number of the Jdbc database server.");
+                    .withDescription("JDBC connection URL for sink database.");
 
     public static final ConfigOption<String> USERNAME =
             ConfigOptions.key("username")

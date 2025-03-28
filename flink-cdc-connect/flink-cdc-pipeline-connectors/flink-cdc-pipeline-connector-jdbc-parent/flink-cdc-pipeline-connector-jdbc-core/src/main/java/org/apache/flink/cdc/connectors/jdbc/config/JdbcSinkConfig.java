@@ -17,16 +17,16 @@
 
 package org.apache.flink.cdc.connectors.jdbc.config;
 
-import org.apache.flink.cdc.connectors.jdbc.dialect.JdbcSinkDialect;
+import org.apache.flink.cdc.common.utils.Preconditions;
 
 import java.io.Serializable;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Properties;
 
 /** Generic configuration class for JDBC-like sinks. */
 public class JdbcSinkConfig implements Serializable {
-    private final String hostname;
-    private final int port;
+    private final String connUrl;
     private final String username;
     private final String password;
     private final String table;
@@ -38,11 +38,12 @@ public class JdbcSinkConfig implements Serializable {
     private final int writeBatchSize;
     private final Properties jdbcProperties;
 
-    private String connUrl;
+    private final String dialect;
+    private final String hostname;
+    private final int port;
 
     protected JdbcSinkConfig(Builder<?> builder) {
-        this.hostname = builder.hostname;
-        this.port = builder.port;
+        this.connUrl = builder.connUrl;
         this.username = builder.username;
         this.password = builder.password;
         this.table = builder.table;
@@ -53,12 +54,20 @@ public class JdbcSinkConfig implements Serializable {
         this.connectionPoolSize = builder.connectionPoolSize;
         this.writeBatchSize = builder.writeBatchSize;
         this.jdbcProperties = builder.jdbcProperties;
+
+        Preconditions.checkArgument(
+                connUrl.startsWith("jdbc:"), "JDBC connection string should start with `jdbc:`");
+        String cleanURI = connUrl.substring(5);
+
+        URI uri = URI.create(cleanURI);
+        this.dialect = uri.getScheme();
+        this.hostname = uri.getHost();
+        this.port = uri.getPort();
     }
 
     /** Builder class for JDBC Sink Config. */
     public static class Builder<T extends Builder<T>> {
-        private String hostname;
-        private int port;
+        private String connUrl;
         private String username;
         private String password;
         private String table;
@@ -70,13 +79,8 @@ public class JdbcSinkConfig implements Serializable {
         private int writeBatchSize;
         private Properties jdbcProperties;
 
-        public T hostname(String hostname) {
-            this.hostname = hostname;
-            return self();
-        }
-
-        public T port(int port) {
-            this.port = port;
+        public T connUrl(String connUrl) {
+            this.connUrl = connUrl;
             return self();
         }
 
@@ -139,7 +143,14 @@ public class JdbcSinkConfig implements Serializable {
         }
     }
 
-    // Getters for each field (optional)
+    public String getConnUrl() {
+        return connUrl;
+    }
+
+    public String getDialect() {
+        return dialect;
+    }
+
     public String getHostname() {
         return hostname;
     }
@@ -186,13 +197,5 @@ public class JdbcSinkConfig implements Serializable {
 
     public Properties getJdbcProperties() {
         return jdbcProperties;
-    }
-
-    public String getConnUrl() {
-        return connUrl;
-    }
-
-    public void setConnUrl(JdbcSinkDialect dialect) {
-        this.connUrl = dialect.getJdbcUrl(this);
     }
 }
