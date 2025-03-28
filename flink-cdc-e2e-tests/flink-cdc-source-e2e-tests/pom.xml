@@ -31,8 +31,8 @@ limitations under the License.
         <flink-1.19>1.19.2</flink-1.19>
         <flink-1.20>1.20.1</flink-1.20>
         <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
+        <!-- TODO: Bump JDBC connector version after it supports Flink 1.20 -->
         <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
-        <mysql.driver.version>8.0.27</mysql.driver.version>
         <postgresql.driver.version>42.7.3</postgresql.driver.version>
     </properties>
 
