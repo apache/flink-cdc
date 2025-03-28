@@ -73,7 +73,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private Set<TableId> alreadySendCreateTableTables;
 
     // Used when startup mode is snapshot
-    private boolean alreadySendAllCreateTableTables = false;
+    private boolean shouldEmitAllCtesInSnapshotMode = true;
 
     private Map<TableId, CreateTableEvent> createTableEventCache;
 
@@ -94,15 +94,14 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     protected void processElement(
             SourceRecord element, SourceOutput<Event> output, MySqlSplitState splitState)
             throws Exception {
-        if (StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())) {
+        if (shouldEmitAllCtesInSnapshotMode
+                && StartupOptions.snapshot().equals(sourceConfig.getStartupOptions())) {
             // In snapshot mode, we simply emit all schemas at once.
-            if (!alreadySendAllCreateTableTables) {
-                createTableEventCache.forEach(
-                        (tableId, createTableEvent) -> {
-                            output.collect(createTableEvent);
-                            alreadySendAllCreateTableTables = true;
-                        });
-            }
+            createTableEventCache.forEach(
+                    (tableId, createTableEvent) -> {
+                        output.collect(createTableEvent);
+                    });
+            shouldEmitAllCtesInSnapshotMode = false;
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             // In Snapshot phase of INITIAL startup mode, we lazily send CreateTableEvent to
             // downstream to avoid checkpoint timeout.

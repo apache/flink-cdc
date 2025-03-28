@@ -343,8 +343,8 @@ public class SchemaDerivator {
         return Optional.of(dataChangeEvent);
     }
 
-    /** Deduce merged CreateTableEvent in batch mode. */
-    public static List<CreateTableEvent> deduceMergedCreateTableEventInBatchMode(
+    /** Deduce merged CreateTableEvent. */
+    public static List<CreateTableEvent> deduceMergedCreateTableEvent(
             TableIdRouter router, List<CreateTableEvent> createTableEvents) {
         Set<TableId> originalTables =
                 createTableEvents.stream()

@@ -602,7 +602,7 @@ public class SchemaDerivatorTest extends SchemaTestBase {
     }
 
     @Test
-    void testDeduceMergedCreateTableEventInBatchMode() {
+    void testDeduceMergedCreateTableEvent() {
         TableIdRouter router =
                 new TableIdRouter(
                         Arrays.asList(
@@ -665,7 +665,7 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                         .physicalColumn("notes4", DataTypes.STRING())
                                         .build()));
         List<CreateTableEvent> mergedCreateTableEvents =
-                SchemaDerivator.deduceMergedCreateTableEventInBatchMode(router, createTableEvents);
+                SchemaDerivator.deduceMergedCreateTableEvent(router, createTableEvents);
         assertThat(mergedCreateTableEvents)
                 .containsExactly(
                         new CreateTableEvent(
