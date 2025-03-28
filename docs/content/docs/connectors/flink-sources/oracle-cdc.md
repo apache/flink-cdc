@@ -671,7 +671,7 @@ There are two places that need to be taken care of.
 
 #### Warning
 
-Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` can lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a oracle table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
 
 #### Problem Scenario
 
