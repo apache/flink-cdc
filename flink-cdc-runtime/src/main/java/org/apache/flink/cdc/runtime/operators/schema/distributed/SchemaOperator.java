@@ -205,17 +205,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         LOG.info("{}> Evolve request response: {}", subTaskId, response);
 
         // Update local evolved schema cache
-        response.getSchemaEvolveResult()
-                .forEach(
-                        schemaChangeEvent ->
-                                evolvedSchemaMap.compute(
-                                        schemaChangeEvent.tableId(),
-                                        (tableId, schema) ->
-                                                SchemaUtils.applySchemaChangeEvent(
-                                                        schema, schemaChangeEvent)));
+        evolvedSchemaMap.putAll(response.getEvolvedSchemas());
 
         // And emit schema change events to downstream
-        response.getSchemaEvolveResult().forEach(evt -> output.collect(new StreamRecord<>(evt)));
+        response.getEvolvedSchemaChangeEvents()
+                .forEach(evt -> output.collect(new StreamRecord<>(evt)));
         LOG.info(
                 "{}> Successfully updated evolved schema cache. Current state: {}",
                 subTaskId,
