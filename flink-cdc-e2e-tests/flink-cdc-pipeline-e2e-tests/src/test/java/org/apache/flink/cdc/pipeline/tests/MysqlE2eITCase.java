@@ -204,6 +204,7 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: snapshot\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
