@@ -64,7 +64,7 @@ public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTo
                 .name("Assign Bucket")
                 // All Events after BucketAssignOperator are decorated with BucketWrapper.
                 .partitionCustom(
-                        (bucket, numPartitions) -> bucket % numPartitions,
+                        (bucket, numPartitions) -> Math.abs(bucket) % numPartitions,
                         (event) -> {
                             if (event instanceof BucketWrapperChangeEvent) {
                                 // Add hash of tableId to avoid data skew.
