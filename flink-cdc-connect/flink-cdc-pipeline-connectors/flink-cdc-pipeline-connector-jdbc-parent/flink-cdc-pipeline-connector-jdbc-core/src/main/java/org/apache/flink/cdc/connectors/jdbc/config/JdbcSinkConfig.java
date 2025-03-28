@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.utils.Preconditions;
 import java.io.Serializable;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.Properties;
 
 /** Generic configuration class for JDBC-like sinks. */
@@ -56,7 +57,7 @@ public class JdbcSinkConfig implements Serializable {
         this.jdbcProperties = builder.jdbcProperties;
 
         Preconditions.checkArgument(
-                connUrl.startsWith("jdbc:"), "JDBC connection string should start with `jdbc:`");
+                connUrl.startsWith("jdbc:"), "JDBC connection string should start with `jdbc:`.");
         String cleanURI = connUrl.substring(5);
 
         URI uri = URI.create(cleanURI);
@@ -197,5 +198,45 @@ public class JdbcSinkConfig implements Serializable {
 
     public Properties getJdbcProperties() {
         return jdbcProperties;
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+        if (!(o instanceof JdbcSinkConfig)) return false;
+
+        JdbcSinkConfig that = (JdbcSinkConfig) o;
+        return connectMaxRetries == that.connectMaxRetries
+                && connectionPoolSize == that.connectionPoolSize
+                && writeBatchSize == that.writeBatchSize
+                && port == that.port
+                && connUrl.equals(that.connUrl)
+                && Objects.equals(username, that.username)
+                && Objects.equals(password, that.password)
+                && Objects.equals(table, that.table)
+                && Objects.equals(driverClassName, that.driverClassName)
+                && Objects.equals(serverTimeZone, that.serverTimeZone)
+                && Objects.equals(connectTimeout, that.connectTimeout)
+                && Objects.equals(jdbcProperties, that.jdbcProperties)
+                && Objects.equals(dialect, that.dialect)
+                && Objects.equals(hostname, that.hostname);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                connUrl,
+                username,
+                password,
+                table,
+                driverClassName,
+                serverTimeZone,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                writeBatchSize,
+                jdbcProperties,
+                dialect,
+                hostname,
+                port);
     }
 }
