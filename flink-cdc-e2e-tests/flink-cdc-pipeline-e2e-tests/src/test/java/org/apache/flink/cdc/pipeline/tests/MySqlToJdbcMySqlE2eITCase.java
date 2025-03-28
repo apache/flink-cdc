@@ -135,9 +135,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: jdbc\n"
-                                + "  dialect: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
+                                + "  conn.url: jdbc:mysql://%s:%d\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "\n"
@@ -148,6 +146,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         TEST_PASSWORD,
                         databaseName,
                         SINK_NETWORK_NAME,
+                        MySqlContainer.MYSQL_PORT,
                         TEST_USERNAME,
                         TEST_PASSWORD,
                         parallelism);
@@ -381,9 +380,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: jdbc\n"
-                                + "  dialect: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
+                                + "  conn.url: jdbc:mysql://%s:%d\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
                                 + "  write.batch.size: 512\n"
@@ -395,6 +392,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         TEST_PASSWORD,
                         databaseName,
                         SINK_NETWORK_NAME,
+                        MySqlContainer.MYSQL_PORT,
                         TEST_USERNAME,
                         TEST_PASSWORD,
                         parallelism);
