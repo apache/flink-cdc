@@ -42,7 +42,6 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -53,6 +52,7 @@ import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -263,23 +263,18 @@ class PostgresSourceITCase extends PostgresTestBase {
     @ValueSource(strings = {"initial", "latest-offset"})
     void testConsumingTableWithoutPrimaryKey(String scanStartupMode) throws Exception {
         if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
-            try {
-                testPostgresParallelSource(
-                        1,
-                        scanStartupMode,
-                        PostgresTestUtils.FailoverType.NONE,
-                        PostgresTestUtils.FailoverPhase.NEVER,
-                        new String[] {"customers_no_pk"},
-                        RestartStrategies.noRestart());
-            } catch (Exception e) {
-                Assertions.assertThat(
-                                ExceptionUtils.findThrowableWithMessage(
-                                        e,
-                                        String.format(
-                                                "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                                SCHEMA_NAME + ".customers_no_pk")))
-                        .isPresent();
-            }
+            Assertions.assertThatThrownBy(
+                            () -> {
+                                testPostgresParallelSource(
+                                        1,
+                                        scanStartupMode,
+                                        PostgresTestUtils.FailoverType.NONE,
+                                        PostgresTestUtils.FailoverPhase.NEVER,
+                                        new String[] {"customers_no_pk"},
+                                        RestartStrategies.noRestart());
+                            })
+                    .hasStackTraceContaining(
+                            "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         } else {
             testPostgresParallelSource(
                     1,
@@ -291,10 +286,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testReadSingleTableWithSingleParallelismAndSkipBackfill(String scanStartupMode)
-            throws Exception {
+    @Test
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
@@ -370,9 +363,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         optionalJobClient.get().cancel().get();
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testSnapshotOnlyModeWithDMLPostHighWaterMark(String scanStartupMode) throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -403,9 +395,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testSnapshotOnlyModeWithDMLPreHighWaterMark(String scanStartupMode) throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -674,26 +665,20 @@ class PostgresSourceITCase extends PostgresTestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
-    void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) {
+    public void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) throws Exception {
         Assumptions.assumeThat(scanStartupMode).isEqualTo(DEFAULT_SCAN_STARTUP_MODE);
         String chunkColumn = "name";
-        try {
-            testPostgresParallelSource(
-                    1,
-                    scanStartupMode,
-                    PostgresTestUtils.FailoverType.NONE,
-                    PostgresTestUtils.FailoverPhase.NEVER,
-                    new String[] {"Customers"},
-                    RestartStrategies.noRestart(),
-                    Collections.singletonMap(
-                            "scan.incremental.snapshot.chunk.key-column", chunkColumn));
-        } catch (Exception e) {
-            Assertions.assertThat(e)
-                    .hasStackTraceContaining(
-                            String.format(
-                                    "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                    chunkColumn, "Id", "customer.Customers"));
-        }
+        testPostgresParallelSource(
+                1,
+                scanStartupMode,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"customers"},
+                RestartStrategies.noRestart(),
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.chunk.key-column", chunkColumn));
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     @ParameterizedTest
