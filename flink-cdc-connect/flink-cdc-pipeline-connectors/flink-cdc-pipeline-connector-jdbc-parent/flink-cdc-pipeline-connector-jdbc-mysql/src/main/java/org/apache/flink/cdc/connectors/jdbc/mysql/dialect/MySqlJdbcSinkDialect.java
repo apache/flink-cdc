@@ -22,23 +22,15 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
-import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.jdbc.dialect.JdbcSinkDialect;
-import org.apache.flink.cdc.connectors.jdbc.exception.JdbcSinkDialectException;
 
 import java.util.List;
 
 /** A JDBC sink variant for MySQL dialect. */
 public class MySqlJdbcSinkDialect extends JdbcSinkDialect {
 
-    public MySqlJdbcSinkDialect(
-            String name, JdbcSinkConfig sinkConfig, JdbcConnectionPoolFactory poolFactory) {
-        super(name, sinkConfig, poolFactory);
-    }
-
-    @Override
-    public void close() throws JdbcSinkDialectException {
-        // Does nothing
+    public MySqlJdbcSinkDialect(String name, JdbcSinkConfig sinkConfig) {
+        super(name, sinkConfig);
     }
 
     @Override

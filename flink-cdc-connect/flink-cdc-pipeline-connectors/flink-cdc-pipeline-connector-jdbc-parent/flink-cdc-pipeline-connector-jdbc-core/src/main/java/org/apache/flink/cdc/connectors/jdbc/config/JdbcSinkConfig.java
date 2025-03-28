@@ -36,7 +36,9 @@ public class JdbcSinkConfig implements Serializable {
     private final Duration connectTimeout;
     private final int connectMaxRetries;
     private final int connectionPoolSize;
+    private final long writeBatchIntervalMs;
     private final int writeBatchSize;
+    private final int writeMaxRetries;
     private final Properties jdbcProperties;
 
     private final String dialect;
@@ -53,7 +55,9 @@ public class JdbcSinkConfig implements Serializable {
         this.connectTimeout = builder.connectTimeout;
         this.connectMaxRetries = builder.connectMaxRetries;
         this.connectionPoolSize = builder.connectionPoolSize;
+        this.writeBatchIntervalMs = builder.writeBatchIntervalMs;
         this.writeBatchSize = builder.writeBatchSize;
+        this.writeMaxRetries = builder.writeMaxRetries;
         this.jdbcProperties = builder.jdbcProperties;
 
         Preconditions.checkArgument(
@@ -77,7 +81,9 @@ public class JdbcSinkConfig implements Serializable {
         private Duration connectTimeout;
         private int connectMaxRetries;
         private int connectionPoolSize;
+        private long writeBatchIntervalMs;
         private int writeBatchSize;
+        private int writeMaxRetries;
         private Properties jdbcProperties;
 
         public T connUrl(String connUrl) {
@@ -125,8 +131,18 @@ public class JdbcSinkConfig implements Serializable {
             return self();
         }
 
+        public T writeBatchIntervalMs(long writeBatchIntervalMs) {
+            this.writeBatchIntervalMs = writeBatchIntervalMs;
+            return self();
+        }
+
         public T writeBatchSize(int writeBatchSize) {
             this.writeBatchSize = writeBatchSize;
+            return self();
+        }
+
+        public T writeMaxRetries(int writeMaxRetries) {
+            this.writeMaxRetries = writeMaxRetries;
             return self();
         }
 
@@ -192,8 +208,16 @@ public class JdbcSinkConfig implements Serializable {
         return connectionPoolSize;
     }
 
+    public long getWriteBatchIntervalMs() {
+        return writeBatchIntervalMs;
+    }
+
     public int getWriteBatchSize() {
         return writeBatchSize;
+    }
+
+    public int getWriteMaxRetries() {
+        return writeMaxRetries;
     }
 
     public Properties getJdbcProperties() {
@@ -202,12 +226,16 @@ public class JdbcSinkConfig implements Serializable {
 
     @Override
     public final boolean equals(Object o) {
-        if (!(o instanceof JdbcSinkConfig)) return false;
+        if (!(o instanceof JdbcSinkConfig)) {
+            return false;
+        }
 
         JdbcSinkConfig that = (JdbcSinkConfig) o;
         return connectMaxRetries == that.connectMaxRetries
                 && connectionPoolSize == that.connectionPoolSize
+                && writeBatchIntervalMs == that.writeBatchIntervalMs
                 && writeBatchSize == that.writeBatchSize
+                && writeMaxRetries == that.writeMaxRetries
                 && port == that.port
                 && connUrl.equals(that.connUrl)
                 && Objects.equals(username, that.username)
@@ -233,7 +261,9 @@ public class JdbcSinkConfig implements Serializable {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
+                writeBatchIntervalMs,
                 writeBatchSize,
+                writeMaxRetries,
                 jdbcProperties,
                 dialect,
                 hostname,

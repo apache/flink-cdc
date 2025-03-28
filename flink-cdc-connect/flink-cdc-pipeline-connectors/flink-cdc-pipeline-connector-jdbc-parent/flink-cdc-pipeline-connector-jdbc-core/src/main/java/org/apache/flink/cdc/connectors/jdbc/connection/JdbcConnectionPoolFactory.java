@@ -23,18 +23,18 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
 import java.io.Serializable;
+import java.sql.DriverManager;
 
 /** A factory class for creating pooled {@link HikariDataSource}. */
-public class JdbcConnectionPoolFactory implements Serializable {
-
-    public static final JdbcConnectionPoolFactory INSTANCE = new JdbcConnectionPoolFactory();
+public abstract class JdbcConnectionPoolFactory implements Serializable {
 
     public static final String CONNECTION_POOL_PREFIX = "connection-pool-";
     public static final String SERVER_TIMEZONE_KEY = "serverTimezone";
     public static final int MINIMUM_POOL_SIZE = 1;
 
-    public HikariDataSource createPooledDataSource(JdbcSinkConfig sinkConfig) {
+    public static HikariDataSource createPooledDataSource(JdbcSinkConfig sinkConfig) {
         final HikariConfig config = new HikariConfig();
+        DriverManager.getDrivers();
 
         String hostName = sinkConfig.getHostname();
         int port = sinkConfig.getPort();
@@ -64,7 +64,7 @@ public class JdbcConnectionPoolFactory implements Serializable {
      * However, in some situations when different databases in same instance cannot reuse same
      * connection pool to connect, such as postgresql, this method should be overridden.
      */
-    public ConnectionPoolId getPoolId(
+    public static ConnectionPoolId getPoolId(
             JdbcSinkConfig sinkConfig, String dataSourcePoolFactoryIdentifier) {
         return new ConnectionPoolId(
                 sinkConfig.getHostname(),

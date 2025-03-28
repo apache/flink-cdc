@@ -30,14 +30,12 @@ import java.util.Collections;
 class JdbcSinkGenericITCase extends JdbcSinkTestBase {
 
     @Test
-    void testRunJdbcWithUnknownDialect() throws Exception {
+    void testRunJdbcWithUnknownDialect() {
         Configuration sinkConfig = new Configuration();
-        sinkConfig.set(JdbcSinkOptions.DIALECT, "unexpected");
-        sinkConfig.set(JdbcSinkOptions.HOSTNAME, "localhost");
-        sinkConfig.set(JdbcSinkOptions.PORT, 3306);
+
+        sinkConfig.set(JdbcSinkOptions.CONN_URL, "jdbc:unexpected://localhost:3306");
         sinkConfig.set(JdbcSinkOptions.USERNAME, "username");
         sinkConfig.set(JdbcSinkOptions.PASSWORD, "password");
-        sinkConfig.set(JdbcSinkOptions.SERVER_TIME_ZONE, "UTC");
 
         Assertions.assertThatThrownBy(() -> runJobWithEvents(sinkConfig, Collections.emptyList()))
                 .isExactlyInstanceOf(IllegalArgumentException.class)

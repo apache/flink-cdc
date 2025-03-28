@@ -38,7 +38,9 @@ class JdbcSinkConfigTest {
     private static final Duration TEST_CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final int TEST_CONNECT_MAX_RETRIES = 3;
     private static final int TEST_CONNECTION_POOL_SIZE = 5;
+    private static final long TEST_WRITE_INTERVAL_MS = 31415926;
     private static final int TEST_WRITE_BATCH_SIZE = 17;
+    private static final int TEST_WRITE_MAX_RETRIES = 5;
 
     private JdbcSinkConfig.Builder<?> builder;
 
@@ -55,7 +57,9 @@ class JdbcSinkConfigTest {
                         .connectTimeout(TEST_CONNECT_TIMEOUT)
                         .connectMaxRetries(TEST_CONNECT_MAX_RETRIES)
                         .connectionPoolSize(TEST_CONNECTION_POOL_SIZE)
-                        .writeBatchSize(TEST_WRITE_BATCH_SIZE);
+                        .writeBatchIntervalMs(TEST_WRITE_INTERVAL_MS)
+                        .writeBatchSize(TEST_WRITE_BATCH_SIZE)
+                        .writeMaxRetries(TEST_WRITE_MAX_RETRIES);
     }
 
     @Test
@@ -71,7 +75,9 @@ class JdbcSinkConfigTest {
         assertThat(config.getConnectTimeout()).isEqualTo(TEST_CONNECT_TIMEOUT);
         assertThat(config.getConnectMaxRetries()).isEqualTo(TEST_CONNECT_MAX_RETRIES);
         assertThat(config.getConnectionPoolSize()).isEqualTo(TEST_CONNECTION_POOL_SIZE);
+        assertThat(config.getWriteBatchIntervalMs()).isEqualTo(TEST_WRITE_INTERVAL_MS);
         assertThat(config.getWriteBatchSize()).isEqualTo(TEST_WRITE_BATCH_SIZE);
+        assertThat(config.getWriteMaxRetries()).isEqualTo(TEST_WRITE_MAX_RETRIES);
     }
 
     @Test

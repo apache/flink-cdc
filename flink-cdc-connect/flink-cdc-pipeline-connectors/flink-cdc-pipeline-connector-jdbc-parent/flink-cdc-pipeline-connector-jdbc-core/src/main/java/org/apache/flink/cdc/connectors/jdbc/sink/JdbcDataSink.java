@@ -57,7 +57,8 @@ public class JdbcDataSink implements DataSink, Serializable {
                         .withExecutionOptions(
                                 JdbcExecutionOptions.builder()
                                         .withBatchSize(sinkConfig.getWriteBatchSize())
-                                        .withMaxRetries(0)
+                                        .withBatchIntervalMs(sinkConfig.getWriteBatchIntervalMs())
+                                        .withMaxRetries(sinkConfig.getWriteMaxRetries())
                                         .build())
                         .withSerializationSchema(new EventRecordSerializationSchema())
                         .withDialect(dialect)

@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.jdbc.connection;
 
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
-import org.apache.flink.util.FlinkRuntimeException;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
@@ -34,17 +33,13 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     private static JdbcConnectionPools instance;
     private final Map<ConnectionPoolId, HikariDataSource> pools = new HashMap<>();
-    private static final Map<String, JdbcConnectionPoolFactory> POOL_FACTORY_MAP = new HashMap<>();
 
     private JdbcConnectionPools() {}
 
-    public static synchronized JdbcConnectionPools getInstance(
-            JdbcConnectionPoolFactory jdbcConnectionPoolFactory) {
+    public static synchronized JdbcConnectionPools getInstance() {
         if (instance == null) {
             instance = new JdbcConnectionPools();
         }
-        POOL_FACTORY_MAP.put(
-                jdbcConnectionPoolFactory.getClass().getName(), jdbcConnectionPoolFactory);
         return instance;
     }
 
@@ -54,15 +49,7 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
         synchronized (pools) {
             if (!pools.containsKey(poolId)) {
                 LOG.info("Create and register connection pool {}", poolId);
-                JdbcConnectionPoolFactory jdbcConnectionPoolFactory =
-                        POOL_FACTORY_MAP.get(poolId.getDataSourcePoolFactoryIdentifier());
-                if (jdbcConnectionPoolFactory == null) {
-                    throw new FlinkRuntimeException(
-                            String.format(
-                                    "Pool factory identifier is required for connection pool, but unknown pool factory identifier %s found.",
-                                    poolId.getDataSourcePoolFactoryIdentifier()));
-                }
-                pools.put(poolId, jdbcConnectionPoolFactory.createPooledDataSource(sourceConfig));
+                pools.put(poolId, JdbcConnectionPoolFactory.createPooledDataSource(sourceConfig));
             }
             return pools.get(poolId);
         }
@@ -70,9 +57,6 @@ public class JdbcConnectionPools implements ConnectionPools<HikariDataSource, Jd
 
     @Override
     public void close() {
-        if (instance != null) {
-            instance.close();
-        }
         pools.values().forEach(HikariDataSource::close);
     }
 }

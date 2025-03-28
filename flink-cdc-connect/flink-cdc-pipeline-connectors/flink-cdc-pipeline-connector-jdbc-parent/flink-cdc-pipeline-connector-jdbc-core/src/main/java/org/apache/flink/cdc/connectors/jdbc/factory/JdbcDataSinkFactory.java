@@ -51,7 +51,9 @@ import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.JDBC_
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.USERNAME;
+import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.WRITE_BATCH_INTERVAL_MS;
 import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.WRITE_BATCH_SIZE;
+import static org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions.WRITE_MAX_RETRIES;
 
 /** A {@link DataSinkFactory} for creating JDBC sinks. */
 public class JdbcDataSinkFactory implements DataSinkFactory {
@@ -79,7 +81,9 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
         builder.connectTimeout(config.get(CONNECT_TIMEOUT));
         builder.connectionPoolSize(config.get(CONNECTION_POOL_SIZE));
         builder.connectMaxRetries(config.get(CONNECT_MAX_RETRIES));
+        builder.writeBatchIntervalMs(config.get(WRITE_BATCH_INTERVAL_MS));
         builder.writeBatchSize(config.get(WRITE_BATCH_SIZE));
+        builder.writeMaxRetries(config.get(WRITE_MAX_RETRIES));
         builder.driverClassName(config.get(DRIVER_CLASS_NAME));
 
         Properties properties = new Properties();
@@ -137,7 +141,9 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECTION_POOL_SIZE);
         options.add(CONNECT_MAX_RETRIES);
+        options.add(WRITE_BATCH_INTERVAL_MS);
         options.add(WRITE_BATCH_SIZE);
+        options.add(WRITE_MAX_RETRIES);
         return options;
     }
 

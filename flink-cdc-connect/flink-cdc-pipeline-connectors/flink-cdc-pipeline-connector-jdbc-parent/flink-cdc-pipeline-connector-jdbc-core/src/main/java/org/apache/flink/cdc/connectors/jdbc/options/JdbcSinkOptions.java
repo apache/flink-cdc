@@ -79,12 +79,25 @@ public class JdbcSinkOptions {
                     .withDescription(
                             "The max retry times that the connector should retry to build database server connection.");
 
+    public static final ConfigOption<Long> WRITE_BATCH_INTERVAL_MS =
+            ConfigOptions.key("write.batch.interval.ms")
+                    .longType()
+                    .defaultValue(0L)
+                    .withDescription(
+                            "The flush interval mills, over this time, asynchronous threads will flush data. Can be set to '0' to disable it.");
+
     public static final ConfigOption<Integer> WRITE_BATCH_SIZE =
             ConfigOptions.key("write.batch.size")
                     .intType()
                     .defaultValue(512)
                     .withDescription(
                             "The maximum amount of records in a single writing batch. Batching is only supported for tables with primary keys.");
+
+    public static final ConfigOption<Integer> WRITE_MAX_RETRIES =
+            ConfigOptions.key("write.max.retries")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription("The max retry times if writing records to database failed.");
 
     public static final String JDBC_PROPERTIES_PROP_PREFIX = "jdbc.properties.";
 

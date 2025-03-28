@@ -68,9 +68,9 @@ public class MySqlSinkTestBase extends JdbcSinkTestBase {
 
     protected void runJobThatSinksToMySqlWithEvents(List<Event> events) throws Exception {
         Configuration sinkConfig = new Configuration();
-        sinkConfig.set(JdbcSinkOptions.DIALECT, "mysql");
-        sinkConfig.set(JdbcSinkOptions.HOSTNAME, MySqlSinkTestBase.MYSQL_CONTAINER.getHost());
-        sinkConfig.set(JdbcSinkOptions.PORT, MySqlSinkTestBase.MYSQL_CONTAINER.getDatabasePort());
+        String host = MySqlSinkTestBase.MYSQL_CONTAINER.getHost();
+        int port = MySqlSinkTestBase.MYSQL_CONTAINER.getDatabasePort();
+        sinkConfig.set(JdbcSinkOptions.CONN_URL, "jdbc:mysql://" + host + ":" + port);
         sinkConfig.set(JdbcSinkOptions.USERNAME, MySqlSinkTestBase.MYSQL_CONTAINER.getUsername());
         sinkConfig.set(JdbcSinkOptions.PASSWORD, MySqlSinkTestBase.MYSQL_CONTAINER.getPassword());
         sinkConfig.set(JdbcSinkOptions.SERVER_TIME_ZONE, "UTC");

@@ -31,7 +31,6 @@ import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
 import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionFactory;
-import org.apache.flink.cdc.connectors.jdbc.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.jdbc.exception.JdbcSinkDialectException;
 
 import org.slf4j.Logger;
@@ -43,7 +42,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 /** An abstract base class for various JDBC-like sinks. */
 public abstract class JdbcSinkDialect implements Serializable {
@@ -51,56 +49,64 @@ public abstract class JdbcSinkDialect implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSinkDialect.class);
 
     private final String dialectName;
-
     protected final JdbcConnectionFactory connectionFactory;
 
-    public JdbcSinkDialect(
-            String dialectName, JdbcSinkConfig sinkConfig, JdbcConnectionPoolFactory poolFactory) {
+    public JdbcSinkDialect(String dialectName, JdbcSinkConfig sinkConfig) {
         this.dialectName = dialectName;
-        this.connectionFactory = new JdbcConnectionFactory(sinkConfig, poolFactory);
+        this.connectionFactory = new JdbcConnectionFactory(sinkConfig);
     }
 
-    // Rewritable methods that could be overwritten by subclasses.
-    public String identifier() {
+    /** Returns a unique identifier of this dialect. */
+    public String getDialectName() {
         return dialectName;
     }
 
-    public String getJdbcUrl(JdbcSinkConfig sinkConfig) {
-        Properties jdbcProperties = sinkConfig.getJdbcProperties();
-        StringBuilder url = new StringBuilder("jdbc:" + dialectName + "://");
-        url.append(sinkConfig.getHostname()).append(":").append(sinkConfig.getPort());
-        url.append("?serverTimezone=").append(sinkConfig.getServerTimeZone());
+    // Rewritable methods that could be overwritten by subclasses.
 
-        if (jdbcProperties != null && !jdbcProperties.isEmpty()) {
-            for (String key : jdbcProperties.stringPropertyNames()) {
-                url.append("&").append(key).append("=").append(jdbcProperties.getProperty(key));
-            }
-        }
-        return url.toString();
-    }
-
+    /** Creates a single row of SQL that upserts into {@code tableId} with given {@code schema}. */
     protected abstract String buildUpsertSql(TableId tableId, Schema schema);
 
+    /** Creates a single row of SQL that deletes from {@code tableId} with given {@code schema}. */
     protected abstract String buildDeleteSql(TableId tableId, Schema schema);
 
+    /**
+     * Creates a single row of SQL that creates a table with {@code tableId} with given {@code
+     * schema}.
+     */
     protected abstract String buildCreateTableSql(
             TableId tableId, Schema schema, boolean ignoreIfExists);
 
+    /**
+     * Creates a single row of SQL that adds multiple columns like {@code addedColumns} into table
+     * {@code tableId}.
+     */
     protected abstract String buildAlterAddColumnsSql(
             TableId tableId, List<AddColumnEvent.ColumnWithPosition> addedColumns);
 
+    /**
+     * Creates a single row of SQL that renames column {@code oldName} to {@code newName} in table
+     * {@code tableId}.
+     */
     protected abstract String buildRenameColumnSql(TableId tableId, String oldName, String newName);
 
+    /**
+     * Creates a single row of SQL that drops specific column with name {@code column} in table
+     * {@code tableId}.
+     */
     protected abstract String buildDropColumnSql(TableId tableId, String column);
 
+    /**
+     * Creates a single row of SQL that alters a specific column {@code columnName}'type to {@code
+     * columnType} in table {@code tableId}.
+     */
     protected abstract String buildAlterColumnTypeSql(
             TableId tableId, String columnName, DataType columnType);
 
+    /** Creates a single row of SQL that truncates given table {@code tableId}. */
     protected abstract String buildTruncateTableSql(TableId tableId);
 
+    /** Creates a single row of SQL that drops given table {@code tableId}. */
     protected abstract String buildDropTableSql(TableId tableId, boolean ignoreIfNotExist);
-
-    public abstract void close() throws JdbcSinkDialectException;
 
     // Final methods that are not meant to be overwritten.
     public final void createTable(CreateTableEvent createTableEvent, boolean ignoreIfExists)

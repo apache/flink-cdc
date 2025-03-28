@@ -33,23 +33,20 @@ public class JdbcConnectionFactory implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcConnectionFactory.class);
 
     private final JdbcSinkConfig sinkConfig;
-    private final JdbcConnectionPoolFactory jdbcConnectionPoolFactory;
 
-    public JdbcConnectionFactory(
-            JdbcSinkConfig sinkConfig, JdbcConnectionPoolFactory jdbcConnectionPoolFactory) {
+    public JdbcConnectionFactory(JdbcSinkConfig sinkConfig) {
         this.sinkConfig = sinkConfig;
-        this.jdbcConnectionPoolFactory = jdbcConnectionPoolFactory;
     }
 
     public Connection connect() throws SQLException {
         final int connectRetryTimes = sinkConfig.getConnectMaxRetries();
 
         final ConnectionPoolId connectionPoolId =
-                jdbcConnectionPoolFactory.getPoolId(
-                        sinkConfig, jdbcConnectionPoolFactory.getClass().getName());
+                JdbcConnectionPoolFactory.getPoolId(
+                        sinkConfig, JdbcConnectionPoolFactory.class.getName());
 
         HikariDataSource dataSource =
-                JdbcConnectionPools.getInstance(jdbcConnectionPoolFactory)
+                JdbcConnectionPools.getInstance()
                         .getOrCreateConnectionPool(connectionPoolId, sinkConfig);
 
         int i = 0;
