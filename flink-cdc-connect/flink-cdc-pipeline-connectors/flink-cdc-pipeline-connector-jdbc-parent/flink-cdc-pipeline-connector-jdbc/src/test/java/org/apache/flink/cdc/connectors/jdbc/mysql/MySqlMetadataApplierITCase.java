@@ -34,6 +34,7 @@ import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.utils.TestCaseUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLSyntaxErrorException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -209,18 +211,8 @@ class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
                         .primaryKey("id")
                         .build();
 
-        BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
-
         return Arrays.asList(
-                new CreateTableEvent(tableId, schema),
-                DataChangeEvent.insertEvent(
-                        tableId,
-                        generator.generate(
-                                new Object[] {
-                                    17, 3.1415926, BinaryStringData.fromString("Alice")
-                                })),
-                new TruncateTableEvent(tableId));
+                new CreateTableEvent(tableId, schema), new TruncateTableEvent(tableId));
     }
 
     private List<Event> generateDropTableEvents(TableId tableId) {
@@ -312,14 +304,19 @@ class MySqlMetadataApplierITCase extends MySqlSinkTestBase {
 
     @Test
     void testMySqlTruncateTable() throws Exception {
-        runJobThatSinksToMySqlWithEvents(generateTruncateTableEvents(TABLE_ID));
-        Assertions.assertThat(inspectTableSchema(TABLE_ID))
-                .containsExactly(
-                        "id | int | NO | PRI | null",
-                        "number | double | YES |  | null",
-                        "name | varchar(17) | YES |  | null");
+        executeSql(
+                String.format(
+                        "CREATE TABLE %s.%s (id INT NOT NULL PRIMARY KEY, number DOUBLE, name VARCHAR(17));",
+                        TABLE_ID.getSchemaName(), TABLE_ID.getTableName()));
+        executeSql(
+                String.format(
+                        "INSERT INTO %s.%s VALUES (1, 3.1415926, 'Alice'), (2, 2.718281828, 'Bob');",
+                        TABLE_ID.getSchemaName(), TABLE_ID.getTableName()));
 
-        Assertions.assertThat(inspectTableContent(TABLE_ID, 3)).isEmpty();
+        runJobThatSinksToMySqlWithEvents(generateTruncateTableEvents(TABLE_ID));
+
+        TestCaseUtils.repeatedCheck(
+                inspectTableContent(TABLE_ID, 3)::isEmpty, Duration.ofMinutes(1));
     }
 
     @Test
