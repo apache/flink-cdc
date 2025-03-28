@@ -52,7 +52,7 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCA
  */
 public class PipelineDef {
     private final SourceDef source;
-    private final SinkDef sink;
+    private final List<SinkDef> sinks;
     private final List<RouteDef> routes;
     private final List<TransformDef> transforms;
     private final List<UdfDef> udfs;
@@ -61,14 +61,14 @@ public class PipelineDef {
 
     public PipelineDef(
             SourceDef source,
-            SinkDef sink,
+            List<SinkDef> sinks,
             List<RouteDef> routes,
             List<TransformDef> transforms,
             List<UdfDef> udfs,
             List<ModelDef> models,
             Configuration config) {
         this.source = source;
-        this.sink = sink;
+        this.sinks = sinks;
         this.routes = routes;
         this.transforms = transforms;
         this.udfs = udfs;
@@ -78,20 +78,20 @@ public class PipelineDef {
 
     public PipelineDef(
             SourceDef source,
-            SinkDef sink,
+            List<SinkDef> sinks,
             List<RouteDef> routes,
             List<TransformDef> transforms,
             List<UdfDef> udfs,
             Configuration config) {
-        this(source, sink, routes, transforms, udfs, new ArrayList<>(), config);
+        this(source, sinks, routes, transforms, udfs, new ArrayList<>(), config);
     }
 
     public SourceDef getSource() {
         return source;
     }
 
-    public SinkDef getSink() {
-        return sink;
+    public List<SinkDef> getSinks() {
+        return sinks;
     }
 
     public List<RouteDef> getRoute() {
@@ -119,8 +119,8 @@ public class PipelineDef {
         return "PipelineDef{"
                 + "source="
                 + source
-                + ", sink="
-                + sink
+                + ", sinks="
+                + sinks
                 + ", routes="
                 + routes
                 + ", transforms="
@@ -144,7 +144,7 @@ public class PipelineDef {
         }
         PipelineDef that = (PipelineDef) o;
         return Objects.equals(source, that.source)
-                && Objects.equals(sink, that.sink)
+                && Objects.equals(sinks, that.sinks)
                 && Objects.equals(routes, that.routes)
                 && Objects.equals(transforms, that.transforms)
                 && Objects.equals(udfs, that.udfs)
@@ -154,7 +154,7 @@ public class PipelineDef {
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, udfs, models, config);
+        return Objects.hash(source, sinks, routes, transforms, udfs, models, config);
     }
 
     // ------------------------------------------------------------------------
