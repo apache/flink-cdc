@@ -100,6 +100,7 @@ public class JdbcWriter<IN> implements StatefulSink.StatefulSinkWriter<IN, JdbcW
         TableId tableId = rowData.getTableId();
         if (RowKind.SCHEMA_CHANGE.is(rowData.getRowKind())) {
             // All previous outputHandlers would expire after schema changes.
+            flush(false);
             Optional.ofNullable(outputHandlers.remove(tableId)).ifPresent(JdbcOutputFormat::close);
         } else {
             RichJdbcOutputFormat outputFormat = getOrCreateHandler(tableId, rowData.getSchema());

@@ -86,7 +86,12 @@ public abstract class JdbcSinkTestBase {
                         new ArrayList<>());
 
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
-        sinkTranslator.translate(sinkDef, stream, dataSink, schemaOperatorIDGenerator.generate());
+        sinkTranslator.translate(
+                sinkDef,
+                stream,
+                MySqlSinkTestBase.DEFAULT_PARALLELISM,
+                dataSink,
+                schemaOperatorIDGenerator.generate());
         ENV.execute("MySql Schema Evolution Test");
     }
 
