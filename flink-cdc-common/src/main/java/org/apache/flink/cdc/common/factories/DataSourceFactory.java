@@ -28,4 +28,10 @@ public interface DataSourceFactory extends Factory {
 
     /** Creates a {@link DataSource} instance. */
     DataSource createDataSource(Context context);
+
+    /** Checking if this {@link DataSource} could be created in batch mode. */
+    default void verifyBatchMode(Context context) {
+        throw new IllegalArgumentException(
+                "Pipeline batch mode couldn't be used with this source connector.");
+    }
 }

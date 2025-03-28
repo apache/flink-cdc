@@ -61,7 +61,20 @@ public class ValuesDataSourceHelper {
         SINGLE_SPLIT_SINGLE_BATCH_TABLE,
         SINGLE_SPLIT_MULTI_BATCH_TABLE,
         MULTI_SPLITS_SINGLE_BATCH_TABLE,
-        TRANSFORM_BATCH_TABLE,
+        TRANSFORM_BATCH_TABLE;
+
+        public boolean isBatchEvent() {
+            switch (this) {
+                case BATCH_TABLE:
+                case SINGLE_SPLIT_SINGLE_BATCH_TABLE:
+                case SINGLE_SPLIT_MULTI_BATCH_TABLE:
+                case MULTI_SPLITS_SINGLE_BATCH_TABLE:
+                case TRANSFORM_BATCH_TABLE:
+                    return true;
+                default:
+                    return false;
+            }
+        }
     }
 
     public static final TableId TABLE_1 =

@@ -406,6 +406,7 @@ public class FlinkPipelineBatchComposerITCase {
         sourceConfig.set(
                 ValuesDataSourceOptions.EVENT_SET_ID,
                 ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        sourceConfig.set(ValuesDataSourceOptions.BATCH_MODE_ENABLED, true);
 
         TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
         TableId myTable2 = TableId.tableId("default_namespace", "default_schema", "mytable2");
@@ -825,6 +826,7 @@ public class FlinkPipelineBatchComposerITCase {
         sourceConfig.set(
                 ValuesDataSourceOptions.EVENT_SET_ID,
                 ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        sourceConfig.set(ValuesDataSourceOptions.BATCH_MODE_ENABLED, true);
 
         TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
         TableId myTable2 = TableId.tableId("default_namespace", "default_schema", "mytable2");
@@ -950,6 +952,7 @@ public class FlinkPipelineBatchComposerITCase {
         sourceConfig.set(
                 ValuesDataSourceOptions.EVENT_SET_ID,
                 ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        sourceConfig.set(ValuesDataSourceOptions.BATCH_MODE_ENABLED, true);
 
         TableId myTable1 = TableId.tableId("default_namespace", "default_schema", "mytable1");
         TableId myTable2 = TableId.tableId("default_namespace", "default_schema", "mytable2");
@@ -1197,6 +1200,7 @@ public class FlinkPipelineBatchComposerITCase {
         sourceConfig.set(
                 ValuesDataSourceOptions.EVENT_SET_ID,
                 ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        sourceConfig.set(ValuesDataSourceOptions.BATCH_MODE_ENABLED, true);
 
         List<Event> events = generateTemporalColumnEvents("default_table_");
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
@@ -1301,6 +1305,7 @@ public class FlinkPipelineBatchComposerITCase {
         sourceConfig.set(
                 ValuesDataSourceOptions.EVENT_SET_ID,
                 ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+        sourceConfig.set(ValuesDataSourceOptions.BATCH_MODE_ENABLED, true);
 
         List<Event> events = generateDecimalColumnEvents("default_table_");
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));

@@ -32,6 +32,7 @@ import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
 /**
  * Translator used to build {@link RegularPrePartitionOperator} or {@link
@@ -63,28 +64,24 @@ public class PartitioningTranslator {
             boolean isBatchMode,
             OperatorID schemaOperatorID,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
-        if (isBatchMode) {
-            return input.transform(
-                            "BatchPrePartition",
-                            new PartitioningEventTypeInfo(),
-                            new RegularPrePartitionBatchOperator(
-                                    downstreamParallelism, hashFunctionProvider))
-                    .setParallelism(upstreamParallelism)
-                    .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
-                    .map(new PostPartitionProcessor(), new EventTypeInfo())
-                    .name("BatchPostPartition")
-                    .setParallelism(downstreamParallelism);
-        } else {
-            return input.transform(
-                            "PrePartition",
-                            new PartitioningEventTypeInfo(),
-                            new RegularPrePartitionOperator(
-                                    schemaOperatorID, downstreamParallelism, hashFunctionProvider))
-                    .setParallelism(upstreamParallelism)
-                    .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
-                    .map(new PostPartitionProcessor(), new EventTypeInfo())
-                    .name("PostPartition");
-        }
+        SingleOutputStreamOperator<Event> singleOutputStreamOperator =
+                input.transform(
+                                isBatchMode ? "BatchPrePartition" : "PrePartition",
+                                new PartitioningEventTypeInfo(),
+                                isBatchMode
+                                        ? new RegularPrePartitionBatchOperator(
+                                                downstreamParallelism, hashFunctionProvider)
+                                        : new RegularPrePartitionOperator(
+                                                schemaOperatorID,
+                                                downstreamParallelism,
+                                                hashFunctionProvider))
+                        .setParallelism(upstreamParallelism)
+                        .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
+                        .map(new PostPartitionProcessor(), new EventTypeInfo())
+                        .name(isBatchMode ? "BatchPostPartition" : "PostPartition");
+        return isBatchMode
+                ? singleOutputStreamOperator.setParallelism(downstreamParallelism)
+                : singleOutputStreamOperator;
     }
 
     public DataStream<PartitioningEvent> translateDistributed(

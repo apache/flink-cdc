@@ -56,4 +56,10 @@ public class ValuesDataSourceOptions {
                     .defaultValue(Integer.MAX_VALUE)
                     .withDescription(
                             "Specific index of test events to fail, set a Integer.MAX_VALUE value by default to avoid failure.");
+
+    public static final ConfigOption<Boolean> BATCH_MODE_ENABLED =
+            ConfigOptions.key("batch-mode.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription("Provide bounded data in batch mode.");
 }

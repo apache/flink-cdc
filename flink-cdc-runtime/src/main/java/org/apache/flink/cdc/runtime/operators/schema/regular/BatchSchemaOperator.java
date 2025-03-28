@@ -49,11 +49,11 @@ import java.util.stream.Collectors;
 
 /** The operator will apply create table event and router mapper in batch mode. */
 @Internal
-public class SchemaBatchOperator extends AbstractStreamOperator<Event>
+public class BatchSchemaOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
-    private static final Logger LOG = LoggerFactory.getLogger(SchemaBatchOperator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BatchSchemaOperator.class);
 
     // Final fields that are set in constructor
     private final String timezone;
@@ -68,7 +68,7 @@ public class SchemaBatchOperator extends AbstractStreamOperator<Event>
     protected MetadataApplier metadataApplier;
     private boolean alreadyMergedCreateTableTables = false;
 
-    public SchemaBatchOperator(
+    public BatchSchemaOperator(
             List<RouteRule> routingRules, MetadataApplier metadataApplier, String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
@@ -124,8 +124,7 @@ public class SchemaBatchOperator extends AbstractStreamOperator<Event>
                         .map(entry -> new CreateTableEvent(entry.getKey(), entry.getValue()))
                         .collect(Collectors.toList());
         List<CreateTableEvent> deducedCreateTableEvents =
-                SchemaDerivator.deduceMergedCreateTableEventInBatchMode(
-                        router, originalCreateTableEvents);
+                SchemaDerivator.deduceMergedCreateTableEvent(router, originalCreateTableEvents);
         deducedCreateTableEvents.forEach(
                 createTableEvent -> {
                     evolvedSchemaMap.put(createTableEvent.tableId(), createTableEvent.getSchema());

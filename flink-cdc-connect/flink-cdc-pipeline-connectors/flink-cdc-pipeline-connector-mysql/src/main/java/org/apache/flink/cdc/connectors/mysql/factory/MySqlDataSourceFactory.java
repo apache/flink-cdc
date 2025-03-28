@@ -130,13 +130,6 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         ZoneId serverTimeZone = getServerTimeZone(config);
         StartupOptions startupOptions = getStartupOptions(config);
 
-        // Batch mode only supports StartupMode.SNAPSHOT.
-        Configuration pipelineConfiguration = context.getPipelineConfiguration();
-        if (pipelineConfiguration != null
-                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
-            startupOptions = StartupOptions.snapshot();
-        }
-
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
 
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -280,6 +273,21 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String metadataList = config.get(METADATA_LIST);
         List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
         return new MySqlDataSource(configFactory, readableMetadataList);
+    }
+
+    @Override
+    public void verifyBatchMode(Context context) {
+        final Configuration config = context.getFactoryConfiguration();
+        StartupOptions startupOptions = getStartupOptions(config);
+        // Batch mode only supports StartupMode.SNAPSHOT.
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
+                && pipelineConfiguration.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
+                && !StartupOptions.snapshot().equals(startupOptions)) {
+            throw new IllegalArgumentException(
+                    "Batch mode is only supported for MySQL source in snapshot mode.");
+        }
     }
 
     private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {

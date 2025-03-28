@@ -84,11 +84,13 @@ public class DataSourceTranslator {
         // Add source JAR to environment
         FactoryDiscoveryUtils.getJarPathByIdentifier(sourceFactory)
                 .ifPresent(jar -> FlinkEnvironmentUtils.addJar(env, jar));
-        return sourceFactory.createDataSource(
+        FactoryHelper.DefaultContext context =
                 new FactoryHelper.DefaultContext(
                         sourceDef.getConfig(),
                         pipelineConfig,
-                        Thread.currentThread().getContextClassLoader()));
+                        Thread.currentThread().getContextClassLoader());
+        sourceFactory.verifyBatchMode(context);
+        return sourceFactory.createDataSource(context);
     }
 
     private String generateDefaultSourceName(SourceDef sourceDef) {
