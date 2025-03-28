@@ -420,7 +420,10 @@ Connector Options
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is 'ROWID'. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.</td>
+            By default, the chunk key is 'ROWID'. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+            <br>
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          </td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
@@ -664,13 +667,13 @@ Starting from version 3.4-SNAPSHOT, Oracle CDC support tables that do not have a
 There are two places that need to be taken care of.
 
 1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
-2. The processing semantics of a Oracle CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+2. The processing semantics of an Oracle CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
 * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
 * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
 
 #### Warning
 
-Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a oracle table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for an oracle table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
 
 #### Problem Scenario
 
