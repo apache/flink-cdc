@@ -25,6 +25,7 @@ import org.apache.flink.runtime.io.disk.iomanager.IOManager;
 import org.apache.flink.runtime.io.disk.iomanager.IOManagerAsync;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
@@ -107,7 +108,7 @@ public class PaimonWriter<InputT>
                                         // avoid prepareCommit the same checkpointId with the first
                                         // round.
                                         return entry.getValue()
-                                                .prepareCommit(true, lastCheckpointId + 1).stream()
+                                                .prepareCommit(false, lastCheckpointId + 1).stream()
                                                 .map(
                                                         committable ->
                                                                 MultiTableCommittable
@@ -155,13 +156,22 @@ public class PaimonWriter<InputT>
                     writes.computeIfAbsent(
                             tableId,
                             id -> {
+                                boolean waitCompaction =
+                                        Boolean.parseBoolean(
+                                                table.options()
+                                                        .getOrDefault(
+                                                                CoreOptions.DELETION_VECTORS_ENABLED
+                                                                        .key(),
+                                                                CoreOptions.DELETION_VECTORS_ENABLED
+                                                                        .defaultValue()
+                                                                        .toString()));
                                 StoreSinkWriteImpl storeSinkWrite =
                                         new StoreSinkWriteImpl(
                                                 table,
                                                 commitUser,
                                                 ioManager,
                                                 false,
-                                                false,
+                                                waitCompaction,
                                                 true,
                                                 memoryPoolFactory,
                                                 metricGroup);
