@@ -21,7 +21,10 @@ import org.apache.flink.cdc.common.event.TableId;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
@@ -80,5 +83,52 @@ public class TableIdRouterTest extends SchemaTestBase {
                 .containsExactlyInAnyOrder("db_5.prefix_table_2_suffix");
         assertThat(testRoute("db_5.table_3"))
                 .containsExactlyInAnyOrder("db_5.prefix_table_3_suffix");
+    }
+
+    @Test
+    void testGroupSourceTablesByRouteRule() {
+        Set<TableId> tableIdSet =
+                new HashSet<>(
+                        Arrays.asList(
+                                TableId.parse("db_1.table_1"),
+                                TableId.parse("db_1.table_2"),
+                                TableId.parse("db_1.table_3"),
+                                TableId.parse("db_2.table_1"),
+                                TableId.parse("db_2.table_2"),
+                                TableId.parse("db_2.table_3"),
+                                TableId.parse("db_3.table_1"),
+                                TableId.parse("db_3.table_2"),
+                                TableId.parse("db_3.table_3"),
+                                TableId.parse("db_4.table_1"),
+                                TableId.parse("db_4.table_2"),
+                                TableId.parse("db_4.table_3"),
+                                TableId.parse("db_5.table_1"),
+                                TableId.parse("db_5.table_2"),
+                                TableId.parse("db_5.table_3")));
+        assertThat(TABLE_ID_ROUTER.groupSourceTablesByRouteRule(tableIdSet))
+                .containsExactlyInAnyOrder(
+                        new HashSet<>(Arrays.asList(TableId.parse("db_1.table_1"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_1.table_2"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_1.table_3"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_2.table_1"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_2.table_2"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_2.table_3"))),
+                        new HashSet<>(
+                                Arrays.asList(
+                                        TableId.parse("db_3.table_1"),
+                                        TableId.parse("db_3.table_2"),
+                                        TableId.parse("db_3.table_3"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_4.table_1"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_4.table_1"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_4.table_1"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_4.table_2"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_4.table_2"))),
+                        new HashSet<>(Arrays.asList(TableId.parse("db_4.table_3"))),
+                        new HashSet<>(
+                                Arrays.asList(
+                                        TableId.parse("db_5.table_1"),
+                                        TableId.parse("db_5.table_2"),
+                                        TableId.parse("db_5.table_3"))),
+                        new HashSet<>());
     }
 }
