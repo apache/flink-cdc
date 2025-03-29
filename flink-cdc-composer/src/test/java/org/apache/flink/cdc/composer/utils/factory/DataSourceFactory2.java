@@ -30,6 +30,9 @@ import java.util.Set;
 public class DataSourceFactory2 implements DataSourceFactory {
 
     @Override
+    public void verifyBatchMode(Context context) {}
+
+    @Override
     public String identifier() {
         return "data-sink-factory-2";
     }

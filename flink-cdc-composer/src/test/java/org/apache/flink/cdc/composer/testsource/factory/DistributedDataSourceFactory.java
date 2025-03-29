@@ -46,6 +46,9 @@ public class DistributedDataSourceFactory implements DataSourceFactory {
     }
 
     @Override
+    public void verifyBatchMode(Context context) {}
+
+    @Override
     public String identifier() {
         return IDENTIFIER;
     }
