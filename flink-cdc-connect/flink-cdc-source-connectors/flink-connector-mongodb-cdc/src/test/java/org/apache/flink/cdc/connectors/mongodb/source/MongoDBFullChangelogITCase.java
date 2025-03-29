@@ -542,25 +542,29 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
         return records;
     }
 
-    @Test
-    public void testMetadataColumns() throws Exception {
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    public void testMetadataColumns(boolean parallelismSnapshot) throws Exception {
         testMongoDBParallelSourceWithMetadataColumns(
-                DEFAULT_PARALLELISM, new String[] {"customers"}, true);
+                DEFAULT_PARALLELISM, new String[] {"customers"}, true, parallelismSnapshot);
     }
 
     private void testMongoDBParallelSourceWithMetadataColumns(
-            int parallelism, String[] captureCustomerCollections, boolean skipSnapshotBackfill)
+            int parallelism,
+            String[] captureCustomerCollections,
+            boolean skipSnapshotBackfill,
+            boolean parallelismSnapshot)
             throws Exception {
         String customerDatabase =
                 "customer_" + Integer.toUnsignedString(new Random().nextInt(), 36);
 
         // A - enable system-level fulldoc pre & post image feature
-        mongoContainer.executeCommand(
+        MONGO_CONTAINER.executeCommand(
                 "use admin; db.runCommand({ setClusterParameter: { changeStreamOptions: { preAndPostImages: { expireAfterSeconds: 'off' } } } })");
 
         // B - enable collection-level fulldoc pre & post image for change capture collection
         for (String collectionName : captureCustomerCollections) {
-            mongoContainer.executeCommandInDatabase(
+            MONGO_CONTAINER.executeCommandInDatabase(
                     String.format(
                             "db.createCollection('%s'); db.runCommand({ collMod: '%s', changeStreamPreAndPostImages: { enabled: true } })",
                             collectionName, collectionName),
@@ -599,14 +603,14 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
                                 + ")",
                         parallelismSnapshot ? "true" : "false",
-                        mongoContainer.getHostAndPort(),
+                        MONGO_CONTAINER.getHostAndPort(),
                         FLINK_USER,
                         FLINK_USER_PASSWORD,
                         customerDatabase,
                         getCollectionNameRegex(customerDatabase, captureCustomerCollections),
                         skipSnapshotBackfill);
 
-        mongoContainer.executeCommandFileInDatabase("customer", customerDatabase);
+        MONGO_CONTAINER.executeCommandFileInDatabase("customer", customerDatabase);
 
         // first step: check the snapshot data
         List<String> snapshotForSingleTable =
