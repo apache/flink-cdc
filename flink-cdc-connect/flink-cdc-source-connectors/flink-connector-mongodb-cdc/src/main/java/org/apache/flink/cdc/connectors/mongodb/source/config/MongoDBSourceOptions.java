@@ -83,10 +83,11 @@ public class MongoDBSourceOptions {
     public static final ConfigOption<Integer> INITIAL_SNAPSHOTTING_QUEUE_SIZE =
             ConfigOptions.key("initial.snapshotting.queue.size")
                     .intType()
-                    .defaultValue(10240)
+                    .noDefaultValue()
                     .withDeprecatedKeys("copy.existing.queue.size")
                     .withDescription(
-                            "The max size of the queue to use when copying data. Defaults to 10240.");
+                            "The max size of the queue to use when copying data. When not set,"
+                                    + "it uses default value 16000 of mongo kafka connect sdk.");
 
     public static final ConfigOption<Integer> INITIAL_SNAPSHOTTING_MAX_THREADS =
             ConfigOptions.key("initial.snapshotting.max.threads")
