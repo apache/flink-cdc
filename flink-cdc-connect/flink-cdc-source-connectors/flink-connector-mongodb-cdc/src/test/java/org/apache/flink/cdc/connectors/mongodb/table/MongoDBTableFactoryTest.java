@@ -309,8 +309,7 @@ class MongoDBTableFactoryTest {
         try {
             Map<String, String> properties = getAllOptions();
             properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put(
-                    "initial.snapshotting.max.threads", "20");
+            properties.put("initial.snapshotting.max.threads", "20");
 
             createTableSource(SCHEMA, properties);
         } catch (Throwable t) {
@@ -326,8 +325,7 @@ class MongoDBTableFactoryTest {
         try {
             Map<String, String> properties = getAllOptions();
             properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put(
-                    "initial.snapshotting.queue.size", "20480");
+            properties.put("initial.snapshotting.queue.size", "20480");
 
             createTableSource(SCHEMA, properties);
         } catch (Throwable t) {
