@@ -111,15 +111,18 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean enableParallelRead = config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED);
 
-        // The initial.snapshotting.pipeline config is only used in Debezium mode and
+        // The initial.snapshotting.pipeline related config is only used in Debezium mode and
         // cannot be used in incremental snapshot mode because the semantic is inconsistent.
         // The reason is that in snapshot phase of incremental snapshot mode, the oplog
         // will be backfilled after each snapshot to compensate for changes, but the pipeline
         // operations in initial.snapshotting.pipeline are not applied to the backfill oplog,
         // which means the semantic of this config is inconsistent.
         checkArgument(
-                !(enableParallelRead && initialSnapshottingPipeline != null),
-                "The initial.snapshotting.pipeline/copy.existing.pipeline config only applies to Debezium mode, "
+                !(enableParallelRead
+                        && (initialSnapshottingPipeline != null
+                        || initialSnapshottingMaxThreads != null
+                        || initialSnapshottingQueueSize != null)),
+                "The initial.snapshotting.*/copy.existing.* config only applies to Debezium mode, "
                         + "not incremental snapshot mode");
 
         boolean enableCloseIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);

@@ -250,7 +250,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
     <tr>
       <td>initial.snapshotting.queue.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">10240</td>
+      <td style="word-wrap: break-word;">16000</td>
       <td>Integer</td>
       <td>进行初始快照时的队列大小。仅在 scan.startup.mode 选项设置为 initial 时生效。<br>
           注意：已弃用的选项名是 copy.existing.queue.size，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名

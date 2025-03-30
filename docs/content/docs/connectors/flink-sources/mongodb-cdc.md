@@ -243,7 +243,7 @@ Connector Options
     <tr>
       <td>initial.snapshotting.queue.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">10240</td>
+      <td style="word-wrap: break-word;">16000</td>
       <td>Integer</td>
       <td>The max size of the queue to use when copying data. Only available when scan.startup.mode is set to 'initial'.<br>
           Note: The deprecated option name is copy.existing.queue.size. To be compatible with old versions of jobs,
