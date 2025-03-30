@@ -245,7 +245,7 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">10240</td>
       <td>Integer</td>
-      <td>The max size of the queue to use when copying data. Only available when scan.startup.mode is set to 'initial'.
+      <td>The max size of the queue to use when copying data. Only available when scan.startup.mode is set to 'initial'.<br>
           Note: The deprecated option name is copy.existing.queue.size. To be compatible with old versions of jobs,
           this parameter is still available, but it is recommended to upgrade to the new option name.
       </td>
@@ -255,7 +255,7 @@ Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">Processors Count</td>
       <td>Integer</td>
-      <td>The number of threads to use when performing the data copy. Only available when scan.startup.mode is set to 'initial'.
+      <td>The number of threads to use when performing the data copy. Only available when scan.startup.mode is set to 'initial'.<br>
           Note: The deprecated option name is copy.existing.max.threads. To be compatible with old versions of jobs,
           this parameter is still available, but it is recommended to upgrade to the new option name.
       </td>
@@ -268,10 +268,10 @@ Connector Options
       <td> An array of JSON objects describing the pipeline operations to run when copying existing data.<br>
            This can improve the use of indexes by the copying manager and make copying more efficient.
            eg. <code>[{"$match": {"closed": "false"}}]</code> ensures that 
-           only documents in which the closed field is set to false are copied.
+           only documents in which the closed field is set to false are copied.<br>
            The initial.snapshotting.pipeline config is only available when scan.startup.mode is set to 'initial',
            and is only used in Debezium mode and cannot be used in 
-           incremental snapshot mode because the semantic is inconsistent.
+           incremental snapshot mode because the semantic is inconsistent.<br>
            Note: The deprecated option name is copy.existing.pipeline. To be compatible with old versions of jobs,
            this parameter is still available, but it is recommended to upgrade to the new option name.
       </td>

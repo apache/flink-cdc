@@ -252,7 +252,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>optional</td>
       <td style="word-wrap: break-word;">10240</td>
       <td>Integer</td>
-      <td>进行初始快照时的队列大小。仅在 scan.startup.mode 选项设置为 initial 时生效。
+      <td>进行初始快照时的队列大小。仅在 scan.startup.mode 选项设置为 initial 时生效。<br>
           注意：已弃用的选项名是 copy.existing.queue.size，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
       </td>
     </tr>
@@ -261,7 +261,7 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>optional</td>
       <td style="word-wrap: break-word;">Processors Count</td>
       <td>Integer</td>
-      <td>执行数据复制时使用的线程数。仅在 scan.startup.mode 选项设置为 initial 时生效。
+      <td>执行数据复制时使用的线程数。仅在 scan.startup.mode 选项设置为 initial 时生效。<br>
           注意：已弃用的选项名是 copy.existing.max.threads，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
       </td>
     </tr>
@@ -271,8 +271,8 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>MongoDB 管道操作的 JSON 对象数组，在快照读取阶段，会把该操作下推到 MongoDB，只筛选所需的数据，从而提高读取效率，
-          比如管道操作 [{"$match": {"closed": "false"}}] 表示只复制 closed 字段为 "false" 的文档。
-          该选项仅在 scan.startup.mode 选项设置为 initial 时生效，且仅限于在 Debezium 模式下使用，不能用于增量快照模式，因为会出现语义不一致的问题。
+          比如管道操作 [{"$match": {"closed": "false"}}] 表示只复制 closed 字段为 "false" 的文档。<br>
+          该选项仅在 scan.startup.mode 选项设置为 initial 时生效，且仅限于在 Debezium 模式下使用，不能用于增量快照模式，因为会出现语义不一致的问题。<br>
           注意：已弃用的选项名是 copy.existing.pipeline，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
       </td>
     </tr>
