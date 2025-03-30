@@ -120,8 +120,8 @@ public class MongoDBTableSourceFactory implements DynamicTableSourceFactory {
         checkArgument(
                 !(enableParallelRead
                         && (initialSnapshottingPipeline != null
-                        || initialSnapshottingMaxThreads != null
-                        || initialSnapshottingQueueSize != null)),
+                                || initialSnapshottingMaxThreads != null
+                                || initialSnapshottingQueueSize != null)),
                 "The initial.snapshotting.*/copy.existing.* config only applies to Debezium mode, "
                         + "not incremental snapshot mode");
 
