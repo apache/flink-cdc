@@ -39,39 +39,49 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.flink.cdc.connectors.oceanbase.table.OceanBaseMySQLModeITCase.NETWORK;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link OceanBaseMetadataApplier}. */
-public class OceanBaseMetadataApplierTest {
+class OceanBaseMetadataApplierTest {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMetadataApplierTest.class);
 
     private OceanBaseMetadataApplier metadataApplier;
     private OceanBaseTestMySQLCatalog catalog;
 
-    @ClassRule
-    public static final OceanBaseContainer OB_SERVER =
+    private static final Network NETWORK = Network.newNetwork();
+
+    private static final OceanBaseContainer OB_SERVER =
             OceanBaseTestUtils.createOceanBaseContainerForJdbc()
                     .withNetwork(NETWORK)
                     .withNetworkAliases("oceanbase")
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @Before
-    public void setup() throws Exception {
+    @BeforeAll
+    static void startContainers() {
+        Startables.deepStart(OB_SERVER).join();
+    }
+
+    @AfterAll
+    static void stopContainers() {
+        OB_SERVER.close();
+    }
+
+    @BeforeEach
+    void setup() {
         final ImmutableMap<String, String> configMap =
                 ImmutableMap.<String, String>builder()
                         .put("url", OB_SERVER.getJdbcUrl())
@@ -84,13 +94,8 @@ public class OceanBaseMetadataApplierTest {
         catalog.open();
     }
 
-    @AfterClass
-    public static void close() {
-        OB_SERVER.close();
-    }
-
     @Test
-    public void testCreateTable() {
+    void testCreateTable() {
         TableId tableId = TableId.parse("test.tbl1");
         Schema schema =
                 Schema.newBuilder()
@@ -104,7 +109,7 @@ public class OceanBaseMetadataApplierTest {
 
         OceanBaseTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        assertThat(actualTable).isNotNull();
 
         List<OceanBaseColumn> columns = new ArrayList<>();
         columns.add(
@@ -139,11 +144,11 @@ public class OceanBaseMetadataApplierTest {
                         .setTableKeys(schema.primaryKeys())
                         .build();
 
-        assertEquals(expectTable, actualTable);
+        assertThat(actualTable).isEqualTo(expectTable);
     }
 
     @Test
-    public void testCreateTableWithAllType() {
+    void testCreateTableWithAllType() {
         TableId tableId = TableId.parse("test.tbl6");
         Schema schema =
                 Schema.newBuilder()
@@ -175,7 +180,7 @@ public class OceanBaseMetadataApplierTest {
 
         OceanBaseTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        assertThat(actualTable).isNotNull();
 
         List<OceanBaseColumn> columns = new ArrayList<>();
         columns.add(
@@ -344,11 +349,11 @@ public class OceanBaseMetadataApplierTest {
                         .setTableKeys(schema.primaryKeys())
                         .build();
 
-        assertEquals(expectTable, actualTable);
+        assertThat(actualTable).isEqualTo(expectTable);
     }
 
     @Test
-    public void testDropTable() {
+    void testDropTable() {
         TableId tableId = TableId.parse("test.tbl2");
         Schema schema =
                 Schema.newBuilder()
@@ -362,17 +367,17 @@ public class OceanBaseMetadataApplierTest {
 
         OceanBaseTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        assertThat(actualTable).isNotNull();
 
         DropTableEvent dropTableEvent = new DropTableEvent(tableId);
         metadataApplier.applySchemaChange(dropTableEvent);
         OceanBaseTable actualDropTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        Assert.assertNull(actualDropTable);
+        assertThat(actualDropTable).isNull();
     }
 
     @Test
-    public void testTruncateTable() throws SQLException {
+    void testTruncateTable() throws SQLException {
         TableId tableId = TableId.parse("test.tbl3");
         Schema schema =
                 Schema.newBuilder()
@@ -386,7 +391,7 @@ public class OceanBaseMetadataApplierTest {
 
         OceanBaseTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        assertThat(actualTable).isNotNull();
 
         String insertSQL =
                 String.format("insert into %s values(1, true, now())", tableId.identifier());
@@ -398,11 +403,11 @@ public class OceanBaseMetadataApplierTest {
         List<String> values =
                 catalog.executeSingleColumnStatement(
                         String.format("select col1 from %s", tableId.identifier()));
-        Assert.assertTrue(values.isEmpty());
+        assertThat(values).isEmpty();
     }
 
     @Test
-    public void testDropColumnEvent() {
+    void testDropColumnEvent() {
         TableId tableId = TableId.parse("test.tbl4");
         Schema schema =
                 Schema.newBuilder()
@@ -416,7 +421,7 @@ public class OceanBaseMetadataApplierTest {
 
         OceanBaseTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        assertThat(actualTable).isNotNull();
 
         DropColumnEvent dropColumnEvent = new DropColumnEvent(tableId, Lists.newArrayList("col2"));
         metadataApplier.applySchemaChange(dropColumnEvent);
@@ -424,11 +429,12 @@ public class OceanBaseMetadataApplierTest {
         OceanBaseTable changeTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
 
-        Assert.assertNotEquals(actualTable.getColumns().size(), changeTable.getColumns().size());
+        assertThat(changeTable).isNotNull();
+        assertThat(changeTable.getColumns().size()).isNotEqualTo(actualTable.getColumns().size());
     }
 
     @Test
-    public void testAlterColumnType() {
+    void testAlterColumnType() {
         TableId tableId = TableId.parse("test.tbl5");
         Schema schema =
                 Schema.newBuilder()
@@ -442,7 +448,7 @@ public class OceanBaseMetadataApplierTest {
 
         OceanBaseTable actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        assertNotNull(actualTable);
+        assertThat(actualTable).isNotNull();
 
         ImmutableMap<String, DataType> map = ImmutableMap.of("col2", new IntType());
         AlterColumnTypeEvent alterColumnTypeEvent = new AlterColumnTypeEvent(tableId, map);
@@ -451,8 +457,8 @@ public class OceanBaseMetadataApplierTest {
         OceanBaseTable changeTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
 
-        Assert.assertNotEquals(
-                actualTable.getColumn("col2").getDataType(),
-                changeTable.getColumn("col2").getDataType());
+        assertThat(changeTable).isNotNull();
+        assertThat(changeTable.getColumn("col2").getDataType())
+                .isNotEqualTo(actualTable.getColumn("col2").getDataType());
     }
 }

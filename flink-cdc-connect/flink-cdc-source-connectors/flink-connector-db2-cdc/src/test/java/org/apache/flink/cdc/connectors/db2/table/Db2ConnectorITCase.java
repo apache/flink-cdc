@@ -19,6 +19,8 @@ package org.apache.flink.cdc.connectors.db2.table;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -29,12 +31,10 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,33 +42,29 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** Integration tests for DB2 CDC source. */
-@RunWith(Parameterized.class)
-public class Db2ConnectorITCase extends Db2TestBase {
+class Db2ConnectorITCase extends Db2TestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(Db2ConnectorITCase.class);
 
     protected static final int DEFAULT_PARALLELISM = 2;
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .build()));
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -76,21 +72,11 @@ public class Db2ConnectorITCase extends Db2TestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
-    private final boolean incrementalSnapshot;
-
-    public Db2ConnectorITCase(boolean incrementalSnapshot) {
-        this.incrementalSnapshot = incrementalSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {true}, new Object[] {false}};
-    }
-
-    @Before
-    public void before() {
+    public void setup(boolean incrementalSnapshot) {
         TestValuesTableFactory.clearAllData();
         env.setRestartStrategy(RestartStrategies.noRestart());
         if (incrementalSnapshot) {
@@ -110,9 +96,11 @@ public class Db2ConnectorITCase extends Db2TestBase {
         }
     }
 
-    @Test
-    public void testConsumingAllEvents()
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEvents(boolean incrementalSnapshot)
             throws SQLException, InterruptedException, ExecutionException {
+        setup(incrementalSnapshot);
         initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
                 String.format(
@@ -210,13 +198,15 @@ public class Db2ConnectorITCase extends Db2TestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         cancelJobIfRunning(result);
     }
 
-    @Test
-    public void testAllTypes() throws Exception {
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testAllTypes(boolean incrementalSnapshot) throws Exception {
+        setup(incrementalSnapshot);
         initializeDb2Table("column_type_test", "FULL_TYPES");
         // NOTE: db2 is not case sensitive by default, the schema returned by debezium
         // is uppercase, thus we need use uppercase when defines a db2 table.
@@ -303,14 +293,14 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         "+I(1,32767,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)",
                         "+U(1,0,65535,2147483647,5.5,6.6,123.12345,404.4,Hello World,a,abc,2020-07-17T18:00:22.123,2020-07-17,18:00:22,500,2020-07-17T18:00:22.123456789)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Collections.sort(expected);
-        Collections.sort(actual);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         cancelJobIfRunning(result);
     }
 
-    @Test
-    public void testStartupFromLatestOffset() throws Exception {
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testStartupFromLatestOffset(boolean incrementalSnapshot) throws Exception {
+        setup(incrementalSnapshot);
         initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
                 String.format(
@@ -374,13 +364,15 @@ public class Db2ConnectorITCase extends Db2TestBase {
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         cancelJobIfRunning(result);
     }
 
-    @Test
-    public void testMetadataColumns() throws Throwable {
+    @ParameterizedTest(name = "incrementalSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMetadataColumns(boolean incrementalSnapshot) throws Throwable {
+        setup(incrementalSnapshot);
         initializeDb2Table("inventory", "PRODUCTS");
         String sourceDDL =
                 String.format(
@@ -471,9 +463,7 @@ public class Db2ConnectorITCase extends Db2TestBase {
                         "-D(testdb,DB2INST1,PRODUCTS,111,scooter,Big 2-wheel scooter ,5.170)");
 
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Collections.sort(expected);
-        Collections.sort(actual);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         cancelJobIfRunning(result);
     }
 

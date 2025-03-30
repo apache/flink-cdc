@@ -110,17 +110,15 @@ public class PreCommitOperator
         super.snapshotState(context);
         long checkpointId = context.getCheckpointId();
         if (!multiTableCommittables.isEmpty()) {
-            multiTableCommittables.forEach(
-                    (multiTableCommittable) ->
-                            LOGGER.debug(
-                                    "Try to commit for {}.{} : {} in checkpoint {}",
-                                    multiTableCommittable.getDatabase(),
-                                    multiTableCommittable.getTable(),
-                                    multiTableCommittables,
-                                    checkpointId));
             WrappedManifestCommittable wrappedManifestCommittable =
                     storeMultiCommitter.combine(checkpointId, checkpointId, multiTableCommittables);
+            long commitStart = System.currentTimeMillis();
             storeMultiCommitter.commit(Collections.singletonList(wrappedManifestCommittable));
+            LOGGER.info(
+                    "Commit for {} in checkpoint {} takes {} ms",
+                    wrappedManifestCommittable,
+                    checkpointId,
+                    System.currentTimeMillis() - commitStart);
             multiTableCommittables.clear();
         }
     }

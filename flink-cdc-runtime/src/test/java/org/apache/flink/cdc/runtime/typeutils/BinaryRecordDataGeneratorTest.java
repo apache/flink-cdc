@@ -36,7 +36,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit tests for {@link BinaryRecordDataGenerator}. */
-public class BinaryRecordDataGeneratorTest {
+class BinaryRecordDataGeneratorTest {
 
     @Test
     void testOf() {
@@ -82,7 +82,7 @@ public class BinaryRecordDataGeneratorTest {
                     4L,
                     5.1f,
                     6.2,
-                    DecimalData.fromBigDecimal(new BigDecimal(7.123), 6, 3),
+                    DecimalData.fromBigDecimal(new BigDecimal("7.123"), 6, 3),
                     BinaryStringData.fromString("test1"),
                     BinaryStringData.fromString("test2"),
                     BinaryStringData.fromString("test3"),

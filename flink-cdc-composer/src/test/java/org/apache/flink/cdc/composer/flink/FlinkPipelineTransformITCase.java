@@ -46,13 +46,18 @@ import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
+import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.assertj.core.api.Assertions;
+import org.assertj.core.api.ThrowableAssert;
+import org.codehaus.commons.compiler.CompileException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -954,6 +959,69 @@ class FlinkPipelineTransformITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
 
         Arrays.stream(outputEvents).forEach(this::extractDataLines);
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    public void testTransformWithColumnNameMap(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.COMPLEX_COLUMN_NAME_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        TransformDef transformDef =
+                new TransformDef(
+                        "default_namespace.default_schema.table1",
+                        "*, `timestamp-type`",
+                        "`foo-bar` > 0",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        new ArrayList<>(Arrays.asList(transformDef)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`class` STRING NOT NULL,`foo-bar` INT,`bar-foo` INT,`timestamp-type` STRING NOT NULL}, primaryKeys=class, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[class1, 1, 10, type1], op=INSERT, meta=({timestamp-type=type1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[class2, 2, 100, type2], op=INSERT, meta=({timestamp-type=type2})}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`import-package` STRING, position=AFTER, existedColumnName=bar-foo}]}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={bar-foo=bar-baz}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[bar-baz]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[class1, 1, , type1], after=[], op=DELETE, meta=({timestamp-type=type1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[class2, 2, , type2], after=[new-class2, 20, new-package2, type2], op=UPDATE, meta=({timestamp-type=type2})}");
     }
 
     void runGenericTransformTest(
@@ -2349,6 +2417,158 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[-4, -4, -4, -4, -4, -4.44, -4.44, -4.44, 4, 4, 4, 4, 4.44, 4.44, 4.44], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[-9, -9, -9, -9, -9, -1.0E8, -9.999999999E7, -99999999.99, 9, 9, 9, 9, 1.0E8, 9.999999999E7, 99999999.99], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+    }
+
+    @Test
+    void testTransformErrorMessage() {
+        // Unexpected column in projection rule
+        assertThatThrownBy(expectTransformError("id1", null, "id"))
+                .cause()
+                .cause()
+                .cause()
+                .isExactlyInstanceOf(TransformException.class)
+                .hasStackTraceContaining(
+                        "Failed to post-transform with\n"
+                                + "\tCreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={}, primaryKeys=id, options=()}\n"
+                                + "for table\n"
+                                + "\tdefault_namespace.default_schema.mytable1\n"
+                                + "from schema\n"
+                                + "\t(Unknown)\n"
+                                + "to schema\n"
+                                + "\t(Unknown).")
+                .rootCause()
+                .isExactlyInstanceOf(SqlValidatorException.class)
+                .hasMessage("Column 'id1' not found in any table");
+
+        // Unexpected column in filter rule
+        assertThatThrownBy(expectTransformError("*", "id1 > 0", "id"))
+                .cause()
+                .cause()
+                .cause()
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessage(
+                        "Failed to post-transform with\n"
+                                + "\tDataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=null, after={id: INT -> 1, name: STRING -> Alice, age: INT -> 18}, op=INSERT, meta=()}\n"
+                                + "for table\n"
+                                + "\tdefault_namespace.default_schema.mytable1\n"
+                                + "from schema\n"
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`id` INT NOT NULL,`name` STRING,`age` INT}, primaryKeys=id, options=().")
+                .cause()
+                .isExactlyInstanceOf(FlinkRuntimeException.class)
+                .hasMessage(
+                        "Failed to compile expression TransformExpressionKey{expression='import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
+                .cause()
+                .hasMessageContaining(
+                        "Expression: import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)")
+                .hasMessageContaining("Column name map: {$0 -> id1}")
+                .rootCause()
+                .isExactlyInstanceOf(CompileException.class)
+                .hasMessageContaining("Unknown variable or type \"$0\"");
+
+        // Unexpected column in filter rule
+        Assertions.assertThatThrownBy(expectTransformError("name", null, "id"))
+                .cause()
+                .cause()
+                .cause()
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessage(
+                        "Failed to post-transform with\n"
+                                + "\tCreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`name` STRING}, primaryKeys=id, options=()}\n"
+                                + "for table\n"
+                                + "\tdefault_namespace.default_schema.mytable1\n"
+                                + "from schema\n"
+                                + "\tcolumns={`name` STRING}, primaryKeys=id, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`name` STRING}, primaryKeys=id, options=().")
+                .rootCause()
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .hasMessage("Unable to find column \"id\" which is defined as primary key");
+
+        // Unsupported operations in projection rule
+        Assertions.assertThatThrownBy(expectTransformError("id, name + 1 AS new_name", null, "id"))
+                .cause()
+                .cause()
+                .cause()
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessage(
+                        "Failed to post-transform with\n"
+                                + "\tDataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=null, after={id: INT -> 1, name: STRING -> Alice}, op=INSERT, meta=()}\n"
+                                + "for table\n"
+                                + "\tdefault_namespace.default_schema.mytable1\n"
+                                + "from schema\n"
+                                + "\tcolumns={`id` INT,`name` STRING}, primaryKeys=id, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`id` INT NOT NULL,`new_name` INT}, primaryKeys=id, options=().")
+                .cause()
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessageContaining(
+                        "Failed to evaluate projection expression `castToInteger($0) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
+                .hasMessageContaining("Column name map: {$0 -> name}");
+
+        // Unsupported operations in filter rule
+        assertThatThrownBy(expectTransformError("*", "name + 1 > 0", "id"))
+                .cause()
+                .cause()
+                .cause()
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessage(
+                        "Failed to post-transform with\n"
+                                + "\tDataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=null, after={id: INT -> 1, name: STRING -> Alice, age: INT -> 18}, op=INSERT, meta=()}\n"
+                                + "for table\n"
+                                + "\tdefault_namespace.default_schema.mytable1\n"
+                                + "from schema\n"
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`id` INT NOT NULL,`name` STRING,`age` INT}, primaryKeys=id, options=().")
+                .cause()
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessageContaining(
+                        "Failed to evaluate filtering expression `greaterThan($0 + 1, 0)` for table `default_namespace.default_schema.mytable1`")
+                .hasMessageContaining("Column name map: {$0 -> name}")
+                .rootCause()
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessage(
+                        "Comparison of unsupported data types: java.lang.String and java.lang.Integer");
+
+        // Unsupported operations in metadata rule
+        Assertions.assertThatThrownBy(expectTransformError("*", null, "not_even_exist"))
+                .cause()
+                .cause()
+                .cause()
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessage(
+                        "Failed to post-transform with\n"
+                                + "\tCreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=()}\n"
+                                + "for table\n"
+                                + "\tdefault_namespace.default_schema.mytable1\n"
+                                + "from schema\n"
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=().")
+                .rootCause()
+                .isExactlyInstanceOf(IllegalStateException.class)
+                .hasMessage(
+                        "Unable to find column \"not_even_exist\" which is defined as primary key");
+    }
+
+    private ThrowableAssert.ThrowingCallable expectTransformError(
+            String projectionRule, String filterRule, String primaryKeys) {
+        return () ->
+                runGenericTransformTest(
+                        ValuesDataSink.SinkApi.SINK_V2,
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "default_namespace.default_schema.\\.*",
+                                        projectionRule,
+                                        filterRule,
+                                        primaryKeys,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList());
     }
 
     private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {

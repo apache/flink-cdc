@@ -33,7 +33,7 @@ import org.apache.flink.cdc.runtime.serializer.data.RecordDataSerializer;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -43,9 +43,9 @@ import static org.apache.flink.cdc.common.data.binary.BinaryStringData.fromStrin
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Test of {@link BinaryArrayData} and {@link BinaryArrayWriter}. */
-public class BinaryArrayWriterTest {
+class BinaryArrayWriterTest {
     @Test
-    public void testArray() {
+    void testArray() {
         // 1.array test
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 3, 4);
@@ -55,9 +55,9 @@ public class BinaryArrayWriterTest {
         writer.writeInt(2, 666);
         writer.complete();
 
-        assertThat(6).isEqualTo(array.getInt(0));
+        assertThat(array.getInt(0)).isEqualTo(6);
         assertThat(array.isNullAt(1)).isTrue();
-        assertThat(666).isEqualTo(array.getInt(2));
+        assertThat(array.getInt(2)).isEqualTo(666);
 
         // 2.test write to binary row.
         {
@@ -68,9 +68,9 @@ public class BinaryArrayWriterTest {
 
             BinaryArrayData array2 = (BinaryArrayData) row2.getArray(0);
             assertThat(array).isEqualTo(array2);
-            assertThat(6).isEqualTo(array2.getInt(0));
+            assertThat(array2.getInt(0)).isEqualTo(6);
             assertThat(array2.isNullAt(1)).isTrue();
-            assertThat(666).isEqualTo(array2.getInt(2));
+            assertThat(array2.getInt(2)).isEqualTo(666);
         }
 
         // 3.test write var seg array to binary row.
@@ -84,14 +84,14 @@ public class BinaryArrayWriterTest {
 
             BinaryArrayData array2 = (BinaryArrayData) row2.getArray(0);
             assertThat(array).isEqualTo(array2);
-            assertThat(6).isEqualTo(array2.getInt(0));
+            assertThat(array2.getInt(0)).isEqualTo(6);
             assertThat(array2.isNullAt(1)).isTrue();
-            assertThat(666).isEqualTo(array2.getInt(2));
+            assertThat(array2.getInt(2)).isEqualTo(666);
         }
     }
 
     @Test
-    public void testArrayTypes() {
+    void testArrayTypes() {
         {
             // test bool
             BinaryArrayData array = new BinaryArrayData();
@@ -347,7 +347,7 @@ public class BinaryArrayWriterTest {
     }
 
     @Test
-    public void testMap() {
+    void testMap() {
         BinaryArrayData array1 = new BinaryArrayData();
         BinaryArrayWriter writer1 = new BinaryArrayWriter(array1, 3, 4);
         writer1.writeInt(0, 6);
@@ -377,7 +377,7 @@ public class BinaryArrayWriterTest {
         assertThat(key).isEqualTo(array1);
         assertThat(value).isEqualTo(array2);
 
-        assertThat(5).isEqualTo(key.getInt(1));
+        assertThat(key.getInt(1)).isEqualTo(5);
         assertThat(BinaryStringData.fromString("5")).isEqualTo(value.getString(1));
     }
 
@@ -404,7 +404,7 @@ public class BinaryArrayWriterTest {
     }
 
     @Test
-    public void testToArray() {
+    void testToArray() {
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 3, 2);
         writer.writeShort(0, (short) 5);
@@ -429,7 +429,7 @@ public class BinaryArrayWriterTest {
     }
 
     @Test
-    public void testDecimal() {
+    void testDecimal() {
 
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 2, 8);
@@ -443,10 +443,10 @@ public class BinaryArrayWriterTest {
             writer.setNullAt(1);
             writer.complete();
 
-            assertThat(array.getDecimal(0, precision, scale).toString()).isEqualTo("0.05");
+            assertThat(array.getDecimal(0, precision, scale)).hasToString("0.05");
             assertThat(array.isNullAt(1)).isTrue();
             array.setDecimal(0, DecimalData.fromUnscaledLong(6, precision, scale), precision);
-            assertThat(array.getDecimal(0, precision, scale).toString()).isEqualTo("0.06");
+            assertThat(array.getDecimal(0, precision, scale)).hasToString("0.06");
         }
 
         // 2.not compact
@@ -463,15 +463,15 @@ public class BinaryArrayWriterTest {
             writer.writeDecimal(1, null, precision);
             writer.complete();
 
-            assertThat(array.getDecimal(0, precision, scale).toString()).isEqualTo("5.55000");
+            assertThat(array.getDecimal(0, precision, scale)).hasToString("5.55000");
             assertThat(array.isNullAt(1)).isTrue();
             array.setDecimal(0, decimal2, precision);
-            assertThat(array.getDecimal(0, precision, scale).toString()).isEqualTo("6.55000");
+            assertThat(array.getDecimal(0, precision, scale)).hasToString("6.55000");
         }
     }
 
     @Test
-    public void testNested() {
+    void testNested() {
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 2, 8);
 
@@ -486,13 +486,13 @@ public class BinaryArrayWriterTest {
         writer.complete();
 
         RecordData nestedRow = array.getRecord(0, 2);
-        assertThat(nestedRow.getString(0).toString()).isEqualTo("1");
-        assertThat(nestedRow.getInt(1)).isEqualTo(1);
+        assertThat(nestedRow.getString(0)).hasToString("1");
+        assertThat(nestedRow.getInt(1)).isOne();
         assertThat(array.isNullAt(1)).isTrue();
     }
 
     @Test
-    public void testBinary() {
+    void testBinary() {
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 2, 8);
         byte[] bytes1 = new byte[] {1, -1, 5};
@@ -506,7 +506,7 @@ public class BinaryArrayWriterTest {
     }
 
     @Test
-    public void testTimestampData() {
+    void testTimestampData() {
         BinaryArrayData array = new BinaryArrayData();
         BinaryArrayWriter writer = new BinaryArrayWriter(array, 2, 8);
 
@@ -524,12 +524,12 @@ public class BinaryArrayWriterTest {
             writer.writeTimestamp(1, null, precision);
             writer.complete();
 
-            assertThat(array.getTimestamp(0, precision).toString())
-                    .isEqualTo("1970-01-01T00:00:00.123456789");
+            assertThat(array.getTimestamp(0, precision))
+                    .hasToString("1970-01-01T00:00:00.123456789");
             assertThat(array.isNullAt(1)).isTrue();
             array.setTimestamp(0, timestamp2, precision);
-            assertThat(array.getTimestamp(0, precision).toString())
-                    .isEqualTo("1969-01-01T00:00:00.123456789");
+            assertThat(array.getTimestamp(0, precision))
+                    .hasToString("1969-01-01T00:00:00.123456789");
         }
     }
 }

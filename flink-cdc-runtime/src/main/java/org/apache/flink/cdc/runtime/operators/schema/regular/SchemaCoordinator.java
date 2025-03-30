@@ -464,15 +464,6 @@ public class SchemaCoordinator extends SchemaRegistry {
     }
 
     /**
-     * {@code IDLE}: Initial idling state, ready for requests. <br>
-     * {@code APPLYING}: When schema change application finishes (successfully or with exceptions)
-     */
-    private enum RequestStatus {
-        IDLE,
-        APPLYING
-    }
-
-    /**
      * Before Flink CDC 3.3, we store routing rules into {@link SchemaCoordinator}'s state, which
      * turns out to be unnecessary since data stream topology might change after stateful restarts,
      * and stale routing status is both unnecessary and erroneous. This function consumes these

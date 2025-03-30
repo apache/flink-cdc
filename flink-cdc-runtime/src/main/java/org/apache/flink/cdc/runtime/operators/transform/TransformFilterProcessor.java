@@ -95,46 +95,48 @@ public class TransformFilterProcessor {
             return (Boolean)
                     expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
         } catch (InvocationTargetException e) {
-            LOG.error(
-                    "Table:{} filter:{} execute failed. {}",
-                    tableInfo.getName(),
-                    transformFilter.getExpression(),
+            throw new RuntimeException(
+                    String.format(
+                            "Failed to evaluate filtering expression `%s` for table `%s`.\n"
+                                    + "\tColumn name map: {%s}",
+                            transformFilter.getScriptExpression(),
+                            tableInfo.getName(),
+                            transformFilter.getColumnNameMapAsString()),
                     e);
-            throw new RuntimeException(e);
         }
     }
 
-    private Tuple2<List<String>, List<Class<?>>> generateArguments() {
+    private Tuple2<List<String>, List<Class<?>>> generateArguments(boolean mapColumnNames) {
         List<String> argNames = new ArrayList<>();
         List<Class<?>> argTypes = new ArrayList<>();
-        String scriptExpression = transformFilter.getScriptExpression();
+        String expression = transformFilter.getExpression();
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
+        Map<String, String> columnNameMap = transformFilter.getColumnNameMap();
         LinkedHashSet<String> columnNames = new LinkedHashSet<>(transformFilter.getColumnNames());
         for (String columnName : columnNames) {
             for (Column column : columns) {
                 if (column.getName().equals(columnName)) {
-                    argNames.add(columnName);
+                    argNames.add(mapColumnNames ? columnNameMap.get(columnName) : columnName);
                     argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
                     break;
                 }
             }
         }
 
-        METADATA_COLUMNS.stream()
-                .forEach(
-                        col -> {
-                            if (scriptExpression.contains(col.f0) && !argNames.contains(col.f0)) {
-                                argNames.add(col.f0);
-                                argTypes.add(col.f2);
-                            }
-                        });
+        METADATA_COLUMNS.forEach(
+                col -> {
+                    if (expression.contains(col.f0) && !argNames.contains(col.f0)) {
+                        argNames.add(mapColumnNames ? columnNameMap.get(col.f0) : col.f0);
+                        argTypes.add(col.f2);
+                    }
+                });
 
         supportedMetadataColumns
                 .keySet()
                 .forEach(
                         colName -> {
-                            if (scriptExpression.contains(colName) && !argNames.contains(colName)) {
-                                argNames.add(colName);
+                            if (expression.contains(colName) && !argNames.contains(colName)) {
+                                argNames.add(mapColumnNames ? columnNameMap.get(colName) : colName);
                                 argTypes.add(supportedMetadataColumns.get(colName).getJavaClass());
                             }
                         });
@@ -147,7 +149,7 @@ public class TransformFilterProcessor {
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
         // 1 - Add referenced columns
-        Tuple2<List<String>, List<Class<?>>> args = generateArguments();
+        Tuple2<List<String>, List<Class<?>>> args = generateArguments(false);
         RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         for (String columnName : args.f0) {
             switch (columnName) {
@@ -191,7 +193,7 @@ public class TransformFilterProcessor {
     }
 
     private TransformExpressionKey generateTransformExpressionKey() {
-        Tuple2<List<String>, List<Class<?>>> args = generateArguments();
+        Tuple2<List<String>, List<Class<?>>> args = generateArguments(true);
 
         args.f0.add(JaninoCompiler.DEFAULT_TIME_ZONE);
         args.f1.add(String.class);
@@ -202,6 +204,7 @@ public class TransformFilterProcessor {
                 JaninoCompiler.loadSystemFunction(transformFilter.getScriptExpression()),
                 args.f0,
                 args.f1,
-                Boolean.class);
+                Boolean.class,
+                transformFilter.getColumnNameMap());
     }
 }

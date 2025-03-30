@@ -20,9 +20,10 @@ package org.apache.flink.cdc.connectors.db2;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Db2Container;
@@ -53,10 +54,6 @@ import java.util.stream.Stream;
 
 import static java.lang.String.format;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing DB2 source, this contains a DB2 container which enables redo logs. */
 public class Db2TestBase {
@@ -90,7 +87,7 @@ public class Db2TestBase {
                                 }
                             });
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(DB2_CONTAINER)).join();
@@ -107,7 +104,7 @@ public class Db2TestBase {
         LOG.info("Db2 asn agent are started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void stopContainers() {
         LOG.info("Stopping containers...");
         if (DB2_CONTAINER != null) {
@@ -127,7 +124,9 @@ public class Db2TestBase {
         Path path = null;
         try {
             URL filePath = Db2TestBase.class.getClassLoader().getResource(resourceFilePath);
-            assertNotNull("Cannot locate " + resourceFilePath, filePath);
+            Assertions.assertThat(filePath)
+                    .withFailMessage("Cannot locate " + resourceFilePath)
+                    .isNotNull();
             path = Paths.get(filePath.toURI());
         } catch (URISyntaxException e) {
             LOG.error("Cannot get path from URI.", e);
@@ -235,7 +234,7 @@ public class Db2TestBase {
     protected void initializeDb2Table(String sqlFile, String tableName) {
         final String ddlFile = String.format("db2_server/%s.sql", sqlFile);
         final URL ddlTestFile = Db2TestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             if (checkTableExists(connection, tableName)) {
@@ -268,16 +267,7 @@ public class Db2TestBase {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     public void executeSql(String sql) {

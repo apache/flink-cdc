@@ -21,6 +21,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.cdc.connectors.db2.source.Db2SourceBuilder.Db2IncrementalSource;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -32,80 +33,81 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
 import static org.testcontainers.containers.Db2Container.DB2_PORT;
 
 /** IT tests for {@link Db2IncrementalSource}. */
-public class Db2SourceITCase extends Db2TestBase {
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
+class Db2SourceITCase extends Db2TestBase {
 
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
-
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .build()));
 
     protected static final int DEFAULT_PARALLELISM = 4;
 
     @Test
-    public void testReadSingleTableWithSingleParallelism() throws Exception {
+    void testReadSingleTableWithSingleParallelism() throws Exception {
         testDb2ParallelSource(
                 1, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     @Test
-    public void testReadSingleTableWithMultipleParallelism() throws Exception {
+    void testReadSingleTableWithMultipleParallelism() throws Exception {
         testDb2ParallelSource(
                 4, FailoverType.NONE, FailoverPhase.NEVER, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     // Failover tests
     @Test
-    public void testTaskManagerFailoverInSnapshotPhase() throws Exception {
+    void testTaskManagerFailoverInSnapshotPhase() throws Exception {
         testDb2ParallelSource(
                 FailoverType.TM, FailoverPhase.SNAPSHOT, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     @Test
-    public void testTaskManagerFailoverInRedoLogsPhase() throws Exception {
+    void testTaskManagerFailoverInRedoLogsPhase() throws Exception {
         testDb2ParallelSource(
                 FailoverType.TM, FailoverPhase.STREAM, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     @Test
-    public void testJobManagerFailoverInSnapshotPhase() throws Exception {
+    void testJobManagerFailoverInSnapshotPhase() throws Exception {
         testDb2ParallelSource(
                 FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     @Test
-    public void testJobManagerFailoverInRedoLogsPhase() throws Exception {
+    void testJobManagerFailoverInRedoLogsPhase() throws Exception {
         testDb2ParallelSource(
                 FailoverType.JM, FailoverPhase.STREAM, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     @Test
-    public void testJobManagerFailoverSingleParallelism() throws Exception {
+    void testJobManagerFailoverSingleParallelism() throws Exception {
         testDb2ParallelSource(
                 1, FailoverType.JM, FailoverPhase.SNAPSHOT, new String[] {"DB2INST1.CUSTOMERS"});
     }
 
     @Test
-    public void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
         testDb2ParallelSource(
                 DEFAULT_PARALLELISM,
                 FailoverType.TM,
@@ -213,7 +215,10 @@ public class Db2SourceITCase extends Db2TestBase {
         // trigger failover after some snapshot splits read finished
         if (failoverPhase == FailoverPhase.SNAPSHOT && iterator.hasNext()) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(100));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(100));
         }
 
         assertEqualsInAnyOrder(
@@ -225,7 +230,10 @@ public class Db2SourceITCase extends Db2TestBase {
         }
         if (failoverPhase == FailoverPhase.STREAM) {
             triggerFailover(
-                    failoverType, jobId, miniClusterResource.getMiniCluster(), () -> sleepMs(200));
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(200));
         }
         for (String tableId : captureCustomerTables) {
             makeSecondPartRedoLogsEvents(tableId);

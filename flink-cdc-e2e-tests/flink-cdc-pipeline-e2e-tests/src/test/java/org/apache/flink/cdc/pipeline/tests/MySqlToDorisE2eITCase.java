@@ -24,16 +24,13 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.lifecycle.Startables;
 
@@ -52,13 +49,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 /** End-to-end tests for mysql cdc to Doris pipeline job. */
-@RunWith(Parameterized.class)
-public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
+class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToDorisE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -70,7 +62,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     public static final Duration DEFAULT_STARTUP_TIMEOUT = Duration.ofSeconds(240);
     public static final Duration DEFAULT_RESULT_VERIFY_TIMEOUT = Duration.ofSeconds(30);
 
-    @ClassRule
+    @org.testcontainers.junit.jupiter.Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -83,7 +75,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                             .withNetwork(NETWORK)
                             .withNetworkAliases("mysql");
 
-    @ClassRule
+    @org.testcontainers.junit.jupiter.Container
     public static final DorisContainer DORIS =
             new DorisContainer(NETWORK).withNetworkAliases("doris");
 
@@ -93,7 +85,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase complexDataTypesDatabase =
             new UniqueDatabase(MYSQL, "data_types_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @BeforeClass
+    @BeforeAll
     public static void initializeContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL)).join();
@@ -122,7 +114,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         LOG.info("Containers are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         mysqlInventoryDatabase.createAndInitialize();
@@ -134,7 +126,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     private static boolean checkBackendAvailability() {
         try {
-            Container.ExecResult rs =
+            org.testcontainers.containers.Container.ExecResult rs =
                     DORIS.execInContainer(
                             "mysql",
                             "--protocol=TCP",
@@ -156,7 +148,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
         }
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         mysqlInventoryDatabase.dropDatabase();
@@ -167,7 +159,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSyncWholeDatabase() throws Exception {
+    void testSyncWholeDatabase() throws Exception {
         String databaseName = mysqlInventoryDatabase.getDatabaseName();
         String pipelineJob =
                 String.format(
@@ -337,7 +329,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testComplexDataTypes() throws Exception {
+    void testComplexDataTypes() throws Exception {
         String databaseName = complexDataTypesDatabase.getDatabaseName();
         String pipelineJob =
                 String.format(
@@ -759,9 +751,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
             stat.execute("DROP TABLE products;");
             Thread.sleep(5000L);
-            SQLException thrown =
-                    assertThrows(
-                            SQLSyntaxErrorException.class,
+            Assertions.assertThatThrownBy(
                             () -> {
                                 try (Connection connection =
                                                 DriverManager.getConnection(
@@ -771,10 +761,9 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                         Statement statement = connection.createStatement()) {
                                     statement.executeQuery("SELECT * FROM products;");
                                 }
-                            });
-            assertTrue(
-                    thrown.getMessage()
-                            .contains("errCode = 2, detailMessage = Unknown table 'products'"));
+                            })
+                    .isExactlyInstanceOf(SQLSyntaxErrorException.class)
+                    .hasMessageContaining("errCode = 2, detailMessage = Unknown table 'products'");
         } catch (SQLException e) {
             throw new RuntimeException("Failed to trigger schema change.", e);
         }
@@ -782,7 +771,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     public static void createDorisDatabase(String databaseName) {
         try {
-            Container.ExecResult rs =
+            org.testcontainers.containers.Container.ExecResult rs =
                     DORIS.execInContainer(
                             "mysql",
                             "--protocol=TCP",
@@ -801,7 +790,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
 
     public static void dropDorisDatabase(String databaseName) {
         try {
-            Container.ExecResult rs =
+            org.testcontainers.containers.Container.ExecResult rs =
                     DORIS.execInContainer(
                             "mysql",
                             "--protocol=TCP",
@@ -876,7 +865,7 @@ public class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             }
             Thread.sleep(1000L);
         }
-        fail(String.format("Failed to verify content of %s::%s.", databaseName, sql));
+        Assertions.fail("Failed to verify content of {}::{}.", databaseName, sql);
     }
 
     private List<String> fetchTableContent(String databaseName, String sql, int columnCount)

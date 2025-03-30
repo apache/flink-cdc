@@ -24,15 +24,13 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -44,8 +42,7 @@ import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 
 /** End-to-end tests for mysql cdc pipeline job. */
-@RunWith(Parameterized.class)
-public class MysqlE2eITCase extends PipelineTestEnvironment {
+class MysqlE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -57,7 +54,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -74,20 +71,20 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         mysqlInventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         mysqlInventoryDatabase.dropDatabase();
     }
 
     @Test
-    public void testSyncWholeDatabase() throws Exception {
+    void testSyncWholeDatabase() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -195,7 +192,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSchemaChangeEvents() throws Exception {
+    void testSchemaChangeEvents() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -344,7 +341,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSoftDelete() throws Exception {
+    void testSoftDelete() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -490,7 +487,7 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testDanglingDropTableEventInBinlog() throws Exception {
+    void testDanglingDropTableEventInBinlog() throws Exception {
         // Create a new table for later deletion
         try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -554,9 +551,18 @@ public class MysqlE2eITCase extends PipelineTestEnvironment {
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
         submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
+        try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+        }
         validateResult(
-                "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
-                "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}");
+                String.format(
+                        "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
+                        mysqlInventoryDatabase.getDatabaseName()),
+                String.format(
+                        "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
+                        mysqlInventoryDatabase.getDatabaseName()));
     }
 
     private void validateResult(String... expectedEvents) throws Exception {

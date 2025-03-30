@@ -45,11 +45,12 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
@@ -71,7 +72,6 @@ import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtil
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
-import static org.junit.Assert.assertEquals;
 
 /**
  * IT case for Evolving MySQL schema with gh-ost/pt-osc utility. See <a
@@ -79,7 +79,7 @@ import static org.junit.Assert.assertEquals;
  * href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">doc/pt-osc</a> for
  * more details.
  */
-public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
+class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
@@ -99,24 +99,24 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                     ? "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
                     : "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
 
-    @BeforeClass
-    public static void beforeClass() {
+    @BeforeAll
+    static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         Startables.deepStart(Stream.of(PERCONA_TOOLKIT_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
-    public static void afterClass() {
+    @AfterAll
+    static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         PERCONA_TOOLKIT_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void before() {
         customerDatabase.createAndInitialize();
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
@@ -124,8 +124,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
         env.setRestartStrategy(RestartStrategies.noRestart());
     }
 
-    @After
-    public void after() {
+    @AfterEach
+    void after() {
         customerDatabase.dropDatabase();
     }
 
@@ -157,7 +157,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testGhOstSchemaMigrationFromScratch() throws Exception {
+    void testGhOstSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Install gh-ost command line utility");
         installGhOstCli(MYSQL8_CONTAINER);
 
@@ -241,8 +241,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .build();
 
-        assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(fetchResults(events, 2))
+                .containsExactly(
                         new AddColumnEvent(
                                 tableId,
                                 Collections.singletonList(
@@ -250,8 +250,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                                 new PhysicalColumn("ext", DataTypes.INT(), null)))),
                         DataChangeEvent.insertEvent(
                                 tableId,
-                                generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17))),
-                fetchResults(events, 2));
+                                generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17)));
 
         LOG.info("Step 4: Evolve schema with gh-ost - MODIFY COLUMN");
         execInContainer(
@@ -285,8 +284,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .build();
 
-        assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(fetchResults(events, 2))
+                .containsExactly(
                         new AlterColumnTypeEvent(
                                 tableId, Collections.singletonMap("ext", DataTypes.DOUBLE())),
                         DataChangeEvent.insertEvent(
@@ -297,8 +296,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                         "Bob",
                                         "Chongqing",
                                         "123567891234",
-                                        2.718281828))),
-                fetchResults(events, 2));
+                                        2.718281828)));
 
         LOG.info("Step 5: Evolve schema with gh-ost - DROP COLUMN");
         execInContainer(
@@ -331,17 +329,16 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .build();
 
-        assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(fetchResults(events, 2))
+                .containsExactly(
                         new DropColumnEvent(tableId, Collections.singletonList("ext")),
                         DataChangeEvent.insertEvent(
                                 tableId,
-                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234"))),
-                fetchResults(events, 2));
+                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234")));
     }
 
     @Test
-    public void testPtOscSchemaMigrationFromScratch() throws Exception {
+    void testPtOscSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Start pipeline job");
 
         env.setParallelism(1);
@@ -425,8 +422,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .build();
 
-        assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(fetchResults(events, 2))
+                .containsExactly(
                         new AddColumnEvent(
                                 tableId,
                                 Collections.singletonList(
@@ -434,8 +431,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                                 new PhysicalColumn("ext", DataTypes.INT(), null)))),
                         DataChangeEvent.insertEvent(
                                 tableId,
-                                generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17))),
-                fetchResults(events, 2));
+                                generate(schemaV2, 10000, "Alice", "Beijing", "123567891234", 17)));
 
         LOG.info("Step 3: Evolve schema with pt-osc - MODIFY COLUMN");
         execInContainer(
@@ -471,8 +467,8 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .build();
 
-        assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(fetchResults(events, 2))
+                .containsExactly(
                         new AlterColumnTypeEvent(
                                 tableId, Collections.singletonMap("ext", DataTypes.DOUBLE())),
                         DataChangeEvent.insertEvent(
@@ -483,8 +479,7 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                                         "Bob",
                                         "Chongqing",
                                         "123567891234",
-                                        2.718281828))),
-                fetchResults(events, 2));
+                                        2.718281828)));
 
         LOG.info("Step 4: Evolve schema with pt-osc - DROP COLUMN");
         execInContainer(
@@ -519,13 +514,12 @@ public class MySqlOnLineSchemaMigrationITCase extends MySqlSourceTestBase {
                         .primaryKey(Collections.singletonList("id"))
                         .build();
 
-        assertEquals(
-                Arrays.asList(
+        Assertions.assertThat(fetchResults(events, 2))
+                .containsExactly(
                         new DropColumnEvent(tableId, Collections.singletonList("ext")),
                         DataChangeEvent.insertEvent(
                                 tableId,
-                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234"))),
-                fetchResults(events, 2));
+                                generate(schemaV4, 10002, "Cicada", "Urumqi", "123567891234")));
     }
 
     private static void execInContainer(Container<?> container, String prompt, String... commands)

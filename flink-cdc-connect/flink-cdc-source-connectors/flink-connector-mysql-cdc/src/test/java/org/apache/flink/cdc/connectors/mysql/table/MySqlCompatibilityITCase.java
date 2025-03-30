@@ -28,9 +28,8 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -51,18 +50,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInAnyOrder;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase.assertEqualsInOrder;
 
 /** Integration tests to check mysql-cdc works well with different MySQL server version. */
-public class MySqlCompatibilityITCase {
+class MySqlCompatibilityITCase {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlCompatibilityITCase.class);
 
-    private static TemporaryFolder tempFolder;
+    private Path tempFolder;
     private static File resourceFolder;
 
     private final StreamExecutionEnvironment env =
@@ -71,7 +69,7 @@ public class MySqlCompatibilityITCase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @Before
+    @BeforeEach
     public void setup() throws Exception {
         resourceFolder =
                 Paths.get(
@@ -81,39 +79,38 @@ public class MySqlCompatibilityITCase {
                                                         .getResource("."))
                                         .toURI())
                         .toFile();
-        tempFolder = new TemporaryFolder(resourceFolder);
-        tempFolder.create();
         env.setParallelism(4);
         env.enableCheckpointing(200);
+        tempFolder = Files.createTempDirectory(resourceFolder.toPath(), "mysql-config");
     }
 
     @Test
-    public void testMySqlV56() throws Exception {
+    void testMySqlV56() throws Exception {
         testDifferentMySqlVersion(MySqlVersion.V5_6, false);
     }
 
     @Test
-    public void testMySqlV56WithGtidModeOn() throws Exception {
+    void testMySqlV56WithGtidModeOn() throws Exception {
         testDifferentMySqlVersion(MySqlVersion.V5_6, true);
     }
 
     @Test
-    public void testMySqlV57() throws Exception {
+    void testMySqlV57() throws Exception {
         testDifferentMySqlVersion(MySqlVersion.V5_7, false);
     }
 
     @Test
-    public void testMySqlV57WithGtidModeOn() throws Exception {
+    void testMySqlV57WithGtidModeOn() throws Exception {
         testDifferentMySqlVersion(MySqlVersion.V5_7, true);
     }
 
     @Test
-    public void testMySqlV8() throws Exception {
+    void testMySqlV8() throws Exception {
         testDifferentMySqlVersion(MySqlVersion.V8_0, false);
     }
 
     @Test
-    public void testMySqlV8WithGtidModeOn() throws Exception {
+    void testMySqlV8WithGtidModeOn() throws Exception {
         testDifferentMySqlVersion(MySqlVersion.V8_0, true);
     }
 
@@ -241,8 +238,7 @@ public class MySqlCompatibilityITCase {
 
     private String buildCustomMySqlConfig(MySqlVersion version, boolean enableGtid) {
         try {
-            File folder = tempFolder.newFolder(String.valueOf(UUID.randomUUID()));
-            Path cnf = Files.createFile(Paths.get(folder.getPath(), "my.cnf"));
+            Path cnf = Files.createFile(Paths.get(tempFolder.toString(), "my.cnf"));
             StringBuilder mysqlConfBuilder = new StringBuilder();
             mysqlConfBuilder.append(
                     "[mysqld]\n"

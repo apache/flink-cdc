@@ -30,7 +30,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link KafkaDataSinkFactory}. */
-public class KafkaDataSinkFactoryTest {
+class KafkaDataSinkFactoryTest {
 
     @Test
     void testCreateDataSink() {
@@ -92,5 +92,46 @@ public class KafkaDataSinkFactoryTest {
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
         Assertions.assertThat(dataSink).isInstanceOf(KafkaDataSink.class);
+    }
+
+    @Test
+    void testCreateDataSinkWithFormatOptions() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("kafka", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(KafkaDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("properties.bootstrap.servers", "test")
+                                .put("key.format", "csv")
+                                .put("value.format", "debezium-json")
+                                .put("csv.write-null-properties", "false")
+                                .put("debezium-json.map-null-key.literal", "NULL")
+                                .build());
+        DataSink dataSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+        Assertions.assertThat(dataSink).isInstanceOf(KafkaDataSink.class);
+
+        Configuration illegalConf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put("properties.bootstrap.servers", "test")
+                                .put("csv.write-null-properties", "false")
+                                .build());
+        Assertions.assertThatThrownBy(
+                        () ->
+                                sinkFactory.createDataSink(
+                                        new FactoryHelper.DefaultContext(
+                                                illegalConf,
+                                                illegalConf,
+                                                Thread.currentThread().getContextClassLoader())))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "Unsupported options found for 'kafka'.\n\n"
+                                + "Unsupported options:\n\n"
+                                + "csv.write-null-properties");
     }
 }

@@ -36,17 +36,15 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.shaded.org.apache.commons.lang3.StringUtils;
 
@@ -76,8 +74,7 @@ import static org.apache.flink.util.DockerImageVersions.KAFKA;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc to Kafka pipeline job. */
-@RunWith(Parameterized.class)
-public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
+class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlToKafkaE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -97,8 +94,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private String topic;
     private KafkaConsumer<byte[], byte[]> consumer;
 
-    @ClassRule
-    public static final MySqlContainer MYSQL =
+    @Container
+    static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
                                     MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
@@ -111,8 +108,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                             .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @ClassRule
-    public static final KafkaContainer KAFKA_CONTAINER =
+    @Container
+    static final KafkaContainer KAFKA_CONTAINER =
             KafkaUtil.createKafkaContainer(KAFKA, LOG)
                     .withNetworkAliases("kafka")
                     .withEmbeddedZookeeper()
@@ -122,8 +119,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @BeforeClass
-    public static void initializeContainers() {
+    @BeforeAll
+    static void initializeContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL)).join();
         Startables.deepStart(Stream.of(KAFKA_CONTAINER)).join();
@@ -135,7 +132,7 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         LOG.info("Containers are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         createTestTopic(1, TOPIC_REPLICATION_FACTOR);
@@ -145,7 +142,7 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         mysqlInventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         admin.deleteTopics(Collections.singletonList(topic));
@@ -154,7 +151,7 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSyncWholeDatabaseWithDebeziumJson() throws Exception {
+    void testSyncWholeDatabaseWithDebeziumJson() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"

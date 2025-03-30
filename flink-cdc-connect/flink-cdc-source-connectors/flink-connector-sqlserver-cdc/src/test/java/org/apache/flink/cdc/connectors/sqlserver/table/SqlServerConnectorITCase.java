@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.sqlserver.table;
 
 import org.apache.flink.cdc.connectors.sqlserver.SqlServerTestBase;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -25,29 +26,23 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.api.common.JobStatus.RUNNING;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.testcontainers.containers.MSSQLServerContainer.MS_SQL_SERVER_PORT;
 
 /** Integration tests for SqlServer Table source. */
-@RunWith(Parameterized.class)
-public class SqlServerConnectorITCase extends SqlServerTestBase {
+class SqlServerConnectorITCase extends SqlServerTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -55,22 +50,11 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
-    // enable the parallelismSnapshot (i.e: The new source JdbcIncrementalSource)
-    private final boolean parallelismSnapshot;
-
-    public SqlServerConnectorITCase(boolean parallelismSnapshot) {
-        this.parallelismSnapshot = parallelismSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[] {false, true};
-    }
-
-    @Before
-    public void before() {
+    void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
 
         if (parallelismSnapshot) {
@@ -81,9 +65,11 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
         }
     }
 
-    @Test
-    public void testConsumingAllEvents()
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEvents(boolean parallelismSnapshot)
             throws SQLException, ExecutionException, InterruptedException {
+        setup(parallelismSnapshot);
         initializeSqlServerTable("inventory");
         initializeSqlServerTable("product");
         String sourceDDL =
@@ -200,13 +186,15 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testStartupFromLatestOffset() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testStartupFromLatestOffset(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializeSqlServerTable("inventory");
 
         Connection connection = getJdbcConnection();
@@ -276,13 +264,15 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testAllTypes() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testAllTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         initializeSqlServerTable("column_type_test");
 
         String sourceDDL =
@@ -386,13 +376,15 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         "+I(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,4444,55555,2018-07-13,10:23:45.680,10:23:45.678,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)",
                         "+U(0,cc ,vcc,tc,cč ,vcč,tč,1.123,2,3.323,4.323,5,6,true,22,333,8888,55555,2018-07-13,10:23:45.680,10:23:45.679,2018-07-13T11:23:45.340,2018-07-13T01:23:45.456Z,2018-07-13T13:23:45.780,2018-07-13T14:24,<a>b</a>)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testMetadataColumns() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testMetadataColumns(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         initializeSqlServerTable("inventory");
         String sourceDDL =
                 String.format(
@@ -484,29 +476,27 @@ public class SqlServerConnectorITCase extends SqlServerTestBase {
                         "+U(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)",
                         "-D(inventory,dbo,products,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Collections.sort(actual);
-        Collections.sort(expected);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testCompositePkTableSplitsUnevenlyWithChunkKeyColumn()
+    @ParameterizedTest
+    @ValueSource(booleans = {true})
+    void testCompositePkTableSplitsUnevenlyWithChunkKeyColumn(boolean parallelismSnapshot)
             throws InterruptedException, ExecutionException {
-        if (parallelismSnapshot) {
-            testUseChunkColumn("product_kind");
-        }
+        setup(parallelismSnapshot);
+        testUseChunkColumn("product_kind", parallelismSnapshot);
     }
 
-    @Test
-    public void testCompositePkTableSplitsEvenlyWithChunkKeyColumn()
+    @ParameterizedTest
+    @ValueSource(booleans = {true})
+    void testCompositePkTableSplitsEvenlyWithChunkKeyColumn(boolean parallelismSnapshot)
             throws ExecutionException, InterruptedException {
-        if (parallelismSnapshot) {
-            testUseChunkColumn("product_no");
-        }
+        setup(parallelismSnapshot);
+        testUseChunkColumn("product_no", parallelismSnapshot);
     }
 
-    private void testUseChunkColumn(String chunkColumn)
+    private void testUseChunkColumn(String chunkColumn, boolean parallelismSnapshot)
             throws InterruptedException, ExecutionException {
         initializeSqlServerTable("customer");
         String sourceDDL =

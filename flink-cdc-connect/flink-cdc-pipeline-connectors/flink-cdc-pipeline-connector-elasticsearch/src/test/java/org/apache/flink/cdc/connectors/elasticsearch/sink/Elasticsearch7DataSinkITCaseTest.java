@@ -60,7 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** ITCase tests for {@link ElasticsearchDataSink}. */
 @Testcontainers
-public class Elasticsearch7DataSinkITCaseTest {
+class Elasticsearch7DataSinkITCaseTest {
 
     private static final Logger LOG =
             LoggerFactory.getLogger(ElasticsearchDataSinkITCaseTest.class);
@@ -90,7 +90,7 @@ public class Elasticsearch7DataSinkITCaseTest {
     }
 
     @Test
-    public void testElasticsearchSink() throws Exception {
+    void testElasticsearchSink() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
         List<Event> events = ElasticsearchTestUtils.createTestEvents(tableId);
 
@@ -125,7 +125,7 @@ public class Elasticsearch7DataSinkITCaseTest {
     }
 
     @Test
-    public void testElasticsearchInsertAndDelete() throws Exception {
+    void testElasticsearchInsertAndDelete() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
         List<Event> events = ElasticsearchTestUtils.createTestEventsWithDelete(tableId);
 
@@ -135,7 +135,7 @@ public class Elasticsearch7DataSinkITCaseTest {
     }
 
     @Test
-    public void testElasticsearchAddColumn() throws Exception {
+    void testElasticsearchAddColumn() throws Exception {
         TableId tableId = TableId.tableId("default", "schema", "table");
         List<Event> events = ElasticsearchTestUtils.createTestEventsWithAddColumn(tableId);
 
@@ -221,8 +221,9 @@ public class Elasticsearch7DataSinkITCaseTest {
         assertThat(((Number) response.getSource().get("id")).intValue()).isEqualTo(expectedId);
         assertThat(((Number) response.getSource().get("number")).doubleValue())
                 .isEqualTo(expectedNumber);
-        assertThat(response.getSource().get("name")).isEqualTo(expectedName);
-        assertThat(response.getSource().get("bool")).isEqualTo(expectedBool);
+        assertThat(response.getSource())
+                .containsEntry("name", expectedName)
+                .containsEntry("bool", expectedBool);
         assertThat(((Number) response.getSource().get("tinyint")).byteValue())
                 .isEqualTo(expectedTinyint);
         assertThat(((Number) response.getSource().get("smallint")).shortValue())
@@ -259,10 +260,11 @@ public class Elasticsearch7DataSinkITCaseTest {
         GetRequest getRequest = new GetRequest(tableId.toString()).id(id);
         GetResponse response = client.get(getRequest, RequestOptions.DEFAULT);
 
-        assertThat(response.getSource()).isNotNull();
-        assertThat(response.getSource().get("id")).isEqualTo(expectedId);
-        assertThat(response.getSource().get("number")).isEqualTo(expectedNumber);
-        assertThat(response.getSource().get("name")).isEqualTo(expectedName);
-        assertThat(response.getSource().get("extra_bool")).isEqualTo(expectedExtraBool);
+        assertThat(response.getSource())
+                .isNotNull()
+                .containsEntry("id", expectedId)
+                .containsEntry("number", expectedNumber)
+                .containsEntry("name", expectedName)
+                .containsEntry("extra_bool", expectedExtraBool);
     }
 }

@@ -22,21 +22,19 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
 
 import io.debezium.relational.TableId;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Map;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertThrows;
-
 /** Tests for {@link PendingSplitsStateSerializer}. */
-public class PendingSplitsStateSerializerTest {
+class PendingSplitsStateSerializerTest {
 
     private final TableId tableId = TableId.parse("catalog.schema.table1");
 
     @Test
-    public void testOutputIsFinallyCleared() throws Exception {
+    void testOutputIsFinallyCleared() throws Exception {
         PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
         StreamPendingSplitsState state = new StreamPendingSplitsState(true);
@@ -46,10 +44,11 @@ public class PendingSplitsStateSerializerTest {
 
         PendingSplitsState unsupportedState = new UnsupportedPendingSplitsState();
 
-        assertThrows(IOException.class, () -> serializer.serialize(unsupportedState));
+        Assertions.assertThatThrownBy(() -> serializer.serialize(unsupportedState))
+                .isExactlyInstanceOf(IOException.class);
 
         final byte[] ser2 = serializer.serialize(state);
-        assertArrayEquals(ser1, ser2);
+        Assertions.assertThat(ser1).isEqualTo(ser2);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {
