@@ -29,6 +29,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -91,8 +93,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         transformTestDatabase.dropDatabase();
     }
 
-    @Test
-    void testHeteroSchemaTransform() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testHeteroSchemaTransform(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -101,6 +105,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -116,15 +121,18 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, VERSION\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -146,6 +154,11 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2011, 11], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2012, 12], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}");
+
+        // Skip incremental stage if we're in batch mode
+        if (batchMode) {
+            return;
+        }
 
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -173,8 +186,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.terminus, before=[2011, 11], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testHeteroSchemaTransformInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMultipleTransformRule(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -183,65 +198,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "route:\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    sink-table: %s.terminus\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION\n"
-                                + "    filter: ID > 1008\n"
-                                + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: ID, VERSION\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[1010, 10], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[1011, 11], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2011, 11], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2012, 12], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, 14], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testMultipleTransformRule() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -258,13 +215,16 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: ID <= 1008\n"
                                 + "\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -294,6 +254,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Type-A], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Type-A], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Type-A], op=INSERT, meta=()}");
+
+        if (batchMode) {
+            return;
+        }
 
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -321,8 +285,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Type-A], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testMultipleTransformRuleInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testAssortedSchemaTransform(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -331,72 +297,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "route:\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, VERSION, 'Type-A' AS CATEGORY\n"
-                                + "    filter: ID > 1008\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, VERSION, 'Type-B' AS CATEGORY\n"
-                                + "    filter: ID <= 1008\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CATEGORY` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, Type-B], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, Type-A], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, Type-A], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, Type-A], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Type-A], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Type-A], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Type-A], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Type-A], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testAssortedSchemaTransform() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -412,15 +313,18 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -442,6 +346,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2012, v12, fred], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2013, v13, gus], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, v14, henry], op=INSERT, meta=()}");
+
+        if (batchMode) {
+            return;
+        }
 
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -469,8 +377,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.terminus, before=[2011, v11, eva], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testAssortedSchemaTransformInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testWildcardSchemaTransform(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -479,65 +389,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "route:\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    sink-table: %s.terminus\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEALPHA) AS NAME\n"
-                                + "    filter: AGEALPHA < 19\n"
-                                + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.terminus, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`NAME` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[1008, v8, alice], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[1009, v8.1, bob], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2011, v11, eva], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2012, v12, fred], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2013, v13, gus], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.terminus, before=[], after=[2014, v14, henry], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testWildcardSchemaTransform() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -550,13 +402,16 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -584,6 +439,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, v12, Monterey, 22, Fred, fred], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, v13, Ventura, 23, Gus, gus], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, v14, Sonoma, 24, Henry, henry], op=INSERT, meta=()}");
+
+        if (batchMode) {
+            return;
+        }
 
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
@@ -611,8 +470,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, v11, Big Sur, 21, Eva, eva], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testWildcardSchemaTransformInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testWildcardWithMetadataColumnTransform(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -621,66 +482,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEALPHA) AS NAME\n"
-                                + "    filter: AGEALPHA < 19\n"
-                                + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` STRING,`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`NAME` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, v8, 199, 17, Alice, alice], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, v8.1, 0, 18, Bob, bob], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, v11, Big Sur, 21, Eva, eva], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, v12, Monterey, 22, Fred, fred], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, v13, Ventura, 23, Gus, gus], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, v14, Sonoma, 24, Henry, henry], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testWildcardWithMetadataColumnTransform() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -693,13 +495,16 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -729,6 +534,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}");
+
+        if (batchMode) {
+            return;
+        }
 
         // generate binlogs
         String mysqlJdbcUrl =
@@ -745,68 +554,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent\\{tableId=%s.TABLEBETA, before=\\[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, -D, \\d+\\], after=\\[\\], op=DELETE, meta=\\(\\{op_ts=\\d+\\}\\)\\}");
     }
 
-    @Test
-    void testWildcardWithMetadataColumnTransformInBatchMode() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  metadata.list: op_ts\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
-                                + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}");
-    }
-
     private static void insertBinlogEvents(String mysqlJdbcUrl) throws SQLException {
         try (Connection conn =
                         DriverManager.getConnection(
@@ -821,8 +568,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
         }
     }
 
-    @Test
-    void testMultipleHittingTable() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMultipleHittingTable(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -831,6 +580,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -840,12 +590,15 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLE\\.*\n"
                                 + "    projection: \\*, ID + 1000 as UID, VERSION AS NEWVERSION\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -876,7 +629,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, 3013, 13], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, 3014, 14], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
+        if (batchMode) {
+            return;
+        }
+
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -902,8 +658,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 21, Eva, 3011, 11], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testMultipleHittingTableInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMultipleTransformWithDiffRefColumn(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -912,64 +670,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLE\\.*\n"
-                                + "    projection: \\*, ID + 1000 as UID, VERSION AS NEWVERSION\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, 2008, 8], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, 2009, 8.1], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, 2010, 10], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, 2011, 11], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, 3011, 11], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, 3012, 12], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, 3013, 13], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, 3014, 14], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testMultipleTransformWithDiffRefColumn() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.TABLEALPHA\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -983,13 +684,16 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, NAMEALPHA AS ROLENAME\n"
                                 + "    filter: AGEALPHA >= 18\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -1010,7 +714,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
+        if (batchMode) {
+            return;
+        }
+
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -1036,8 +743,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1011, 11, 59, 20, Dave], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testMultipleTransformWithDiffRefColumnInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testTransformWithCast(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -1046,59 +755,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.TABLEALPHA\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, 'Juvenile' AS ROLENAME\n"
-                                + "    filter: AGEALPHA < 18\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, NAMEALPHA AS ROLENAME\n"
-                                + "    filter: AGEALPHA >= 18\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`ROLENAME` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Juvenile], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testTransformWithCast() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -1111,20 +768,26 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, CAST(VERSION AS DOUBLE) + 100 AS VERSION, CAST(AGEBETA AS VARCHAR) || ' - ' || NAMEBETA AS IDENTIFIER\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
         submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+
+        if (batchMode) {
+            return;
+        }
 
         waitUntilSpecificEvent(
                 String.format(
@@ -1171,8 +834,10 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 111.0, 21 - Eva], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testTransformWithCastInBatchMode() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testTemporalFunctions(boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -1181,65 +846,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: ID, CAST(VERSION AS DOUBLE) + 100 AS VERSION, CAST(AGEALPHA AS VARCHAR) || ' - ' || NAMEALPHA AS IDENTIFIER\n"
-                                + "    filter: AGEALPHA < 19\n"
-                                + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: ID, CAST(VERSION AS DOUBLE) + 100 AS VERSION, CAST(AGEBETA AS VARCHAR) || ' - ' || NAMEBETA AS IDENTIFIER\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` DOUBLE,`IDENTIFIER` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` DOUBLE,`IDENTIFIER` STRING}, primaryKeys=ID, options=()}",
-                        transformTestDatabase.getDatabaseName()),
-                60000L);
-
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 108.0, 17 - Alice], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 108.1, 18 - Bob], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 111.0, 21 - Eva], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 112.0, 22 - Fred], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 113.0, 23 - Gus], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 114.0, 24 - Henry], op=INSERT, meta=()}");
-    }
-
-    @Test
-    void testTemporalFunctions() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -1251,54 +858,16 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: ID, LOCALTIME as lcl_t, CURRENT_TIME as cur_t, CAST(CURRENT_TIMESTAMP AS TIMESTAMP) as cur_ts, CAST(NOW() AS TIMESTAMP) as now_ts, LOCALTIMESTAMP as lcl_ts, CURRENT_DATE as cur_dt\n"
                                 + "\n"
                                 + "pipeline:\n"
+                                + "  batch-mode.enabled: %s\n"
                                 + "  parallelism: %d\n"
                                 + "  local-time-zone: America/Los_Angeles",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitForTemporaryRecords(8, 60000L);
-    }
-
-    @Test
-    void testTemporalFunctionsInBatchMode() throws Exception {
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "transform:\n"
-                                + "  - source-table: %s.\\.*\n"
-                                + "    projection: ID, LOCALTIME as lcl_t, CURRENT_TIME as cur_t, CAST(CURRENT_TIMESTAMP AS TIMESTAMP) as cur_ts, CAST(NOW() AS TIMESTAMP) as now_ts, LOCALTIMESTAMP as lcl_ts, CURRENT_DATE as cur_dt\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  local-time-zone: America/Los_Angeles\n"
-                                + "  batch-mode.enabled: true",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        transformTestDatabase.getDatabaseName(),
-                        transformTestDatabase.getDatabaseName(),
+                        batchMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -1646,12 +1215,6 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                             transformTestDatabase.getDatabaseName(),
                             transformTestDatabase.getDatabaseName()),
                     20000L);
-        }
-    }
-
-    private void validateResult(List<String> expectedEvents) throws Exception {
-        for (String event : expectedEvents) {
-            waitUntilSpecificEvent(event, 6000L);
         }
     }
 
