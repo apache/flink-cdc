@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -79,6 +80,13 @@ public class FlinkPipelineComposer implements PipelineComposer {
         return new FlinkPipelineComposer(env, false);
     }
 
+    public static FlinkPipelineComposer ofMiniCluster(
+            org.apache.flink.configuration.Configuration flinkConfig) {
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(flinkConfig), true);
+    }
+
+    @VisibleForTesting
     public static FlinkPipelineComposer ofMiniCluster() {
         return new FlinkPipelineComposer(
                 StreamExecutionEnvironment.getExecutionEnvironment(), true);
