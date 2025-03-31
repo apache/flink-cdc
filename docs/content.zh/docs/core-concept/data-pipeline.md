@@ -60,6 +60,8 @@ under the License.
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 ## 包含可选部分
@@ -106,14 +108,17 @@ under the License.
          classpath: com.example.functions.AddOneFunctionClass
        - name: format
          classpath: com.example.functions.FormatFunctionClass
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 # Pipeline 配置
 下面 是 Data Pipeline 的一些可选配置：
 
-| 参数                      | 含义                                                  | optional/required |
-|-------------------------|-----------------------------------------------------|-------------------|
-| name                    | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。               | optional          |
-| parallelism             | pipeline的全局并发度，默认值是1。                               | optional          |
-| local-time-zone         | 作业级别的本地时区。                                          | optional          |
-| execution.runtime-mode  | pipeline 的运行模式，包含 STREAMING 和 BATCH，默认值是 STREAMING。 | optional          |
+| 参数                     | 含义                                                  | optional/required |
+|------------------------|-----------------------------------------------------|-------------------|
+| name                   | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。               | optional          |
+| parallelism            | pipeline的全局并发度，默认值是1。                               | optional          |
+| local-time-zone        | 作业级别的本地时区。                                          | optional          |
+| execution.runtime-mode | pipeline 的运行模式，包含 STREAMING 和 BATCH，默认值是 STREAMING。 | optional          |
+| flink-conf             | 用于配置[Flink相关参数](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/config/)。 <br/>Flink参数优先级：config.yaml < job command-line < pipeline.yaml | optional          |
