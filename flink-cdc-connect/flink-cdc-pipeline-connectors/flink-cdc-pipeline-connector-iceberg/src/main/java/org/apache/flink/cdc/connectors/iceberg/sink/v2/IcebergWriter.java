@@ -122,7 +122,8 @@ public class IcebergWriter implements CommittingSinkWriter<Event, WriteResultWra
             TaskWriter<RowData> writer =
                     writerMap.computeIfAbsent(
                             tableId, tableId1 -> writerFactoryMap.get(tableId1).create());
-            writer.write(schemaMap.get(tableId).convertEventToRowData(dataChangeEvent));
+            RowData rowData = schemaMap.get(tableId).convertEventToRowData(dataChangeEvent);
+            writer.write(rowData);
         } else {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             TableId tableId = schemaChangeEvent.tableId();

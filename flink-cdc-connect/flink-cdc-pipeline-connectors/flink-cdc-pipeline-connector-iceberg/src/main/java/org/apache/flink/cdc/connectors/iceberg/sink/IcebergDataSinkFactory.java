@@ -105,8 +105,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
 
     @Override
     public Set<ConfigOption<?>> requiredOptions() {
-        Set<ConfigOption<?>> options = new HashSet<>();
-        return options;
+        return new HashSet<>();
     }
 
     @Override

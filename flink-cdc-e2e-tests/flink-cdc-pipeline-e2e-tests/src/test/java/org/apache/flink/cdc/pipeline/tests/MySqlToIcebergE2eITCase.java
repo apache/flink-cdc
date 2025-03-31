@@ -33,11 +33,10 @@ import org.apache.iceberg.data.Record;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
@@ -46,6 +45,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.lifecycle.Startables;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -75,7 +75,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_TEST_USER = "mysqluser";
     protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
 
-    @ClassRule
+    @org.testcontainers.junit.jupiter.Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -94,17 +94,17 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
 
     private String warehouse;
 
-    @BeforeClass
+    @BeforeAll
     public static void initializeContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL)).join();
         LOG.info("Containers are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         LOG.info("Starting containers...");
-        warehouse = temporaryFolder.newFolder(UUID.randomUUID().toString()).getPath();
+        warehouse = new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
         jobManagerConsumer = new ToStringConsumer();
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
@@ -139,7 +139,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         inventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         inventoryDatabase.dropDatabase();
@@ -167,8 +167,8 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
-                                + "  parallelism: 1",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse);
+                                + "  parallelism: %s",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path icebergCdcConnector = TestUtils.getResource("iceberg-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
