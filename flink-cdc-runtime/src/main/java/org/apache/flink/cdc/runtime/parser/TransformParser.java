@@ -285,17 +285,15 @@ public class TransformParser {
 
         expandWildcard(sqlSelect, columns);
         RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
-        Map<String, RelDataType> relDataTypeMap =
-                relNode.getRowType().getFieldList().stream()
-                        .collect(
-                                Collectors.toMap(
-                                        RelDataTypeField::getName, RelDataTypeField::getType));
+        List<RelDataTypeField> relDataTypeList = relNode.getRowType().getFieldList();
         Map<String, Column> originalColumnMap =
                 columns.stream().collect(Collectors.toMap(Column::getName, column -> column));
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         Map<String, Integer> addedProjectionColumnNames = new HashMap<>();
 
-        for (SqlNode sqlNode : sqlSelect.getSelectList()) {
+        for (int i = 0; i < sqlSelect.getSelectList().size(); i++) {
+            SqlNode sqlNode = sqlSelect.getSelectList().get(i);
+            RelDataType dataType = relDataTypeList.get(i).getType();
             ProjectionColumn projectionColumn;
 
             // A projection column could be <EXPR> AS <IDENTIFIER>...
@@ -330,7 +328,7 @@ public class TransformParser {
                             identifierExprNode.names.get(identifierExprNode.names.size() - 1);
                     projectionColumn =
                             resolveProjectionColumnFromIdentifier(
-                                    relDataTypeMap,
+                                    dataType,
                                     originalColumnMap,
                                     originalName,
                                     columnName,
@@ -341,8 +339,7 @@ public class TransformParser {
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
-                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataTypeMap.get(columnName)),
+                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(dataType),
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
                                             exprNode, udfDescriptors, columnNameMap),
@@ -356,7 +353,7 @@ public class TransformParser {
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                 projectionColumn =
                         resolveProjectionColumnFromIdentifier(
-                                relDataTypeMap,
+                                dataType,
                                 originalColumnMap,
                                 columnName,
                                 columnName,
@@ -384,7 +381,7 @@ public class TransformParser {
      * column or a metadata column).
      */
     public static ProjectionColumn resolveProjectionColumnFromIdentifier(
-            Map<String, RelDataType> relDataTypeMap,
+            RelDataType relDataType,
             Map<String, Column> originalColumnMap,
             String identifier,
             String projectedColumnName,
@@ -396,9 +393,7 @@ public class TransformParser {
             return ProjectionColumn.ofCalculated(
                     projectedColumnName,
                     // Metadata columns should never be null
-                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                    relDataTypeMap.get(projectedColumnName))
-                            .notNull(),
+                    DataTypeConverter.convertCalciteRelDataTypeToDataType(relDataType).notNull(),
                     identifier,
                     columnNameMap.get(identifier),
                     Collections.singletonList(identifier),
