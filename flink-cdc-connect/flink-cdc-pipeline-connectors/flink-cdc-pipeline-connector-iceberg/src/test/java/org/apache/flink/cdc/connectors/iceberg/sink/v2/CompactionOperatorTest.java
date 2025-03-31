@@ -38,7 +38,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -158,6 +158,7 @@ public class CompactionOperatorTest {
                 catalog.loadTable(TableIdentifier.parse(tableId.identifier()))
                         .currentSnapshot()
                         .summary();
-        Assertions.assertEquals(summary.get("deleted-data-files"), String.valueOf(smallFileCount));
+        Assertions.assertThat(summary.get("deleted-data-files"))
+                .isEqualTo(String.valueOf(smallFileCount));
     }
 }

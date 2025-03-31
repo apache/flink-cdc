@@ -26,25 +26,23 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.iceberg.sink.IcebergDataSink;
+import org.apache.flink.table.data.TimestampData;
 
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
-import org.apache.iceberg.util.DateTimeUtil;
 
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
+import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 
-/** Util class for {@link IcebergDataSink}. */
+/** Util class for types in {@link IcebergDataSink}. */
 public class IcebergTypeUtils {
 
-    /** Convert column from CDC framework to Iceberg framework. */
-    public static Types.NestedField convertCDCColumnToIcebergField(
+    /** Convert column from Flink CDC framework to Iceberg framework. */
+    public static Types.NestedField convertCdcColumnToIcebergField(
             int index, PhysicalColumn column) {
         DataType dataType = column.getType();
         return Types.NestedField.of(
@@ -77,26 +75,27 @@ public class IcebergTypeUtils {
             case DECIMAL:
                 return Types.DecimalType.of(precision, scale);
             case TINYINT:
+                return new Types.BooleanType();
             case SMALLINT:
             case INTEGER:
                 return new Types.IntegerType();
-            case DATE:
-                return new Types.DateType();
-            case TIME_WITHOUT_TIME_ZONE:
-                return Types.TimeType.get();
             case BIGINT:
                 return new Types.LongType();
             case FLOAT:
                 return new Types.FloatType();
             case DOUBLE:
                 return new Types.DoubleType();
+            case DATE:
+                return new Types.DateType();
+            case TIME_WITHOUT_TIME_ZONE:
+                return Types.TimeType.get();
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return Types.TimestampType.withoutZone();
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
             case TIMESTAMP_WITH_TIME_ZONE:
                 return Types.TimestampType.withZone();
             default:
-                throw new IllegalArgumentException("Illegal type: " + type);
+                throw new IllegalArgumentException("Unsupported cdc type in iceberg: " + type);
         }
     }
 
@@ -131,21 +130,21 @@ public class IcebergTypeUtils {
                 fieldGetter = row -> row.getBinary(fieldPos);
                 break;
             case DECIMAL:
-                final int decimalPrecision = DataTypeChecks.getPrecision(fieldType);
                 final int decimalScale = DataTypeChecks.getScale(fieldType);
+                int precision = getPrecision(fieldType);
                 fieldGetter =
                         row -> {
                             DecimalData decimalData =
-                                    row.getDecimal(fieldPos, decimalPrecision, decimalScale);
+                                    row.getDecimal(fieldPos, precision, decimalScale);
                             return org.apache.flink.table.data.DecimalData.fromBigDecimal(
-                                    decimalData.toBigDecimal(), decimalPrecision, decimalScale);
+                                    decimalData.toBigDecimal(), precision, decimalScale);
                         };
                 break;
             case TINYINT:
-                fieldGetter = row -> row.getByte(fieldPos);
+                fieldGetter = row -> row.getBoolean(fieldPos);
                 break;
             case SMALLINT:
-                fieldGetter = row -> row.getShort(fieldPos);
+                fieldGetter = row -> row.getInt(fieldPos);
                 break;
             case BIGINT:
                 fieldGetter = row -> row.getLong(fieldPos);
@@ -158,40 +157,31 @@ public class IcebergTypeUtils {
                 break;
             case INTEGER:
             case DATE:
-                fieldGetter = row -> row.getInt(fieldPos);
-                break;
             case TIME_WITHOUT_TIME_ZONE:
-                fieldGetter =
-                        (row) -> {
-                            LocalDateTime localDateTime =
-                                    row.getTimestamp(
-                                                    fieldPos,
-                                                    DataTypeChecks.getPrecision(fieldType))
-                                            .toLocalDateTime();
-                            return DateTimeUtil.microsFromTimestamp(localDateTime);
-                        };
+                fieldGetter = (row) -> row.getInt(fieldPos);
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =
-                        (row) -> {
-                            Instant instant =
-                                    row.getLocalZonedTimestampData(
-                                                    fieldPos,
-                                                    DataTypeChecks.getPrecision(fieldType))
-                                            .toInstant();
-                            return DateTimeUtil.microsFromTimestamptz(
-                                    OffsetDateTime.ofInstant(instant, zoneId));
-                        };
+                        (row) ->
+                                TimestampData.fromTimestamp(
+                                        row.getTimestamp(fieldPos, getPrecision(fieldType))
+                                                .toTimestamp());
                 break;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-            case TIMESTAMP_WITH_TIME_ZONE:
                 fieldGetter =
                         row ->
-                                DateTimeUtil.microsFromInstant(
+                                TimestampData.fromInstant(
                                         row.getLocalZonedTimestampData(
                                                         fieldPos,
                                                         DataTypeChecks.getPrecision(fieldType))
                                                 .toInstant());
+                break;
+            case TIMESTAMP_WITH_TIME_ZONE:
+                fieldGetter =
+                        (row) ->
+                                TimestampData.fromTimestamp(
+                                        row.getZonedTimestamp(fieldPos, getPrecision(fieldType))
+                                                .toTimestamp());
                 break;
             case ROW:
                 final int rowFieldCount = getFieldCount(fieldType);

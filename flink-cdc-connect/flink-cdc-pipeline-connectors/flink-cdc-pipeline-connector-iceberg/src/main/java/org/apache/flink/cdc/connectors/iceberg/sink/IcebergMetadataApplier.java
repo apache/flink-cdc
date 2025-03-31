@@ -76,10 +76,7 @@ public class IcebergMetadataApplier implements MetadataApplier {
     private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
     public IcebergMetadataApplier(Map<String, String> catalogOptions) {
-        this.catalogOptions = catalogOptions;
-        this.tableOptions = new HashMap<>();
-        this.partitionMaps = new HashMap<>();
-        this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+        this(catalogOptions, new HashMap<>(), new HashMap<>());
     }
 
     public IcebergMetadataApplier(
@@ -140,7 +137,7 @@ public class IcebergMetadataApplier implements MetadataApplier {
             Set<Integer> identifierFieldIds = new HashSet<>();
             for (int index = 0; index < event.getSchema().getColumnCount(); index++) {
                 columns.add(
-                        IcebergTypeUtils.convertCDCColumnToIcebergField(
+                        IcebergTypeUtils.convertCdcColumnToIcebergField(
                                 index, (PhysicalColumn) cdcSchema.getColumns().get(index)));
                 if (cdcSchema.primaryKeys().contains(cdcSchema.getColumns().get(index).getName())) {
                     identifierFieldIds.add(index);
@@ -185,47 +182,32 @@ public class IcebergMetadataApplier implements MetadataApplier {
             UpdateSchema updateSchema = table.updateSchema();
             for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
                 Column addColumn = columnWithPosition.getAddColumn();
+                String columnName = addColumn.getName();
+                String columnComment = addColumn.getComment();
+                Type icebergType =
+                        FlinkSchemaUtil.convert(
+                                DataTypeUtils.toFlinkDataType(addColumn.getType())
+                                        .getLogicalType());
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
-                        updateSchema.addColumn(
-                                addColumn.getName(),
-                                FlinkSchemaUtil.convert(
-                                        DataTypeUtils.toFlinkDataType(addColumn.getType())
-                                                .getLogicalType()),
-                                addColumn.getComment());
-                        table.updateSchema().moveFirst(addColumn.getName());
+                        updateSchema.addColumn(columnName, icebergType, columnComment);
+                        table.updateSchema().moveFirst(columnName);
                         break;
                     case LAST:
-                        updateSchema.addColumn(
-                                addColumn.getName(),
-                                FlinkSchemaUtil.convert(
-                                        DataTypeUtils.toFlinkDataType(addColumn.getType())
-                                                .getLogicalType()),
-                                addColumn.getComment());
+                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         break;
                     case BEFORE:
-                        updateSchema.addColumn(
-                                addColumn.getName(),
-                                FlinkSchemaUtil.convert(
-                                        DataTypeUtils.toFlinkDataType(addColumn.getType())
-                                                .getLogicalType()),
-                                addColumn.getComment());
+                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         updateSchema.moveBefore(
-                                addColumn.getName(), columnWithPosition.getExistedColumnName());
+                                columnName, columnWithPosition.getExistedColumnName());
                         break;
                     case AFTER:
                         checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "Existing column name must be provided for AFTER position");
-                        updateSchema.addColumn(
-                                addColumn.getName(),
-                                FlinkSchemaUtil.convert(
-                                        DataTypeUtils.toFlinkDataType(addColumn.getType())
-                                                .getLogicalType()),
-                                addColumn.getComment());
+                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         updateSchema.moveAfter(
-                                columnWithPosition.getAddColumn().getName(),
-                                columnWithPosition.getExistedColumnName());
+                                columnName, columnWithPosition.getExistedColumnName());
                         break;
                     default:
                         throw new SchemaEvolveException(

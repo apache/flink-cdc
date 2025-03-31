@@ -115,13 +115,10 @@ public class CompactionOperator
                     CatalogUtil.buildIcebergCatalog(
                             "cdc-iceberg-compaction-catalog", catalogOptions, new Configuration());
         }
-        org.apache.flink.configuration.Configuration config =
-                new org.apache.flink.configuration.Configuration();
-        config.setString("classloader.resolve-order", "parent-first");
         try {
             RewriteDataFilesActionResult rewriteResult =
                     Actions.forTable(
-                                    StreamExecutionEnvironment.createLocalEnvironment(config),
+                                    StreamExecutionEnvironment.createLocalEnvironment(),
                                     catalog.loadTable(TableIdentifier.parse(tableId.identifier())))
                             .rewriteDataFiles()
                             .execute();
@@ -137,7 +134,7 @@ public class CompactionOperator
 
     @Override
     public void snapshotState(StateSnapshotContext context) {
-        // reset the commit times.
+        // Reset the commit times.
         for (TableId tableId : compactedTables) {
             tableCommitTimes.put(tableId, 0);
         }
