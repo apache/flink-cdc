@@ -75,6 +75,8 @@ sink:
 pipeline:
    name: MySQL to Doris Pipeline
    parallelism: 4
+   flink:
+     execution.checkpointing.interval: 2min
 ```
 
 ## 连接器配置项

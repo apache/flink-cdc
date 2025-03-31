@@ -46,7 +46,8 @@ sink:
 
 pipeline:
    parallelism: 1
-
+   flink:
+     execution.checkpointing.interval: 2min
 ```
 
 ## Connector Options
