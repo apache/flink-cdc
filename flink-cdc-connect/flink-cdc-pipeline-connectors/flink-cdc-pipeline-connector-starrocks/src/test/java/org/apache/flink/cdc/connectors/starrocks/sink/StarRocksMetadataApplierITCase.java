@@ -460,6 +460,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         sinkTranslator.translate(
                 new SinkDef("starrocks", "Dummy StarRocks Sink", config),
                 stream,
+                DEFAULT_PARALLELISM,
                 starRocksSink,
                 schemaOperatorIDGenerator.generate());
 
