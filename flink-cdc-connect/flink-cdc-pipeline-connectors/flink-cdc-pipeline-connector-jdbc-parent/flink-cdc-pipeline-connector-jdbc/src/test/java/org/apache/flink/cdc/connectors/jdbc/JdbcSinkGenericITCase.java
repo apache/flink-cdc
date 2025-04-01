@@ -19,6 +19,9 @@ package org.apache.flink.cdc.connectors.jdbc;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.connectors.jdbc.common.JdbcSinkTestBase;
+import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
+import org.apache.flink.cdc.connectors.jdbc.dialect.JdbcSinkDialect;
+import org.apache.flink.cdc.connectors.jdbc.dialect.JdbcSinkDialectFactory;
 import org.apache.flink.cdc.connectors.jdbc.options.JdbcSinkOptions;
 
 import org.assertj.core.api.Assertions;
@@ -40,6 +43,51 @@ class JdbcSinkGenericITCase extends JdbcSinkTestBase {
         Assertions.assertThatThrownBy(() -> runJobWithEvents(sinkConfig, Collections.emptyList()))
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
-                        "Unknown Jdbc sink dialect unexpected. Supported dialects are: [mysql]");
+                        "There must be exactly one factory for dialect unexpected, but 0 found.\n"
+                                + "Matched dialects: []\n"
+                                + "Available dialects: [dummy, dummy, mysql]");
+    }
+
+    @Test
+    void testRunJdbcWithDuplicatedDialect() throws Exception {
+        Configuration sinkConfig = new Configuration();
+
+        sinkConfig.set(JdbcSinkOptions.CONN_URL, "jdbc:dummy://localhost:3306");
+        sinkConfig.set(JdbcSinkOptions.USERNAME, "username");
+        sinkConfig.set(JdbcSinkOptions.PASSWORD, "password");
+
+        Assertions.assertThatThrownBy(() -> runJobWithEvents(sinkConfig, Collections.emptyList()))
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "There must be exactly one factory for dialect dummy, but 2 found.\n"
+                                + "Matched dialects: [class org.apache.flink.cdc.connectors.jdbc.JdbcSinkGenericITCase$DummyFactoryA, class org.apache.flink.cdc.connectors.jdbc.JdbcSinkGenericITCase$DummyFactoryB]\n"
+                                + "Available dialects: [dummy, dummy, mysql]");
+    }
+
+    public static class DummyFactoryA implements JdbcSinkDialectFactory<JdbcSinkConfig> {
+
+        @Override
+        public String identifier() {
+            return "dummy";
+        }
+
+        @Override
+        public JdbcSinkDialect createDialect(JdbcSinkConfig option) {
+            throw new UnsupportedOperationException(
+                    "This is a dummy dialect factory and is not meant to be instantiated.");
+        }
+    }
+
+    public static class DummyFactoryB implements JdbcSinkDialectFactory<JdbcSinkConfig> {
+        @Override
+        public String identifier() {
+            return "dummy";
+        }
+
+        @Override
+        public JdbcSinkDialect createDialect(JdbcSinkConfig option) {
+            throw new UnsupportedOperationException(
+                    "This is a dummy dialect factory and is not meant to be instantiated.");
+        }
     }
 }

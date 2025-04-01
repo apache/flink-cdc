@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.base.utils.OptionUtils;
 import org.apache.flink.cdc.connectors.jdbc.config.JdbcSinkConfig;
 import org.apache.flink.cdc.connectors.jdbc.dialect.JdbcSinkDialectFactory;
@@ -98,21 +99,23 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
 
         // Discover corresponding factory
         String dialect = jdbcSinkConfig.getDialect();
-        JdbcSinkDialectFactory<JdbcSinkConfig> dialectFactory =
+
+        List<JdbcSinkDialectFactory<JdbcSinkConfig>> availableFactories =
                 dialectFactories.stream()
                         .filter(d -> dialect.equalsIgnoreCase(d.identifier()))
-                        .findFirst()
-                        .orElseThrow(
-                                () ->
-                                        new IllegalArgumentException(
-                                                "Unknown Jdbc sink dialect "
-                                                        + dialect
-                                                        + ". Supported dialects are: "
-                                                        + dialectFactories.stream()
-                                                                .map(
-                                                                        JdbcSinkDialectFactory
-                                                                                ::identifier)
-                                                                .collect(Collectors.toList())));
+                        .collect(Collectors.toList());
+
+        Preconditions.checkArgument(
+                availableFactories.size() == 1,
+                "There must be exactly one factory for dialect %s, but %s found.\nMatched dialects: %s\nAvailable dialects: %s",
+                dialect,
+                availableFactories.size(),
+                availableFactories.stream().map(Object::getClass).collect(Collectors.toList()),
+                dialectFactories.stream()
+                        .map(JdbcSinkDialectFactory::identifier)
+                        .collect(Collectors.toList()));
+
+        JdbcSinkDialectFactory<JdbcSinkConfig> dialectFactory = availableFactories.get(0);
 
         if (LOG.isInfoEnabled()) {
             OptionUtils.printOptions(
