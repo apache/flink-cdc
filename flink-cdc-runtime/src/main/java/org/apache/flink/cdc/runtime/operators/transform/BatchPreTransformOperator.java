@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -30,6 +31,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
@@ -191,6 +193,29 @@ public class BatchPreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
+
+        try {
+            processEvent(event);
+        } catch (Exception e) {
+            TableId tableId = null;
+            Schema schemaBefore = null;
+            Schema schemaAfter = null;
+
+            if (event instanceof ChangeEvent) {
+                tableId = ((ChangeEvent) event).tableId();
+                PreTransformChangeInfo info = preTransformChangeInfoMap.get(tableId);
+                if (info != null) {
+                    schemaBefore = info.getSourceSchema();
+                    schemaAfter = info.getPreTransformedSchema();
+                }
+            }
+
+            throw new TransformException(
+                    "batch-pre-transform", event, tableId, schemaBefore, schemaAfter, e);
+        }
+    }
+
+    private void processEvent(Event event) {
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             preTransformProcessorMap.remove(createTableEvent.tableId());
