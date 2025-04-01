@@ -29,76 +29,95 @@ import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
+import static org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit.generateSplitId;
 
 /**
  * Tests for {@link
  * org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer}.
  */
-@RunWith(Parameterized.class)
-public class PendingSplitsStateSerializerTest {
+class PendingSplitsStateSerializerTest {
 
     private static final TableId tableId0 = TableId.parse("test_db.test_table");
     private static final TableId tableId1 = TableId.parse("test_db.test_table1");
     private static final TableId tableId2 = TableId.parse("test_db.test_table2");
 
-    @Parameterized.Parameter public PendingSplitsState state;
-
-    @Parameterized.Parameters(name = "PendingSplitsState = {index}")
-    public static Collection<PendingSplitsState> params() {
-        return Arrays.asList(
-                getTestSnapshotPendingSplitsState(true),
-                getTestSnapshotPendingSplitsState(false),
-                getTestHybridPendingSplitsState(false),
-                getTestHybridPendingSplitsState(true),
-                getTestBinlogPendingSplitsState());
+    public static Stream<Arguments> params() {
+        return Stream.of(
+                Arguments.of(getTestSnapshotPendingSplitsState(true)),
+                Arguments.of(getTestSnapshotPendingSplitsState(false)),
+                Arguments.of(getTestHybridPendingSplitsState(false)),
+                Arguments.of(getTestHybridPendingSplitsState(true)),
+                Arguments.of(getTestBinlogPendingSplitsState()));
     }
 
-    @Test
-    public void testsSerializeAndDeserialize() throws Exception {
-        assertEquals(state, serializeAndDeserializeSourceEnumState(state));
+    @ParameterizedTest
+    @MethodSource("params")
+    void testsSerializeAndDeserialize(PendingSplitsState state) throws Exception {
+        Assertions.assertThat(serializeAndDeserializeSourceEnumState(state)).isEqualTo(state);
     }
 
-    @Test
-    public void testTableSchemasAfterSerializeAndDeserialize() throws Exception {
+    @ParameterizedTest
+    @MethodSource("params")
+    void testTableSchemasAfterSerializeAndDeserialize(PendingSplitsState state) throws Exception {
         PendingSplitsState pendingSplitsState = serializeAndDeserializeSourceEnumState(state);
         if (pendingSplitsState instanceof SnapshotPendingSplitsState) {
-            assertEquals(
-                    getTestTableSchema(tableId0, tableId1).keySet(),
-                    ((SnapshotPendingSplitsState) pendingSplitsState).getTableSchemas().keySet());
+            Assertions.assertThat(
+                            ((SnapshotPendingSplitsState) pendingSplitsState)
+                                    .getTableSchemas()
+                                    .keySet())
+                    .isEqualTo(getTestTableSchema(tableId0, tableId1).keySet());
         } else if (pendingSplitsState instanceof HybridPendingSplitsState) {
-            assertEquals(
-                    getTestTableSchema(tableId0, tableId1).keySet(),
-                    ((HybridPendingSplitsState) pendingSplitsState)
-                            .getSnapshotPendingSplits()
-                            .getTableSchemas()
-                            .keySet());
+            Assertions.assertThat(
+                            ((HybridPendingSplitsState) pendingSplitsState)
+                                    .getSnapshotPendingSplits()
+                                    .getTableSchemas()
+                                    .keySet())
+                    .isEqualTo(getTestTableSchema(tableId0, tableId1).keySet());
         }
     }
 
-    @Test
-    public void testRepeatedSerializationCache() throws Exception {
+    @ParameterizedTest
+    @MethodSource("params")
+    void testRepeatedSerializationCache(PendingSplitsState state) throws Exception {
         final PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
 
         final byte[] ser1 = serializer.serialize(state);
         final byte[] ser2 = serializer.serialize(state);
         final byte[] ser3 = state.serializedFormCache;
-        assertSame(ser1, ser2);
-        assertSame(ser1, ser3);
+        Assertions.assertThat(ser1).isSameAs(ser2).isSameAs(ser3);
+    }
+
+    @ParameterizedTest
+    @MethodSource("params")
+    void testOutputIsFinallyCleared(PendingSplitsState state) throws Exception {
+        final PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(MySqlSplitSerializer.INSTANCE);
+
+        final byte[] ser1 = serializer.serialize(state);
+        state.serializedFormCache = null;
+
+        PendingSplitsState unsupportedState = new UnsupportedPendingSplitsState();
+
+        Assertions.assertThatThrownBy(() -> serializer.serialize(unsupportedState))
+                .isExactlyInstanceOf(IOException.class);
+
+        final byte[] ser2 = serializer.serialize(state);
+        Assertions.assertThat(ser1).isEqualTo(ser2);
     }
 
     static PendingSplitsState serializeAndDeserializeSourceEnumState(PendingSplitsState state)
@@ -190,7 +209,7 @@ public class PendingSplitsStateSerializerTest {
             TableId tableId, int splitNo) {
         return new MySqlSchemalessSnapshotSplit(
                 tableId,
-                tableId.toString() + "-" + splitNo,
+                generateSplitId(tableId, splitNo),
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
                 new Object[] {100L + splitNo * 1000L},
@@ -269,4 +288,7 @@ public class PendingSplitsStateSerializerTest {
             throw new UnsupportedOperationException("Not implemented.");
         }
     }
+
+    /** An implementation for {@link PendingSplitsState} which will cause a serialization error. */
+    static class UnsupportedPendingSplitsState extends PendingSplitsState {}
 }

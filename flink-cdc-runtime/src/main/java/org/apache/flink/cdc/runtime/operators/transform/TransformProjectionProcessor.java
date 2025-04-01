@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
@@ -29,8 +30,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -59,7 +63,8 @@ public class TransformProjectionProcessor {
             TransformProjection transformProjection,
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            final List<Object> udfFunctionInstances) {
+            final List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         this.postTransformChangeInfo = postTransformChangeInfo;
         this.transformProjection = transformProjection;
         this.timezone = timezone;
@@ -68,11 +73,16 @@ public class TransformProjectionProcessor {
 
         // Create cached projection column processors after setting all other fields.
         this.cachedProjectionColumnProcessors =
-                cacheProjectionColumnProcessors(postTransformChangeInfo, transformProjection);
+                cacheProjectionColumnProcessors(
+                        postTransformChangeInfo, transformProjection, supportedMetadataColumns);
     }
 
     public boolean hasTableInfo() {
         return this.postTransformChangeInfo != null;
+    }
+
+    public TransformProjection getTransformProjection() {
+        return transformProjection;
     }
 
     public static TransformProjectionProcessor of(
@@ -80,40 +90,72 @@ public class TransformProjectionProcessor {
             TransformProjection transformProjection,
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances) {
+            List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         return new TransformProjectionProcessor(
-                tableInfo, transformProjection, timezone, udfDescriptors, udfFunctionInstances);
+                tableInfo,
+                transformProjection,
+                timezone,
+                udfDescriptors,
+                udfFunctionInstances,
+                supportedMetadataColumns);
     }
 
     public static TransformProjectionProcessor of(
             TransformProjection transformProjection,
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances) {
+            List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         return new TransformProjectionProcessor(
-                null, transformProjection, timezone, udfDescriptors, udfFunctionInstances);
+                null,
+                transformProjection,
+                timezone,
+                udfDescriptors,
+                udfFunctionInstances,
+                supportedMetadataColumns);
     }
 
     public static TransformProjectionProcessor of(
             TransformProjection transformProjection,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances) {
+            List<Object> udfFunctionInstances,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         return new TransformProjectionProcessor(
-                null, transformProjection, null, udfDescriptors, udfFunctionInstances);
+                null,
+                transformProjection,
+                null,
+                udfDescriptors,
+                udfFunctionInstances,
+                supportedMetadataColumns);
     }
 
-    public Schema processSchemaChangeEvent(Schema schema) {
+    public Schema processSchema(Schema schema, SupportedMetadataColumn[] supportedMetadataColumns) {
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
-                        transformProjection.getProjection(), schema.getColumns(), udfDescriptors);
+                        transformProjection.getProjection(),
+                        schema.getColumns(),
+                        udfDescriptors,
+                        supportedMetadataColumns);
         transformProjection.setProjectionColumns(projectionColumns);
+        Set<String> primaryKeys = new HashSet<>(schema.primaryKeys());
         return schema.copy(
                 projectionColumns.stream()
                         .map(ProjectionColumn::getColumn)
+                        .map(column -> setPkNonNull(primaryKeys, column))
                         .collect(Collectors.toList()));
     }
 
-    public BinaryRecordData processData(BinaryRecordData payload, long epochTime, String opType) {
+    private static Column setPkNonNull(Set<String> primaryKeys, Column column) {
+        if (primaryKeys.contains(column.getName())) {
+            return column.copy(column.getType().notNull());
+        } else {
+            return column;
+        }
+    }
+
+    public BinaryRecordData processData(
+            BinaryRecordData payload, long epochTime, String opType, Map<String, String> meta) {
         List<Object> valueList = new ArrayList<>();
         List<Column> columns = postTransformChangeInfo.getPostTransformedSchema().getColumns();
 
@@ -124,7 +166,8 @@ public class TransformProjectionProcessor {
                 ProjectionColumn projectionColumn = projectionColumnProcessor.getProjectionColumn();
                 valueList.add(
                         DataTypeConverter.convert(
-                                projectionColumnProcessor.evaluate(payload, epochTime, opType),
+                                projectionColumnProcessor.evaluate(
+                                        payload, epochTime, opType, meta),
                                 projectionColumn.getDataType()));
             } else {
                 Column column = columns.get(i);
@@ -159,7 +202,9 @@ public class TransformProjectionProcessor {
     }
 
     private List<ProjectionColumnProcessor> cacheProjectionColumnProcessors(
-            PostTransformChangeInfo tableInfo, TransformProjection transformProjection) {
+            PostTransformChangeInfo tableInfo,
+            TransformProjection transformProjection,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         List<ProjectionColumnProcessor> cachedProjectionColumnProcessors = new ArrayList<>();
         if (!hasTableInfo()) {
             return cachedProjectionColumnProcessors;
@@ -184,7 +229,8 @@ public class TransformProjectionProcessor {
                                                     col,
                                                     timezone,
                                                     udfDescriptors,
-                                                    udfFunctionInstances))
+                                                    udfFunctionInstances,
+                                                    supportedMetadataColumns))
                             .orElse(null));
         }
 

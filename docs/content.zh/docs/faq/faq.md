@@ -207,6 +207,19 @@ restart-strategy.fixed-delay.delay= 30s
 1. tableList选项要求表名使用数据库名，而不是DataStream API中的表名。对于MySQL CDC源代码，tableList选项值应该类似于‘my_db.my_table’。
 2. 如果要同步排除products和orders表之外的整个my_db库，tableList选项值应该类似于‘my_db.(?!products｜orders).*’。
 
+### Q16: MySQL源表中存在TINYINT(1)类型的列，且部分行的数值>1，Pipeline作业下游接收到的数据却是true/false，为什么？
+这是由于MySQL连接参数`tinyInt1isBit`默认值为`true`，Flink CDC 3.3.0之前的版本未处理该参数，导致TINYINT(1)类型的数据被解析为布尔值。
+若需将其转换为实际值，请将CDC升级至3.3.0+，并在source节点添加配置`treat-tinyint1-as-boolean.enabled: false`。  
+例如：
+```yaml
+source:
+  type: mysql
+  ...
+  treat-tinyint1-as-boolean.enabled: false
+
+sink:
+  type: ...
+```
 ## Postgres CDC FAQ
 
 ### Q1: 发现 PG 服务器磁盘使用率高，WAL 不释放 是什么原因？

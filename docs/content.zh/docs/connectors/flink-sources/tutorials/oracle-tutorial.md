@@ -81,7 +81,7 @@ docker-compose down
 *下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地编译*
 
 - [flink-sql-connector-elasticsearch7-3.0.1-1.17.jar](https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-elasticsearch7/3.0.1-1.17/flink-sql-connector-elasticsearch7-3.0.1-1.17.jar)
-- [flink-sql-connector-oracle-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/3.1.0/flink-sql-connector-oracle-cdc-3.1.0.jar)
+- [flink-sql-connector-oracle-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-oracle-cdc/{{< param Version >}}/flink-sql-connector-oracle-cdc-{{< param Version >}}.jar)
 
 
 **在 Oracle 数据库中准备数据**

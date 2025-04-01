@@ -24,10 +24,17 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.source.MetadataAccessor;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
+import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+
+import io.debezium.relational.RelationalDatabaseConnectorConfig;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
@@ -36,16 +43,36 @@ public class MySqlDataSource implements DataSource {
     private final MySqlSourceConfigFactory configFactory;
     private final MySqlSourceConfig sourceConfig;
 
+    private List<MySqlReadableMetadata> readableMetadataList;
+
     public MySqlDataSource(MySqlSourceConfigFactory configFactory) {
+        this(configFactory, new ArrayList<>());
+    }
+
+    public MySqlDataSource(
+            MySqlSourceConfigFactory configFactory,
+            List<MySqlReadableMetadata> readableMetadataList) {
         this.configFactory = configFactory;
         this.sourceConfig = configFactory.createConfig(0);
+        this.readableMetadataList = readableMetadataList;
     }
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
+        boolean includeComments =
+                sourceConfig
+                        .getDbzConfiguration()
+                        .getBoolean(
+                                RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
+                                false);
+
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL, sourceConfig.isIncludeSchemaChanges());
+                        DebeziumChangelogMode.ALL,
+                        sourceConfig.isIncludeSchemaChanges(),
+                        readableMetadataList,
+                        includeComments,
+                        sourceConfig.isTreatTinyInt1AsBoolean());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
@@ -66,5 +93,17 @@ public class MySqlDataSource implements DataSource {
     @VisibleForTesting
     public MySqlSourceConfig getSourceConfig() {
         return sourceConfig;
+    }
+
+    @Override
+    public SupportedMetadataColumn[] supportedMetadataColumns() {
+        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
+    }
+
+    @Override
+    public boolean isParallelMetadataSource() {
+        // During incremental stage, MySQL never emits schema change events on different partitions
+        // (since it has one Binlog stream only.)
+        return false;
     }
 }

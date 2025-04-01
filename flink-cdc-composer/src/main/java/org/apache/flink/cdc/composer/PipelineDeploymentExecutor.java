@@ -18,16 +18,19 @@
 package org.apache.flink.cdc.composer;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.commons.cli.CommandLine;
 
-import java.nio.file.Path;
 import java.util.List;
 
 /** PipelineDeploymentExecutor to execute flink cdc job from different target. */
 public interface PipelineDeploymentExecutor {
 
     PipelineExecution.ExecutionInfo deploy(
-            CommandLine commandLine, Configuration flinkConfig, List<Path> additionalJars)
+            CommandLine commandLine,
+            Configuration flinkConfig,
+            List<Path> additionalJars,
+            Path flinkHome)
             throws Exception;
 }

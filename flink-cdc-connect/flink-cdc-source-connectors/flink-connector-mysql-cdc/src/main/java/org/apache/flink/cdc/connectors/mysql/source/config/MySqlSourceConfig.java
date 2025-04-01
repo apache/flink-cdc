@@ -66,6 +66,9 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
+    private final boolean parseOnLineSchemaChanges;
+    public static boolean useLegacyJsonFormat = true;
+    private final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -73,6 +76,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties dbzProperties;
     private final Configuration dbzConfiguration;
     private final MySqlConnectorConfig dbzMySqlConfig;
+    private final boolean treatTinyInt1AsBoolean;
 
     MySqlSourceConfig(
             String hostname,
@@ -99,7 +103,11 @@ public class MySqlSourceConfig implements Serializable {
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean parseOnLineSchemaChanges,
+            boolean treatTinyInt1AsBoolean,
+            boolean useLegacyJsonFormat,
+            boolean assignUnboundedChunkFirst) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -127,6 +135,10 @@ public class MySqlSourceConfig implements Serializable {
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
+        this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     public String getHostname() {
@@ -210,6 +222,14 @@ public class MySqlSourceConfig implements Serializable {
         return closeIdleReaders;
     }
 
+    public boolean isParseOnLineSchemaChanges() {
+        return parseOnLineSchemaChanges;
+    }
+
+    public boolean isAssignUnboundedChunkFirst() {
+        return assignUnboundedChunkFirst;
+    }
+
     public Properties getDbzProperties() {
         return dbzProperties;
     }
@@ -253,5 +273,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isSkipSnapshotBackfill() {
         return skipSnapshotBackfill;
+    }
+
+    public boolean isTreatTinyInt1AsBoolean() {
+        return treatTinyInt1AsBoolean;
     }
 }

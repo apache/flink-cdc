@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChangeEvent;
 
@@ -31,6 +32,7 @@ import org.apache.paimon.data.GenericRow;
 
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -66,22 +68,23 @@ public class PaimonRecordEventSerializer implements PaimonRecordSerializer<Event
                         new TableSchemaInfo(createTableEvent.getSchema(), zoneId));
             } else {
                 SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-                schemaMaps.put(
-                        schemaChangeEvent.tableId(),
-                        new TableSchemaInfo(
-                                SchemaUtils.applySchemaChangeEvent(
-                                        schemaMaps.get(schemaChangeEvent.tableId()).getSchema(),
-                                        schemaChangeEvent),
-                                zoneId));
+                Schema schema = schemaMaps.get(schemaChangeEvent.tableId()).getSchema();
+                if (!SchemaUtils.isSchemaChangeEventRedundant(schema, schemaChangeEvent)) {
+                    schemaMaps.put(
+                            schemaChangeEvent.tableId(),
+                            new TableSchemaInfo(
+                                    SchemaUtils.applySchemaChangeEvent(schema, schemaChangeEvent),
+                                    zoneId));
+                }
             }
             return new PaimonEvent(tableId, null, true);
         } else if (event instanceof DataChangeEvent) {
             DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            GenericRow genericRow =
-                    PaimonWriterHelper.convertEventToGenericRow(
+            List<GenericRow> genericRows =
+                    PaimonWriterHelper.convertEventToFullGenericRows(
                             dataChangeEvent,
                             schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
-            return new PaimonEvent(tableId, genericRow, false, bucket);
+            return new PaimonEvent(tableId, genericRows, false, bucket);
         } else {
             throw new IllegalArgumentException(
                     "failed to convert Input into PaimonEvent, unsupported event: " + event);

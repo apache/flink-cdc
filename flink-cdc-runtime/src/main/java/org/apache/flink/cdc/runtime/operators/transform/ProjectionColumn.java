@@ -20,10 +20,14 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The ProjectionColumn applies to describe the information of the transformation column. If it only
@@ -47,17 +51,19 @@ public class ProjectionColumn implements Serializable {
     private final String expression;
     private final String scriptExpression;
     private final List<String> originalColumnNames;
-    private TransformExpressionKey transformExpressionKey;
+    private final Map<String, String> columnNameMap;
 
     public ProjectionColumn(
             Column column,
             String expression,
             String scriptExpression,
-            List<String> originalColumnNames) {
+            List<String> originalColumnNames,
+            Map<String, String> columnNameMap) {
         this.column = column;
         this.expression = expression;
         this.scriptExpression = scriptExpression;
         this.originalColumnNames = originalColumnNames;
+        this.columnNameMap = columnNameMap;
     }
 
     public ProjectionColumn copy() {
@@ -65,7 +71,8 @@ public class ProjectionColumn implements Serializable {
                 column.copy(column.getName()),
                 expression,
                 scriptExpression,
-                new ArrayList<>(originalColumnNames));
+                new ArrayList<>(originalColumnNames),
+                new HashMap<>(columnNameMap));
     }
 
     public Column getColumn() {
@@ -88,29 +95,66 @@ public class ProjectionColumn implements Serializable {
         return originalColumnNames;
     }
 
-    public void setTransformExpressionKey(TransformExpressionKey transformExpressionKey) {
-        this.transformExpressionKey = transformExpressionKey;
+    public Map<String, String> getColumnNameMap() {
+        return columnNameMap;
+    }
+
+    public String getColumnNameMapAsString() {
+        return TransformException.prettyPrintColumnNameMap(getColumnNameMap());
     }
 
     public boolean isValidTransformedProjectionColumn() {
         return !StringUtils.isNullOrWhitespaceOnly(scriptExpression);
     }
 
-    public static ProjectionColumn of(String columnName, DataType dataType) {
-        return new ProjectionColumn(Column.physicalColumn(columnName, dataType), null, null, null);
+    /**
+     * This projection is created with a plain column name. <br>
+     * Just like column {@code id} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
+     * Comments and default expressions will be intact.
+     */
+    public static ProjectionColumn ofForwarded(Column column, String mappedColumnName) {
+        String name = column.getName();
+        Map<String, String> columnNameMap = Collections.singletonMap(name, mappedColumnName);
+        return new ProjectionColumn(
+                column, name, mappedColumnName, Collections.singletonList(name), columnNameMap);
     }
 
-    public static ProjectionColumn of(
+    /**
+     * This projection is created with a simple $id$ AS $new_id$ expression. <br>
+     * Just like column {@code new_name} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
+     * Comments and default expressions will be intact.
+     */
+    public static ProjectionColumn ofAliased(
+            Column column, String newName, String mappedColumnName) {
+        String originalName = column.getName();
+        Map<String, String> columnNameMap =
+                Collections.singletonMap(originalName, mappedColumnName);
+        return new ProjectionColumn(
+                column.copy(newName),
+                originalName,
+                mappedColumnName,
+                Collections.singletonList(originalName),
+                columnNameMap);
+    }
+
+    /**
+     * This projection is created with a complex calculation expression. <br>
+     * Just like column {@code new_age} in {@code id, name AS new_name, age + 1 AS new_age}. <br>
+     * No comments nor default expressions will be kept.
+     */
+    public static ProjectionColumn ofCalculated(
             String columnName,
             DataType dataType,
             String expression,
             String scriptExpression,
-            List<String> originalColumnNames) {
+            List<String> originalColumnNames,
+            Map<String, String> columnNameMap) {
         return new ProjectionColumn(
                 Column.physicalColumn(columnName, dataType),
                 expression,
                 scriptExpression,
-                originalColumnNames);
+                originalColumnNames,
+                columnNameMap);
     }
 
     @Override
@@ -126,8 +170,8 @@ public class ProjectionColumn implements Serializable {
                 + '\''
                 + ", originalColumnNames="
                 + originalColumnNames
-                + ", transformExpressionKey="
-                + transformExpressionKey
+                + ", columnNameMap="
+                + columnNameMap
                 + '}';
     }
 }

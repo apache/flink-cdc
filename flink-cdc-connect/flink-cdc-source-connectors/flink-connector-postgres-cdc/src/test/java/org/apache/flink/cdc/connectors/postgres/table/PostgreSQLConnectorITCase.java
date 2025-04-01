@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.table;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -28,32 +29,24 @@ import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Integration tests for PostgreSQL Table source. */
-@RunWith(Parameterized.class)
-public class PostgreSQLConnectorITCase extends PostgresTestBase {
+class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -61,21 +54,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
-    private final boolean parallelismSnapshot;
-
-    public PostgreSQLConnectorITCase(boolean parallelismSnapshot) {
-        this.parallelismSnapshot = parallelismSnapshot;
-    }
-
-    @Parameterized.Parameters(name = "parallelismSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {true}, new Object[] {false}};
-    }
-
-    @Before
-    public void before() {
+    void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
         env.setRestartStrategy(RestartStrategies.noRestart());
         if (parallelismSnapshot) {
@@ -86,9 +69,11 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
         }
     }
 
-    @Test
-    public void testConsumingAllEvents()
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testConsumingAllEvents(boolean parallelismSnapshot)
             throws SQLException, ExecutionException, InterruptedException {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
@@ -165,20 +150,24 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
          * The final database table looks like this:
          *
          * > SELECT * FROM products;
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | id  | name               | description                                             | weight |
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
-         * | 102 | car battery        | 12V car battery                                         |    8.1 |
-         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
-         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
-         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
-         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
-         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
-         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
-         * +-----+--------------------+---------------------------------------------------------+--------+
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | id | name | description | weight |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | 101 | scooter | Small 2-wheel scooter | 3.14 |
+         * | 102 | car battery | 12V car battery | 8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from
+         * #40 to #3 | 0.8 |
+         * | 104 | hammer | 12oz carpenter's hammer | 0.75 |
+         * | 105 | hammer | 14oz carpenter's hammer | 0.875 |
+         * | 106 | hammer | 18oz carpenter hammer | 1 |
+         * | 107 | rocks | box of assorted rocks | 5.1 |
+         * | 108 | jacket | water resistent black wind breaker | 0.1 |
+         * | 109 | spare tire | 24 inch spare tire | 22.2 |
+         * | 110 | jacket | new water resistent white wind breaker | 0.5 |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
          * </pre>
          */
 
@@ -194,16 +183,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testStartupFromLatestOffset() throws Exception {
-        if (!parallelismSnapshot) {
-            return;
-        }
+    @ParameterizedTest
+    @ValueSource(booleans = {true})
+    void testStartupFromLatestOffset(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
@@ -246,7 +234,8 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        // wait for the source startup, we don't have a better way to wait it, use sleep for now
+        // wait for the source startup, we don't have a better way to wait it, use sleep
+        // for now
         Thread.sleep(10000L);
 
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
@@ -267,13 +256,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 new String[] {"110,jacket,new water resistent white wind breaker,0.500"};
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testExceptionForReplicaIdentity() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testExceptionForReplicaIdentity(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
                 String.format(
@@ -342,20 +333,16 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
             statement.execute("DELETE FROM inventory.products WHERE id=111;");
         }
 
-        try {
-            result.await();
-        } catch (Exception e) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(
-                                    e,
-                                    "The \"before\" field of UPDATE/DELETE message is null, "
-                                            + "please check the Postgres table has been set REPLICA IDENTITY to FULL level.")
-                            .isPresent());
-        }
+        Assertions.assertThatThrownBy(result::await)
+                .hasStackTraceContaining(
+                        "The \"before\" field of UPDATE/DELETE message is null, "
+                                + "please check the Postgres table has been set REPLICA IDENTITY to FULL level.");
     }
 
-    @Test
-    public void testAllTypes() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testAllTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "column_type_test");
 
         String sourceDDL =
@@ -455,13 +442,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         "-D(1,[50],32767,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})",
                         "+I(1,[50],0,65535,2147483647,5.5,6.6,123.12345,404.4,true,Hello World,a,abc,abcd..xyz,2020-07-17T18:00:22.123,2020-07-17T18:00:22.123456,2020-07-17,18:00:22,500,{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326},{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187})");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testMetadataColumns() throws Throwable {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testMetadataColumns(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         String sourceDDL =
                 String.format(
@@ -469,6 +458,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
                                 + " schema_name STRING METADATA VIRTUAL,"
                                 + " table_name STRING METADATA VIRTUAL,"
+                                + " row_kind STRING METADATA FROM 'row_kind' VIRTUAL,"
                                 + " id INT NOT NULL,"
                                 + " name STRING,"
                                 + " description STRING,"
@@ -501,6 +491,7 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                         + " database_name STRING,"
                         + " schema_name STRING,"
                         + " table_name STRING,"
+                        + " row_kind STRING,"
                         + " id INT,"
                         + " name STRING,"
                         + " description STRING,"
@@ -546,61 +537,61 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 Arrays.asList(
                         "+I("
                                 + databaseName
-                                + ",inventory,products,101,scooter,Small 2-wheel scooter,3.140)",
+                                + ",inventory,products,+I,101,scooter,Small 2-wheel scooter,3.140)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,102,car battery,12V car battery,8.100)",
+                                + ",inventory,products,+I,102,car battery,12V car battery,8.100)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
+                                + ",inventory,products,+I,103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.800)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,104,hammer,12oz carpenter's hammer,0.750)",
+                                + ",inventory,products,+I,104,hammer,12oz carpenter's hammer,0.750)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,105,hammer,14oz carpenter's hammer,0.875)",
+                                + ",inventory,products,+I,105,hammer,14oz carpenter's hammer,0.875)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,106,hammer,16oz carpenter's hammer,1.000)",
+                                + ",inventory,products,+I,106,hammer,16oz carpenter's hammer,1.000)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,107,rocks,box of assorted rocks,5.300)",
+                                + ",inventory,products,+I,107,rocks,box of assorted rocks,5.300)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,108,jacket,water resistent black wind breaker,0.100)",
+                                + ",inventory,products,+I,108,jacket,water resistent black wind breaker,0.100)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,109,spare tire,24 inch spare tire,22.200)",
+                                + ",inventory,products,+I,109,spare tire,24 inch spare tire,22.200)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,110,jacket,water resistent white wind breaker,0.200)",
+                                + ",inventory,products,+I,110,jacket,water resistent white wind breaker,0.200)",
                         "+I("
                                 + databaseName
-                                + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.180)",
+                                + ",inventory,products,+I,111,scooter,Big 2-wheel scooter ,5.180)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,106,hammer,18oz carpenter hammer,1.000)",
+                                + ",inventory,products,+U,106,hammer,18oz carpenter hammer,1.000)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,107,rocks,box of assorted rocks,5.100)",
+                                + ",inventory,products,+U,107,rocks,box of assorted rocks,5.100)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,110,jacket,new water resistent white wind breaker,0.500)",
+                                + ",inventory,products,+U,110,jacket,new water resistent white wind breaker,0.500)",
                         "+U("
                                 + databaseName
-                                + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.170)",
+                                + ",inventory,products,+U,111,scooter,Big 2-wheel scooter ,5.170)",
                         "-D("
                                 + databaseName
-                                + ",inventory,products,111,scooter,Big 2-wheel scooter ,5.170)");
+                                + ",inventory,products,-D,111,scooter,Big 2-wheel scooter ,5.170)");
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Collections.sort(actual);
-        Collections.sort(expected);
-        assertEquals(expected, actual);
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testUpsertMode() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testUpsertMode(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "replica_identity");
         String sourceDDL =
                 String.format(
@@ -679,20 +670,24 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
          * The final database table looks like this:
          *
          * > SELECT * FROM products;
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | id  | name               | description                                             | weight |
-         * +-----+--------------------+---------------------------------------------------------+--------+
-         * | 101 | scooter            | Small 2-wheel scooter                                   |   3.14 |
-         * | 102 | car battery        | 12V car battery                                         |    8.1 |
-         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 |    0.8 |
-         * | 104 | hammer             | 12oz carpenter's hammer                                 |   0.75 |
-         * | 105 | hammer             | 14oz carpenter's hammer                                 |  0.875 |
-         * | 106 | hammer             | 18oz carpenter hammer                                   |      1 |
-         * | 107 | rocks              | box of assorted rocks                                   |    5.1 |
-         * | 108 | jacket             | water resistent black wind breaker                      |    0.1 |
-         * | 109 | spare tire         | 24 inch spare tire                                      |   22.2 |
-         * | 110 | jacket             | new water resistent white wind breaker                  |    0.5 |
-         * +-----+--------------------+---------------------------------------------------------+--------+
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | id | name | description | weight |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
+         * | 101 | scooter | Small 2-wheel scooter | 3.14 |
+         * | 102 | car battery | 12V car battery | 8.1 |
+         * | 103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from
+         * #40 to #3 | 0.8 |
+         * | 104 | hammer | 12oz carpenter's hammer | 0.75 |
+         * | 105 | hammer | 14oz carpenter's hammer | 0.875 |
+         * | 106 | hammer | 18oz carpenter hammer | 1 |
+         * | 107 | rocks | box of assorted rocks | 5.1 |
+         * | 108 | jacket | water resistent black wind breaker | 0.1 |
+         * | 109 | spare tire | 24 inch spare tire | 22.2 |
+         * | 110 | jacket | new water resistent white wind breaker | 0.5 |
+         * +-----+--------------------+-------------------------------------------------
+         * --------+--------+
          * </pre>
          */
 
@@ -708,13 +703,15 @@ public class PostgreSQLConnectorITCase extends PostgresTestBase {
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
-        assertThat(actual, containsInAnyOrder(expected));
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
         result.getJobClient().get().cancel().get();
     }
 
-    @Test
-    public void testUniqueIndexIncludingFunction() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testUniqueIndexIncludingFunction(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
         // Clear the influence of usesLegacyRows which set USE_LEGACY_TO_STRING = true.
         // In this test, print +I,-U, +U to see more clearly.
         RowUtils.USE_LEGACY_TO_STRING = false;

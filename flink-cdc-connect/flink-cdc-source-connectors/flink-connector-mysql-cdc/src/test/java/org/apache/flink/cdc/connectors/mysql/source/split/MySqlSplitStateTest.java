@@ -23,7 +23,8 @@ import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,17 +32,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-
 /** Tests for {@link MySqlSplitState}. */
-public class MySqlSplitStateTest {
+class MySqlSplitStateTest {
 
     @Test
-    public void testFromToSplit() {
+    void testFromToSplit() {
         final MySqlSnapshotSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -50,15 +49,15 @@ public class MySqlSplitStateTest {
                         BinlogOffset.ofBinlogFilePosition("mysql-bin.000002", 78L),
                         new HashMap<>());
         final MySqlSnapshotSplitState mySqlSplitState = new MySqlSnapshotSplitState(split);
-        assertEquals(split, mySqlSplitState.toMySqlSplit());
+        Assertions.assertThat(mySqlSplitState.toMySqlSplit()).isEqualTo(split);
     }
 
     @Test
-    public void testRecordSnapshotSplitState() {
+    void testRecordSnapshotSplitState() {
         final MySqlSnapshotSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -73,7 +72,7 @@ public class MySqlSplitStateTest {
         final MySqlSnapshotSplit expected =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -81,11 +80,11 @@ public class MySqlSplitStateTest {
                         new Object[] {999L},
                         BinlogOffset.ofBinlogFilePosition("mysql-bin.000002", 78L),
                         new HashMap<>());
-        assertEquals(expected, mySqlSplitState.toMySqlSplit());
+        Assertions.assertThat(mySqlSplitState.toMySqlSplit()).isEqualTo(expected);
     }
 
     @Test
-    public void testRecordBinlogSplitState() throws Exception {
+    void testRecordBinlogSplitState() throws Exception {
 
         final MySqlBinlogSplit split =
                 getTestBinlogSplitWithOffset(
@@ -95,17 +94,17 @@ public class MySqlSplitStateTest {
         mySqlSplitState.setStartingOffset(
                 BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100));
 
-        assertEquals(
-                getTestBinlogSplitWithOffset(
-                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100)),
-                mySqlSplitState.toMySqlSplit());
+        Assertions.assertThat(mySqlSplitState.toMySqlSplit())
+                .isEqualTo(
+                        getTestBinlogSplitWithOffset(
+                                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 100)));
 
         mySqlSplitState.setStartingOffset(
                 BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400));
-        assertEquals(
-                getTestBinlogSplitWithOffset(
-                        BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400)),
-                mySqlSplitState.toMySqlSplit());
+        Assertions.assertThat(mySqlSplitState.toMySqlSplit())
+                .isEqualTo(
+                        getTestBinlogSplitWithOffset(
+                                BinlogOffset.ofBinlogFilePosition("mysql-bin.000001", 400)));
     }
 
     private MySqlBinlogSplit getTestBinlogSplitWithOffset(BinlogOffset startingOffset)

@@ -37,7 +37,13 @@ def put_mystery_data(mystery)
 end
 
 def ensure_mystery_data(mystery)
-  throw StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
+  raise StandardError, 'Failed to get specific mystery string' unless `cat #{FLINK_HOME}/log/*.out`.include? mystery
+end
+
+def extract_job_id(output)
+  current_job_id = output.split("\n").filter { _1.start_with?('Job ID: ') }.first&.split&.last
+  raise StandardError, "Failed to submit Flink job. Output: #{output}" unless current_job_id&.length == 32
+  current_job_id
 end
 
 puts '   Waiting for source to start up...'
@@ -53,8 +59,7 @@ def test_migration_chore(from_version, to_version)
   `rm -rf savepoints`
 
   # Prepare for current YAML file
-  test_route = !%w[3.0.0 3.0.1].include?(from_version)
-  yaml_job_template_file = test_route ? 'conf/pipeline-route.yaml' : 'conf/pipeline.yaml'
+  yaml_job_template_file = 'conf/pipeline-route.yaml'
   yaml_job_file = 'conf/temp.yaml'
   yaml_content = File.open(yaml_job_template_file).read.gsub('${PIPELINE_NAME}',
                                                              "Pipeline Migration Job (#{from_version} -> #{to_version})")
@@ -63,8 +68,7 @@ def test_migration_chore(from_version, to_version)
   # Submit current pipeline job file
   submit_job_output = `bash ./cdc-versions/#{from_version}/bin/flink-cdc.sh --flink-home #{FLINK_HOME} #{yaml_job_file}`
   puts "   #{submit_job_output}"
-  current_job_id = submit_job_output.split("\n")[1].split.last
-  raise StandardError, 'Failed to submit Flink job' unless current_job_id.length == 32
+  current_job_id = extract_job_id(submit_job_output)
 
   puts "   Current Job ID: #{current_job_id}"
 
@@ -81,9 +85,8 @@ def test_migration_chore(from_version, to_version)
   # Migrate to a newer CDC version
   puts "   Submitting CDC jobs at #{to_version}..."
   submit_job_output = `bash ./cdc-versions/#{to_version}/bin/flink-cdc.sh --from-savepoint #{Dir.pwd}/savepoints/#{savepoint_file} --allow-nonRestored-state --flink-home #{FLINK_HOME} #{yaml_job_file}`
-  puts "   #{submit_job_output}"
-  new_job_id = submit_job_output.split("\n")[1].split.last
-  raise StandardError, 'Failed to submit Flink job' unless new_job_id.length == 32
+  puts "#{submit_job_output}"
+  new_job_id = extract_job_id(submit_job_output)
 
   puts "   Upgraded Job ID: #{new_job_id}"
 
@@ -115,54 +118,29 @@ def test_migration(from_version, to_version)
 end
 
 version_list = case ARGV[0]
-               when '1.18.1' then %w[3.0.0 3.0.1 3.1.1 3.3-SNAPSHOT]
-               when '1.19.1' then %w[3.1.1 3.3-SNAPSHOT]
-               when '1.20.0' then %w[3.3-SNAPSHOT]
-               else []
+               when '1.19.2' then %w[3.2.0 3.2.1 3.3.0 3.4-SNAPSHOT]
+               when '1.20.1' then %w[3.2.1 3.3.0 3.4-SNAPSHOT]
+               else throw "Unknown Flink target version: #{ARGV[0]}."
                end
 
-no_savepoint_versions = %w[3.0.0 3.0.1]
-version_result = Hash.new('❓')
 @failures = []
 
-version_list.each_with_index do |old_version, old_index|
+new_version = version_list.last
+
+version_list.each do |old_version|
+  puts "-> Testing migrating from #{old_version} to latest snapshot."
   puts 'Restarting cluster...'
   `#{FLINK_HOME}/bin/stop-cluster.sh`
   puts 'Stopped cluster.'
   `#{FLINK_HOME}/bin/start-cluster.sh`
   puts 'Started cluster.'
-  version_list.each_with_index do |new_version, new_index|
-    next if old_index > new_index
-    next if no_savepoint_versions.include? new_version
 
-    result = test_migration old_version, new_version
-    version_result[old_version + new_version] = result ? '✅' : '❌'
-    @failures << [old_version, new_version] unless result
-  end
+  result = test_migration old_version, new_version
+  @failures << "#{old_version} => #{new_version}" unless result
 end
-
-printable_result = []
-printable_result << [''] + version_list
-version_list.each_with_index do |old_version, old_index|
-  table_line = [old_version]
-  version_list.each_with_index do |new_version, new_index|
-    table_line << if old_index > new_index
-                    ''
-                  else
-                    version_result[old_version + new_version]
-                  end
-  end
-  printable_result << table_line
-end
-
-begin
-  require 'terminal-table'
-  puts Terminal::Table.new rows: printable_result, title: 'Migration Test Result'
-rescue LoadError
-  puts 'Test summary: ', printable_result
-end
-puts "✅ - Compatible, ❌ - Not compatible, ❓ - Target version doesn't support `--from-savepoint`"
 
 if @failures.any?
+  puts 'Some migration to snapshot version tests failed. Details: '
+  puts @failures
   abort 'Some migration to snapshot version tests failed.'
 end

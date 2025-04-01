@@ -22,18 +22,18 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 /** Example Tests for {@link MySqlSource}. */
-public class MySqlSourceExampleTest extends MySqlSourceTestBase {
+class MySqlSourceExampleTest extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "inventory", "mysqluser", "mysqlpw");
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testConsumingAllEvents() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testConsumingAllEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()

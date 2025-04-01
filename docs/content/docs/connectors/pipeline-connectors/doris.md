@@ -120,6 +120,13 @@ pipeline:
        <td> Whether to write through FE redirection and directly connect to BE to write </td>
      </tr>
      <tr>
+       <td>charset-encoding</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">false</td>
+       <td>Boolean</td>
+       <td> Charset encoding for doris http client, default UTF-8 </td>
+     </tr>
+     <tr>
        <td>sink.enable.batch-mode</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">true</td>
@@ -162,7 +169,7 @@ pipeline:
        <td>String</td>
        <td> Parameters of StreamLoad.
          For example: <code> sink.properties.strict_mode: true</code>.
-         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad Properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad Properties</a></td>
        </td>
      </tr>
      <tr>
@@ -172,7 +179,7 @@ pipeline:
        <td>String</td>
        <td>Create the Properties configuration of the table.
          For example: <code> table.create.properties.replication_num: 1</code>.
-         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table Properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table Properties</a></td>
        </td>
      </tr>
      </tbody>

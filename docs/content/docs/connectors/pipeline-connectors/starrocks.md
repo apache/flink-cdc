@@ -215,6 +215,13 @@ pipeline:
           seconds. StarRocks will cancel the schema change after timeout which will
           cause the sink failure. </td>
     </tr>
+    <tr>
+      <td>sink.socket.timeout-ms</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">-1</td>
+      <td>Integer</td>
+      <td>The time duration for which the HTTP client waits for data. The default value -1 means there is no timeout</td>
+    </tr>
     </tbody>
 </table>    
 </div>

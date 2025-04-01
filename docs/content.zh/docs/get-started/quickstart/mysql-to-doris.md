@@ -33,11 +33,11 @@ under the License.
 准备一台已经安装了 Docker 的 Linux 或者 MacOS 电脑。
 
 ### 准备 Flink Standalone 集群
-1. 下载 [Flink 1.18.0](https://archive.apache.org/dist/flink/flink-1.18.0/flink-1.18.0-bin-scala_2.12.tgz)，解压后得到 flink-1.18.0 目录。
-   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-1.18.0 所在目录。
+1. 下载 [Flink 1.20.1](https://archive.apache.org/dist/flink/flink-1.20.1/flink-1.20.1-bin-scala_2.12.tgz)，解压后得到 flink-1.20.1 目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-1.20.1 所在目录。
 
    ```shell
-   cd flink-1.18.0
+   cd flink-1.20.1
    ```
 
 2. 通过在 conf/flink-conf.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
@@ -180,15 +180,15 @@ MacOS 由于内部实现容器的方式不同，在部署时宿主机直接修�
    {{< img src="/fig/mysql-doris-tutorial/doris-create-table.png" alt="Doris create table" >}}
 
 ## 通过 Flink CDC CLI 提交任务
-1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-3.1.0`；
-   [flink-cdc-3.1.0-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-3.1.0/flink-cdc-3.1.0-bin.tar.gz)
-   flink-cdc-3.1.0 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
+1. 下载下面列出的二进制压缩包，并解压得到目录 `flink-cdc-{{< param Version >}}`；
+   [flink-cdc-{{< param Version >}}-bin.tar.gz](https://www.apache.org/dyn/closer.lua/flink/flink-cdc-{{< param Version >}}/flink-cdc-{{< param Version >}}-bin.tar.gz)
+   flink-cdc-{{< param Version >}} 下会包含 `bin`、`lib`、`log`、`conf` 四个目录。
 
 2. 下载下面列出的 connector 包，并且移动到 `lib` 目录下；
    **下载链接只对已发布的版本有效, SNAPSHOT 版本需要本地基于 master 或 release- 分支编译.**
    **请注意，您需要将 jar 移动到 Flink CDC Home 的 lib 目录，而非 Flink Home 的 lib 目录下。**
-   - [MySQL pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-mysql/3.1.0/flink-cdc-pipeline-connector-mysql-3.1.0.jar)
-   - [Apache Doris pipeline connector 3.1.0](https://search.maven.org/remotecontent?filepath=org/apache/flink/flink-cdc-pipeline-connector-doris/3.1.0/flink-cdc-pipeline-connector-doris-3.1.0.jar)
+   - [MySQL pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-mysql/{{< param Version >}}/flink-cdc-pipeline-connector-mysql-{{< param Version >}}.jar)
+   - [Apache Doris pipeline connector {{< param Version >}}](https://repo1.maven.org/maven2/org/apache/flink/flink-cdc-pipeline-connector-doris/{{< param Version >}}/flink-cdc-pipeline-connector-doris-{{< param Version >}}.jar)
 
    您还需要将下面的 Driver 包放在 Flink `lib` 目录下，或通过 `--jar` 参数将其传入 Flink CDC CLI，因为 CDC Connectors 不再包含这些 Drivers：
    - [MySQL Connector Java](https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar)
@@ -338,7 +338,7 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
    ```shell
    docker-compose down
    ```
-在 Flink 所在目录 `flink-1.18.0` 下执行如下命令停止 Flink 集群：
+在 Flink 所在目录 `flink-1.20.1` 下执行如下命令停止 Flink 集群：
 
    ```shell
    ./bin/stop-cluster.sh

@@ -18,11 +18,13 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseCdcMetadata;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 import org.apache.flink.test.util.AbstractTestBase;
 
-import org.junit.ClassRule;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.net.URL;
 import java.nio.file.Files;
@@ -31,21 +33,24 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing OceanBase source. */
 public abstract class OceanBaseTestBase extends AbstractTestBase {
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
+
+    public static final Duration FETCH_TIMEOUT = Duration.ofSeconds(60);
 
     protected abstract OceanBaseCdcMetadata metadata();
 
@@ -104,7 +109,7 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
         final String ddlFile =
                 String.format("ddl/%s/%s.sql", metadata().getCompatibleMode(), sqlFile);
         final URL ddlTestFile = getClass().getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             final List<String> statements =
@@ -130,10 +135,19 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
     }
 
     public static void waitForSinkSize(String sinkName, int expectedSize)
-            throws InterruptedException {
-        while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
+            throws InterruptedException, TimeoutException {
+        long deadlineTimestamp = System.currentTimeMillis() + FETCH_TIMEOUT.toMillis();
+        while (System.currentTimeMillis() < deadlineTimestamp) {
+            if (sinkSize(sinkName) < expectedSize) {
+                Thread.sleep(100);
+            } else {
+                return;
+            }
         }
+        throw new TimeoutException(
+                String.format(
+                        "Failed to fetch enough records in sink.\nExpected size: %d\nActual values: %s",
+                        expectedSize, TestValuesTableFactory.getRawResults(sinkName)));
     }
 
     public static int sinkSize(String sinkName) {
@@ -148,9 +162,6 @@ public abstract class OceanBaseTestBase extends AbstractTestBase {
     }
 
     public static void assertContainsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertTrue(
-                String.format("expected: %s, actual: %s", expected, actual),
-                actual.containsAll(expected));
+        Assertions.assertThat(actual).containsAll(expected);
     }
 }

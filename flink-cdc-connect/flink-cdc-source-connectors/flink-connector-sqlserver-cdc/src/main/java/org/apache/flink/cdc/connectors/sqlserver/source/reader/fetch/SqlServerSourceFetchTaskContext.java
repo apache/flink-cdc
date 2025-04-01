@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch;
 
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
@@ -229,7 +230,12 @@ public class SqlServerSourceFetchTaskContext extends JdbcSourceFetchTaskContext 
     }
 
     @Override
-    public JdbcSourceEventDispatcher<SqlServerPartition> getDispatcher() {
+    public JdbcSourceEventDispatcher<SqlServerPartition> getEventDispatcher() {
+        return dispatcher;
+    }
+
+    @Override
+    public WatermarkDispatcher getWaterMarkDispatcher() {
         return dispatcher;
     }
 

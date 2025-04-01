@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.functions;
 
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
@@ -34,8 +35,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -44,7 +43,10 @@ import java.util.regex.Pattern;
 import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToDate;
 import static org.apache.flink.cdc.common.utils.DateTimeUtils.timestampMillisToTime;
 
-/** System function utils to support the call of flink cdc pipeline transform. */
+/**
+ * System function utils to support the call of flink cdc pipeline transform. <br>
+ * {@code castToXxx}-series function returns `null` when conversion is not viable.
+ */
 public class SystemFunctionUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(SystemFunctionUtils.class);
@@ -77,6 +79,27 @@ public class SystemFunctionUtils {
         return timestampMillisToDate(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
+    public static String fromUnixtime(long seconds, String timezone) {
+        return DateTimeUtils.formatUnixTimestamp(seconds, TimeZone.getTimeZone(timezone));
+    }
+
+    public static String fromUnixtime(long seconds, String format, String timezone) {
+        return DateTimeUtils.formatUnixTimestamp(seconds, format, TimeZone.getTimeZone(timezone));
+    }
+
+    public static long unixTimestamp(long epochTime, String timezone) {
+        return epochTime / 1000;
+    }
+
+    public static long unixTimestamp(String dateTimeStr, long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(dateTimeStr, TimeZone.getTimeZone(timezone));
+    }
+
+    public static long unixTimestamp(
+            String dateTimeStr, String format, long epochTime, String timezone) {
+        return DateTimeUtils.unixTimestamp(dateTimeStr, format, TimeZone.getTimeZone(timezone));
+    }
+
     public static String dateFormat(TimestampData timestamp, String format) {
         return DateTimeUtils.formatTimestampMillis(
                 timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));
@@ -105,83 +128,127 @@ public class SystemFunctionUtils {
         }
     }
 
-    public static int timestampDiff(
-            String symbol,
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
             LocalZonedTimestampData fromTimestamp,
-            LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, LocalZonedTimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getEpochMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, LocalZonedTimestampData toTimestamp) {
-        return timestampDiff(
-                symbol, fromTimestamp.getMillisecond(), toTimestamp.getEpochMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, TimestampData fromTimestamp, ZonedTimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(
-            String symbol, ZonedTimestampData fromTimestamp, TimestampData toTimestamp) {
-        return timestampDiff(symbol, fromTimestamp.getMillisecond(), toTimestamp.getMillisecond());
-    }
-
-    public static int timestampDiff(String symbol, long fromDate, long toDate) {
-        Calendar from = Calendar.getInstance();
-        from.setTime(new Date(fromDate));
-        Calendar to = Calendar.getInstance();
-        to.setTime(new Date(toDate));
-        Long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
-        switch (symbol) {
-            case "SECOND":
-                return second.intValue();
-            case "MINUTE":
-                return second.intValue() / 60;
-            case "HOUR":
-                return second.intValue() / 3600;
-            case "DAY":
-                return second.intValue() / (24 * 3600);
-            case "MONTH":
-                return to.get(Calendar.YEAR) * 12
-                        + to.get(Calendar.MONDAY)
-                        - (from.get(Calendar.YEAR) * 12 + from.get(Calendar.MONDAY));
-            case "YEAR":
-                return to.get(Calendar.YEAR) - from.get(Calendar.YEAR);
-            default:
-                LOG.error("Unsupported timestamp diff: {}", symbol);
-                throw new RuntimeException("Unsupported timestamp diff: " + symbol);
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
         }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                timezone,
+                toTimestamp.getEpochMillisecond(),
+                timezone);
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                "UTC",
+                toTimestamp.getMillisecond(),
+                "UTC");
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getMillisecond(),
+                "UTC",
+                toTimestamp.getEpochMillisecond(),
+                timezone);
+    }
+
+    // Be compatible with the existing definition of Function TIMESTAMP_DIFF
+    public static Integer timestampDiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        if (fromTimestamp == null || toTimestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.timestampDiff(
+                timeIntervalUnit,
+                fromTimestamp.getEpochMillisecond(),
+                timezone,
+                toTimestamp.getMillisecond(),
+                "UTC");
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            TimestampData fromTimestamp,
+            LocalZonedTimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static Integer timestampdiff(
+            String timeIntervalUnit,
+            LocalZonedTimestampData fromTimestamp,
+            TimestampData toTimestamp,
+            String timezone) {
+        return timestampDiff(timeIntervalUnit, fromTimestamp, toTimestamp, timezone);
+    }
+
+    public static LocalZonedTimestampData timestampadd(
+            String timeIntervalUnit,
+            Integer interval,
+            LocalZonedTimestampData timePoint,
+            String timezone) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return LocalZonedTimestampData.fromEpochMillis(
+                DateTimeUtils.timestampAdd(
+                        timeIntervalUnit, interval, timePoint.getEpochMillisecond(), timezone));
+    }
+
+    public static TimestampData timestampadd(
+            String timeIntervalUnit, Integer interval, TimestampData timePoint, String timezone) {
+        if (interval == null || timePoint == null) {
+            return null;
+        }
+        return TimestampData.fromMillis(
+                DateTimeUtils.timestampAdd(
+                        timeIntervalUnit, interval, timePoint.getMillisecond(), "UTC"));
     }
 
     public static boolean betweenAsymmetric(String value, String minValue, String maxValue) {
@@ -234,6 +301,14 @@ public class SystemFunctionUtils {
         return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
+    public static boolean betweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
+    }
+
     public static boolean notBetweenAsymmetric(String value, String minValue, String maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
@@ -260,6 +335,11 @@ public class SystemFunctionUtils {
 
     public static boolean notBetweenAsymmetric(
             BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
+    public static boolean notBetweenAsymmetric(
+            DecimalData value, DecimalData minValue, DecimalData maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
@@ -291,6 +371,10 @@ public class SystemFunctionUtils {
         return Arrays.stream(values).anyMatch(item -> value.equals(item));
     }
 
+    public static boolean in(DecimalData value, DecimalData... values) {
+        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+    }
+
     public static boolean notIn(String value, String... values) {
         return !in(value, values);
     }
@@ -316,6 +400,10 @@ public class SystemFunctionUtils {
     }
 
     public static boolean notIn(BigDecimal value, BigDecimal... values) {
+        return !in(value, values);
+    }
+
+    public static boolean notIn(DecimalData value, DecimalData... values) {
         return !in(value, values);
     }
 
@@ -430,152 +518,214 @@ public class SystemFunctionUtils {
     }
 
     /** SQL <code>ABS</code> operator applied to byte values. */
-    public static byte abs(byte b0) {
-        return (byte) Math.abs(b0);
+    public static Byte abs(Byte value) {
+        if (value == null) {
+            return null;
+        }
+        return (byte) Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to short values. */
-    public static short abs(short b0) {
-        return (short) Math.abs(b0);
+    public static Short abs(Short value) {
+        if (value == null) {
+            return null;
+        }
+        return (short) Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to int values. */
-    public static int abs(int b0) {
-        return Math.abs(b0);
+    public static Integer abs(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to long values. */
-    public static long abs(long b0) {
-        return Math.abs(b0);
+    public static Long abs(Long value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to float values. */
-    public static float abs(float b0) {
-        return Math.abs(b0);
+    public static Float abs(Float value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.abs(value);
     }
 
     /** SQL <code>ABS</code> operator applied to double values. */
-    public static double abs(double b0) {
-        return Math.abs(b0);
-    }
-
-    public static double floor(double b0) {
-        return Math.floor(b0);
-    }
-
-    public static float floor(float b0) {
-        return (float) Math.floor(b0);
-    }
-
-    /** SQL <code>FLOOR</code> operator applied to int values. */
-    public static int floor(int b0, int b1) {
-        int r = b0 % b1;
-        if (r < 0) {
-            r += b1;
+    public static Double abs(Double value) {
+        if (value == null) {
+            return null;
         }
-        return b0 - r;
+        return Math.abs(value);
     }
 
-    /** SQL <code>FLOOR</code> operator applied to long values. */
-    public static long floor(long b0, long b1) {
-        long r = b0 % b1;
-        if (r < 0) {
-            r += b1;
+    /** SQL <code>ABS</code> operator applied to decimal values. */
+    public static DecimalData abs(DecimalData value) {
+        if (value == null) {
+            return null;
         }
-        return b0 - r;
+        return DecimalData.fromBigDecimal(
+                BigDecimal.valueOf(Math.abs(value.toBigDecimal().doubleValue())),
+                value.precision(),
+                value.scale());
     }
 
-    public static double ceil(double b0) {
-        return Math.ceil(b0);
+    public static Byte floor(Byte value) {
+        return value;
     }
 
-    public static float ceil(float b0) {
-        return (float) Math.ceil(b0);
+    public static Short floor(Short value) {
+        return value;
     }
 
-    /** SQL <code>CEIL</code> operator applied to int values. */
-    public static int ceil(int b0, int b1) {
-        int r = b0 % b1;
-        if (r > 0) {
-            r -= b1;
+    public static Integer floor(Integer value) {
+        return value;
+    }
+
+    public static Long floor(Long value) {
+        return value;
+    }
+
+    public static Double floor(Double value) {
+        if (value == null) {
+            return null;
         }
-        return b0 - r;
+        return Math.floor(value);
     }
 
-    /** SQL <code>CEIL</code> operator applied to long values. */
-    public static long ceil(long b0, long b1) {
-        return floor(b0 + b1 - 1, b1);
+    public static Float floor(Float value) {
+        if (value == null) {
+            return null;
+        }
+        return (float) Math.floor(value);
+    }
+
+    public static DecimalData floor(DecimalData value) {
+        if (value == null) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(
+                BigDecimal.valueOf(Math.floor(value.toBigDecimal().doubleValue())),
+                value.precision(),
+                0);
+    }
+
+    public static Byte ceil(Byte value) {
+        return value;
+    }
+
+    public static Short ceil(Short value) {
+        return value;
+    }
+
+    public static Integer ceil(Integer value) {
+        return value;
+    }
+
+    public static Long ceil(Long value) {
+        return value;
+    }
+
+    public static Double ceil(Double value) {
+        if (value == null) {
+            return null;
+        }
+        return Math.ceil(value);
+    }
+
+    public static Float ceil(Float value) {
+        if (value == null) {
+            return null;
+        }
+        return (float) Math.ceil(value);
+    }
+
+    public static DecimalData ceil(DecimalData value) {
+        if (value == null) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(
+                BigDecimal.valueOf(Math.ceil(value.toBigDecimal().doubleValue())),
+                value.precision(),
+                0);
     }
 
     // SQL ROUND
     /** SQL <code>ROUND</code> operator applied to byte values. */
-    public static byte round(byte b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to byte values. */
-    public static byte round(byte b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).byteValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to short values. */
-    public static short round(short b0) {
-        return round(b0, 0);
+    public static Byte round(Byte value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).byteValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to short values. */
-    public static short round(short b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).shortValue();
+    public static Short round(Short value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).shortValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to int values. */
-    public static int round(int b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to int values. */
-    public static int round(int b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).intValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to long values. */
-    public static long round(long b0) {
-        return round(b0, 0);
+    public static Integer round(Integer value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).intValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to long values. */
-    public static long round(long b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).longValue();
+    public static Long round(Long value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).longValue();
     }
 
-    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
-    public static BigDecimal round(BigDecimal b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to BigDecimal values. */
-    public static BigDecimal round(BigDecimal b0, int b1) {
-        return b0.movePointRight(b1).setScale(0, RoundingMode.HALF_UP).movePointLeft(b1);
+    /** SQL <code>ROUND</code> operator applied to DecimalData values. */
+    public static DecimalData round(DecimalData value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(
+                value.toBigDecimal()
+                        .movePointRight(pointOffset)
+                        .setScale(0, RoundingMode.HALF_UP)
+                        .movePointLeft(pointOffset),
+                value.precision(),
+                pointOffset);
     }
 
     /** SQL <code>ROUND</code> operator applied to float values. */
-    public static float round(float b0) {
-        return round(b0, 0);
-    }
-
-    /** SQL <code>ROUND</code> operator applied to float values. */
-    public static float round(float b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).floatValue();
-    }
-
-    /** SQL <code>ROUND</code> operator applied to double values. */
-    public static double round(double b0) {
-        return round(b0, 0);
+    public static Float round(Float value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(new BigDecimal(value.toString()), pointOffset).floatValue();
     }
 
     /** SQL <code>ROUND</code> operator applied to double values. */
-    public static double round(double b0, int b1) {
-        return round(BigDecimal.valueOf(b0), b1).doubleValue();
+    public static Double round(Double value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return round(BigDecimal.valueOf(value), pointOffset).doubleValue();
+    }
+
+    private static BigDecimal round(BigDecimal value, int pointOffset) {
+        if (value == null) {
+            return null;
+        }
+        return value.movePointRight(pointOffset)
+                .setScale(0, RoundingMode.HALF_UP)
+                .movePointLeft(pointOffset);
     }
 
     public static String uuid() {
@@ -606,72 +756,261 @@ public class SystemFunctionUtils {
         return object.toString();
     }
 
+    public static Boolean castToBoolean(Object object) {
+        if (object == null) {
+            return null;
+        } else if (object instanceof Boolean) {
+            return (Boolean) object;
+        } else if (object instanceof Byte) {
+            return !object.equals((byte) 0);
+        } else if (object instanceof Short) {
+            return !object.equals((short) 0);
+        } else if (object instanceof Integer) {
+            return !object.equals(0);
+        } else if (object instanceof Long) {
+            return !object.equals(0L);
+        } else if (object instanceof Float) {
+            return !object.equals(0f);
+        } else if (object instanceof Double) {
+            return !object.equals(0d);
+        } else if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).compareTo(BigDecimal.ZERO) != 0;
+        } else if (object instanceof DecimalData) {
+            return ((DecimalData) object).compareTo(DecimalData.zero(1, 0)) != 0;
+        }
+        return Boolean.valueOf(castToString(object));
+    }
+
     public static Byte castToByte(Object object) {
         if (object == null) {
             return null;
         }
-        return Byte.valueOf(castObjectIntoString(object));
-    }
-
-    public static Boolean castToBoolean(Object object) {
-        if (object == null) {
+        if (object instanceof Boolean) {
+            return (byte) ((Boolean) object ? 1 : 0);
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).byteValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().byteValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).byteValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).byteValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Byte.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Byte#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).byteValue();
+        } catch (NumberFormatException ignored) {
             return null;
         }
-        if (object instanceof Byte
-                || object instanceof Short
-                || object instanceof Integer
-                || object instanceof Long
-                || object instanceof Float
-                || object instanceof Double
-                || object instanceof BigDecimal) {
-            return !object.equals(0);
-        }
-        return Boolean.valueOf(castToString(object));
     }
 
     public static Short castToShort(Object object) {
         if (object == null) {
             return null;
         }
-        return Short.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (short) ((Boolean) object ? 1 : 0);
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).shortValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().shortValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).shortValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).shortValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Short.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Short#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).shortValue();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Integer castToInteger(Object object) {
         if (object == null) {
             return null;
         }
-        return Integer.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1 : 0;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).intValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().intValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).intValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).intValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Integer.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Integer#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).intValue();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Long castToLong(Object object) {
         if (object == null) {
             return null;
         }
-        return Long.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1L : 0L;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).longValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().longValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).longValue();
+        }
+        if (object instanceof Float) {
+            return ((Float) object).longValue();
+        }
+        String stringRep = castToString(object);
+        try {
+            return Long.valueOf(stringRep);
+        } catch (NumberFormatException e) {
+            // Ignore this exception because it could still represent a valid floating point number,
+            // but could not be accepted by Long#valueOf.
+        }
+        try {
+            return Double.valueOf(stringRep).longValue();
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Float castToFloat(Object object) {
         if (object == null) {
             return null;
         }
-        return Float.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1f : 0f;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).floatValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().floatValue();
+        }
+        if (object instanceof Double) {
+            return ((Double) object).floatValue();
+        }
+        if (object instanceof Float) {
+            return (Float) object;
+        }
+        try {
+            return Float.valueOf(castObjectIntoString(object));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static Double castToDouble(Object object) {
         if (object == null) {
             return null;
         }
-        return Double.valueOf(castObjectIntoString(object));
+        if (object instanceof Boolean) {
+            return (Boolean) object ? 1d : 0d;
+        }
+        if (object instanceof BigDecimal) {
+            return ((BigDecimal) object).doubleValue();
+        }
+        if (object instanceof DecimalData) {
+            return ((DecimalData) object).toBigDecimal().doubleValue();
+        }
+        if (object instanceof Double) {
+            return (Double) object;
+        }
+        if (object instanceof Float) {
+            return ((Float) object).doubleValue();
+        }
+        try {
+            return Double.valueOf(castObjectIntoString(object));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     public static BigDecimal castToBigDecimal(Object object, int precision, int scale) {
         if (object == null) {
             return null;
         }
-        BigDecimal bigDecimal =
-                new BigDecimal(castObjectIntoString(object), new MathContext(precision));
-        bigDecimal = bigDecimal.setScale(scale, BigDecimal.ROUND_HALF_UP);
+        if (object instanceof Boolean) {
+            object = (Boolean) object ? 1 : 0;
+        }
+
+        BigDecimal bigDecimal;
+        try {
+            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
+        // non-serializable object into the pipeline that breaks downstream.
+        if (bigDecimal.precision() > precision) {
+            return null;
+        }
         return bigDecimal;
+    }
+
+    public static DecimalData castToDecimalData(Object object, int precision, int scale) {
+        if (object == null) {
+            return null;
+        }
+        if (object instanceof Boolean) {
+            object = (Boolean) object ? 1 : 0;
+        }
+
+        BigDecimal bigDecimal;
+        try {
+            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
+            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+
+        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
+        // non-serializable object into the pipeline that breaks downstream.
+        if (bigDecimal.precision() > precision) {
+            return null;
+        }
+        return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
     }
 
     public static TimestampData castToTimestamp(Object object, String timezone) {
@@ -697,5 +1036,49 @@ public class SystemFunctionUtils {
             return Boolean.valueOf(castToString(object)) ? "1" : "0";
         }
         return String.valueOf(object);
+    }
+
+    private static int universalCompares(Object lhs, Object rhs) {
+        Class<?> leftClass = lhs.getClass();
+        Class<?> rightClass = rhs.getClass();
+        if (leftClass.equals(rightClass) && lhs instanceof Comparable) {
+            return ((Comparable) lhs).compareTo(rhs);
+        } else if (lhs instanceof Number && rhs instanceof Number) {
+            return Double.compare(((Number) lhs).doubleValue(), ((Number) rhs).doubleValue());
+        } else {
+            throw new RuntimeException(
+                    "Comparison of unsupported data types: "
+                            + leftClass.getName()
+                            + " and "
+                            + rightClass.getName());
+        }
+    }
+
+    public static boolean greaterThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) > 0;
+    }
+
+    public static boolean greaterThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) >= 0;
+    }
+
+    public static boolean lessThan(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) < 0;
+    }
+
+    public static boolean lessThanOrEqual(Object lhs, Object rhs) {
+        if (lhs == null || rhs == null) {
+            return false;
+        }
+        return universalCompares(lhs, rhs) <= 0;
     }
 }

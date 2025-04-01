@@ -26,7 +26,8 @@ import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,18 +36,16 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit.toSuspendedBinlogSplit;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer}. */
-public class MySqlSplitSerializerTest {
+class MySqlSplitSerializerTest {
 
     @Test
-    public void testSnapshotSplit() throws Exception {
+    void testSnapshotSplit() throws Exception {
         final MySqlSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-1",
+                        1,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -54,11 +53,11 @@ public class MySqlSplitSerializerTest {
                         new Object[] {999L},
                         null,
                         new HashMap<>());
-        assertEquals(split, serializeAndDeserializeSplit(split));
+        Assertions.assertThat(serializeAndDeserializeSplit(split)).isEqualTo(split);
     }
 
     @Test
-    public void testBinlogSplit() throws Exception {
+    void testBinlogSplit() throws Exception {
         final TableId tableId = TableId.parse("test_db.test_table");
         final List<FinishedSnapshotSplitInfo> finishedSplitsInfo = new ArrayList<>();
         finishedSplitsInfo.add(
@@ -101,10 +100,11 @@ public class MySqlSplitSerializerTest {
                         finishedSplitsInfo,
                         databaseHistory,
                         finishedSplitsInfo.size());
-        assertEquals(split, serializeAndDeserializeSplit(split));
+        Assertions.assertThat(serializeAndDeserializeSplit(split)).isEqualTo(split);
 
         final MySqlSplit suspendedBinlogSplit = toSuspendedBinlogSplit(split.asBinlogSplit());
-        assertEquals(suspendedBinlogSplit, serializeAndDeserializeSplit(suspendedBinlogSplit));
+        Assertions.assertThat(serializeAndDeserializeSplit(suspendedBinlogSplit))
+                .isEqualTo(suspendedBinlogSplit);
 
         final MySqlSplit unCompletedBinlogSplit =
                 new MySqlBinlogSplit(
@@ -114,15 +114,16 @@ public class MySqlSplitSerializerTest {
                         new ArrayList<>(),
                         new HashMap<>(),
                         0);
-        assertEquals(unCompletedBinlogSplit, serializeAndDeserializeSplit(unCompletedBinlogSplit));
+        Assertions.assertThat(serializeAndDeserializeSplit(unCompletedBinlogSplit))
+                .isEqualTo(unCompletedBinlogSplit);
     }
 
     @Test
-    public void testRepeatedSerializationCache() throws Exception {
+    void testRepeatedSerializationCache() throws Exception {
         final MySqlSplit split =
                 new MySqlSnapshotSplit(
                         TableId.parse("test_db.test_table"),
-                        "test_db.test_table-0",
+                        0,
                         new RowType(
                                 Collections.singletonList(
                                         new RowType.RowField("id", new BigIntType()))),
@@ -132,7 +133,7 @@ public class MySqlSplitSerializerTest {
                         new HashMap<>());
         final byte[] ser1 = MySqlSplitSerializer.INSTANCE.serialize(split);
         final byte[] ser2 = MySqlSplitSerializer.INSTANCE.serialize(split);
-        assertSame(ser1, ser2);
+        Assertions.assertThat(ser1).isSameAs(ser2);
     }
 
     private MySqlSplit serializeAndDeserializeSplit(MySqlSplit split) throws Exception {

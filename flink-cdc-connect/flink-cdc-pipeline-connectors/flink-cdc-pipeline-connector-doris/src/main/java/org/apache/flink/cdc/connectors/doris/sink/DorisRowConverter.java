@@ -34,6 +34,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import java.io.IOException;
 import java.io.Serializable;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
@@ -116,6 +117,8 @@ public class DorisRowConverter implements Serializable {
             case TIMESTAMP_WITH_TIME_ZONE:
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();
+            case TIME_WITHOUT_TIME_ZONE:
+                return (index, val) -> LocalTime.ofNanoOfDay(val.getLong(index) * 1_000_000L);
             case ARRAY:
                 return (index, val) -> convertArrayData(val.getArray(index), type);
             case MAP:

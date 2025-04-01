@@ -22,7 +22,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.logical.RowType;
 
-import io.debezium.relational.TableId;
 import org.bson.BsonDocument;
 
 import java.util.Collection;
@@ -35,10 +34,6 @@ import java.util.Collection;
 public interface SplitStrategy {
 
     Collection<SnapshotSplit> split(SplitContext splitContext);
-
-    default String splitId(TableId collectionId, int chunkId) {
-        return collectionId.identifier() + ":" + chunkId;
-    }
 
     default RowType shardKeysToRowType(BsonDocument shardKeys) {
         return shardKeysToRowType(shardKeys.keySet());

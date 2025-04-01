@@ -24,7 +24,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 /** A test for the {@link PhysicalColumnSerializer}. */
-public class PhysicalColumnSerializerTest extends SerializerTestBase<PhysicalColumn> {
+class PhysicalColumnSerializerTest extends SerializerTestBase<PhysicalColumn> {
     @Override
     protected TypeSerializer<PhysicalColumn> createSerializer() {
         return PhysicalColumnSerializer.INSTANCE;

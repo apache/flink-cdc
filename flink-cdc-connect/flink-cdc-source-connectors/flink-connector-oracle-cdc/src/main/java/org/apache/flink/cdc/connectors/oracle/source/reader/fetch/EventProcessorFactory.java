@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.oracle.source.reader.fetch;
 
 import org.apache.flink.cdc.common.annotation.Internal;
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
@@ -36,7 +36,9 @@ import io.debezium.connector.oracle.logminer.processor.infinispan.EmbeddedInfini
 import io.debezium.connector.oracle.logminer.processor.infinispan.RemoteInfinispanLogMinerEventProcessor;
 import io.debezium.connector.oracle.logminer.processor.memory.MemoryLogMinerEventProcessor;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource;
+import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +58,8 @@ public class EventProcessorFactory {
             ChangeEventSource.ChangeEventSourceContext context,
             OracleConnectorConfig connectorConfig,
             OracleConnection jdbcConnection,
-            JdbcSourceEventDispatcher<OraclePartition> dispatcher,
+            EventDispatcher<OraclePartition, TableId> eventDispatcher,
+            WatermarkDispatcher watermarkDispatcher,
             OraclePartition partition,
             OracleOffsetContext offsetContext,
             OracleDatabaseSchema schema,
@@ -70,7 +73,8 @@ public class EventProcessorFactory {
                     context,
                     connectorConfig,
                     jdbcConnection,
-                    dispatcher,
+                    eventDispatcher,
+                    watermarkDispatcher,
                     partition,
                     offsetContext,
                     schema,
@@ -83,7 +87,8 @@ public class EventProcessorFactory {
                     context,
                     connectorConfig,
                     jdbcConnection,
-                    dispatcher,
+                    eventDispatcher,
+                    watermarkDispatcher,
                     partition,
                     offsetContext,
                     schema,
@@ -95,7 +100,8 @@ public class EventProcessorFactory {
                     context,
                     connectorConfig,
                     jdbcConnection,
-                    dispatcher,
+                    eventDispatcher,
+                    watermarkDispatcher,
                     partition,
                     offsetContext,
                     schema,
@@ -117,13 +123,14 @@ public class EventProcessorFactory {
         private final ErrorHandler errorHandler;
 
         private ChangeEventSource.ChangeEventSourceContext context;
-        private final JdbcSourceEventDispatcher<OraclePartition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
 
         public CDCMemoryLogMinerEventProcessor(
                 ChangeEventSource.ChangeEventSourceContext context,
                 OracleConnectorConfig connectorConfig,
                 OracleConnection jdbcConnection,
-                JdbcSourceEventDispatcher<OraclePartition> dispatcher,
+                EventDispatcher<OraclePartition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 OraclePartition partition,
                 OracleOffsetContext offsetContext,
                 OracleDatabaseSchema schema,
@@ -134,7 +141,7 @@ public class EventProcessorFactory {
                     context,
                     connectorConfig,
                     jdbcConnection,
-                    dispatcher,
+                    eventDispatcher,
                     partition,
                     offsetContext,
                     schema,
@@ -142,14 +149,14 @@ public class EventProcessorFactory {
             this.redoLogSplit = redoLogSplit;
             this.errorHandler = errorHandler;
             this.context = context;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
         }
 
         @Override
         protected void processRow(OraclePartition partition, LogMinerEventRow row)
                 throws SQLException, InterruptedException {
             if (reachEndingOffset(
-                    partition, row, redoLogSplit, errorHandler, dispatcher, context)) {
+                    partition, row, redoLogSplit, errorHandler, watermarkDispatcher, context)) {
                 return;
             }
             super.processRow(partition, row);
@@ -166,13 +173,14 @@ public class EventProcessorFactory {
         private final ErrorHandler errorHandler;
 
         private ChangeEventSource.ChangeEventSourceContext context;
-        private final JdbcSourceEventDispatcher<OraclePartition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
 
         public CDCEmbeddedInfinispanLogMinerEventProcessor(
                 ChangeEventSource.ChangeEventSourceContext context,
                 OracleConnectorConfig connectorConfig,
                 OracleConnection jdbcConnection,
-                JdbcSourceEventDispatcher<OraclePartition> dispatcher,
+                EventDispatcher<OraclePartition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 OraclePartition partition,
                 OracleOffsetContext offsetContext,
                 OracleDatabaseSchema schema,
@@ -183,7 +191,7 @@ public class EventProcessorFactory {
                     context,
                     connectorConfig,
                     jdbcConnection,
-                    dispatcher,
+                    eventDispatcher,
                     partition,
                     offsetContext,
                     schema,
@@ -191,14 +199,14 @@ public class EventProcessorFactory {
             this.redoLogSplit = redoLogSplit;
             this.errorHandler = errorHandler;
             this.context = context;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
         }
 
         @Override
         protected void processRow(OraclePartition partition, LogMinerEventRow row)
                 throws SQLException, InterruptedException {
             if (reachEndingOffset(
-                    partition, row, redoLogSplit, errorHandler, dispatcher, context)) {
+                    partition, row, redoLogSplit, errorHandler, watermarkDispatcher, context)) {
                 return;
             }
             super.processRow(partition, row);
@@ -215,13 +223,14 @@ public class EventProcessorFactory {
         private final ErrorHandler errorHandler;
 
         private ChangeEventSource.ChangeEventSourceContext context;
-        private final JdbcSourceEventDispatcher<OraclePartition> dispatcher;
+        private final WatermarkDispatcher watermarkDispatcher;
 
         public CDCRemoteInfinispanLogMinerEventProcessor(
                 ChangeEventSource.ChangeEventSourceContext context,
                 OracleConnectorConfig connectorConfig,
                 OracleConnection jdbcConnection,
-                JdbcSourceEventDispatcher<OraclePartition> dispatcher,
+                EventDispatcher<OraclePartition, TableId> eventDispatcher,
+                WatermarkDispatcher watermarkDispatcher,
                 OraclePartition partition,
                 OracleOffsetContext offsetContext,
                 OracleDatabaseSchema schema,
@@ -232,7 +241,7 @@ public class EventProcessorFactory {
                     context,
                     connectorConfig,
                     jdbcConnection,
-                    dispatcher,
+                    eventDispatcher,
                     partition,
                     offsetContext,
                     schema,
@@ -240,14 +249,14 @@ public class EventProcessorFactory {
             this.redoLogSplit = redoLogSplit;
             this.errorHandler = errorHandler;
             this.context = context;
-            this.dispatcher = dispatcher;
+            this.watermarkDispatcher = watermarkDispatcher;
         }
 
         @Override
         protected void processRow(OraclePartition partition, LogMinerEventRow row)
                 throws SQLException, InterruptedException {
             if (reachEndingOffset(
-                    partition, row, redoLogSplit, errorHandler, dispatcher, context)) {
+                    partition, row, redoLogSplit, errorHandler, watermarkDispatcher, context)) {
                 return;
             }
             super.processRow(partition, row);
@@ -259,7 +268,7 @@ public class EventProcessorFactory {
             LogMinerEventRow row,
             StreamSplit redoLogSplit,
             ErrorHandler errorHandler,
-            JdbcSourceEventDispatcher dispatcher,
+            WatermarkDispatcher dispatcher,
             ChangeEventSource.ChangeEventSourceContext context) {
         // check do we need to stop for fetch redo log for snapshot split.
         if (isBoundedRead(redoLogSplit)) {

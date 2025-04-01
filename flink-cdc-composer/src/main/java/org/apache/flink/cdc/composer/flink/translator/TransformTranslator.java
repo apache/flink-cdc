@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
@@ -46,7 +47,9 @@ public class TransformTranslator {
             DataStream<Event> input,
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models) {
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            boolean canContainDistributedTables) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -56,17 +59,24 @@ public class TransformTranslator {
         for (TransformDef transform : transforms) {
             preTransformFunctionBuilder.addTransform(
                     transform.getSourceTable(),
-                    transform.getProjection().orElse(null),
-                    transform.getFilter().orElse(null),
+                    transform.getProjection(),
+                    transform.getFilter(),
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
-                    transform.getTableOptions());
+                    transform.getTableOptions(),
+                    transform.getPostTransformConverter(),
+                    supportedMetadataColumns);
         }
 
-        preTransformFunctionBuilder.addUdfFunctions(
-                udfFunctions.stream().map(this::udfDefToUDFTuple).collect(Collectors.toList()));
-        preTransformFunctionBuilder.addUdfFunctions(
-                models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
+        preTransformFunctionBuilder
+                .addUdfFunctions(
+                        udfFunctions.stream()
+                                .map(this::udfDefToUDFTuple)
+                                .collect(Collectors.toList()))
+                .addUdfFunctions(
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
+                .canContainDistributedTables(canContainDistributedTables);
+
         return input.transform(
                 "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
     }
@@ -76,7 +86,8 @@ public class TransformTranslator {
             List<TransformDef> transforms,
             String timezone,
             List<UdfDef> udfFunctions,
-            List<ModelDef> models) {
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -87,11 +98,13 @@ public class TransformTranslator {
             if (transform.isValidProjection() || transform.isValidFilter()) {
                 postTransformFunctionBuilder.addTransform(
                         transform.getSourceTable(),
-                        transform.isValidProjection() ? transform.getProjection().get() : null,
-                        transform.isValidFilter() ? transform.getFilter().get() : null,
+                        transform.getProjection(),
+                        transform.getFilter(),
                         transform.getPrimaryKeys(),
                         transform.getPartitionKeys(),
-                        transform.getTableOptions());
+                        transform.getTableOptions(),
+                        transform.getPostTransformConverter(),
+                        supportedMetadataColumns);
             }
         }
         postTransformFunctionBuilder.addTimezone(timezone);
