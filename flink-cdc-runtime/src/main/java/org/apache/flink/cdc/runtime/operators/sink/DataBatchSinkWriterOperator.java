@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
@@ -125,8 +126,14 @@ public class DataBatchSinkWriterOperator<CommT>
 
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
-        this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
-                .processElement(element);
+        Event event = element.getValue();
+
+        try {
+            this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
+                    .processElement(element);
+        } catch (Exception e) {
+            throw new SinkWrapperException(event, e);
+        }
     }
 
     @Override
