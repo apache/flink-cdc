@@ -32,6 +32,7 @@ import org.apache.flink.configuration.ConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -73,18 +74,20 @@ public class JdbcDataSinkFactory implements DataSinkFactory {
 
         List<JdbcSinkDialectFactory<JdbcSinkConfig>> dialectFactories =
                 discoverDialectFactories(getClass().getClassLoader());
-        config.getOptional(CONN_URL).ifPresent(builder::connUrl);
-        config.getOptional(USERNAME).ifPresent(builder::username);
-        config.getOptional(PASSWORD).ifPresent(builder::password);
 
-        builder.serverTimeZone(config.getOptional(SERVER_TIME_ZONE).orElse("UTC"));
-        builder.connectTimeout(config.get(CONNECT_TIMEOUT));
-        builder.connectionPoolSize(config.get(CONNECTION_POOL_SIZE));
-        builder.connectMaxRetries(config.get(CONNECT_MAX_RETRIES));
-        builder.writeBatchIntervalMs(config.get(WRITE_BATCH_INTERVAL_MS));
-        builder.writeBatchSize(config.get(WRITE_BATCH_SIZE));
-        builder.writeMaxRetries(config.get(WRITE_MAX_RETRIES));
-        builder.driverClassName(config.get(DRIVER_CLASS_NAME));
+        builder.connUrl(config.get(CONN_URL))
+                .username(config.get(USERNAME))
+                .password(config.get(PASSWORD))
+                .serverTimeZone(
+                        config.getOptional(SERVER_TIME_ZONE)
+                                .orElse(ZoneId.systemDefault().toString()))
+                .connectTimeout(config.get(CONNECT_TIMEOUT))
+                .connectionPoolSize(config.get(CONNECTION_POOL_SIZE))
+                .connectMaxRetries(config.get(CONNECT_MAX_RETRIES))
+                .writeBatchIntervalMs(config.get(WRITE_BATCH_INTERVAL_MS))
+                .writeBatchSize(config.get(WRITE_BATCH_SIZE))
+                .writeMaxRetries(config.get(WRITE_MAX_RETRIES))
+                .driverClassName(config.get(DRIVER_CLASS_NAME));
 
         Properties properties = new Properties();
         Map<String, String> jdbcProperties =
