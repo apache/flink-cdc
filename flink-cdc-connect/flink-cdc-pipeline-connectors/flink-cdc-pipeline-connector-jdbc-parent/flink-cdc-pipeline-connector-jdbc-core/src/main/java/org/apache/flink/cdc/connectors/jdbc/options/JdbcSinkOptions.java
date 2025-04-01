@@ -28,7 +28,7 @@ import java.util.Map;
 /** Configurations for JDBC data source. */
 public class JdbcSinkOptions {
     public static final ConfigOption<String> CONN_URL =
-            ConfigOptions.key("conn.url")
+            ConfigOptions.key("url")
                     .stringType()
                     .noDefaultValue()
                     .withDescription("JDBC connection URL for sink database.");
