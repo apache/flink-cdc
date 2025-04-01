@@ -11,7 +11,7 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
+ * See the License for the specific langutinyIntCol governing permissions and
  * limitations under the License.
  */
 
@@ -42,6 +42,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -84,7 +85,11 @@ public class IcebergMetadataApplierTest {
                                         DataTypes.VARCHAR(255).notNull(),
                                         "column for name",
                                         "John Smith")
-                                .physicalColumn("age", DataTypes.TINYINT(), "column for age", "91")
+                                .physicalColumn(
+                                        "tinyIntCol",
+                                        DataTypes.TINYINT(),
+                                        "column for tinyIntCol",
+                                        "1")
                                 .physicalColumn(
                                         "description",
                                         DataTypes.STRING(),
@@ -128,7 +133,11 @@ public class IcebergMetadataApplierTest {
                                         Types.StringType.get(),
                                         "column for name"),
                                 Types.NestedField.of(
-                                        3, true, "age", Types.IntegerType.get(), "column for age"),
+                                        3,
+                                        true,
+                                        "tinyIntCol",
+                                        Types.BooleanType.get(),
+                                        "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         4,
                                         true,
@@ -159,14 +168,14 @@ public class IcebergMetadataApplierTest {
                                         "decimal_column",
                                         Types.DecimalType.of(10, 2),
                                         "column for decimal")),
-                        new HashSet<>(Arrays.asList(1)));
+                        new HashSet<>(List.of(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
         // Add column.
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(
                         tableId,
-                        Arrays.asList(
+                        List.of(
                                 AddColumnEvent.last(
                                         new PhysicalColumn(
                                                 "newIntColumn",
@@ -188,7 +197,11 @@ public class IcebergMetadataApplierTest {
                                         Types.StringType.get(),
                                         "column for name"),
                                 Types.NestedField.of(
-                                        3, true, "age", Types.IntegerType.get(), "column for age"),
+                                        3,
+                                        true,
+                                        "tinyIntCol",
+                                        Types.BooleanType.get(),
+                                        "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         4,
                                         true,
@@ -225,12 +238,11 @@ public class IcebergMetadataApplierTest {
                                         "newIntColumn",
                                         Types.IntegerType.get(),
                                         "comment for newIntColumn")),
-                        new HashSet<>(Arrays.asList(1)));
+                        new HashSet<>(List.of(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
         // Drop Column.
-        DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(tableId, Arrays.asList("description"));
+        DropColumnEvent dropColumnEvent = new DropColumnEvent(tableId, List.of("description"));
         icebergMetadataApplier.applySchemaChange(dropColumnEvent);
         table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
         schema =
@@ -246,7 +258,11 @@ public class IcebergMetadataApplierTest {
                                         Types.StringType.get(),
                                         "column for name"),
                                 Types.NestedField.of(
-                                        3, true, "age", Types.IntegerType.get(), "column for age"),
+                                        3,
+                                        true,
+                                        "tinyIntCol",
+                                        Types.BooleanType.get(),
+                                        "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         5,
                                         true,
@@ -277,7 +293,7 @@ public class IcebergMetadataApplierTest {
                                         "newIntColumn",
                                         Types.IntegerType.get(),
                                         "comment for newIntColumn")),
-                        new HashSet<>(Arrays.asList(1)));
+                        new HashSet<>(List.of(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
         // Rename Column.
@@ -298,7 +314,11 @@ public class IcebergMetadataApplierTest {
                                         Types.StringType.get(),
                                         "column for name"),
                                 Types.NestedField.of(
-                                        3, true, "age", Types.IntegerType.get(), "column for age"),
+                                        3,
+                                        true,
+                                        "tinyIntCol",
+                                        Types.BooleanType.get(),
+                                        "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         5,
                                         true,
@@ -329,7 +349,7 @@ public class IcebergMetadataApplierTest {
                                         "renamedIntColumn",
                                         Types.IntegerType.get(),
                                         "comment for newIntColumn")),
-                        new HashSet<>(Arrays.asList(1)));
+                        new HashSet<>(List.of(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
         // Alter Column Type.
@@ -351,7 +371,11 @@ public class IcebergMetadataApplierTest {
                                         Types.StringType.get(),
                                         "column for name"),
                                 Types.NestedField.of(
-                                        3, true, "age", Types.IntegerType.get(), "column for age"),
+                                        3,
+                                        true,
+                                        "tinyIntCol",
+                                        Types.BooleanType.get(),
+                                        "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         5,
                                         true,
@@ -382,7 +406,7 @@ public class IcebergMetadataApplierTest {
                                         "renamedIntColumn",
                                         Types.LongType.get(),
                                         "comment for newIntColumn")),
-                        new HashSet<>(Arrays.asList(1)));
+                        new HashSet<>(List.of(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
     }
 }
