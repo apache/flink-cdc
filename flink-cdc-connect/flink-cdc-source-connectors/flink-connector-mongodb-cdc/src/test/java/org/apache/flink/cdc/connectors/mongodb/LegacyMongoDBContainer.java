@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -35,8 +36,6 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertNotNull;
 
 /** Mongodb test container. */
 public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContainer> {
@@ -188,7 +187,7 @@ public class LegacyMongoDBContainer extends GenericContainer<LegacyMongoDBContai
         final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
         final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);
         final URL ddlTestFile = LegacyMongoDBContainer.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
 
         try {
             // use database;

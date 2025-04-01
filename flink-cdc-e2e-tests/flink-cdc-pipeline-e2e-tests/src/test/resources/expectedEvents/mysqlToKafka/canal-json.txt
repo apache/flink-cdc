@@ -1,0 +1,37 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+{"old":null,"data":[{"id":103,"name":"user_3","address":"Shanghai","phone_number":"123567891234"}],"type":"INSERT","database":"$databaseName","table":"customers","pkNames":["id"]}
+{"old":null,"data":[{"id":104,"name":"user_4","address":"Shanghai","phone_number":"123567891234"}],"type":"INSERT","database":"$databaseName","table":"customers","pkNames":["id"]}
+{"old":null,"data":[{"id":102,"name":"user_2","address":"Shanghai","phone_number":"123567891234"}],"type":"INSERT","database":"$databaseName","table":"customers","pkNames":["id"]}
+{"old":null,"data":[{"id":101,"name":"user_1","address":"Shanghai","phone_number":"123567891234"}],"type":"INSERT","database":"$databaseName","table":"customers","pkNames":["id"]}
+{"old":null,"data":[{"id":107,"name":"rocks","description":"box of assorted rocks","weight":5.3,"enum_c":null,"json_c":null,"point_c":null}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":108,"name":"jacket","description":"water resistent black wind breaker","weight":0.1,"enum_c":null,"json_c":null,"point_c":null}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":103,"name":"12-pack drill bits","description":"12-pack of drill bits with sizes ranging from #40 to #3","weight":0.8,"enum_c":"red","json_c":"{\"key3\": \"value3\"}","point_c":"{\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}"}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":105,"name":"hammer","description":"14oz carpenter's hammer","weight":0.875,"enum_c":"red","json_c":"{\"k1\": \"v1\", \"k2\": \"v2\"}","point_c":"{\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}"}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":109,"name":"spare tire","description":"24 inch spare tire","weight":22.2,"enum_c":null,"json_c":null,"point_c":null}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":101,"name":"scooter","description":"Small 2-wheel scooter","weight":3.14,"enum_c":"red","json_c":"{\"key1\": \"value1\"}","point_c":"{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}"}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":106,"name":"hammer","description":"16oz carpenter's hammer","weight":1.0,"enum_c":null,"json_c":null,"point_c":null}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":102,"name":"car battery","description":"12V car battery","weight":8.1,"enum_c":"white","json_c":"{\"key2\": \"value2\"}","point_c":"{\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}"}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":104,"name":"hammer","description":"12oz carpenter's hammer","weight":0.75,"enum_c":"white","json_c":"{\"key4\": \"value4\"}","point_c":"{\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}"}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":[{"id":107,"name":"rocks","description":"box of assorted rocks","weight":5.3,"enum_c":null,"json_c":null,"point_c":null}],"data":[{"id":107,"name":"rocks","description":"box of assorted rocks","weight":5.1,"enum_c":null,"json_c":null,"point_c":null}],"type":"UPDATE","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":[{"id":106,"name":"hammer","description":"16oz carpenter's hammer","weight":1.0,"enum_c":null,"json_c":null,"point_c":null}],"data":[{"id":106,"name":"hammer","description":"18oz carpenter hammer","weight":1.0,"enum_c":null,"json_c":null,"point_c":null}],"type":"UPDATE","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":111,"name":"scooter","description":"Big 2-wheel scooter ","weight":5.18,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":110,"name":"jacket","description":"water resistent white wind breaker","weight":0.2,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"type":"INSERT","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":[{"id":111,"name":"scooter","description":"Big 2-wheel scooter ","weight":5.18,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"data":[{"id":111,"name":"scooter","description":"Big 2-wheel scooter ","weight":5.17,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"type":"UPDATE","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":null,"data":[{"id":111,"name":"scooter","description":"Big 2-wheel scooter ","weight":5.17,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"type":"DELETE","database":"$databaseName","table":"products","pkNames":["id"]}
+{"old":[{"id":110,"name":"jacket","description":"water resistent white wind breaker","weight":0.2,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"data":[{"id":110,"name":"jacket","description":"new water resistent white wind breaker","weight":0.5,"enum_c":null,"json_c":null,"point_c":null,"new_col":1}],"type":"UPDATE","database":"$databaseName","table":"products","pkNames":["id"]}

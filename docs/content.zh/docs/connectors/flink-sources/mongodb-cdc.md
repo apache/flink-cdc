@@ -147,7 +147,7 @@ SELECT * FROM products;
 **请注意**
 
 MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能将其转换为 Flink 的 UPSERT 更改日志流。
-upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为主键。
+因为 upsert 流需要唯一键，所以我们必须声明 `_id` 作为主键。
 我们不能将其他列声明为主键, 因为删除操作不包含除 `_id` 和 `sharding key` 之外的键和值。
 
 连接器选项
@@ -332,6 +332,17 @@ upstart 流需要一个唯一的密钥，所以我们必须声明 `_id` 作为�
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这是一项实验特性，默认为 false。
+      </td>
+    </tr>
   </tbody>
 </table>
 
@@ -367,7 +378,7 @@ MongoDB CDC 连接器是一个 Flink Source 连接器，它将首先读取数据
 
 ### 启动模式<a name="启动模式" id="002" ></a>
 
-配置选项```scan.startup.mode```指定 MySQL CDC 使用者的启动模式。有效枚举包括：
+配置选项```scan.startup.mode```指定 MongoDB CDC 消费者的启动模式。有效枚举包括：
 
 - `initial` （默认）：在第一次启动时对受监视的数据库表执行初始快照，并继续读取最新的 oplog。
 - `latest-offset`：首次启动时，从不对受监视的数据库表执行快照， 连接器仅从 oplog 的结尾处开始读取，这意味着连接器只能读取在连接器启动之后的数据更改。
@@ -487,6 +498,82 @@ public class MongoDBIncrementalSourceExample {
 **注意:**
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
+
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 MongoDB，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
+
+### 完整的 Changelog
+
+MongoDB 6.0 以及更高的版本支持发送变更流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
+
+- 前镜像是指被替换、更新或删除之前的文档。对于插入操作没有前镜像。
+
+- 后镜像是指被替换、更新或删除之后的文档。对于删除操作没有后镜像。
+
+MongoDB CDC 能够使用前镜像和后镜像来生成完整的变更日志流，包括插入、更新前、更新后和删除的数据行，从而避免了额外的 `ChangelogNormalize` 下游节点。
+
+为了启用此功能，你需要满足以下条件：
+
+- MongoDB 的版本必须为 6.0 或更高版本。
+- 启用 `preAndPostImages` 功能。
+
+```javascript
+db.runCommand({
+  setClusterParameter: {
+    changeStreamOptions: {
+      preAndPostImages: {
+        expireAfterSeconds: 'off' // replace with custom image expiration time
+      }
+    }
+  }
+})
+```
+
+- 为希望监控的 collection 启用 `changeStreamPreAndPostImages` 功能：
+```javascript
+db.runCommand({
+  collMod: "<< collection name >>", 
+  changeStreamPreAndPostImages: {
+    enabled: true 
+  } 
+})
+```
+
+在 DataStream 中开启 MongoDB CDC 的 `scan.full-changelog` 功能：
+
+```java
+MongoDBSource.builder()
+    .scanFullChangelog(true)
+    ...
+    .build()
+```
+
+或者使用 Flink SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.full-changelog' = 'true',
+    ...
+)
+```
 
 数据类型映射
 ----------------

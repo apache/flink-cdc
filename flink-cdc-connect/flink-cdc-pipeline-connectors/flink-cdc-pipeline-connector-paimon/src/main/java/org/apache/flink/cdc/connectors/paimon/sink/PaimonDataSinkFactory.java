@@ -24,12 +24,9 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonRecordEventSerializer;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonRecordSerializer;
 
-import org.apache.paimon.catalog.Catalog;
-import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 
 import java.time.ZoneId;
@@ -69,12 +66,8 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
                     }
                 });
         Options options = Options.fromMap(catalogOptions);
-        try (Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(options)) {
-            Preconditions.checkNotNull(
-                    catalog.listDatabases(), "catalog option of Paimon is invalid.");
-        } catch (Exception e) {
-            throw new RuntimeException("failed to create or use paimon catalog", e);
-        }
+        // Avoid using previous table schema.
+        options.setString("cache-enabled", "false");
         ZoneId zoneId = ZoneId.systemDefault();
         if (!Objects.equals(
                 context.getPipelineConfiguration().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),

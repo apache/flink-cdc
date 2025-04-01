@@ -20,7 +20,9 @@ package org.apache.flink.cdc.connectors.vitess;
 import org.apache.flink.cdc.connectors.vitess.container.VitessContainer;
 import org.apache.flink.test.util.AbstractTestBase;
 
-import org.junit.BeforeClass;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -40,8 +42,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
-
 /** Basic class for testing Vitess source, this contains a Vitess container. */
 public abstract class VitessTestBase extends AbstractTestBase {
 
@@ -57,11 +57,18 @@ public abstract class VitessTestBase extends AbstractTestBase {
                             .withExposedPorts(VitessContainer.MYSQL_PORT, VitessContainer.GRPC_PORT)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() throws Exception {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(VITESS_CONTAINER)).join();
         LOG.info("Containers are started.");
+    }
+
+    @AfterAll
+    static void stopContainers() {
+        LOG.info("Stopping containers...");
+        VITESS_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
     }
 
     public Connection getJdbcConnection() throws SQLException {
@@ -75,7 +82,7 @@ public abstract class VitessTestBase extends AbstractTestBase {
     protected void initializeTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = VitessTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             final List<String> statements =

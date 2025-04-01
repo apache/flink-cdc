@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
+import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -59,11 +60,16 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive) {
+            boolean isTableIdCaseSensitive,
+            SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this(
                 sourceConfig,
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, currentParallelism, remainingTables, isTableIdCaseSensitive),
+                        sourceConfig,
+                        currentParallelism,
+                        remainingTables,
+                        isTableIdCaseSensitive,
+                        enumeratorContext),
                 false,
                 sourceConfig.getSplitMetaGroupSize());
     }
@@ -71,11 +77,15 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
     public MySqlHybridSplitAssigner(
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
-            HybridPendingSplitsState checkpoint) {
+            HybridPendingSplitsState checkpoint,
+            SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this(
                 sourceConfig,
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, currentParallelism, checkpoint.getSnapshotPendingSplits()),
+                        sourceConfig,
+                        currentParallelism,
+                        checkpoint.getSnapshotPendingSplits(),
+                        enumeratorContext),
                 checkpoint.isBinlogSplitAssigned(),
                 sourceConfig.getSplitMetaGroupSize());
     }

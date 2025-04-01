@@ -28,8 +28,8 @@ limitations under the License.
     <artifactId>flink-cdc-source-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.19>1.19.1</flink-1.19>
-        <flink-1.20>1.20.0</flink-1.20>
+        <flink-1.19>1.19.2</flink-1.19>
+        <flink-1.20>1.20.1</flink-1.20>
         <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
         <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
@@ -138,6 +138,12 @@ limitations under the License.
         <!-- testcontainers -->
         <dependency>
             <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
             <artifactId>mysql</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
@@ -169,7 +175,7 @@ limitations under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>mongodb</artifactId>
-            <version>1.18.3</version>
+            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

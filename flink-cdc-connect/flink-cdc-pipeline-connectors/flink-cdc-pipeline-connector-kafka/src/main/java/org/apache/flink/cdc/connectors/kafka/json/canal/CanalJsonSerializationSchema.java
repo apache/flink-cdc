@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.kafka.json.TableSchemaInfo;
+import org.apache.flink.cdc.connectors.kafka.utils.JsonRowDataSerializationSchemaUtils;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
@@ -73,6 +74,8 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
 
     private final boolean encodeDecimalAsPlainNumber;
 
+    private final boolean ignoreNullFields;
+
     private final ZoneId zoneId;
 
     private InitializationContext context;
@@ -82,13 +85,15 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             JsonFormatOptions.MapNullKeyMode mapNullKeyMode,
             String mapNullKeyLiteral,
             ZoneId zoneId,
-            boolean encodeDecimalAsPlainNumber) {
+            boolean encodeDecimalAsPlainNumber,
+            boolean ignoreNullFields) {
         this.timestampFormat = timestampFormat;
         this.mapNullKeyMode = mapNullKeyMode;
         this.mapNullKeyLiteral = mapNullKeyLiteral;
         this.encodeDecimalAsPlainNumber = encodeDecimalAsPlainNumber;
         this.zoneId = zoneId;
         jsonSerializers = new HashMap<>();
+        this.ignoreNullFields = ignoreNullFields;
     }
 
     @Override
@@ -114,12 +119,13 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
             LogicalType rowType =
                     DataTypeUtils.toFlinkDataType(schema.toRowDataType()).getLogicalType();
             JsonRowDataSerializationSchema jsonSerializer =
-                    new JsonRowDataSerializationSchema(
+                    JsonRowDataSerializationSchemaUtils.createSerializationSchema(
                             createJsonRowType(fromLogicalToDataType(rowType)),
                             timestampFormat,
                             mapNullKeyMode,
                             mapNullKeyLiteral,
-                            encodeDecimalAsPlainNumber);
+                            encodeDecimalAsPlainNumber,
+                            ignoreNullFields);
             try {
                 jsonSerializer.open(context);
             } catch (Exception e) {
@@ -163,8 +169,9 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                             .getSerializationSchema()
                             .serialize(reuseGenericRowData);
                 case DELETE:
+                    reuseGenericRowData.setField(0, null);
                     reuseGenericRowData.setField(
-                            0,
+                            1,
                             new GenericArrayData(
                                     new RowData[] {
                                         jsonSerializers
@@ -172,7 +179,6 @@ public class CanalJsonSerializationSchema implements SerializationSchema<Event> 
                                                 .getRowDataFromRecordData(
                                                         dataChangeEvent.before(), false)
                                     }));
-                    reuseGenericRowData.setField(1, null);
                     reuseGenericRowData.setField(2, OP_DELETE);
                     return jsonSerializers
                             .get(dataChangeEvent.tableId())

@@ -269,6 +269,15 @@ public class MongoDBSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link MongoDBSource} should assign the unbounded chunks first or not during
+     * snapshot reading phase.
+     */
+    public MongoDBSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link MongoDBSource}.
      *
      * @return a MongoDBParallelSource with the settings made for this builder.

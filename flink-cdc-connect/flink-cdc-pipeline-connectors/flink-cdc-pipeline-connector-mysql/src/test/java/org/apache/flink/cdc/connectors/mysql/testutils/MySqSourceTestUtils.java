@@ -20,10 +20,13 @@ package org.apache.flink.cdc.connectors.mysql.testutils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 /** Test utilities for MySQL event source. */
 public class MySqSourceTestUtils {
@@ -61,6 +64,20 @@ public class MySqSourceTestUtils {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         return serverId + "-" + (serverId + parallelism);
+    }
+
+    public static void loopCheck(
+            Supplier<Boolean> runnable, String description, Duration timeout, Duration interval)
+            throws Exception {
+        long deadline = System.currentTimeMillis() + timeout.toMillis();
+        while (System.currentTimeMillis() < deadline) {
+            if (runnable.get()) {
+                return;
+            }
+            Thread.sleep(interval.toMillis());
+        }
+        throw new TimeoutException(
+                "Ran out of time when waiting for " + description + " to success.");
     }
 
     private MySqSourceTestUtils() {}

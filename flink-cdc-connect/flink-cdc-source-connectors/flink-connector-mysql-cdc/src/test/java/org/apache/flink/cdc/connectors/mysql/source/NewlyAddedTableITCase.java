@@ -50,13 +50,13 @@ import org.apache.flink.util.ExceptionUtils;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -82,16 +82,17 @@ import static org.apache.flink.api.common.restartstrategy.RestartStrategies.noRe
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** IT tests to cover various newly added tables during capture process. */
-public class NewlyAddedTableITCase extends MySqlSourceTestBase {
-
-    @Rule public final Timeout timeoutPerTest = Timeout.seconds(300);
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
+class NewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
     private final ScheduledExecutorService mockBinlogExecutor = Executors.newScheduledThreadPool(1);
 
-    @Before
+    @TempDir private Path tempFolder;
+
+    @BeforeEach
     public void before() throws SQLException {
         TestValuesTableFactory.clearAllData();
         customDatabase.createAndInitialize();
@@ -122,13 +123,13 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         }
     }
 
-    @After
+    @AfterEach
     public void after() {
         mockBinlogExecutor.shutdown();
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineOnce() throws Exception {
+    void testNewlyAddedTableForExistsPipelineOnce() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -139,7 +140,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineOnceWithAheadBinlog() throws Exception {
+    void testNewlyAddedTableForExistsPipelineOnceWithAheadBinlog() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -150,7 +151,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineTwice() throws Exception {
+    void testNewlyAddedTableForExistsPipelineTwice() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -162,7 +163,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineTwiceWithAheadBinlog() throws Exception {
+    void testNewlyAddedTableForExistsPipelineTwiceWithAheadBinlog() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -174,7 +175,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineTwiceWithAheadBinlogAndAutoCloseReader()
+    void testNewlyAddedTableForExistsPipelineTwiceWithAheadBinlogAndAutoCloseReader()
             throws Exception {
         Map<String, String> otherOptions = new HashMap<>();
         otherOptions.put("scan.incremental.close-idle-reader.enabled", "true");
@@ -190,7 +191,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineThrice() throws Exception {
+    void testNewlyAddedTableForExistsPipelineThrice() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -203,7 +204,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineThriceWithAheadBinlog() throws Exception {
+    void testNewlyAddedTableForExistsPipelineThriceWithAheadBinlog() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -216,7 +217,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
+    void testNewlyAddedTableForExistsPipelineSingleParallelism() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -227,8 +228,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadBinlog()
-            throws Exception {
+    void testNewlyAddedTableForExistsPipelineSingleParallelismWithAheadBinlog() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.NONE,
@@ -239,7 +239,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForNewlyAddedTable() throws Exception {
+    void testJobManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
@@ -250,7 +250,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForNewlyAddedTableWithAheadBinlog() throws Exception {
+    void testJobManagerFailoverForNewlyAddedTableWithAheadBinlog() throws Exception {
         testNewlyAddedTableOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
@@ -261,7 +261,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForNewlyAddedTable() throws Exception {
+    void testTaskManagerFailoverForNewlyAddedTable() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.TM,
@@ -272,7 +272,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForNewlyAddedTableWithAheadBinlog() throws Exception {
+    void testTaskManagerFailoverForNewlyAddedTableWithAheadBinlog() throws Exception {
         testNewlyAddedTableOneByOne(
                 1,
                 FailoverType.TM,
@@ -283,7 +283,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForRemoveTableSingleParallelism() throws Exception {
+    void testJobManagerFailoverForRemoveTableSingleParallelism() throws Exception {
         testRemoveTablesOneByOne(
                 1,
                 FailoverType.JM,
@@ -294,7 +294,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testJobManagerFailoverForRemoveTable() throws Exception {
+    void testJobManagerFailoverForRemoveTable() throws Exception {
         testRemoveTablesOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.JM,
@@ -305,7 +305,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForRemoveTableSingleParallelism() throws Exception {
+    void testTaskManagerFailoverForRemoveTableSingleParallelism() throws Exception {
         testRemoveTablesOneByOne(
                 1,
                 FailoverType.TM,
@@ -316,7 +316,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testTaskManagerFailoverForRemoveTable() throws Exception {
+    void testTaskManagerFailoverForRemoveTable() throws Exception {
         testRemoveTablesOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.TM,
@@ -327,7 +327,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testRemoveTableSingleParallelism() throws Exception {
+    void testRemoveTableSingleParallelism() throws Exception {
         testRemoveTablesOneByOne(
                 1,
                 FailoverType.NONE,
@@ -338,7 +338,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testRemoveTable() throws Exception {
+    void testRemoveTable() throws Exception {
         testRemoveTablesOneByOne(
                 DEFAULT_PARALLELISM,
                 FailoverType.NONE,
@@ -349,16 +349,14 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testRemoveAndAddNewTable() throws Exception {
+    void testRemoveAndAddNewTable() throws Exception {
         // round 1 : table0 + table1 (customers_even_dist + customers)
         // round 2 : table0 + table2 (customers_even_dist + customers_1)
         String tableId0 = customDatabase.getDatabaseName() + ".customers_even_dist";
         String tableId1 = "customers";
         String tableId2 = "customers_\\d+";
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
 
         String finishedSavePointPath = null;
         CollectResultIterator<RowData> iterator = null;
@@ -509,11 +507,10 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
-        temporaryFolder.delete();
     }
 
     @Test
-    public void testNewlyAddedEmptyTableAndInsertAfterJobStart() throws Exception {
+    void testNewlyAddedEmptyTableAndInsertAfterJobStart() throws Exception {
         testNewlyAddedTableOneByOneWithCreateBeforeStart(
                 1, new HashMap<>(), "address_hangzhou", "address_beijing");
     }
@@ -584,9 +581,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         // step 1: create mysql tables with all tables included
         initialAddressTables(getConnection(), captureAddressTables);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
 
         // get all expected data
         List<String> fetchedDataList = new ArrayList<>();
@@ -635,7 +630,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             waitForSinkSize("sink", fetchedDataList.size());
@@ -709,7 +704,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
 
@@ -753,9 +748,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
         // step 1: create mysql tables with initial data
         initialAddressTables(getConnection(), captureAddressTables);
 
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
 
         // test newly added table one by one
         String finishedSavePointPath = null;
@@ -826,7 +819,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             fetchedDataList.addAll(expectedSnapshotDataThisRound);
@@ -840,7 +833,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
                 triggerFailover(
                         failoverType,
                         jobClient.getJobID(),
-                        miniClusterResource.getMiniCluster(),
+                        miniClusterResource.get().getMiniCluster(),
                         () -> sleepMs(100));
             }
             makeSecondPartBinlogForAddressTable(getConnection(), newlyAddedTable);
@@ -1125,9 +1118,7 @@ public class NewlyAddedTableITCase extends MySqlSourceTestBase {
     private void testNewlyAddedTableOneByOneWithCreateBeforeStart(
             int parallelism, Map<String, String> sourceOptions, String... captureAddressTables)
             throws Exception {
-        final TemporaryFolder temporaryFolder = new TemporaryFolder();
-        temporaryFolder.create();
-        final String savepointDirectory = temporaryFolder.newFolder().toURI().toString();
+        final String savepointDirectory = tempFolder.toString();
         String finishedSavePointPath = null;
         List<String> fetchedDataList = new ArrayList<>();
         for (int round = 0; round < captureAddressTables.length; round++) {

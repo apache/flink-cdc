@@ -29,6 +29,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
+import org.apache.flink.cdc.connectors.mysql.source.utils.MockMySqlSplitEnumeratorEnumeratorContext;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.table.api.DataTypes;
@@ -37,8 +38,9 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import io.debezium.relational.TableId;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -50,22 +52,22 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link MySqlHybridSplitAssigner}. */
-public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
+class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
 
-    @BeforeClass
+    @BeforeAll
     public static void init() {
         customerDatabase.createAndInitialize();
     }
 
     @Test
-    public void testAssignMySqlBinlogSplitAfterAllSnapshotSplitsFinished() {
+    void testAssignMySqlBinlogSplitAfterAllSnapshotSplitsFinished() {
 
         final String captureTable = "customers";
         MySqlSourceConfig configuration =
@@ -109,8 +111,11 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
         HybridPendingSplitsState checkpoint =
                 new HybridPendingSplitsState(snapshotPendingSplitsState, false);
+        MockMySqlSplitEnumeratorEnumeratorContext enumeratorContext =
+                getMySqlSplitEnumeratorContext();
         final MySqlHybridSplitAssigner assigner =
-                new MySqlHybridSplitAssigner(configuration, DEFAULT_PARALLELISM, checkpoint);
+                new MySqlHybridSplitAssigner(
+                        configuration, DEFAULT_PARALLELISM, checkpoint, enumeratorContext);
 
         // step 2. Get the MySqlBinlogSplit after all snapshot splits finished
         Optional<MySqlSplit> binlogSplit = assigner.getNext();
@@ -139,12 +144,12 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                         finishedSnapshotSplitInfos,
                         new HashMap<>(),
                         finishedSnapshotSplitInfos.size());
-        assertEquals(expected, mySqlBinlogSplit);
+        Assertions.assertThat(mySqlBinlogSplit).isEqualTo(expected);
         assigner.close();
     }
 
     @Test
-    public void testAssigningInSnapshotOnlyMode() {
+    void testAssigningInSnapshotOnlyMode() {
         final String captureTable = "customers";
 
         MySqlSourceConfig sourceConfig =
@@ -152,7 +157,12 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
         // Create and initialize assigner
         MySqlHybridSplitAssigner assigner =
-                new MySqlHybridSplitAssigner(sourceConfig, 1, new ArrayList<>(), false);
+                new MySqlHybridSplitAssigner(
+                        sourceConfig,
+                        1,
+                        new ArrayList<>(),
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
 
         // Get all snapshot splits
@@ -170,17 +180,16 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
 
         // Get the binlog split
         Optional<MySqlSplit> split = assigner.getNext();
-        assertTrue(split.isPresent());
-        assertTrue(split.get() instanceof MySqlBinlogSplit);
+        Assertions.assertThat(split).isPresent().get().isInstanceOf(MySqlBinlogSplit.class);
         MySqlBinlogSplit binlogSplit = split.get().asBinlogSplit();
 
         // Validate if the stopping offset of the binlog split is the maximum among all finished
         // offsets, which should be snapshotSplits.size() - 1
-        assertEquals(
-                BinlogOffset.builder()
-                        .setBinlogFilePosition("foo", snapshotSplits.size() - 1)
-                        .build(),
-                binlogSplit.getEndingOffset());
+        Assertions.assertThat(binlogSplit.getEndingOffset())
+                .isEqualTo(
+                        BinlogOffset.builder()
+                                .setBinlogFilePosition("foo", snapshotSplits.size() - 1)
+                                .build());
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables, StartupOptions startupOptions) {
@@ -201,6 +210,57 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
                 .createConfig(0);
     }
 
+    @Test
+    public void testSetProcessingBacklog() {
+        final String captureTable = "customers";
+        MySqlSourceConfig configuration = getConfig(new String[] {captureTable});
+        MockMySqlSplitEnumeratorEnumeratorContext enumeratorContext =
+                getMySqlSplitEnumeratorContext();
+        final MySqlHybridSplitAssigner assigner =
+                new MySqlHybridSplitAssigner(
+                        configuration,
+                        DEFAULT_PARALLELISM,
+                        new ArrayList<>(),
+                        false,
+                        enumeratorContext);
+        assertThat(enumeratorContext.isProcessingBacklog()).isFalse();
+        assigner.open();
+        assertThat(enumeratorContext.isProcessingBacklog()).isTrue();
+        // Get all snapshot splits
+        List<MySqlSnapshotSplit> snapshotSplits = drainSnapshotSplits(assigner);
+        Map<String, BinlogOffset> finishedOffsets = new HashMap<>();
+        int i = 0;
+        for (MySqlSnapshotSplit snapshotSplit : snapshotSplits) {
+            BinlogOffset binlogOffset =
+                    BinlogOffset.builder().setBinlogFilePosition("foo", i++).build();
+            finishedOffsets.put(snapshotSplit.splitId(), binlogOffset);
+        }
+        assigner.onFinishedSplits(finishedOffsets);
+        assertThat(enumeratorContext.isProcessingBacklog()).isFalse();
+        assigner.close();
+    }
+
+    private MySqlSourceConfigFactory getConfigFactory(String[] captureTables) {
+        String[] captureTableIds =
+                Arrays.stream(captureTables)
+                        .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
+                        .toArray(String[]::new);
+
+        return new MySqlSourceConfigFactory()
+                .startupOptions(StartupOptions.initial())
+                .databaseList(customerDatabase.getDatabaseName())
+                .tableList(captureTableIds)
+                .hostname(MYSQL_CONTAINER.getHost())
+                .port(MYSQL_CONTAINER.getDatabasePort())
+                .username(customerDatabase.getUsername())
+                .password(customerDatabase.getPassword())
+                .serverTimeZone(ZoneId.of("UTC").toString());
+    }
+
+    private MySqlSourceConfig getConfig(String[] captureTables) {
+        return getConfigFactory(captureTables).createConfig(0);
+    }
+
     private List<MySqlSnapshotSplit> drainSnapshotSplits(MySqlHybridSplitAssigner assigner) {
         List<MySqlSnapshotSplit> snapshotSplits = new ArrayList<>();
         while (true) {
@@ -208,7 +268,7 @@ public class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
             if (!split.isPresent()) {
                 break;
             }
-            assertTrue(split.get() instanceof MySqlSnapshotSplit);
+            Assertions.assertThat(split.get()).isInstanceOf(MySqlSnapshotSplit.class);
             snapshotSplits.add(split.get().asSnapshotSplit());
         }
         return snapshotSplits;

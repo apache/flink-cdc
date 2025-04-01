@@ -34,18 +34,20 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * PreTransformChangeInfo caches source / pre-transformed schema, source schema field getters, and
  * binary record data generator for pre-transform schema.
  */
 public class PreTransformChangeInfo {
-    private TableId tableId;
-    private Schema sourceSchema;
-    private Schema preTransformedSchema;
-    private RecordData.FieldGetter[] sourceFieldGetters;
-    private BinaryRecordDataGenerator preTransformedRecordDataGenerator;
+    private final TableId tableId;
+    private final Schema sourceSchema;
+    private final Schema preTransformedSchema;
+    private final Map<String, RecordData.FieldGetter> sourceFieldGettersMap;
+    private final BinaryRecordDataGenerator preTransformedRecordDataGenerator;
 
     public static final PreTransformChangeInfo.Serializer SERIALIZER =
             new PreTransformChangeInfo.Serializer();
@@ -54,12 +56,16 @@ public class PreTransformChangeInfo {
             TableId tableId,
             Schema sourceSchema,
             Schema preTransformedSchema,
-            RecordData.FieldGetter[] sourceFieldGetters,
+            RecordData.FieldGetter[] sourceFieldGettersMap,
             BinaryRecordDataGenerator preTransformedRecordDataGenerator) {
         this.tableId = tableId;
         this.sourceSchema = sourceSchema;
         this.preTransformedSchema = preTransformedSchema;
-        this.sourceFieldGetters = sourceFieldGetters;
+        this.sourceFieldGettersMap = new HashMap<>(sourceSchema.getColumnCount());
+        for (int i = 0; i < sourceSchema.getColumns().size(); i++) {
+            this.sourceFieldGettersMap.put(
+                    sourceSchema.getColumns().get(i).getName(), sourceFieldGettersMap[i]);
+        }
         this.preTransformedRecordDataGenerator = preTransformedRecordDataGenerator;
     }
 
@@ -87,8 +93,8 @@ public class PreTransformChangeInfo {
         return preTransformedSchema;
     }
 
-    public RecordData.FieldGetter[] getSourceFieldGetters() {
-        return sourceFieldGetters;
+    public Map<String, RecordData.FieldGetter> getSourceFieldGettersMap() {
+        return sourceFieldGettersMap;
     }
 
     public BinaryRecordDataGenerator getPreTransformedRecordDataGenerator() {

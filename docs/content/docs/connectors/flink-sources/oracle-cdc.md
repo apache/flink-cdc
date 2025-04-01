@@ -423,6 +423,17 @@ Connector Options
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
             By default, the chunk key is 'ROWID'. This column must be a column of the primary key.</td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+        Experimental option, defaults to false.
+      </td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -614,6 +625,26 @@ public class OracleSourceExample {
   }
 }
 ```
+
+### Available Source metrics
+
+Metrics can help understand the progress of assignments, and the following are the supported [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description                                         |
+|------------------------|----------------------------|-------|-----------------------------------------------------|
+| namespace.schema.table | isSnapshotting             | Gauge | Weather the table is snapshotting or not            |
+| namespace.schema.table | isStreamReading            | Gauge | Weather the table is stream reading or not          |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | The number of tables that have been snapshotted     |
+| namespace.schema.table | numTablesRemaining         | Gauge | The number of tables that have not been snapshotted |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | The number of splits that is being processed        |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | The number of splits that have not been processed   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | The number of splits that have been processed       |
+| namespace.schema.table | snapshotStartTime          | Gauge | The time when the snapshot started                  |
+| namespace.schema.table | snapshotEndTime            | Gauge | The time when the snapshot ended                    |
+
+Notice:
+1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
+2. For Oracle, the group name will be like `test_database.test_schema.test_table`.
 
 Data Type Mapping
 ----------------

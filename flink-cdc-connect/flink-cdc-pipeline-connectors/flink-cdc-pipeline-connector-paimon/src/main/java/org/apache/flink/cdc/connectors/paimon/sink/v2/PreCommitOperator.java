@@ -17,16 +17,25 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
-import org.apache.flink.streaming.api.connector.sink2.CommittableSummary;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.flink.FlinkCatalogFactory;
+import org.apache.paimon.flink.sink.Committer;
 import org.apache.paimon.flink.sink.MultiTableCommittable;
+import org.apache.paimon.flink.sink.StoreMultiCommitter;
+import org.apache.paimon.manifest.WrappedManifestCommittable;
+import org.apache.paimon.options.Options;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** An Operator to add checkpointId to MultiTableCommittable and generate CommittableSummary. */
@@ -35,12 +44,23 @@ public class PreCommitOperator
         implements OneInputStreamOperator<
                 CommittableMessage<MultiTableCommittable>,
                 CommittableMessage<MultiTableCommittable>> {
+    protected static final Logger LOGGER = LoggerFactory.getLogger(PreCommitOperator.class);
+
+    private final String commitUser;
+
+    private final Options catalogOptions;
+
+    private Catalog catalog;
+
+    private StoreMultiCommitter storeMultiCommitter;
 
     /** store a list of MultiTableCommittable in one checkpoint. */
-    private final List<MultiTableCommittable> results;
+    private final List<MultiTableCommittable> multiTableCommittables;
 
-    public PreCommitOperator() {
-        results = new ArrayList<>();
+    public PreCommitOperator(Options catalogOptions, String commitUser) {
+        multiTableCommittables = new ArrayList<>();
+        this.catalogOptions = catalogOptions;
+        this.commitUser = commitUser;
     }
 
     @Override
@@ -50,8 +70,16 @@ public class PreCommitOperator
 
     @Override
     public void processElement(StreamRecord<CommittableMessage<MultiTableCommittable>> element) {
+        if (catalog == null) {
+            this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+            this.storeMultiCommitter =
+                    new StoreMultiCommitter(
+                            () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
+                            Committer.createContext(
+                                    commitUser, getMetricGroup(), true, false, null));
+        }
         if (element.getValue() instanceof CommittableWithLineage) {
-            results.add(
+            multiTableCommittables.add(
                     ((CommittableWithLineage<MultiTableCommittable>) element.getValue())
                             .getCommittable());
         }
@@ -64,34 +92,42 @@ public class PreCommitOperator
 
     @Override
     public void prepareSnapshotPreBarrier(long checkpointId) {
-        // CommittableSummary should be sent before all CommittableWithLineage.
-        CommittableMessage<MultiTableCommittable> summary =
-                new CommittableSummary<>(
-                        getRuntimeContext().getIndexOfThisSubtask(),
-                        getRuntimeContext().getNumberOfParallelSubtasks(),
-                        checkpointId,
-                        results.size(),
-                        results.size(),
-                        0);
-        output.collect(new StreamRecord<>(summary));
+        for (int i = 0; i < multiTableCommittables.size(); i++) {
+            MultiTableCommittable multiTableCommittable = multiTableCommittables.get(i);
+            multiTableCommittables.set(
+                    i,
+                    new MultiTableCommittable(
+                            multiTableCommittable.getDatabase(),
+                            multiTableCommittable.getTable(),
+                            checkpointId,
+                            multiTableCommittable.kind(),
+                            multiTableCommittable.wrappedCommittable()));
+        }
+    }
 
-        results.forEach(
-                committable -> {
-                    // update the right checkpointId for MultiTableCommittable
-                    MultiTableCommittable committableWithCheckPointId =
-                            new MultiTableCommittable(
-                                    committable.getDatabase(),
-                                    committable.getTable(),
-                                    checkpointId,
-                                    committable.kind(),
-                                    committable.wrappedCommittable());
-                    CommittableMessage<MultiTableCommittable> message =
-                            new CommittableWithLineage<>(
-                                    committableWithCheckPointId,
-                                    checkpointId,
-                                    getRuntimeContext().getIndexOfThisSubtask());
-                    output.collect(new StreamRecord<>(message));
-                });
-        results.clear();
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
+        long checkpointId = context.getCheckpointId();
+        if (!multiTableCommittables.isEmpty()) {
+            WrappedManifestCommittable wrappedManifestCommittable =
+                    storeMultiCommitter.combine(checkpointId, checkpointId, multiTableCommittables);
+            long commitStart = System.currentTimeMillis();
+            storeMultiCommitter.commit(Collections.singletonList(wrappedManifestCommittable));
+            LOGGER.info(
+                    "Commit for {} in checkpoint {} takes {} ms",
+                    wrappedManifestCommittable,
+                    checkpointId,
+                    System.currentTimeMillis() - commitStart);
+            multiTableCommittables.clear();
+        }
+    }
+
+    @Override
+    public void close() throws Exception {
+        super.close();
+        if (storeMultiCommitter != null) {
+            storeMultiCommitter.close();
+        }
     }
 }

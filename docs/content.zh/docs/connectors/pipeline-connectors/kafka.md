@@ -143,6 +143,13 @@ Pipeline 连接器配置项
       <td>String</td>
       <td>Kafka 记录自定义的 Header。每个 Header 使用 ','分割， 键值使用 ':' 分割。举例来说，可以使用这种方式 'key1:value1,key2:value2'。 </td>
     </tr>
+    <tr>
+      <td>sink.tableId-to-topic.mapping</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>自定义的上游表名到下游 Kafka Topic 名的映射关系。 每个映射关系由 `;` 分割，上游表的 TableId 和下游 Kafka 的 Topic 名由 `:` 分割。 举个例子，我们可以配置 `sink.tableId-to-topic.mapping` 的值为 `mydb.mytable1:topic1;mydb.mytable2:topic2`。 </td>
+    </tr>
     </tbody>
 </table>    
 </div>

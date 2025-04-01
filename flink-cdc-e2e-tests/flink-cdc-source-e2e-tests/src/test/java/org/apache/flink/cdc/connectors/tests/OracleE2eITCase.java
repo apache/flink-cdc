@@ -23,9 +23,10 @@ import org.apache.flink.cdc.connectors.oracle.source.OracleSourceITCase;
 import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment;
 
 import io.debezium.relational.TableId;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -61,10 +62,11 @@ import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.ORACLE_DATABASE;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TEST_PWD;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TEST_USER;
-import static org.junit.Assert.assertNotNull;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TOP_SECRET;
+import static org.apache.flink.cdc.connectors.oracle.source.OracleSourceTestBase.TOP_USER;
 
 /** End-to-end tests for oracle-cdc connector uber jar. */
-public class OracleE2eITCase extends FlinkContainerTestEnvironment {
+class OracleE2eITCase extends FlinkContainerTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleE2eITCase.class);
     protected static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
@@ -77,7 +79,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     public static final String ORACLE_IMAGE = "goodboy008/oracle-19.3.0-ee";
     private static OracleContainer oracle;
 
-    @Before
+    @BeforeEach
     public void before() {
         super.before();
         LOG.info("Starting containers...");
@@ -107,7 +109,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
         LOG.info("Containers are started.");
     }
 
-    @After
+    @AfterEach
     public void after() {
         if (oracle != null) {
             oracle.stop();
@@ -116,7 +118,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     @Test
-    public void testOracleCDC() throws Exception {
+    void testOracleCDC() throws Exception {
         List<String> sqlLines =
                 Arrays.asList(
                         "SET 'execution.checkpointing.interval' = '3s';",
@@ -130,8 +132,10 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
                         " 'connector' = 'oracle-cdc',",
                         " 'hostname' = '" + oracle.getNetworkAliases().get(0) + "',",
                         " 'port' = '" + oracle.getExposedPorts().get(0) + "',",
-                        " 'username' = '" + CONNECTOR_USER + "',",
-                        " 'password' = '" + CONNECTOR_PWD + "',",
+                        // To analyze table for approximate rowCnt computation, use admin user
+                        // before chunk splitting.
+                        " 'username' = '" + TOP_USER + "',",
+                        " 'password' = '" + TOP_SECRET + "',",
                         " 'database-name' = 'ORCLCDB',",
                         " 'schema-name' = 'DEBEZIUM',",
                         " 'scan.incremental.snapshot.enabled' = 'true',",
@@ -221,7 +225,7 @@ public class OracleE2eITCase extends FlinkContainerTestEnvironment {
     private static void initializeOracleTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = OracleSourceITCase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getOracleJdbcConnection();
                 Statement statement = connection.createStatement()) {
             connection.setAutoCommit(true);

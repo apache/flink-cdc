@@ -20,13 +20,29 @@ package org.apache.flink.cdc.runtime.serializer.schema;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
+import org.apache.flink.core.memory.DataInputView;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputView;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.stream.Stream;
 
 /** A test for the {@link DataTypeSerializer}. */
-public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
+class DataTypeSerializerTest extends SerializerTestBase<DataType> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DataTypeSerializerTest.class);
+
     @Override
     protected TypeSerializer<DataType> createSerializer() {
         return new DataTypeSerializer();
@@ -79,5 +95,44 @@ public class DataTypeSerializerTest extends SerializerTestBase<DataType> {
         return Stream.concat(
                         Arrays.stream(allTypes), Arrays.stream(allTypes).map(DataType::notNull))
                 .toArray(DataType[]::new);
+    }
+
+    @Test
+    void testNestedRow() throws IOException {
+        RowType innerMostRowType = RowType.of(DataTypes.BIGINT());
+        RowType outerRowType =
+                RowType.of(DataTypes.ROW(DataTypes.FIELD("outerRow", innerMostRowType)));
+
+        DataTypeSerializer serializer = new DataTypeSerializer();
+
+        // Log to ensure INSTANCE is initialized
+        Assertions.assertThat(RowTypeSerializer.INSTANCE)
+                .as("RowTypeSerializer.INSTANCE should not be null")
+                .isNotNull();
+        LOG.info("RowTypeSerializer.INSTANCE is initialized");
+
+        // Copy the RowType
+        RowType copiedRow = (RowType) serializer.copy(outerRowType);
+        Assertions.assertThat(copiedRow).as("Copied RowType should not be null").isNotNull();
+        LOG.info("Copied RowType: {}", copiedRow);
+
+        // Serialize the RowType
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        DataOutputView outputView = new DataOutputViewStreamWrapper(byteArrayOutputStream);
+        serializer.serialize(outerRowType, outputView);
+
+        // Deserialize the RowType
+        ByteArrayInputStream byteArrayInputStream =
+                new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+        DataInputView inputView = new DataInputViewStreamWrapper(byteArrayInputStream);
+        RowType deserializedRow = (RowType) serializer.deserialize(inputView);
+
+        // Assert that the deserialized RowType is not null and equals the original
+        Assertions.assertThat(deserializedRow)
+                .as("Deserialized RowType should not be null")
+                .isNotNull()
+                .as("Deserialized RowType should match the original")
+                .isEqualTo(outerRowType);
+        LOG.info("Deserialized RowType: {}", deserializedRow);
     }
 }

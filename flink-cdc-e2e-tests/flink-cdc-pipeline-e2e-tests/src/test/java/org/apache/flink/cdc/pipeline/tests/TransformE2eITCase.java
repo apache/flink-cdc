@@ -25,16 +25,14 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -49,11 +47,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
-@RunWith(Parameterized.class)
-public class TransformE2eITCase extends PipelineTestEnvironment {
+class TransformE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -64,7 +62,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -81,20 +79,20 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase transformTestDatabase =
             new UniqueDatabase(MYSQL, "transform_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         transformTestDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         transformTestDatabase.dropDatabase();
     }
 
     @Test
-    public void testHeteroSchemaTransform() throws Exception {
+    void testHeteroSchemaTransform() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -176,7 +174,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMultipleTransformRule() throws Exception {
+    void testMultipleTransformRule() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -265,7 +263,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testAssortedSchemaTransform() throws Exception {
+    void testAssortedSchemaTransform() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -347,7 +345,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testWildcardSchemaTransform() throws Exception {
+    void testWildcardSchemaTransform() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -430,7 +428,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testWildcardWithMetadataColumnTransform() throws Exception {
+    void testWildcardWithMetadataColumnTransform() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -442,13 +440,14 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
+                                + "  metadata.list: op_ts\n"
                                 + "sink:\n"
                                 + "  type: values\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.TABLEALPHA\n"
-                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type\n"
+                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
                                 + "  - source-table: %s.TABLEBETA\n"
-                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type\n"
+                                + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
@@ -467,25 +466,25 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`identifier_name` STRING,`type` STRING NOT NULL,`opts` BIGINT NOT NULL}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, null.%s.TABLEBETA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, null.%s.TABLEBETA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, null.%s.TABLEBETA, +I], op=INSERT, meta=()}");
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8, 199, 17, Alice, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10, 99, 19, Carol, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1011, 11, 59, 20, Dave, null.%s.TABLEALPHA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2012, 12, Monterey, 22, Fred, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Sonoma, 24, Henry, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}",
+                "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Ventura, 23, Gus, null.%s.TABLEBETA, +I, 0], op=INSERT, meta=({op_ts=0})}");
 
         // generate binlogs
         String mysqlJdbcUrl =
@@ -496,10 +495,10 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName());
         insertBinlogEvents(mysqlJdbcUrl);
 
-        validateEvents(
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, -U], after=[1009, 100, 0, 18, Bob, null.%s.TABLEALPHA, +U], op=UPDATE, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7, 79, 16, IINA, null.%s.TABLEALPHA, +I], op=INSERT, meta=()}",
-                "DataChangeEvent{tableId=%s.TABLEBETA, before=[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, -D], after=[], op=DELETE, meta=()}");
+        validateEventsWithPattern(
+                "DataChangeEvent\\{tableId=%s.TABLEALPHA, before=\\[1009, 8.1, 0, 18, Bob, null.%s.TABLEALPHA, -U, \\d+\\], after=\\[1009, 100, 0, 18, Bob, null.%s.TABLEALPHA, \\+U, \\d+\\], op=UPDATE, meta=\\(\\{op_ts=\\d+\\}\\)\\}",
+                "DataChangeEvent\\{tableId=%s.TABLEALPHA, before=\\[\\], after=\\[3007, 7, 79, 16, IINA, null.%s.TABLEALPHA, \\+I, \\d+\\], op=INSERT, meta=\\(\\{op_ts=\\d+\\}\\)\\}",
+                "DataChangeEvent\\{tableId=%s.TABLEBETA, before=\\[2011, 11, Big Sur, 21, Eva, null.%s.TABLEBETA, -D, \\d+\\], after=\\[\\], op=DELETE, meta=\\(\\{op_ts=\\d+\\}\\)\\}");
     }
 
     private static void insertBinlogEvents(String mysqlJdbcUrl) throws SQLException {
@@ -517,7 +516,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMultipleHittingTable() throws Exception {
+    void testMultipleHittingTable() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -551,13 +550,13 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`PRICEALPHA` INT,`AGEALPHA` INT,`NAMEALPHA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
         waitUntilSpecificEvent(
                 String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` STRING}, primaryKeys=ID, options=()}",
+                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`CODENAMESBETA` VARCHAR(17),`AGEBETA` INT,`NAMEBETA` VARCHAR(128),`UID` INT,`NEWVERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                         transformTestDatabase.getDatabaseName()),
                 60000L);
 
@@ -598,7 +597,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testMultipleTransformWithDiffRefColumn() throws Exception {
+    void testMultipleTransformWithDiffRefColumn() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -674,7 +673,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testTransformWithCast() throws Exception {
+    void testTransformWithCast() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -756,7 +755,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testTemporalFunctions() throws Exception {
+    void testTemporalFunctions() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -795,7 +794,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testTransformWithSchemaEvolution() throws Exception {
+    void testTransformWithSchemaEvolution() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -894,7 +893,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testTransformWildcardPrefixWithSchemaEvolution() throws Exception {
+    void testTransformWildcardPrefixWithSchemaEvolution() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -1001,7 +1000,7 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testTransformWildcardSuffixWithSchemaEvolution() throws Exception {
+    void testTransformWildcardSuffixWithSchemaEvolution() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -1121,9 +1120,43 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
         }
     }
 
+    private void validateEventsWithPattern(String... patterns) throws Exception {
+        for (String pattern : patterns) {
+            waitUntilSpecificEventWithPattern(
+                    String.format(
+                            pattern,
+                            transformTestDatabase.getDatabaseName(),
+                            transformTestDatabase.getDatabaseName(),
+                            transformTestDatabase.getDatabaseName()),
+                    20000L);
+        }
+    }
+
     private void validateResult(List<String> expectedEvents) throws Exception {
         for (String event : expectedEvents) {
             waitUntilSpecificEvent(event, 6000L);
+        }
+    }
+
+    private void waitUntilSpecificEventWithPattern(String patternStr, long timeout)
+            throws Exception {
+        boolean result = false;
+        long endTimeout = System.currentTimeMillis() + timeout;
+        while (System.currentTimeMillis() < endTimeout) {
+            String stdout = taskManagerConsumer.toUtf8String();
+            Pattern pattern = Pattern.compile(patternStr);
+            if (pattern.matcher(stdout).find()) {
+                result = true;
+                break;
+            }
+            Thread.sleep(1000);
+        }
+        if (!result) {
+            throw new TimeoutException(
+                    "failed to get events with pattern: "
+                            + patternStr
+                            + " from stdout: "
+                            + taskManagerConsumer.toUtf8String());
         }
     }
 
@@ -1179,8 +1212,14 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     boolean extractDataLines(String line) {
         // In multiple parallelism mode, a prefix with subTaskId (like '1> ') will be appended.
         // Should trim it before extracting data fields.
-        if (!line.startsWith("DataChangeEvent{", 3)) {
-            return false;
+        if (parallelism > 1) {
+            if (!line.startsWith("DataChangeEvent{", 3)) {
+                return false;
+            }
+        } else {
+            if (!line.startsWith("DataChangeEvent{")) {
+                return false;
+            }
         }
         Stream.of("before", "after")
                 .forEach(
@@ -1197,19 +1236,18 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
     void verifyDataRecord(String recordLine) {
         LOG.info("Verifying data line {}", recordLine);
         List<String> tokens = Arrays.asList(recordLine.split(", "));
-        Assert.assertTrue(tokens.size() >= 6);
+        Assertions.assertThat(tokens).hasSizeGreaterThanOrEqualTo(6);
 
         tokens = tokens.subList(tokens.size() - 6, tokens.size());
 
         String localTime = tokens.get(0);
         String currentTime = tokens.get(1);
-        Assert.assertEquals(localTime, currentTime);
+        Assertions.assertThat(currentTime).isEqualTo(localTime);
 
         String currentTimestamp = tokens.get(2);
         String nowTimestamp = tokens.get(3);
         String localTimestamp = tokens.get(4);
-        Assert.assertEquals(currentTimestamp, nowTimestamp);
-        Assert.assertEquals(currentTimestamp, localTimestamp);
+        Assertions.assertThat(currentTimestamp).isEqualTo(nowTimestamp).isEqualTo(localTimestamp);
 
         // If timestamp millisecond part is .000, it will be truncated to yyyy-MM-dd'T'HH:mm:ss
         // format. Manually append this for the following checks.
@@ -1225,12 +1263,12 @@ public class TransformE2eITCase extends PipelineTestEnvironment {
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
 
-        Assert.assertEquals(
-                instant.toEpochMilli() % milliSecondsInOneDay, Long.parseLong(localTime));
+        Assertions.assertThat(Long.parseLong(localTime))
+                .isEqualTo(instant.toEpochMilli() % milliSecondsInOneDay);
 
         String currentDate = tokens.get(5);
 
-        Assert.assertEquals(
-                instant.toEpochMilli() / milliSecondsInOneDay, Long.parseLong(currentDate));
+        Assertions.assertThat(Long.parseLong(currentDate))
+                .isEqualTo(instant.toEpochMilli() / milliSecondsInOneDay);
     }
 }

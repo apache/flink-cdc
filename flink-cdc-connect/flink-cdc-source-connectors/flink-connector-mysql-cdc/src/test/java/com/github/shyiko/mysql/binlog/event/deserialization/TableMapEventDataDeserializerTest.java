@@ -20,7 +20,7 @@ package com.github.shyiko.mysql.binlog.event.deserialization;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventMetadata;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -30,9 +30,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for the copied class {@link TableMapEventDataDeserializer}. */
-public class TableMapEventDataDeserializerTest {
+class TableMapEventDataDeserializerTest {
     @Test
-    public void testDeserialize() throws IOException {
+    void testDeserialize() throws IOException {
         TableMapEventDataDeserializer deserializer = new TableMapEventDataDeserializer();
         // The Table_map_event data. See its format at
         // https://dev.mysql.com/doc/dev/mysql-server/latest/classbinary__log_1_1Table__map__event.html
@@ -95,11 +95,11 @@ public class TableMapEventDataDeserializerTest {
             45
         };
         TableMapEventData eventData = deserializer.deserialize(new ByteArrayInputStream(data));
-        assertThat(eventData.toString()).isEqualTo(getExpectedEventData().toString());
+        assertThat(eventData).hasToString(getExpectedEventData().toString());
     }
 
     @Test
-    public void testDeserializeMetadata() throws IOException {
+    void testDeserializeMetadata() throws IOException {
         byte[] data = {
             // SIGNEDNESS
             1,
@@ -155,7 +155,7 @@ public class TableMapEventDataDeserializerTest {
         TableMapEventMetadata metadata =
                 deserializer.deserialize(new ByteArrayInputStream(data), 59, 32);
 
-        assertThat(metadata.toString()).isEqualTo(getExpectedTableMapEventMetaData().toString());
+        assertThat(metadata).hasToString(getExpectedTableMapEventMetaData().toString());
     }
 
     private TableMapEventData getExpectedEventData() {

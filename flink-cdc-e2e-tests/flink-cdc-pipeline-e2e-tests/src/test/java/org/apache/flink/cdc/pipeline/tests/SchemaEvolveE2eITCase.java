@@ -23,15 +23,15 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** E2e tests for Schema Evolution cases. */
-public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
+class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(SchemaEvolveE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -57,7 +57,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -74,20 +74,20 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase schemaEvolveDatabase =
             new UniqueDatabase(MYSQL, "schema_evolve", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         schemaEvolveDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         schemaEvolveDatabase.dropDatabase();
     }
 
     @Test
-    public void testSchemaEvolve() throws Exception {
+    void testSchemaEvolve() throws Exception {
         testGenericSchemaEvolution(
                 "evolve",
                 false,
@@ -107,20 +107,24 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSchemaEvolveWithIncompatibleChanges() throws Exception {
+    void testSchemaEvolveWithIncompatibleChanges() throws Exception {
         testGenericSchemaEvolution(
                 "evolve",
                 true,
                 false,
                 false,
-                Collections.emptyList(),
                 Arrays.asList(
-                        "java.lang.IllegalStateException: Incompatible types found for column `age`: \"INT\" and \"DOUBLE\"",
-                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1012, Eve, 17, 0], op=INSERT, meta=()}",
+                        "AlterColumnTypeEvent{tableId=%s.merged, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`precise_age` DOUBLE, position=AFTER, existedColumnName=gender}]}",
+                        "AddColumnEvent{tableId=%s.merged, addedColumns=[ColumnWithPosition{column=`biological_sex` TINYINT, position=AFTER, existedColumnName=precise_age}]}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1013, Fiona, null, null, 16.0, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.merged, before=[], after=[1014, Gem, null, null, 17.0, null], op=INSERT, meta=()}"));
     }
 
     @Test
-    public void testSchemaEvolveWithException() throws Exception {
+    void testSchemaEvolveWithException() throws Exception {
         testGenericSchemaEvolution(
                 "evolve",
                 false,
@@ -128,13 +132,13 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 false,
                 Collections.emptyList(),
                 Arrays.asList(
-                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Caused by: org.apache.flink.util.FlinkRuntimeException: Failed to apply schema change event.",
+                        "Caused by: org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException",
                         "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 
     @Test
-    public void testSchemaTryEvolveWithException() throws Exception {
+    void testSchemaTryEvolveWithException() throws Exception {
         testGenericSchemaEvolution(
                 "try_evolve",
                 false,
@@ -143,14 +147,20 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                 Arrays.asList(
                         // Add column never succeeded, so age column will not appear.
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1012, Eve, 17], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}"),
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1013, Fiona, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, null], op=INSERT, meta=()}"),
                 Arrays.asList(
-                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} to table %s.members. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
-                        "UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
+                        "Failed to apply schema change AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=AlterColumnTypeEvent{tableId=%s.members, typeMapping={age=DOUBLE}, oldTypeMapping={age=INT}}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=RenameColumnEvent{tableId=%s.members, nameMapping={age=precise_age}}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=RenameColumnEvent{tableId=%s.members, nameMapping={gender=biological_sex}}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change TruncateTableEvent{tableId=%s.members}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=TruncateTableEvent{tableId=%s.members}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}",
+                        "Failed to apply schema change DropTableEvent{tableId=%s.members}, but keeps running in tolerant mode. Caused by: UnsupportedSchemaChangeEventException{applyingEvent=DropTableEvent{tableId=%s.members}, exceptionMessage='Rejected schema change event since error.on.schema.change is enabled.', cause='null'}"));
     }
 
     @Test
-    public void testSchemaIgnore() throws Exception {
+    void testSchemaIgnore() throws Exception {
 
         testGenericSchemaEvolution(
                 "ignore",
@@ -164,19 +174,20 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSchemaException() throws Exception {
+    void testSchemaException() throws Exception {
         testGenericSchemaEvolution(
                 "exception",
                 false,
                 false,
                 false,
                 Collections.emptyList(),
-                Collections.singletonList(
-                        "java.lang.RuntimeException: Refused to apply schema change event AddColumnEvent{tableId=%s.members, addedColumns=[ColumnWithPosition{column=`gender` TINYINT, position=AFTER, existedColumnName=age}]} in EXCEPTION mode."));
+                Arrays.asList(
+                        "An exception was triggered from Schema change applying task. Job will fail now.",
+                        "org.apache.flink.runtime.JobException: Recovery is suppressed by NoRestartBackoffTimeStrategy"));
     }
 
     @Test
-    public void testLenientSchemaEvolution() throws Exception {
+    void testLenientSchemaEvolution() throws Exception {
 
         testGenericSchemaEvolution(
                 "lenient",
@@ -199,7 +210,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testFineGrainedSchemaEvolution() throws Exception {
+    void testFineGrainedSchemaEvolution() throws Exception {
 
         testGenericSchemaEvolution(
                 "evolve",
@@ -216,12 +227,12 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
                         "TruncateTableEvent{tableId=%s.members}",
                         "DataChangeEvent{tableId=%s.members, before=[], after=[1014, Gem, 17.0, null], op=INSERT, meta=()}"),
                 Arrays.asList(
-                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]} to table %s.members.",
-                        "Ignored schema change DropTableEvent{tableId=%s.members} to table %s.members."));
+                        "Ignored schema change DropColumnEvent{tableId=%s.members, droppedColumnNames=[biological_sex]}.",
+                        "Ignored schema change DropTableEvent{tableId=%s.members}."));
     }
 
     @Test
-    public void testLenientWithRoute() throws Exception {
+    void testLenientWithRoute() throws Exception {
         String dbName = schemaEvolveDatabase.getDatabaseName();
 
         String pipelineJob =
@@ -313,7 +324,7 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testUnexpectedBehavior() {
+    void testUnexpectedBehavior() {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -342,13 +353,15 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
         Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
 
         // Submitting job should fail given an unknown schema change behavior configuration
-        Assert.assertThrows(
-                AssertionError.class,
-                () -> submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar));
+        Assertions.assertThatThrownBy(
+                        () ->
+                                submitPipelineJob(
+                                        pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar))
+                .isExactlyInstanceOf(AssertionError.class);
     }
 
     @Test
-    public void testByDefaultTransform() throws Exception {
+    void testByDefaultTransform() throws Exception {
         String dbName = schemaEvolveDatabase.getDatabaseName();
 
         // We put a dummy transform block that matches nothing
@@ -599,9 +612,8 @@ public class SchemaEvolveE2eITCase extends PipelineTestEnvironment {
     private void assertNotExists(List<String> unexpectedEvents, ToStringConsumer consumer) {
         String consumerLog = consumer.toUtf8String();
         for (String event : unexpectedEvents) {
-            Assert.assertFalse(
-                    consumerLog.contains(
-                            String.format(event, schemaEvolveDatabase.getDatabaseName())));
+            Assertions.assertThat(consumerLog)
+                    .doesNotContain(String.format(event, schemaEvolveDatabase.getDatabaseName()));
         }
     }
 
