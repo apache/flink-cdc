@@ -17,82 +17,91 @@
 
 package org.apache.flink.cdc.connectors.jdbc.sink.v2;
 
-import org.apache.flink.connector.jdbc.JdbcStatementBuilder;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.connector.jdbc.internal.executor.JdbcBatchStatementExecutor;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Function;
 
-/** A batched statement executor of {@link RichJdbcRowData}. */
-public class BatchedStatementExecutor implements JdbcBatchStatementExecutor<RichJdbcRowData> {
-    private final String upsertSql;
-    private final String deleteSql;
-    private final JdbcStatementBuilder<RichJdbcRowData> upsertParamSetter;
-    private final JdbcStatementBuilder<RichJdbcRowData> deleteParamSetter;
-    private final List<RichJdbcRowData> batch;
+/** A batched statement executor of {@link JdbcRowData}. */
+public class BatchedStatementExecutor implements JdbcBatchStatementExecutor<JdbcRowData> {
 
-    private transient PreparedStatement upsertStmt;
-    private transient PreparedStatement deleteStmt;
+    private final JdbcBatchStatementExecutor<JdbcRowData> upsertExecutor;
+    private final JdbcBatchStatementExecutor<JdbcRowData> deleteExecutor;
+    private final Function<JdbcRowData, JdbcRowData> keyExtractor;
+
+    // A buffer holding batched records. The key is the upserting / deleting column row data, and
+    // its value could be overwritten.
+    private final Map<JdbcRowData, Tuple2<Boolean, JdbcRowData>> reduceBuffer;
 
     public BatchedStatementExecutor(
-            String upsertSql,
-            String deleteSql,
-            JdbcStatementBuilder<RichJdbcRowData> upsertParamSetter,
-            JdbcStatementBuilder<RichJdbcRowData> deleteParamSetter) {
-        this.upsertSql = upsertSql;
-        this.deleteSql = deleteSql;
-        this.upsertParamSetter = upsertParamSetter;
-        this.deleteParamSetter = deleteParamSetter;
-        this.batch = new ArrayList<>();
+            JdbcBatchStatementExecutor<JdbcRowData> upsertExecutor,
+            JdbcBatchStatementExecutor<JdbcRowData> deleteExecutor,
+            Function<JdbcRowData, JdbcRowData> keyExtractor) {
+        this.upsertExecutor = upsertExecutor;
+        this.deleteExecutor = deleteExecutor;
+        this.keyExtractor = keyExtractor;
+        this.reduceBuffer = new HashMap<>();
     }
 
     @Override
     public void prepareStatements(Connection connection) throws SQLException {
-        this.upsertStmt = connection.prepareStatement(this.upsertSql);
-        this.deleteStmt = connection.prepareStatement(this.deleteSql);
+        upsertExecutor.prepareStatements(connection);
+        deleteExecutor.prepareStatements(connection);
     }
 
     @Override
-    public void addToBatch(RichJdbcRowData record) {
-        this.batch.add(record);
+    public void addToBatch(JdbcRowData record) {
+        JdbcRowData key = keyExtractor.apply(record);
+        boolean flag = changeFlag(record.getRowKind());
+        reduceBuffer.put(key, Tuple2.of(flag, record));
+    }
+
+    /**
+     * Returns true if the row kind is INSERT or UPDATE_AFTER, returns false if the row kind is
+     * DELETE or UPDATE_BEFORE.
+     */
+    private boolean changeFlag(RowKind rowKind) {
+        switch (rowKind) {
+            case INSERT:
+            case UPDATE_AFTER:
+                return true;
+            case DELETE:
+            case UPDATE_BEFORE:
+                return false;
+            default:
+                throw new UnsupportedOperationException(
+                        String.format(
+                                "Unknown row kind, the supported row kinds is: INSERT, UPDATE_BEFORE, UPDATE_AFTER,"
+                                        + " DELETE, but get: %s.",
+                                rowKind));
+        }
     }
 
     @Override
     public void executeBatch() throws SQLException {
-        if (!this.batch.isEmpty()) {
-            for (RichJdbcRowData record : this.batch) {
-                RowKind rowKind = record.getRowKind();
-                PreparedStatement statement;
-                JdbcStatementBuilder<RichJdbcRowData> paramSetter;
-                if (rowKind.is(RowKind.INSERT) || rowKind.is(RowKind.UPDATE_AFTER)) {
-                    statement = this.upsertStmt;
-                    paramSetter = this.upsertParamSetter;
-                } else if (rowKind.is(RowKind.UPDATE_BEFORE) || rowKind.is(RowKind.DELETE)) {
-                    statement = this.deleteStmt;
-                    paramSetter = this.deleteParamSetter;
+        if (!reduceBuffer.isEmpty()) {
+            for (Map.Entry<JdbcRowData, Tuple2<Boolean, JdbcRowData>> entry :
+                    reduceBuffer.entrySet()) {
+                if (entry.getValue().f0) {
+                    upsertExecutor.addToBatch(entry.getValue().f1);
                 } else {
-                    throw new IllegalArgumentException("Unsupported row kind: " + rowKind);
+                    // delete by key
+                    deleteExecutor.addToBatch(entry.getKey());
                 }
-
-                paramSetter.accept(statement, record);
-                statement.execute();
             }
-            batch.clear();
+            upsertExecutor.executeBatch();
+            deleteExecutor.executeBatch();
+            reduceBuffer.clear();
         }
     }
 
     @Override
     public void closeStatements() throws SQLException {
-        if (upsertStmt != null) {
-            upsertStmt.close();
-            upsertStmt = null;
-        }
-        if (deleteStmt != null) {
-            deleteStmt.close();
-            deleteStmt = null;
-        }
+        upsertExecutor.closeStatements();
+        deleteExecutor.closeStatements();
     }
 }

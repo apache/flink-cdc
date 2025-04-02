@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.connectors.jdbc.sink.v2;
 
-import javax.annotation.Nullable;
-
 import java.io.IOException;
 import java.io.Serializable;
 
@@ -26,6 +24,5 @@ import java.io.Serializable;
  * Abstract base serialization schema class between generic type {@code T} and {@link JdbcRowData}.
  */
 public interface RecordSerializationSchema<IN> extends Serializable {
-    @Nullable
-    RichJdbcRowData serialize(IN record) throws IOException;
+    JdbcRowData[] serialize(IN record) throws IOException;
 }

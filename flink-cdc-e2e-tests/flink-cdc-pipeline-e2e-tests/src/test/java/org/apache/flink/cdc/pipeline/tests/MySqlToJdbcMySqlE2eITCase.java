@@ -28,6 +28,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -52,7 +54,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToJdbcMySqlE2eITCase.class);
 
-    private static final int TESTCASE_TIMEOUT_SECONDS = 60;
+    private static final Duration TESTCASE_TIMEOUT = Duration.ofMinutes(5);
     private static final String TEST_USERNAME = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
     private static final String SOURCE_NETWORK_NAME = "mysqlsource";
@@ -91,7 +93,6 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
 
     protected final UniqueDatabase batchedWriteDatabase =
             new UniqueDatabase(MYSQL_SOURCE, "batched_write", TEST_USERNAME, TEST_PASSWORD);
-    private String databaseName;
 
     @BeforeEach
     public void before() throws Exception {
@@ -118,7 +119,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
 
     @Test
     void testSyncSchemaChanges() throws Exception {
-        databaseName = mysqlInventoryDatabase.getDatabaseName();
+        String databaseName = mysqlInventoryDatabase.getDatabaseName();
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -359,11 +360,12 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         "json_c | text | YES |  | null"));
     }
 
-    @Test
-    void testWriteBatchedRecords() throws Exception {
+    @ParameterizedTest(name = "hasPK: {0}")
+    @ValueSource(booleans = {true, false})
+    void testWriteBatchedRecords(boolean hasPrimaryKey) throws Exception {
         String databaseName = batchedWriteDatabase.getDatabaseName();
         int recordsCount = 10240;
-        runBatchedDataReadPhaseOne(recordsCount);
+        runBatchedDataReadPhaseOne(recordsCount, hasPrimaryKey);
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -375,6 +377,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
+                                + "  scan.incremental.snapshot.chunk.key-column: \\.*.\\.*:id\n"
                                 + "  jdbc.properties.useSSL: false\n"
                                 + "  jdbc.properties.allowPublicKeyRetrieval: true\n"
                                 + "\n"
@@ -412,7 +415,11 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
         validateSinkSchema(
                 databaseName,
                 "batch_table",
-                Arrays.asList("id | int | NO | PRI | null", "name | varchar(255) | YES |  | null"));
+                Arrays.asList(
+                        hasPrimaryKey
+                                ? "id | varchar(255) | NO | PRI | null"
+                                : "id | varchar(255) | YES |  | null",
+                        "number | int | YES |  | null"));
 
         // Check incremental writing
         runBatchedDataReadPhaseTwo(recordsCount);
@@ -422,6 +429,19 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                 "COUNT(id)",
                 1,
                 Collections.singletonList(String.valueOf(recordsCount * 2)));
+
+        // Check updating
+        runBatchedDataReadPhaseThree();
+        validateSinkResult(
+                databaseName,
+                "batch_table",
+                "SUM(number)",
+                1,
+                Collections.singletonList(String.valueOf(recordsCount * (recordsCount + 3))));
+
+        runBatchedDataReadPhaseFour();
+        validateSinkResult(
+                databaseName, "batch_table", "COUNT(*)", 1, Collections.singletonList("0"));
     }
 
     private void runBinlogEvents() throws Exception {
@@ -480,7 +500,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         "INSERT INTO products VALUES (10003, 'Mojave', 'M', 'macOS 10.14', 1.414, 'white', null);"));
     }
 
-    private void runBatchedDataReadPhaseOne(int count) throws Exception {
+    private void runBatchedDataReadPhaseOne(int count, boolean hasPrimaryKey) throws Exception {
         String databaseName = batchedWriteDatabase.getDatabaseName();
         executeSql(
                 MYSQL_SOURCE,
@@ -495,7 +515,9 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                 TEST_USERNAME,
                 TEST_PASSWORD,
                 Collections.singletonList(
-                        "CREATE TABLE batch_table (id INT PRIMARY KEY, name VARCHAR(255));"));
+                        "CREATE TABLE batch_table (id VARCHAR(255) "
+                                + (hasPrimaryKey ? "PRIMARY KEY" : "")
+                                + ", number INT);"));
 
         executeSql(
                 MYSQL_SOURCE,
@@ -506,7 +528,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         .mapToObj(
                                 i ->
                                         String.format(
-                                                "INSERT INTO batch_table VALUES (%d, 'name%d')",
+                                                "INSERT INTO batch_table VALUES ('name%d', %d)",
                                                 i, i))
                         .collect(Collectors.toList()));
     }
@@ -522,9 +544,29 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         .mapToObj(
                                 i ->
                                         String.format(
-                                                "INSERT INTO batch_table VALUES (%d, 'name%d')",
+                                                "INSERT INTO batch_table VALUES ('name%d', %d)",
                                                 100_000 + i, i))
                         .collect(Collectors.toList()));
+    }
+
+    private void runBatchedDataReadPhaseThree() throws Exception {
+        String databaseName = batchedWriteDatabase.getDatabaseName();
+        executeSql(
+                MYSQL_SOURCE,
+                databaseName,
+                TEST_USERNAME,
+                TEST_PASSWORD,
+                Collections.singletonList("UPDATE batch_table SET number = number + 1;"));
+    }
+
+    private void runBatchedDataReadPhaseFour() throws Exception {
+        String databaseName = batchedWriteDatabase.getDatabaseName();
+        executeSql(
+                MYSQL_SOURCE,
+                databaseName,
+                TEST_USERNAME,
+                TEST_PASSWORD,
+                Collections.singletonList("DELETE FROM batch_table;"));
     }
 
     private void executeSql(
@@ -613,7 +655,7 @@ class MySqlToJdbcMySqlE2eITCase extends PipelineTestEnvironment {
                         return false;
                     }
                 },
-                Duration.ofSeconds(TESTCASE_TIMEOUT_SECONDS),
+                TESTCASE_TIMEOUT,
                 Duration.ofSeconds(1),
                 Collections.singletonList(SQLException.class));
     }

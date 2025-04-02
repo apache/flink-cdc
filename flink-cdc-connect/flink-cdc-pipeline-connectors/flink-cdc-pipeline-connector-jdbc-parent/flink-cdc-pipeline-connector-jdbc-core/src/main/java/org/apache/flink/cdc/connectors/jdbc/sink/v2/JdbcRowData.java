@@ -31,4 +31,6 @@ public interface JdbcRowData extends Serializable {
     RowKind getRowKind();
 
     byte[] getRows();
+
+    boolean hasPrimaryKey();
 }

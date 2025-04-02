@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import org.assertj.core.api.Assertions;
+import org.assertj.core.groups.Tuple;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -112,16 +113,19 @@ class EventRecordSerializationSchemaTest {
         EventRecordSerializationSchema schema = new EventRecordSerializationSchema();
 
         Assertions.assertThat(schema.serialize(CREATE_TABLE_EVENT))
+                .singleElement()
                 .extracting("tableId", "schema", "rowKind", "rows")
                 .containsExactly(TABLE_ID, null, RowKind.SCHEMA_CHANGE, null);
 
         Assertions.assertThat(
                         schema.serialize(DataChangeEvent.insertEvent(TABLE_ID, RECORD_NON_NULL)))
+                .singleElement()
                 .extracting("tableId", "schema", "rowKind", "rows")
                 .containsExactly(
                         TABLE_ID, SCHEMA, RowKind.INSERT, RECORD_NON_NULL_IN_JSON.getBytes());
 
         Assertions.assertThat(schema.serialize(DataChangeEvent.insertEvent(TABLE_ID, RECORD_NULL)))
+                .singleElement()
                 .extracting("tableId", "schema", "rowKind", "rows")
                 .containsExactly(TABLE_ID, SCHEMA, RowKind.INSERT, RECORD_NULL_IN_JSON.getBytes());
 
@@ -129,18 +133,34 @@ class EventRecordSerializationSchemaTest {
                         schema.serialize(
                                 DataChangeEvent.updateEvent(
                                         TABLE_ID, RECORD_NON_NULL, RECORD_NULL)))
+                .hasSize(2)
                 .extracting("tableId", "schema", "rowKind", "rows")
-                .containsExactly(TABLE_ID, SCHEMA, RowKind.INSERT, RECORD_NULL_IN_JSON.getBytes());
+                .containsExactly(
+                        Tuple.tuple(
+                                TABLE_ID,
+                                SCHEMA,
+                                RowKind.DELETE,
+                                RECORD_NON_NULL_IN_JSON.getBytes()),
+                        Tuple.tuple(
+                                TABLE_ID, SCHEMA, RowKind.INSERT, RECORD_NULL_IN_JSON.getBytes()));
 
         Assertions.assertThat(
                         schema.serialize(
                                 DataChangeEvent.updateEvent(
                                         TABLE_ID, RECORD_NULL, RECORD_NON_NULL)))
+                .hasSize(2)
                 .extracting("tableId", "schema", "rowKind", "rows")
                 .containsExactly(
-                        TABLE_ID, SCHEMA, RowKind.INSERT, RECORD_NON_NULL_IN_JSON.getBytes());
+                        Tuple.tuple(
+                                TABLE_ID, SCHEMA, RowKind.DELETE, RECORD_NULL_IN_JSON.getBytes()),
+                        Tuple.tuple(
+                                TABLE_ID,
+                                SCHEMA,
+                                RowKind.INSERT,
+                                RECORD_NON_NULL_IN_JSON.getBytes()));
 
         Assertions.assertThat(schema.serialize(DataChangeEvent.deleteEvent(TABLE_ID, RECORD_NULL)))
+                .singleElement()
                 .extracting("tableId", "schema", "rowKind", "rows")
                 .containsExactly(TABLE_ID, SCHEMA, RowKind.DELETE, RECORD_NULL_IN_JSON.getBytes());
     }

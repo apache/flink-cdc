@@ -25,18 +25,17 @@ import org.apache.flink.connector.jdbc.internal.executor.JdbcBatchStatementExecu
 import javax.annotation.Nonnull;
 
 /**
- * Merely a wrapper of {@code JdbcOutputFormat<Object, RichJdbcOutputFormat,
- * JdbcBatchStatementExecutor<RichJdbcOutputFormat>>} to avoid typing such a long generic type
- * arguments again and again.
+ * Merely a wrapper of {@code JdbcOutputFormat<Object, JdbcRowData,
+ * JdbcBatchStatementExecutor<JdbcRowData>>} to avoid typing such a long generic type arguments
+ * again and again.
  */
 public class RichJdbcOutputFormat
-        extends JdbcOutputFormat<
-                Object, RichJdbcRowData, JdbcBatchStatementExecutor<RichJdbcRowData>> {
+        extends JdbcOutputFormat<Object, JdbcRowData, JdbcBatchStatementExecutor<JdbcRowData>> {
     public RichJdbcOutputFormat(
             @Nonnull JdbcConnectionProvider connectionProvider,
             @Nonnull JdbcExecutionOptions executionOptions,
             @Nonnull
-                    StatementExecutorFactory<JdbcBatchStatementExecutor<RichJdbcRowData>>
+                    StatementExecutorFactory<JdbcBatchStatementExecutor<JdbcRowData>>
                             statementExecutorFactory) {
         super(connectionProvider, executionOptions, statementExecutorFactory);
     }

@@ -32,7 +32,7 @@ import org.apache.flink.cdc.connectors.jdbc.sink.utils.JsonWrapper;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,19 +42,16 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
     /** Keeping the relationship of TableId and table information. */
     private final Map<TableId, TableInfo> tableInfoMap;
 
-    private final Map<TableId, Boolean> tableHasPrimaryKeyMap;
-    private final JsonWrapper jsonWrapper;
+    private final JsonWrapper jsonWrapper = new JsonWrapper();
 
     public EventRecordSerializationSchema() {
         tableInfoMap = new HashMap<>();
-        tableHasPrimaryKeyMap = new HashMap<>();
-        jsonWrapper = new JsonWrapper();
     }
 
     @Override
-    public RichJdbcRowData serialize(Event record) throws IOException {
+    public JdbcRowData[] serialize(Event record) throws IOException {
         if (record instanceof SchemaChangeEvent) {
-            return applySchemaChangeEvent((SchemaChangeEvent) record);
+            return new JdbcRowData[] {applySchemaChangeEvent((SchemaChangeEvent) record)};
         } else if (record instanceof DataChangeEvent) {
             return applyDataChangeEvent((DataChangeEvent) record);
         } else {
@@ -62,7 +59,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         }
     }
 
-    private RichJdbcRowData applySchemaChangeEvent(SchemaChangeEvent event) {
+    private JdbcRowData applySchemaChangeEvent(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         Schema newSchema;
         if (event instanceof CreateTableEvent) {
@@ -74,52 +71,40 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
             }
             newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.schema, event);
         }
-        TableInfo tableInfo = new TableInfo();
-        tableInfo.schema = newSchema;
-        tableInfo.fieldGetters = new RecordData.FieldGetter[newSchema.getColumnCount()];
-        for (int i = 0; i < newSchema.getColumnCount(); i++) {
-            tableInfo.fieldGetters[i] =
-                    RecordData.createFieldGetter(newSchema.getColumns().get(i).getType(), i);
-        }
-
+        TableInfo tableInfo = new TableInfo(newSchema);
         tableInfoMap.put(tableId, tableInfo);
-        tableHasPrimaryKeyMap.put(tableId, !newSchema.primaryKeys().isEmpty());
 
-        RichJdbcRowData reusableRowData = new RichJdbcRowData();
-        reusableRowData.setRowKind(RowKind.SCHEMA_CHANGE);
-        reusableRowData.setTableId(event.tableId());
-        return reusableRowData;
+        return new RichJdbcRowData.Builder()
+                .setRowKind(RowKind.SCHEMA_CHANGE)
+                .setTableId(event.tableId())
+                .build();
     }
 
-    private RichJdbcRowData applyDataChangeEvent(DataChangeEvent event)
+    private JdbcRowData[] applyDataChangeEvent(DataChangeEvent event)
             throws JsonProcessingException {
         TableInfo tableInfo = tableInfoMap.get(event.tableId());
-        Preconditions.checkNotNull(tableInfo, event.tableId() + " is not existed");
+        Preconditions.checkNotNull(tableInfo, event.tableId() + " does not exist");
 
-        RichJdbcRowData reusableRowData = new RichJdbcRowData();
-        reusableRowData.setTableId(event.tableId());
-        reusableRowData.setSchema(tableInfo.schema);
+        RichJdbcRowData.Builder builder =
+                new RichJdbcRowData.Builder()
+                        .setTableId(event.tableId())
+                        .setSchema(tableInfo.schema);
 
-        byte[] value = null;
-        switch (event.op()) {
-            case INSERT:
-            case UPDATE:
-            case REPLACE:
-                reusableRowData.setRowKind(RowKind.INSERT);
-                value = serializeRecord(event.tableId(), tableInfo, event.after());
-                break;
-            case DELETE:
-                reusableRowData.setRowKind(RowKind.DELETE);
-                value = serializeRecord(event.tableId(), tableInfo, event.before());
-                break;
-            default:
-                throw new UnsupportedOperationException(
-                        "Don't support operation type " + event.op());
+        List<JdbcRowData> rows = new ArrayList<>(2);
+
+        if (event.before() != null) {
+            builder.setRowKind(RowKind.DELETE);
+            builder.setRows(serializeRecord(event.tableId(), tableInfo, event.before()));
+            rows.add(builder.build());
         }
 
-        reusableRowData.setRows(value);
-        reusableRowData.setHasPrimaryKey(tableHasPrimaryKeyMap.get(event.tableId()));
-        return reusableRowData;
+        if (event.after() != null) {
+            builder.setRowKind(RowKind.INSERT);
+            builder.setRows(serializeRecord(event.tableId(), tableInfo, event.after()));
+            rows.add(builder.build());
+        }
+
+        return rows.toArray(JdbcRowData[]::new);
     }
 
     private byte[] serializeRecord(TableId tableId, TableInfo tableInfo, RecordData record)
@@ -134,12 +119,18 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
             rowMap.put(columns.get(i).getName(), tableInfo.fieldGetters[i].getFieldOrNull(record));
         }
 
-        return jsonWrapper.toJSONString(rowMap).getBytes(StandardCharsets.UTF_8);
+        return jsonWrapper.toJSONBytes(rowMap);
     }
 
     /** Table information. */
     private static class TableInfo {
         Schema schema;
         RecordData.FieldGetter[] fieldGetters;
+
+        public TableInfo(Schema schema) {
+            this.schema = schema;
+            this.fieldGetters =
+                    SchemaUtils.createFieldGetters(schema).toArray(RecordData.FieldGetter[]::new);
+        }
     }
 }

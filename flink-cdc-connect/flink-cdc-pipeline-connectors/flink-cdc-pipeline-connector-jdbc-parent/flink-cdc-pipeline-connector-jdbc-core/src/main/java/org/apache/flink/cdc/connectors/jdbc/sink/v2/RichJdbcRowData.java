@@ -19,42 +19,69 @@ package org.apache.flink.cdc.connectors.jdbc.sink.v2;
 
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.utils.Preconditions;
+
+import javax.annotation.Nullable;
+
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Enriched {@link JdbcRowData} for serializing {@link org.apache.flink.cdc.common.event.Event}s.
  */
 public class RichJdbcRowData implements JdbcRowData {
-    private TableId tableId;
-    private Schema schema;
-    private RowKind rowKind;
-    private byte[] rows;
-    private boolean hasPrimaryKey;
+    protected final TableId tableId;
+    protected final RowKind rowKind;
+    protected final @Nullable byte[] rows;
+    protected final @Nullable Schema schema;
+    protected final @Nullable Boolean hasPrimaryKey;
 
-    public void setTableId(TableId tableId) {
+    protected RichJdbcRowData(
+            RowKind rowKind, TableId tableId, @Nullable Schema schema, @Nullable byte[] rows) {
         this.tableId = tableId;
-    }
-
-    public void setSchema(Schema schema) {
         this.schema = schema;
-    }
-
-    public void setRowKind(RowKind rowKind) {
         this.rowKind = rowKind;
-    }
-
-    public void setRows(byte[] rows) {
         this.rows = rows;
+
+        if (schema != null) {
+            this.hasPrimaryKey = !schema.primaryKeys().isEmpty();
+        } else {
+            this.hasPrimaryKey = null;
+        }
     }
 
-    public void setHasPrimaryKey(boolean hasPrimaryKey) {
-        this.hasPrimaryKey = hasPrimaryKey;
-    }
+    /** Builder clas for {@link RichJdbcRowData}. */
+    public static class Builder {
+        private TableId tableId;
+        private Schema schema;
+        private RowKind rowKind;
+        private byte[] rows;
 
-    public RichJdbcRowData() {}
+        public Builder setTableId(TableId tableId) {
+            this.tableId = tableId;
+            return this;
+        }
 
-    public RichJdbcRowData(TableId tableId, byte[] rows) {
-        this.tableId = tableId;
-        this.rows = rows;
+        public Builder setSchema(Schema schema) {
+            this.schema = schema;
+            return this;
+        }
+
+        public Builder setRowKind(RowKind rowKind) {
+            this.rowKind = rowKind;
+            return this;
+        }
+
+        public Builder setRows(byte[] rows) {
+            this.rows = rows;
+            return this;
+        }
+
+        public RichJdbcRowData build() {
+            Preconditions.checkNotNull(rowKind, "No Row Kind provided for JdbcRowData.");
+            Preconditions.checkNotNull(tableId, "No Table Id provided for JdbcRowData.");
+            return new RichJdbcRowData(rowKind, tableId, schema, rows);
+        }
     }
 
     @Override
@@ -78,6 +105,41 @@ public class RichJdbcRowData implements JdbcRowData {
     }
 
     public boolean hasPrimaryKey() {
-        return hasPrimaryKey;
+        return Boolean.TRUE.equals(hasPrimaryKey);
+    }
+
+    @Override
+    public String toString() {
+        return "RichJdbcRowData{"
+                + "tableId="
+                + tableId
+                + ", schema="
+                + schema
+                + ", rowKind="
+                + rowKind
+                + ", rows="
+                + (rows != null ? new String(rows) : "null")
+                + ", hasPrimaryKey="
+                + hasPrimaryKey
+                + '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof RichJdbcRowData)) {
+            return false;
+        }
+
+        RichJdbcRowData that = (RichJdbcRowData) o;
+        return hasPrimaryKey == that.hasPrimaryKey
+                && Objects.equals(tableId, that.tableId)
+                && Objects.equals(schema, that.schema)
+                && rowKind == that.rowKind
+                && Arrays.equals(rows, that.rows);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(tableId, schema, rowKind, Arrays.hashCode(rows), hasPrimaryKey);
     }
 }

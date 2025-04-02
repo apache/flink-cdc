@@ -23,7 +23,8 @@ public enum RowKind {
     UPDATE_BEFORE,
     UPDATE_AFTER,
     DELETE,
-    SCHEMA_CHANGE;
+    SCHEMA_CHANGE,
+    PK_ROW;
 
     public boolean is(RowKind otherKind) {
         return this == otherKind;
