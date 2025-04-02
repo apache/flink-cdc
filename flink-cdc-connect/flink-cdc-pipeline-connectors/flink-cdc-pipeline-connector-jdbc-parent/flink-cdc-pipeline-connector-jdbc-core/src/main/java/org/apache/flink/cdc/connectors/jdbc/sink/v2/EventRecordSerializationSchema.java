@@ -104,7 +104,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
             rows.add(builder.build());
         }
 
-        return rows.toArray(JdbcRowData[]::new);
+        return rows.toArray(new JdbcRowData[0]);
     }
 
     private byte[] serializeRecord(TableId tableId, TableInfo tableInfo, RecordData record)
@@ -130,7 +130,7 @@ public class EventRecordSerializationSchema implements RecordSerializationSchema
         public TableInfo(Schema schema) {
             this.schema = schema;
             this.fieldGetters =
-                    SchemaUtils.createFieldGetters(schema).toArray(RecordData.FieldGetter[]::new);
+                    SchemaUtils.createFieldGetters(schema).toArray(new RecordData.FieldGetter[0]);
         }
     }
 }
