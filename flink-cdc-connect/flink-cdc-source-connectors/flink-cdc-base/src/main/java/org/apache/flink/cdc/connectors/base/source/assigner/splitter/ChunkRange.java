@@ -86,6 +86,6 @@ public class ChunkRange {
 
     @Override
     public String toString() {
-        return "ChunkRange{" + "chunkStart=" + chunkStart + ", chunkEnd=" + chunkEnd + '}';
+        return "ChunkRange{chunkStart=" + chunkStart + ", chunkEnd=" + chunkEnd + '}';
     }
 }
