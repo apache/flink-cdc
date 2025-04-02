@@ -42,6 +42,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
@@ -571,7 +572,8 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new SinkDef("doris", "Dummy Doris Sink", config),
                 stream,
                 dorisSink,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                new OperatorUidGenerator());
 
         env.execute("Doris Schema Evolution Test");
     }
