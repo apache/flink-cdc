@@ -47,14 +47,16 @@ public class PartitioningTranslator {
             int upstreamParallelism,
             int downstreamParallelism,
             OperatorID schemaOperatorID,
-            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            OperatorUidGenerator operatorUidGenerator) {
         return translateRegular(
                 input,
                 upstreamParallelism,
                 downstreamParallelism,
                 false,
                 schemaOperatorID,
-                hashFunctionProvider);
+                hashFunctionProvider,
+                operatorUidGenerator);
     }
 
     public DataStream<Event> translateRegular(
@@ -63,7 +65,8 @@ public class PartitioningTranslator {
             int downstreamParallelism,
             boolean isBatchMode,
             OperatorID schemaOperatorID,
-            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            OperatorUidGenerator operatorUidGenerator) {
         SingleOutputStreamOperator<Event> singleOutputStreamOperator =
                 input.transform(
                                 isBatchMode ? "BatchPrePartition" : "PrePartition",
@@ -75,10 +78,12 @@ public class PartitioningTranslator {
                                                 schemaOperatorID,
                                                 downstreamParallelism,
                                                 hashFunctionProvider))
+                        .uid(operatorUidGenerator.generateUid("pre-partition"))
                         .setParallelism(upstreamParallelism)
                         .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
                         .map(new PostPartitionProcessor(), new EventTypeInfo())
-                        .name(isBatchMode ? "BatchPostPartition" : "PostPartition");
+                        .name(isBatchMode ? "BatchPostPartition" : "PostPartition")
+                        .uid(operatorUidGenerator.generateUid("post-partition"));
         return isBatchMode
                 ? singleOutputStreamOperator.setParallelism(downstreamParallelism)
                 : singleOutputStreamOperator;

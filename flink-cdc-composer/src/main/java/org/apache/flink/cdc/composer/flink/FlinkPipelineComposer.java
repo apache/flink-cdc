@@ -31,6 +31,7 @@ import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
@@ -143,9 +144,18 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
 
+        OperatorUidGenerator operatorUidGenerator =
+                new OperatorUidGenerator(
+                        pipelineDef.getConfig().get(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX));
+
         // O ---> Source
         DataStream<Event> stream =
-                sourceTranslator.translate(pipelineDef.getSource(), dataSource, env, parallelism);
+                sourceTranslator.translate(
+                        pipelineDef.getSource(),
+                        dataSource,
+                        env,
+                        parallelism,
+                        operatorUidGenerator);
 
         // Source ---> PreTransform
         stream =
@@ -155,7 +165,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
-                        !isParallelMetadataSource && !isBatchMode);
+                        !isParallelMetadataSource && !isBatchMode,
+                        operatorUidGenerator);
 
         // PreTransform ---> PostTransform
         stream =
@@ -165,7 +176,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
-                        dataSource.supportedMetadataColumns());
+                        dataSource.supportedMetadataColumns(),
+                        operatorUidGenerator);
 
         if (isParallelMetadataSource) {
             // Translate a distributed topology for sources with distributed tables
@@ -212,7 +224,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             parallelism,
                             isBatchMode,
                             schemaOperatorIDGenerator.generate(),
-                            dataSink.getDataChangeEventHashFunctionProvider(parallelism));
+                            dataSink.getDataChangeEventHashFunctionProvider(parallelism),
+                            operatorUidGenerator);
         }
 
         // Schema Operator -> Sink -> X
@@ -221,7 +234,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 stream,
                 dataSink,
                 isBatchMode,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                operatorUidGenerator);
     }
 
     private void addFrameworkJars() {
