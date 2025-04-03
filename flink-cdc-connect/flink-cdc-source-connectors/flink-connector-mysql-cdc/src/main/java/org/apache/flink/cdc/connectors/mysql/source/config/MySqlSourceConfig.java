@@ -26,6 +26,7 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 
 import javax.annotation.Nullable;
 
@@ -132,6 +133,18 @@ public class MySqlSourceConfig implements Serializable {
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
+        Selectors excludeTableFilter =
+                (excludeTableList == null
+                        ? null
+                        : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
+        Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
+        dbzMySqlConfig
+                .getTableFilters()
+                .setDataCollectionFilters(
+                        (TableId tableId) ->
+                                tableFilter.isIncluded(tableId)
+                                        && (excludeTableFilter == null
+                                                || !excludeTableFilter.isMatch(tableId)));
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
@@ -254,13 +267,7 @@ public class MySqlSourceConfig implements Serializable {
 
     public Predicate<TableId> getTableFilter() {
         RelationalTableFilters tableFilters = dbzMySqlConfig.getTableFilters();
-        Selectors excludeTableFilter =
-                (excludeTableList == null
-                        ? null
-                        : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
-        return (TableId tableId) ->
-                tableFilters.dataCollectionFilter().isIncluded(tableId)
-                        && (excludeTableFilter == null || !excludeTableFilter.isMatch(tableId));
+        return tableId -> tableFilters.dataCollectionFilter().isIncluded(tableId);
     }
 
     public Properties getJdbcProperties() {
