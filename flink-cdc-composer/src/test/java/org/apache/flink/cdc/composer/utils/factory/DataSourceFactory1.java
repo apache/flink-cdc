@@ -34,6 +34,9 @@ public class DataSourceFactory1 implements DataSourceFactory {
     }
 
     @Override
+    public void verifyBatchMode(Context context) {}
+
+    @Override
     public String identifier() {
         return "data-source-factory-1";
     }

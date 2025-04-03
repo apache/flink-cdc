@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -272,6 +273,21 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String metadataList = config.get(METADATA_LIST);
         List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
         return new MySqlDataSource(configFactory, readableMetadataList);
+    }
+
+    @Override
+    public void verifyBatchMode(Context context) {
+        final Configuration config = context.getFactoryConfiguration();
+        StartupOptions startupOptions = getStartupOptions(config);
+        // Batch mode only supports StartupMode.SNAPSHOT.
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
+                && pipelineConfiguration.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
+                && !StartupOptions.snapshot().equals(startupOptions)) {
+            throw new IllegalArgumentException(
+                    "Batch mode is only supported for MySQL source in snapshot mode.");
+        }
     }
 
     private List<MySqlReadableMetadata> listReadableMetadata(String metadataList) {
