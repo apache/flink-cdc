@@ -53,6 +53,7 @@ import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -368,6 +369,21 @@ class PostgresSourceITCase extends PostgresTestBase {
         Optional<JobClient> optionalJobClient = tableResult.getJobClient();
         assertThat(optionalJobClient).isPresent();
         optionalJobClient.get().cancel().get();
+    }
+
+    @Test
+    void testReadSingleTableMutilpleFetch() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.snapshot.fetch.size", "2");
+        options.put("debezium.max.batch.size", "3");
+        testPostgresParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                options);
     }
 
     @ParameterizedTest
