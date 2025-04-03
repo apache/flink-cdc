@@ -205,7 +205,11 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Schema Operator -> Sink -> X
         sinkTranslator.translate(
-                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
+                pipelineDef.getSink(),
+                stream,
+                parallelism,
+                dataSink,
+                schemaOperatorIDGenerator.generate());
     }
 
     private void addFrameworkJars() {

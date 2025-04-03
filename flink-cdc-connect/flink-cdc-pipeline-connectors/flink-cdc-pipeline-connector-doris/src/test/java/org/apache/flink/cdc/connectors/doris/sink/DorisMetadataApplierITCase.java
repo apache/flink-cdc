@@ -570,6 +570,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         sinkTranslator.translate(
                 new SinkDef("doris", "Dummy Doris Sink", config),
                 stream,
+                DEFAULT_PARALLELISM,
                 dorisSink,
                 schemaOperatorIDGenerator.generate());
 
