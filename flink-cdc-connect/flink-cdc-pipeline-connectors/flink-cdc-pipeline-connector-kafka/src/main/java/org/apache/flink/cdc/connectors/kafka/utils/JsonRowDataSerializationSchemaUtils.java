@@ -22,6 +22,7 @@ import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
 import org.apache.flink.formats.json.JsonRowDataSerializationSchema;
+import org.apache.flink.formats.json.RowDataToJsonConverters;
 import org.apache.flink.table.types.logical.RowType;
 
 import java.lang.reflect.Constructor;
@@ -84,6 +85,49 @@ public class JsonRowDataSerializationSchemaUtils {
         }
         throw new RuntimeException(
                 "Failed to find appropriate constructor for JsonRowDataSerializationSchema,please check your Flink version is 1.19 or 1.20.");
+    }
+
+    /**
+     * In flink>=1.20, the constructor of RowDataToJsonConverters has 4 parameters, and in
+     * flink<1.20, the constructor of RowDataToJsonConverters has 3 parameters.
+     */
+    public static RowDataToJsonConverters createRowDataToJsonConverters(
+            TimestampFormat timestampFormat,
+            JsonFormatOptions.MapNullKeyMode mapNullKeyMode,
+            String mapNullKeyLiteral,
+            boolean ignoreNullFields) {
+        try {
+            Class<?>[] fullParams =
+                    new Class[] {
+                        TimestampFormat.class,
+                        JsonFormatOptions.MapNullKeyMode.class,
+                        String.class,
+                        boolean.class
+                    };
+
+            Object[] fullParamValues =
+                    new Object[] {
+                        timestampFormat, mapNullKeyMode, mapNullKeyLiteral, ignoreNullFields
+                    };
+
+            for (int i = fullParams.length; i >= 3; i--) {
+                try {
+                    Constructor<?> constructor =
+                            RowDataToJsonConverters.class.getConstructor(
+                                    Arrays.copyOfRange(fullParams, 0, i));
+
+                    return (RowDataToJsonConverters)
+                            constructor.newInstance(Arrays.copyOfRange(fullParamValues, 0, i));
+                } catch (NoSuchMethodException ignored) {
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to create RowDataToJsonConverters,please check your Flink version is 1.19 or 1.20.",
+                    e);
+        }
+        throw new RuntimeException(
+                "Failed to find appropriate constructor for RowDataToJsonConverters,please check your Flink version is 1.19 or 1.20.");
     }
 
     /** flink>=1.20 only has the ENCODE_IGNORE_NULL_FIELDS parameter. */
