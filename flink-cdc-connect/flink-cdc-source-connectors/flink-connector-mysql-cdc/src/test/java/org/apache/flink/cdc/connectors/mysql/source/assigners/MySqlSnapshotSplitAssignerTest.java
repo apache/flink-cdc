@@ -512,19 +512,17 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
     void testSplitEvenlySizedChunksEndingFirst() {
         List<String> expected =
                 Arrays.asList(
-                        "shopping_cart [KIND_100] null",
-                        "shopping_cart null [KIND_007]",
-                        "shopping_cart [KIND_007] [KIND_008]",
-                        "shopping_cart [KIND_008] [KIND_009]",
-                        "shopping_cart [KIND_009] [KIND_100]");
+                        "evenly_shopping_cart [109] null",
+                        "evenly_shopping_cart null [105]",
+                        "evenly_shopping_cart [105] [109]");
         List<String> splits =
                 getTestAssignSnapshotSplits(
                         customerDatabase,
                         4,
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
-                        new String[] {"shopping_cart"},
-                        "product_kind",
+                        new String[] {"evenly_shopping_cart"},
+                        "product_no",
                         true);
         assertThat(splits).isEqualTo(expected);
     }
