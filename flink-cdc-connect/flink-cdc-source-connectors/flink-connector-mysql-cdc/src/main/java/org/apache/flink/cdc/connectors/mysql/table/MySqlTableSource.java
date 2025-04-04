@@ -31,6 +31,7 @@ import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.SourceProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -63,7 +64,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a MySQL binlog source from a logical
  * description.
  */
-public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadata {
+public class MySqlTableSource
+        implements ScanTableSource, SupportsReadingMetadata, SupportsProjectionPushDown {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlTableSource.class);
     private final Set<String> exceptDbzProperties =
             Stream.of(
@@ -183,15 +185,13 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType physicalDataType =
-                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
         final TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType(physicalDataType)
+                        .setPhysicalRowType((RowType) producedDataType.getLogicalType())
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
                         .setServerTimeZone(serverTimeZone)
@@ -425,5 +425,20 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             }
         }
         return newDbzProperties;
+    }
+
+    @Override
+    public boolean supportsNestedProjection() {
+        return false;
+    }
+
+    @Override
+    public void applyProjection(int[][] projectedFields, DataType producedDataType) {
+        this.producedDataType = producedDataType;
+        List<String> fieldNames = DataType.getFieldNames(producedDataType);
+        // db.table.(c1|c2)
+        String columnRegex =
+                database + "\\." + tableName + "\\.(" + String.join("|", fieldNames) + ")";
+        dbzProperties.put("column.include.list", columnRegex);
     }
 }

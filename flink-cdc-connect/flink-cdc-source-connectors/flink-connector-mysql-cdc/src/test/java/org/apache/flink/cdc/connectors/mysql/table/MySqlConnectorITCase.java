@@ -44,6 +44,7 @@ import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -2381,7 +2382,6 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'debezium.column.include.list' = '%s.%s.id,%s.%s.country', "
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
@@ -2391,14 +2391,10 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
                         "address",
-                        customerDatabase.getDatabaseName(),
-                        "address",
-                        customerDatabase.getDatabaseName(),
-                        "address",
-                        getServerId());
+                        getServerId(true));
         tEnv.executeSql(sourceDDL);
         // async submit job
-        TableResult result = tEnv.executeSql("SELECT * from address");
+        TableResult result = tEnv.executeSql("SELECT id,country from address");
 
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
@@ -2412,17 +2408,17 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         String[] expected =
                 new String[] {
-                    "+I[417271541558096811, America, null, null]",
-                    "+I[417272886855938987, America, null, null]",
-                    "+I[417111867899200427, America, null, null]",
-                    "+I[417420106184475563, Germany, null, null]",
-                    "+I[418161258277847979, Germany, null, null]",
-                    "+I[416874195632735147, China, null, null]",
-                    "+I[416927583791428523, China, null, null]",
-                    "+I[417022095255614379, China, null, null]",
-                    "-U[416927583791428523, China, null, null]",
-                    "+U[416927583791428523, China, null, null]",
-                    "+I[418257940021724075, Germany, null, null]"
+                    "+I[417271541558096811, America]",
+                    "+I[417272886855938987, America]",
+                    "+I[417111867899200427, America]",
+                    "+I[417420106184475563, Germany]",
+                    "+I[418161258277847979, Germany]",
+                    "+I[416874195632735147, China]",
+                    "+I[416927583791428523, China]",
+                    "+I[417022095255614379, China]",
+                    "-U[416927583791428523, China]",
+                    "+U[416927583791428523, China]",
+                    "+I[418257940021724075, Germany]"
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();

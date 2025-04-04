@@ -344,6 +344,7 @@ public class MySqlSnapshotSplitReadTask
         if (columnNames.isEmpty()) {
             columnNames.add("*");
         }
+        LOG.info("Scanning columns: {}", columnNames);
         return String.join(", ", columnNames);
     }
 
