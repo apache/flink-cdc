@@ -436,15 +436,16 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
 
         DataSink starRocksSink = createStarRocksDataSink(config);
 
+        String schemaOperatorUid = "$$_schema_operator_$$";
+
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
-                        "$$_schema_operator_$$",
+                        schemaOperatorUid,
                         DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
                         "UTC");
 
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+        OperatorIDGenerator schemaOperatorIDGenerator = new OperatorIDGenerator(schemaOperatorUid);
 
         stream =
                 schemaOperatorTranslator.translateRegular(
