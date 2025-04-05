@@ -127,6 +127,8 @@ public class MySqlSnapshotSplitReadTask
             this.columnFilter =
                     Tables.ColumnNameFilterFactory.createIncludeListFilter(
                             columnIncludeList, ColumnFilterMode.CATALOG);
+            LOG.warn(
+                    "column.include.list is used first, column.exclude.list configuration is ignored.");
         } else {
             this.columnFilter =
                     Tables.ColumnNameFilterFactory.createExcludeListFilter(
