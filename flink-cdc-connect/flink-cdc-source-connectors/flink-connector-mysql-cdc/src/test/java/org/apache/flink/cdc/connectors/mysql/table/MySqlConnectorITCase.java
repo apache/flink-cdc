@@ -2366,6 +2366,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
     @Test
     public void testColumnFilters() throws Exception {
         customerDatabase.createAndInitialize();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(200);
         String sourceDDL =
                 String.format(
                         "CREATE TABLE address ("
