@@ -27,6 +27,7 @@ import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.Projection;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
@@ -114,6 +115,8 @@ public class MySqlTableSource
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
 
+    protected DataType physicalDataType;
+
     public MySqlTableSource(
             ResolvedSchema physicalSchema,
             int port,
@@ -170,6 +173,7 @@ public class MySqlTableSource
         this.parseOnlineSchemaChanges = parseOnlineSchemaChanges;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.physicalDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
@@ -191,7 +195,7 @@ public class MySqlTableSource
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType((RowType) producedDataType.getLogicalType())
+                        .setPhysicalRowType((RowType) physicalDataType.getLogicalType())
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
                         .setServerTimeZone(serverTimeZone)
@@ -434,8 +438,9 @@ public class MySqlTableSource
 
     @Override
     public void applyProjection(int[][] projectedFields, DataType producedDataType) {
+        this.physicalDataType = Projection.of(projectedFields).project(physicalDataType);
         this.producedDataType = producedDataType;
-        List<String> fieldNames = DataType.getFieldNames(producedDataType);
+        List<String> fieldNames = DataType.getFieldNames(physicalDataType);
         // db.table.(c1|c2)
         String columnRegex =
                 database + "\\." + tableName + "\\.(" + String.join("|", fieldNames) + ")";
