@@ -150,10 +150,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             Configuration.Builder builder = dbzConfig
                     .getConfig()
                     .edit();
-            if(isBackFillSplit(sourceSplitBase)) {
+            if (isBackFillSplit(sourceSplitBase)) {
                 // when backfilled split, only current table schema should be scan
                 builder.with("table.include.list",
-                        sourceSplitBase.asStreamSplit().getTableSchemas().keySet().iterator().next().toString());
+                        sourceSplitBase.asStreamSplit()
+                                .getTableSchemas().keySet().iterator()
+                                .next().toString());
             }
 
             dbzConfig =
@@ -379,12 +381,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     private boolean isBackFillSplit(SourceSplitBase sourceSplitBase) {
-        if( sourceSplitBase instanceof StreamSplit) {
-            StreamSplit streamSplit  = (StreamSplit) sourceSplitBase;
+        if (sourceSplitBase instanceof StreamSplit) {
+            StreamSplit streamSplit = (StreamSplit) sourceSplitBase;
             // when backfilled, will send specified table schema.
-             return !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(streamSplit.splitId())
-                     && streamSplit.getTableSchemas() != null
-                     && streamSplit.getTableSchemas().size() == 1;
+            return !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(streamSplit.splitId())
+                    && streamSplit.getTableSchemas() != null
+                    && streamSplit.getTableSchemas().size() == 1;
         }
         return false;
     }
