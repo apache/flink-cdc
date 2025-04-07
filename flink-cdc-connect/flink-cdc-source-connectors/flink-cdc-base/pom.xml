@@ -50,7 +50,7 @@ limitations under the License.
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>4.0.3</version>
+            <version>${hikari.version}</version>
         </dependency>
 
         <dependency>

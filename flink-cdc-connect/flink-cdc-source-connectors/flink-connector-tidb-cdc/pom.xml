@@ -133,7 +133,7 @@ limitations under the License.
                     <artifactId>protobuf-java</artifactId>
                 </exclusion>
             </exclusions>
-            <version>8.0.27</version>
+            <version>${mysql.driver.version}</version>
             <scope>test</scope>
         </dependency>
 
