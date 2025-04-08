@@ -309,10 +309,12 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     return TimestampData.fromMillis((Long) dbzObj);
                 case MicroTimestamp.SCHEMA_NAME:
                     long micro = (long) dbzObj;
-                    return TimestampData.fromMillis(micro / 1000, (int) (micro % 1000 * 1000));
+                    return TimestampData.fromMillis(
+                            Math.floorDiv(micro, 1000), (int) (Math.floorMod(micro, 1000) * 1000));
                 case NanoTimestamp.SCHEMA_NAME:
                     long nano = (long) dbzObj;
-                    return TimestampData.fromMillis(nano / 1000_000, (int) (nano % 1000_000));
+                    return TimestampData.fromMillis(
+                            Math.floorDiv(nano, 1000_000), (int) (Math.floorMod(nano, 1000_000)));
             }
         }
         throw new IllegalArgumentException(

@@ -481,12 +481,17 @@ public final class RowDataDebeziumDeserializeSchema
                             return TimestampData.fromEpochMillis((Long) dbzObj);
                         case MicroTimestamp.SCHEMA_NAME:
                             long micro = (long) dbzObj;
+                            // Use Math#floorDiv and Math#floorMod instead of `/` and `%`, because
+                            // timestamp number could be negative if we're handling timestamps prior
+                            // to 1970.
                             return TimestampData.fromEpochMillis(
-                                    micro / 1000, (int) (micro % 1000 * 1000));
+                                    Math.floorDiv(micro, 1000),
+                                    (int) (Math.floorMod(micro, 1000) * 1000));
                         case NanoTimestamp.SCHEMA_NAME:
                             long nano = (long) dbzObj;
                             return TimestampData.fromEpochMillis(
-                                    nano / 1000_000, (int) (nano % 1000_000));
+                                    Math.floorDiv(nano, 1000_000),
+                                    (int) (Math.floorMod(nano, 1000_000)));
                     }
                 }
                 LocalDateTime localDateTime =
