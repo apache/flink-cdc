@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
-import io.debezium.config.Configuration;
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
@@ -35,6 +34,7 @@ import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
+import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
@@ -146,16 +146,18 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .build());
         } else {
 
-
-            Configuration.Builder builder = dbzConfig
-                    .getConfig()
-                    .edit();
+            Configuration.Builder builder = dbzConfig.getConfig().edit();
             if (isBackFillSplit(sourceSplitBase)) {
                 // when backfilled split, only current table schema should be scan
-                builder.with("table.include.list",
-                        sourceSplitBase.asStreamSplit()
-                                .getTableSchemas().keySet().iterator()
-                                .next().toString());
+                builder.with(
+                        "table.include.list",
+                        sourceSplitBase
+                                .asStreamSplit()
+                                .getTableSchemas()
+                                .keySet()
+                                .iterator()
+                                .next()
+                                .toString());
             }
 
             dbzConfig =
