@@ -833,7 +833,7 @@ $ ./bin/flink run \
 
 #### 警告
 
-在 MySQL 表中，若使用 **非主键列** 作为 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
+在 MySQL 表中，若使用 **非主键列** 作为有主键表的 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
 
 #### 问题场景
 
