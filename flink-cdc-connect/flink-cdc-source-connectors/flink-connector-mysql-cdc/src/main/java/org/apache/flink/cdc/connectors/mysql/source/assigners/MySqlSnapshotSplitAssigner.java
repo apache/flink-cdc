@@ -324,12 +324,19 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     tableSchema.putAll(splits.iterator().next().getTableSchemas());
                     tableSchemas.putAll(tableSchema);
                 }
-                final List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
-                        splits.stream()
-                                .map(MySqlSnapshotSplit::toSchemalessSnapshotSplit)
-                                .collect(Collectors.toList());
+
+                for (MySqlSnapshotSplit split : splits) {
+                    MySqlSchemalessSnapshotSplit schemalessSnapshotSplit =
+                            split.toSchemalessSnapshotSplit();
+                    if (sourceConfig.isAssignUnboundedChunkFirst() && split.getSplitEnd() == null) {
+                        // assign unbounded split first
+                        remainingSplits.add(0, schemalessSnapshotSplit);
+                    } else {
+                        remainingSplits.add(schemalessSnapshotSplit);
+                    }
+                }
+
                 chunkNum += splits.size();
-                remainingSplits.addAll(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
                 }

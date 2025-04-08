@@ -53,6 +53,7 @@ import org.assertj.core.api.Assertions;
 import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -305,6 +306,19 @@ class PostgresSourceITCase extends PostgresTestBase {
                 Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
 
+    @Test
+    void testReadSingleTableWithSingleParallelismAndUnboundedChunkFirst() throws Exception {
+        testPostgresParallelSource(
+                DEFAULT_PARALLELISM,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.TM,
+                PostgresTestUtils.FailoverPhase.SNAPSHOT,
+                new String[] {"Customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled", "true"));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
     void testDebeziumSlotDropOnStop(String scanStartupMode) throws Exception {
@@ -370,9 +384,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         optionalJobClient.get().cancel().get();
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testSnapshotOnlyModeWithDMLPostHighWaterMark(String scanStartupMode) throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -403,9 +416,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testSnapshotOnlyModeWithDMLPreHighWaterMark(String scanStartupMode) throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -1066,6 +1078,7 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
+
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
         Optional<JobClient> optionalJobClient = tableResult.getJobClient();
