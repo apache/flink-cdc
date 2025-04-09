@@ -101,8 +101,8 @@ public class KafkaDataSinkOptions {
                                             ". For example, we can set 'sink.tableId-to-topic.mappingg' like 'mydb.mytable1:topic1;mydb.mytable2:topic2'.")
                                     .build());
 
-    public static final ConfigOption<Boolean> SINK_DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED =
-            key("sink.debezium-json.include-schema.enabled")
+    public static final ConfigOption<Boolean> DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED =
+            key("debezium-json.include-schema.enabled")
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(

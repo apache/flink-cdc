@@ -149,7 +149,7 @@ Pipeline Connector Options
       <td>Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by `;`, separate upstream tableId and downstream Kafka topic by `:`, For example, we can set `sink.tableId-to-topic.mapping` like `mydb.mytable1:topic1;mydb.mytable2:topic2`. </td>
     </tr>
     <tr>
-      <td>sink.debezium-json.include-schema.enabled</td>
+      <td>debezium-json.include-schema.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
@@ -185,7 +185,7 @@ An output example is:
   }
 }
 ```
-When `sink.debezium-json.include-schema.enabled` is true, the output format will be:
+When `debezium-json.include-schema.enabled` is true, the output format will be:
 ```json
 {
   "schema":{

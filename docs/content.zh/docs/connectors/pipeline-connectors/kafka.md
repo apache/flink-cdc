@@ -151,7 +151,7 @@ Pipeline 连接器配置项
       <td>自定义的上游表名到下游 Kafka Topic 名的映射关系。 每个映射关系由 `;` 分割，上游表的 TableId 和下游 Kafka 的 Topic 名由 `:` 分割。 举个例子，我们可以配置 `sink.tableId-to-topic.mapping` 的值为 `mydb.mytable1:topic1;mydb.mytable2:topic2`。 </td>
     </tr>
     <tr>
-      <td>sink.debezium-json.include-schema.enabled</td>
+      <td>debezium-json.include-schema.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
@@ -187,7 +187,7 @@ Pipeline 连接器配置项
   }
 }
 ```
-当`sink.debezium-json.include-schema.enabled=true`时，输出示例如下:
+当`debezium-json.include-schema.enabled=true`时，输出示例如下:
 ```json
 {
   "schema":{

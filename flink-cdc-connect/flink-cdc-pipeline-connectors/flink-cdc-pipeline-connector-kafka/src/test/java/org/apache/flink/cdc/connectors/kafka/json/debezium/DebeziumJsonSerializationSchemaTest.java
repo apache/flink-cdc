@@ -49,8 +49,6 @@ import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.SINK_DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED;
-
 /** Tests for {@link DebeziumJsonSerializationSchema}. */
 class DebeziumJsonSerializationSchemaTest {
 
@@ -145,7 +143,7 @@ class DebeziumJsonSerializationSchemaTest {
                 JacksonMapperFactory.createObjectMapper()
                         .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
         Map<String, String> properties = new HashMap<>();
-        properties.put(SINK_DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED.key(), "true");
+        properties.put("include-schema.enabled", "true");
         Configuration configuration = Configuration.fromMap(properties);
         SerializationSchema<Event> serializationSchema =
                 ChangeLogJsonFormatFactory.createSerializationSchema(
@@ -205,7 +203,7 @@ class DebeziumJsonSerializationSchemaTest {
                         DataTypes.STRING());
 
         CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
-        Assertions.assertNull(serializationSchema.serialize(createTableEvent));
+        Assertions.assertThat(serializationSchema.serialize(createTableEvent)).isNull();
         BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
         // insert
         DataChangeEvent insertEvent1 =
@@ -244,6 +242,6 @@ class DebeziumJsonSerializationSchemaTest {
                 mapper.readTree(
                         "{\"schema\":{\"type\":\"struct\",\"fields\":[{\"type\":\"struct\",\"fields\":[{\"type\":\"boolean\",\"optional\":true,\"doc\":\"_boolean comment\",\"field\":\"_boolean\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"3\"},\"field\":\"_binary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"10\"},\"field\":\"_varbinary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"2147483647\"},\"field\":\"_bytes\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_tinyint\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_smallint\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"_int\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"_bigint\"},{\"type\":\"float\",\"optional\":true,\"field\":\"_float\"},{\"type\":\"double\",\"optional\":true,\"field\":\"_double\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"3\",\"connect.decimal.precision\":\"6\"},\"field\":\"_decimal\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_char\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_varchar\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_string\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"_date\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time_6\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"field\":\"_timestamp\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"_timestamp_3\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz_3\"},{\"type\":\"string\",\"optional\":true,\"field\":\"pt\"}],\"optional\":true,\"field\":\"before\"},{\"type\":\"struct\",\"fields\":[{\"type\":\"boolean\",\"optional\":true,\"doc\":\"_boolean comment\",\"field\":\"_boolean\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"3\"},\"field\":\"_binary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"10\"},\"field\":\"_varbinary\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"io.debezium.data.Bits\",\"version\":1,\"parameters\":{\"length\":\"2147483647\"},\"field\":\"_bytes\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_tinyint\"},{\"type\":\"int16\",\"optional\":true,\"field\":\"_smallint\"},{\"type\":\"int32\",\"optional\":true,\"field\":\"_int\"},{\"type\":\"int64\",\"optional\":true,\"field\":\"_bigint\"},{\"type\":\"float\",\"optional\":true,\"field\":\"_float\"},{\"type\":\"double\",\"optional\":true,\"field\":\"_double\"},{\"type\":\"bytes\",\"optional\":true,\"name\":\"org.apache.kafka.connect.data.Decimal\",\"version\":1,\"parameters\":{\"scale\":\"3\",\"connect.decimal.precision\":\"6\"},\"field\":\"_decimal\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_char\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_varchar\"},{\"type\":\"string\",\"optional\":true,\"field\":\"_string\"},{\"type\":\"int32\",\"optional\":true,\"name\":\"io.debezium.time.Date\",\"version\":1,\"field\":\"_date\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTime\",\"version\":1,\"field\":\"_time_6\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.MicroTimestamp\",\"version\":1,\"field\":\"_timestamp\"},{\"type\":\"int64\",\"optional\":true,\"name\":\"io.debezium.time.Timestamp\",\"version\":1,\"field\":\"_timestamp_3\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz\"},{\"type\":\"string\",\"optional\":true,\"name\":\"io.debezium.time.ZonedTimestamp\",\"version\":1,\"field\":\"_timestamp_ltz_3\"},{\"type\":\"string\",\"optional\":true,\"field\":\"pt\"}],\"optional\":true,\"field\":\"after\"}],\"optional\":false},\"payload\":{\"before\":null,\"after\":{\"_boolean\":true,\"_binary\":\"AQI=\",\"_varbinary\":\"AwQ=\",\"_bytes\":\"BQYH\",\"_tinyint\":1,\"_smallint\":2,\"_int\":3,\"_bigint\":4,\"_float\":5.1,\"_double\":6.2,\"_decimal\":7.123,\"_char\":\"test1\",\"_varchar\":\"test2\",\"_string\":\"test3\",\"_date\":\"1970-04-11\",\"_time\":\"00:00:00\",\"_time_6\":\"00:00:00\",\"_timestamp\":\"2023-01-01 00:00:00\",\"_timestamp_3\":\"2023-01-01 00:00:00\",\"_timestamp_ltz\":\"2023-01-01 00:00:00Z\",\"_timestamp_ltz_3\":\"2023-01-01 00:00:00Z\",\"pt\":null},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
         JsonNode actual = mapper.readTree(serializationSchema.serialize(insertEvent1));
-        Assertions.assertEquals(expected, actual);
+        Assertions.assertThat(actual).isEqualTo(expected);
     }
 }
