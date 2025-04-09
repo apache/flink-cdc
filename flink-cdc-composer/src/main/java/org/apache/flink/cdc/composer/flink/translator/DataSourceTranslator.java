@@ -89,7 +89,7 @@ public class DataSourceTranslator {
                         sourceDef.getConfig(),
                         pipelineConfig,
                         Thread.currentThread().getContextClassLoader());
-        sourceFactory.verifyBatchMode(context);
+        sourceFactory.verifyRuntimeMode(context);
         return sourceFactory.createDataSource(context);
     }
 

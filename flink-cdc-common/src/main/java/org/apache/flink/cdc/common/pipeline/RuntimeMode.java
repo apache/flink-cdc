@@ -15,20 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.factories;
+package org.apache.flink.cdc.common.pipeline;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
-import org.apache.flink.cdc.common.source.DataSource;
 
-/**
- * A factory to create {@link DataSource} instances. See also {@link Factory} for more information.
- */
 @PublicEvolving
-public interface DataSourceFactory extends Factory {
-
-    /** Creates a {@link DataSource} instance. */
-    DataSource createDataSource(Context context);
-
-    /** Checking if this {@link DataSource} could be created in batch mode. */
-    default void verifyRuntimeMode(Context context) {}
+public enum RuntimeMode {
+    STREAMING,
+    BATCH
 }

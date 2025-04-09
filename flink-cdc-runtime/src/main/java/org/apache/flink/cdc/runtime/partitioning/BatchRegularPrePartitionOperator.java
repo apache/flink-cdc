@@ -44,7 +44,7 @@ import java.util.Optional;
  * regular topology in batch mode.
  */
 @Internal
-public class RegularPrePartitionBatchOperator extends AbstractStreamOperator<PartitioningEvent>
+public class BatchRegularPrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -56,7 +56,7 @@ public class RegularPrePartitionBatchOperator extends AbstractStreamOperator<Par
     private transient Map<TableId, HashFunction<DataChangeEvent>> cachedHashFunctions;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
 
-    public RegularPrePartitionBatchOperator(
+    public BatchRegularPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.downstreamParallelism = downstreamParallelism;

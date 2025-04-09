@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -198,7 +199,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -252,7 +253,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -316,7 +317,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, MAX_PARALLELISM);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -373,7 +374,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -505,7 +506,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -583,7 +584,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -649,7 +650,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -702,7 +703,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -774,7 +775,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -919,7 +920,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -1088,7 +1089,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -1156,7 +1157,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -1216,7 +1217,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         pipelineConfig.set(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE, "America/New_York");
         PipelineDef pipelineDef =
                 new PipelineDef(
@@ -1321,7 +1322,7 @@ public class FlinkPipelineBatchComposerITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED, true);
+        pipelineConfig.set(PipelineOptions.PIPELINE_RUNTIME_MODE, RuntimeMode.BATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,

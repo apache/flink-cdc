@@ -211,7 +211,7 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: true",
+                                + "  runtime-mode: BATCH",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,

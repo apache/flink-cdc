@@ -21,12 +21,12 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
+import org.apache.flink.cdc.runtime.partitioning.BatchRegularPrePartitionOperator;
 import org.apache.flink.cdc.runtime.partitioning.DistributedPrePartitionOperator;
 import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
 import org.apache.flink.cdc.runtime.partitioning.PostPartitionProcessor;
-import org.apache.flink.cdc.runtime.partitioning.RegularPrePartitionBatchOperator;
 import org.apache.flink.cdc.runtime.partitioning.RegularPrePartitionOperator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
@@ -69,7 +69,7 @@ public class PartitioningTranslator {
                                 isBatchMode ? "BatchPrePartition" : "PrePartition",
                                 new PartitioningEventTypeInfo(),
                                 isBatchMode
-                                        ? new RegularPrePartitionBatchOperator(
+                                        ? new BatchRegularPrePartitionOperator(
                                                 downstreamParallelism, hashFunctionProvider)
                                         : new RegularPrePartitionOperator(
                                                 schemaOperatorID,

@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeMode;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
@@ -54,11 +55,12 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
     }
 
     @Override
-    public void verifyBatchMode(Context context) {
+    public void verifyRuntimeMode(Context context) {
         Configuration pipelineConfiguration = context.getPipelineConfiguration();
         if (pipelineConfiguration == null
-                || !pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
-                || !pipelineConfiguration.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)) {
+                || !pipelineConfiguration.contains(PipelineOptions.PIPELINE_RUNTIME_MODE)
+                || !RuntimeMode.BATCH.equals(
+                        pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE))) {
             return;
         }
         if (context.getFactoryConfiguration().contains(ValuesDataSourceOptions.EVENT_SET_ID)) {
@@ -70,7 +72,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
                                 .get(ValuesDataSourceOptions.BATCH_MODE_ENABLED);
                 if (!batchModeEnabled) {
                     throw new IllegalArgumentException(
-                            "Batch mode is only supported for Values Data source with configuration 'batch-mode.enabled = true'.");
+                            "Batch mode is only supported for Values Data source with configuration 'runtime-mode = BATCH'.");
                 }
             } else if (!eventType.isBatchEvent()) {
                 throw new IllegalArgumentException(

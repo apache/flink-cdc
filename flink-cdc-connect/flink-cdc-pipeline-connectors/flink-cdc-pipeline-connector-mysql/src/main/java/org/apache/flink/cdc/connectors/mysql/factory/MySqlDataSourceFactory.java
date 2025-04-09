@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -276,14 +277,15 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
     }
 
     @Override
-    public void verifyBatchMode(Context context) {
+    public void verifyRuntimeMode(Context context) {
         final Configuration config = context.getFactoryConfiguration();
         StartupOptions startupOptions = getStartupOptions(config);
         // Batch mode only supports StartupMode.SNAPSHOT.
         Configuration pipelineConfiguration = context.getPipelineConfiguration();
         if (pipelineConfiguration != null
-                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
-                && pipelineConfiguration.get(PipelineOptions.PIPELINE_BATCH_MODE_ENABLED)
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_RUNTIME_MODE)
+                && RuntimeMode.BATCH.equals(
+                        pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE))
                 && !StartupOptions.snapshot().equals(startupOptions)) {
             throw new IllegalArgumentException(
                     "Batch mode is only supported for MySQL source in snapshot mode.");
