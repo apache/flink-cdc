@@ -19,6 +19,10 @@ package org.apache.flink.cdc.common.pipeline;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
+/**
+ * The runtime mode of the pipeline includes STREAMING and BATCH, with the default value being
+ * STREAMING.
+ */
 @PublicEvolving
 public enum RuntimeMode {
     STREAMING,
