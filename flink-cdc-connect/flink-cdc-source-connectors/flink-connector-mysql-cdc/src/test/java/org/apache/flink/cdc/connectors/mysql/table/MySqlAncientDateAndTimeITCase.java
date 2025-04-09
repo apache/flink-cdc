@@ -30,13 +30,11 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.lifecycle.Startables;
@@ -54,7 +52,6 @@ import java.util.stream.Stream;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 
 /** Integration tests for MySQL Table source to handle ancient date and time records. */
-@RunWith(Parameterized.class)
 public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlAncientDateAndTimeITCase.class);
 
@@ -74,33 +71,21 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private final boolean incrementalSnapshot;
-
-    @Parameterized.Parameters(name = "incrementalSnapshot: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {new Object[] {false}, new Object[] {true}};
-    }
-
-    public MySqlAncientDateAndTimeITCase(boolean incrementalSnapshot) {
-        this.incrementalSnapshot = incrementalSnapshot;
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql container...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Container MySql is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql containers...");
         MYSQL_CONTAINER.stop();
         LOG.info("Container MySql is stopped.");
     }
 
-    @Before
-    public void before() {
+    void setup(boolean incrementalSnapshot) {
         TestValuesTableFactory.clearAllData();
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
@@ -111,7 +96,7 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
         ancientDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         ancientDatabase.dropDatabase();
     }
@@ -120,8 +105,11 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
      * With the TimeAdjuster in Debezium, all date / time records between year 0001 and 0099 will be
      * shifted to 1971 ~ 2069.
      */
-    @Test
-    public void testAncientDateAndTimeWithTimeAdjuster() throws Exception {
+    @ParameterizedTest(name = "incrementalSnapshot = {0}")
+    @ValueSource(booleans = {true, false})
+    public void testAncientDateAndTimeWithTimeAdjuster(boolean incrementalSnapshot)
+            throws Exception {
+        setup(incrementalSnapshot);
         runGenericAncientDateAndTimeTest(
                 MYSQL_CONTAINER,
                 ancientDatabase,
@@ -147,8 +135,11 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
                         "+I[16, 2019-12-31, 2019-12-31T23:11:11, 2019-12-31T23:11:11.100, 2019-12-31T23:11:11.120, 2019-12-31T23:11:11.123, 2019-12-31T23:11:11.123400, 2019-12-31T23:11:11.123450, 2019-12-31T23:11:11.123456]"));
     }
 
-    @Test
-    public void testAncientDateAndTimeWithoutTimeAdjuster() throws Exception {
+    @ParameterizedTest(name = "incrementalSnapshot = {0}")
+    @ValueSource(booleans = {true, false})
+    public void testAncientDateAndTimeWithoutTimeAdjuster(boolean incrementalSnapshot)
+            throws Exception {
+        setup(incrementalSnapshot);
         runGenericAncientDateAndTimeTest(
                 MYSQL_CONTAINER,
                 ancientDatabase,
@@ -215,7 +206,7 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
                         database.getDatabaseName(),
                         "ancient_times",
                         incrementalSnapshot,
-                        getServerId(),
+                        getServerId(incrementalSnapshot),
                         enableTimeAdjuster);
 
         tEnv.executeSql(sourceDDL);
@@ -352,7 +343,7 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
         return rows;
     }
 
-    private String getServerId() {
+    private String getServerId(boolean incrementalSnapshot) {
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         if (incrementalSnapshot) {

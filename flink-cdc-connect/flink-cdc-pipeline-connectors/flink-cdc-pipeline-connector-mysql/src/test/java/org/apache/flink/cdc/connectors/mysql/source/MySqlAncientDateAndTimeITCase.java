@@ -39,11 +39,11 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.lifecycle.Startables;
@@ -76,21 +76,21 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql container...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Container MySql is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql containers...");
         MYSQL_CONTAINER.stop();
         LOG.info("Container MySql is stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -98,7 +98,7 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
         ancientDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         ancientDatabase.dropDatabase();
     }
