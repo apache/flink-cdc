@@ -97,6 +97,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testHeteroSchemaTransform(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -121,7 +122,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, VERSION\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -132,7 +133,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -190,6 +191,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testMultipleTransformRule(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -215,7 +217,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: ID <= 1008\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -224,7 +226,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -289,6 +291,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testAssortedSchemaTransform(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -313,7 +316,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -324,7 +327,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -381,6 +384,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testWildcardSchemaTransform(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -402,7 +406,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, CONCAT('v', VERSION) AS VERSION, LOWER(NAMEBETA) AS NAME\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -411,7 +415,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -474,6 +478,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testWildcardWithMetadataColumnTransform(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -495,7 +500,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: \\*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -504,7 +509,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -572,6 +577,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testMultipleHittingTable(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -590,7 +596,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLE\\.*\n"
                                 + "    projection: \\*, ID + 1000 as UID, VERSION AS NEWVERSION\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -598,7 +604,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -662,6 +668,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testMultipleTransformWithDiffRefColumn(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -684,7 +691,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: ID, VERSION, PRICEALPHA, AGEALPHA, NAMEALPHA AS ROLENAME\n"
                                 + "    filter: AGEALPHA >= 18\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -693,7 +700,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -747,6 +754,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testTransformWithCast(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -768,7 +776,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "  - source-table: %s.TABLEBETA\n"
                                 + "    projection: ID, CAST(VERSION AS DOUBLE) + 100 AS VERSION, CAST(AGEBETA AS VARCHAR) || ' - ' || NAMEBETA AS IDENTIFIER\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
@@ -777,7 +785,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
@@ -838,6 +846,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     @ValueSource(booleans = {true, false})
     void testTemporalFunctions(boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -858,7 +867,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "    projection: ID, LOCALTIME as lcl_t, CURRENT_TIME as cur_t, CAST(CURRENT_TIMESTAMP AS TIMESTAMP) as cur_ts, CAST(NOW() AS TIMESTAMP) as now_ts, LOCALTIMESTAMP as lcl_ts, CURRENT_DATE as cur_dt\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  parallelism: %d\n"
                                 + "  local-time-zone: America/Los_Angeles",
                         INTER_CONTAINER_MYSQL_ALIAS,
@@ -867,7 +876,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         startupMode,
                         transformTestDatabase.getDatabaseName(),
                         transformTestDatabase.getDatabaseName(),
-                        batchMode,
+                        runtimeMode,
                         parallelism);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");

@@ -68,15 +68,11 @@ public class SchemaManager {
     private final Map<TableId, SortedMap<Integer, Schema>> evolvedSchemas;
 
     public SchemaManager() {
-        evolvedSchemas = new ConcurrentHashMap<>();
-        originalSchemas = new ConcurrentHashMap<>();
-        behavior = SchemaChangeBehavior.EVOLVE;
+        this(new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), SchemaChangeBehavior.EVOLVE);
     }
 
     public SchemaManager(SchemaChangeBehavior schemaChangeBehavior) {
-        evolvedSchemas = new ConcurrentHashMap<>();
-        originalSchemas = new ConcurrentHashMap<>();
-        behavior = schemaChangeBehavior;
+        this(new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), schemaChangeBehavior);
     }
 
     public SchemaManager(

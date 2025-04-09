@@ -52,8 +52,8 @@ public class DataSinkWriterOperatorFactory<CommT>
             StreamOperatorParameters<CommittableMessage<CommT>> parameters) {
 
         if (isBatchMode) {
-            DataBatchSinkWriterOperator<CommT> writerOperator =
-                    new DataBatchSinkWriterOperator<>(
+            BatchDataSinkWriterOperator<CommT> writerOperator =
+                    new BatchDataSinkWriterOperator<>(
                             sink, processingTimeService, getMailboxExecutor());
             writerOperator.setup(
                     parameters.getContainingTask(),
@@ -74,7 +74,7 @@ public class DataSinkWriterOperatorFactory<CommT>
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
         if (isBatchMode) {
-            return DataBatchSinkWriterOperator.class;
+            return BatchDataSinkWriterOperator.class;
         } else {
             return DataSinkWriterOperator.class;
         }

@@ -97,17 +97,15 @@ public class TableIdRouter {
         return TableId.parse(route.f1);
     }
 
-    /*
-     * groupSourceTablesByRouteRule
+    /**
+     * Group the source tables that conform to the same routing rule together. The total number of
+     * groups is less than or equal to the number of routing rules. For the source tables within
+     * each group, their table structures will be merged to obtain the widest table structure in
+     * that group. The structures of all tables within the group will be expanded to this widest
+     * table structure.
      *
-     * @param: tableIdSet
-     * @return: java.util.List<java.util.Set<org.apache.flink.cdc.common.event.TableId>>
-     *
-     * Group the source tables that conform to the same routing rule together.
-     * The total number of groups is less than or equal to the number of routing rules.
-     * For the source tables within each group, their table structures will be merged to obtain
-     * the widest table structure in that group. The structures of all tables within the group
-     * will be expanded to this widest table structure.
+     * @param tableIdSet The tables need to be grouped by the router
+     * @return The tables grouped by the router
      */
     public List<Set<TableId>> groupSourceTablesByRouteRule(Set<TableId> tableIdSet) {
         if (routes.isEmpty()) {

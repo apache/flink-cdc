@@ -97,6 +97,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     @MethodSource(value = "variants")
     void testUserDefinedFunctions(String language, boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -121,7 +122,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: addone\n"
                                 + "      classpath: org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass\n"
@@ -141,7 +142,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         parallelism,
-                        batchMode,
+                        runtimeMode,
                         language,
                         language,
                         language,
@@ -249,6 +250,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
     @MethodSource(value = "variants")
     void testFlinkCompatibleScalarFunctions(String language, boolean batchMode) throws Exception {
         String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -273,7 +275,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  batch-mode.enabled: %s\n"
+                                + "  runtime-mode: %s\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: addone\n"
                                 + "      classpath: org.apache.flink.udf.examples.%s.AddOneFunctionClass\n"
@@ -289,7 +291,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         parallelism,
-                        batchMode,
+                        runtimeMode,
                         language,
                         language,
                         language);

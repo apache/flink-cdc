@@ -52,7 +52,7 @@ import java.lang.reflect.Field;
  * @param <CommT> the type of the committable (to send to downstream operators)
  */
 @Internal
-public class DataBatchSinkWriterOperator<CommT>
+public class BatchDataSinkWriterOperator<CommT>
         extends AbstractStreamOperator<CommittableMessage<CommT>>
         implements OneInputStreamOperator<Event, CommittableMessage<CommT>>, BoundedOneInput {
 
@@ -71,7 +71,7 @@ public class DataBatchSinkWriterOperator<CommT>
      */
     private SinkWriter<Event> copySinkWriter;
 
-    public DataBatchSinkWriterOperator(
+    public BatchDataSinkWriterOperator(
             Sink<Event> sink,
             ProcessingTimeService processingTimeService,
             MailboxExecutor mailboxExecutor) {

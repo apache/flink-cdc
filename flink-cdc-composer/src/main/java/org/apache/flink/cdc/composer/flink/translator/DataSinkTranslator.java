@@ -33,7 +33,7 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
-import org.apache.flink.cdc.runtime.operators.sink.DataBatchSinkFunctionOperator;
+import org.apache.flink.cdc.runtime.operators.sink.BatchDataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -141,7 +141,7 @@ public class DataSinkTranslator {
             OperatorID schemaOperatorID) {
         StreamSink<Event> sinkOperator;
         if (isBatchMode) {
-            sinkOperator = new DataBatchSinkFunctionOperator(sinkFunction);
+            sinkOperator = new BatchDataSinkFunctionOperator(sinkFunction);
         } else {
             sinkOperator = new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
         }

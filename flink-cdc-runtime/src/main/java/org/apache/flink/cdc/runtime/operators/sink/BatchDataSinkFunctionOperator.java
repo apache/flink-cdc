@@ -33,9 +33,9 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
  * <p>The operator is always part of a sink pipeline and is the first operator.
  */
 @Internal
-public class DataBatchSinkFunctionOperator extends StreamSink<Event> {
+public class BatchDataSinkFunctionOperator extends StreamSink<Event> {
 
-    public DataBatchSinkFunctionOperator(SinkFunction<Event> userFunction) {
+    public BatchDataSinkFunctionOperator(SinkFunction<Event> userFunction) {
         super(userFunction);
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
