@@ -104,9 +104,10 @@ public final class RowDataDebeziumDeserializeSchema
             ValueValidator validator,
             ZoneId serverTimeZone,
             DeserializationRuntimeConverterFactory userDefinedConverterFactory,
-            DebeziumChangelogMode changelogMode) {
+            DebeziumChangelogMode changelogMode,
+            boolean appendOnly) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
-        this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
+        this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters, appendOnly);
         this.physicalConverter =
                 createConverter(
                         checkNotNull(physicalDataType),
@@ -190,6 +191,8 @@ public final class RowDataDebeziumDeserializeSchema
                 DeserializationRuntimeConverterFactory.DEFAULT;
         private DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
 
+        private boolean appendOnly = false;
+
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
             return this;
@@ -226,6 +229,11 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
+        public Builder setAppendOnly(boolean appendOnly) {
+            this.appendOnly = appendOnly;
+            return this;
+        }
+
         public RowDataDebeziumDeserializeSchema build() {
             return new RowDataDebeziumDeserializeSchema(
                     physicalRowType,
@@ -234,7 +242,8 @@ public final class RowDataDebeziumDeserializeSchema
                     validator,
                     serverTimeZone,
                     userDefinedConverterFactory,
-                    changelogMode);
+                    changelogMode,
+                    appendOnly);
         }
     }
 
