@@ -136,8 +136,7 @@ class MaxComputeE2eITCase extends PipelineTestEnvironment {
                         + "pipeline:\n"
                         + "   parallelism: 4";
         Path maxcomputeCdcJar = TestUtils.getResource("maxcompute-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        submitPipelineJob(pipelineJob, maxcomputeCdcJar, valuesCdcJar);
+        submitPipelineJob(pipelineJob, maxcomputeCdcJar);
         waitUntilJobFinished(Duration.ofMinutes(10));
         LOG.info("Pipeline job is running");
     }

@@ -18,8 +18,6 @@
 package org.apache.flink.cdc.pipeline.tests;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
@@ -31,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.MountableFile;
@@ -54,27 +51,7 @@ import java.util.stream.Stream;
 class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToPaimonE2eITCase.class);
 
-    public static final Duration TESTCASE_TIMEOUT = Duration.ofMinutes(3);
-
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-
-    @org.testcontainers.junit.jupiter.Container
-    static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases("mysql")
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
+    private static final Duration PAIMON_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
 
     protected final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL, "paimon_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
@@ -131,11 +108,9 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: 4",
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, paimonCdcConnector, mysqlDriverJar, hadoopJar);
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         validateSinkResult(
@@ -238,10 +213,8 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: 4",
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, database, warehouse);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
@@ -274,7 +247,7 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
             LOG.error("Create table for CDC failed.", e);
             throw e;
         }
-        submitPipelineJob(pipelineJob, mysqlCdcJar, paimonCdcConnector, mysqlDriverJar, hadoopJar);
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         validateSinkResult(
@@ -495,7 +468,7 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
             String warehouse, String database, String table, List<String> expected)
             throws InterruptedException {
         LOG.info("Verifying Paimon {}::{}::{} results...", warehouse, database, table);
-        long deadline = System.currentTimeMillis() + TESTCASE_TIMEOUT.toMillis();
+        long deadline = System.currentTimeMillis() + PAIMON_TESTCASE_TIMEOUT.toMillis();
         List<String> results = Collections.emptyList();
         while (System.currentTimeMillis() < deadline) {
             try {
@@ -504,7 +477,7 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                 LOG.info(
                         "Successfully verified {} records in {} seconds.",
                         expected.size(),
-                        (System.currentTimeMillis() - deadline + TESTCASE_TIMEOUT.toMillis())
+                        (System.currentTimeMillis() - deadline + PAIMON_TESTCASE_TIMEOUT.toMillis())
                                 / 1000);
                 return;
             } catch (Exception e) {
