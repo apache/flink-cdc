@@ -47,6 +47,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -289,7 +290,9 @@ public class MySqlTableSource
     @Override
     public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
         this.metadataKeys = metadataKeys;
-        this.producedDataType = producedDataType;
+        if (!this.producedDataType.getChildren().containsAll(producedDataType.getChildren())) {
+            this.producedDataType = producedDataType;
+        }
     }
 
     @Override
@@ -438,8 +441,30 @@ public class MySqlTableSource
 
     @Override
     public void applyProjection(int[][] projectedFields, DataType producedDataType) {
-        this.physicalDataType = Projection.of(projectedFields).project(physicalDataType);
-        this.producedDataType = producedDataType;
+        int[] primaryKeyIndexes = physicalSchema.getPrimaryKeyIndexes();
+        if (primaryKeyIndexes.length > 0) {
+            // If there is a primary key, we need to use the primary key and the projected fields
+            Set<Integer> finalIndex = new LinkedHashSet<>();
+            for (int[] field : projectedFields) {
+                finalIndex.add(field[0]);
+            }
+
+            for (int pkIdx : primaryKeyIndexes) {
+                finalIndex.add(pkIdx);
+            }
+
+            int[][] newProjectedFields =
+                    finalIndex.stream().map(idx -> new int[] {idx}).toArray(int[][]::new);
+            this.physicalDataType = Projection.of(newProjectedFields).project(physicalDataType);
+            this.producedDataType = physicalDataType;
+        }
+
+        if (primaryKeyIndexes.length == 0) {
+            // If there is no primary key, we need use all columns to the projection
+            this.physicalDataType = physicalSchema.toPhysicalRowDataType();
+            this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        }
+
         List<String> fieldNames = DataType.getFieldNames(physicalDataType);
         // db.table.(c1|c2)
         String columnRegex =
