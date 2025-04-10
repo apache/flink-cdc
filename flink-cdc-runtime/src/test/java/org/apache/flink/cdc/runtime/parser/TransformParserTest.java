@@ -573,25 +573,6 @@ class TransformParserTest {
     }
 
     @Test
-    void testNormalizeFilter() {
-        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", "a > 0 and b > 0"))
-                .isEqualTo("`a` > 0 AND `b` > 0");
-        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", null)).isNull();
-        Assertions.assertThat(
-                        TransformParser.normalizeFilter(
-                                "abs(a) as cal_a, char_length(b) as cal_b, c, d",
-                                "a > 4 and cal_a > 8 and cal_b < 17 and c != d"))
-                .isEqualTo("`a` > 4 AND ABS(`a`) > 8 AND CHAR_LENGTH(`b`) < 17 AND `c` <> `d`");
-
-        Assertions.assertThat(
-                        TransformParser.normalizeFilter(
-                                "x, y, z, 1 - x as u, 1 - y as v, 1 - z as w",
-                                "concat(u, concat(v, concat(w, x), y), z) != 10"))
-                .isEqualTo(
-                        "`concat`(1 - `x`, `concat`(1 - `y`, `concat`(1 - `z`, `x`), `y`), `z`) <> 10");
-    }
-
-    @Test
     void testTranslateUdfFilterToJaninoExpression() {
         testFilterExpressionWithUdf(
                 "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");

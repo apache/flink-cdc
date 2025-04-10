@@ -26,42 +26,38 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
-import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverter;
 import org.apache.flink.cdc.runtime.operators.transform.converter.PostTransformConverters;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
-import org.apache.flink.streaming.api.graph.StreamConfig;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
-import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.runtime.tasks.StreamTask;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
+import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
-import java.lang.reflect.InvocationTargetException;
-import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /**
  * A data process function that performs column filtering, calculated column evaluation & final
@@ -74,596 +70,473 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
     private final String timezone;
     private final List<TransformRule> transformRules;
-    private transient List<PostTransformer> transforms;
-
-    /** keep the relationship of TableId and table information. */
-    private final Map<TableId, PostTransformChangeInfo> postTransformChangeInfoMap;
-
-    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
-    private List<UserDefinedFunctionDescriptor> udfDescriptors;
-    private transient Map<String, Object> udfFunctionInstances;
-
-    private transient Map<Tuple2<TableId, String>, TransformProjectionProcessor>
-            transformProjectionProcessorMap;
-    private transient Map<Tuple2<TableId, TransformFilter>, TransformFilterProcessor>
-            transformFilterProcessorMap;
     private final Map<TableId, Boolean> hasAsteriskMap;
     private final Map<TableId, List<String>> projectedColumnsMap;
+    private final Map<TableId, PostTransformChangeInfo> postTransformInfoMap;
 
-    public static PostTransformOperator.Builder newBuilder() {
-        return new PostTransformOperator.Builder();
+    // Tuple3 items are: function name, class path, and extra options.
+    private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
+
+    private transient List<PostTransformer> transformers;
+    private transient List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private transient List<Object> udfFunctionInstances;
+
+    // Querying a TransformProjectionProcessor with an upstream TableId and effective
+    // post-transformer.
+    private transient Table<TableId, PostTransformer, TransformProjectionProcessor>
+            projectionProcessors;
+    private transient Table<TableId, PostTransformer, TransformFilterProcessor> filterProcessors;
+
+    public static PostTransformOperatorBuilder newBuilder() {
+        return new PostTransformOperatorBuilder();
     }
 
-    /** Builder of {@link PostTransformOperator}. */
-    public static class Builder {
-        private final List<TransformRule> transformRules = new ArrayList<>();
-        private String timezone;
-        private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
-                new ArrayList<>();
-
-        public PostTransformOperator.Builder addTransform(
-                String tableInclusions,
-                @Nullable String projection,
-                @Nullable String filter,
-                String primaryKey,
-                String partitionKey,
-                String tableOptions,
-                String postTransformConverter,
-                SupportedMetadataColumn[] supportedMetadataColumns) {
-            transformRules.add(
-                    new TransformRule(
-                            tableInclusions,
-                            projection,
-                            filter,
-                            primaryKey,
-                            partitionKey,
-                            tableOptions,
-                            postTransformConverter,
-                            supportedMetadataColumns));
-            return this;
-        }
-
-        public PostTransformOperator.Builder addTransform(
-                String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(
-                    new TransformRule(
-                            tableInclusions,
-                            projection,
-                            filter,
-                            "",
-                            "",
-                            "",
-                            null,
-                            new SupportedMetadataColumn[0]));
-            return this;
-        }
-
-        public PostTransformOperator.Builder addTimezone(String timezone) {
-            if (PipelineOptions.PIPELINE_LOCAL_TIME_ZONE.defaultValue().equals(timezone)) {
-                this.timezone = ZoneId.systemDefault().toString();
-            } else {
-                this.timezone = timezone;
-            }
-            return this;
-        }
-
-        public PostTransformOperator.Builder addUdfFunctions(
-                List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
-            this.udfFunctions.addAll(udfFunctions);
-            return this;
-        }
-
-        public PostTransformOperator build() {
-            return new PostTransformOperator(transformRules, timezone, udfFunctions);
-        }
-    }
-
-    private PostTransformOperator(
+    PostTransformOperator(
             List<TransformRule> transformRules,
             String timezone,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
-        this.transformRules = transformRules;
         this.timezone = timezone;
-        this.postTransformChangeInfoMap = new ConcurrentHashMap<>();
-        this.transformFilterProcessorMap = new ConcurrentHashMap<>();
-        this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
-        this.udfFunctions = udfFunctions;
-        this.udfFunctionInstances = new ConcurrentHashMap<>();
+        this.transformRules = transformRules;
         this.hasAsteriskMap = new HashMap<>();
         this.projectedColumnsMap = new HashMap<>();
-    }
-
-    @Override
-    public void setup(
-            StreamTask<?, ?> containingTask,
-            StreamConfig config,
-            Output<StreamRecord<Event>> output) {
-        super.setup(containingTask, config, output);
-        udfDescriptors =
-                udfFunctions.stream()
-                        .map(udf -> new UserDefinedFunctionDescriptor(udf.f0, udf.f1, udf.f2))
-                        .collect(Collectors.toList());
+        this.postTransformInfoMap = new ConcurrentHashMap<>();
+        this.udfFunctions = udfFunctions;
     }
 
     @Override
     public void open() throws Exception {
         super.open();
-        transforms =
-                transformRules.stream()
-                        .map(
-                                transformRule -> {
-                                    String tableInclusions = transformRule.getTableInclusions();
-                                    String projection = transformRule.getProjection();
-                                    String filterExpression = transformRule.getFilter();
 
-                                    Selectors selectors =
-                                            new Selectors.SelectorsBuilder()
-                                                    .includeTables(tableInclusions)
-                                                    .build();
-                                    return new PostTransformer(
-                                            selectors,
-                                            TransformProjection.of(projection).orElse(null),
-                                            TransformFilter.of(filterExpression, udfDescriptors)
-                                                    .orElse(null),
-                                            PostTransformConverters.of(
-                                                    transformRule.getPostTransformConverter()),
-                                            transformRule.getSupportedMetadataColumns());
-                                })
-                        .collect(Collectors.toList());
-        this.transformProjectionProcessorMap = new ConcurrentHashMap<>();
-        this.transformFilterProcessorMap = new ConcurrentHashMap<>();
-        this.udfFunctionInstances = new ConcurrentHashMap<>();
-        udfDescriptors.forEach(
-                udf -> {
-                    try {
-                        Class<?> clazz = Class.forName(udf.getClasspath());
-                        udfFunctionInstances.put(udf.getName(), clazz.newInstance());
-                    } catch (ClassNotFoundException
-                            | InstantiationException
-                            | IllegalAccessException e) {
-                        throw new RuntimeException("Failed to instantiate UDF function " + udf);
-                    }
-                });
+        // Initialize multi-key lookup tables
+        this.projectionProcessors = HashBasedTable.create();
+        this.filterProcessors = HashBasedTable.create();
+
+        // Be sure to initialize UDF related fields before creating transformers
         initializeUdf();
-    }
 
-    @Override
-    public void finish() throws Exception {
-        super.finish();
-        clearOperator();
+        this.transformers = createTransformers();
     }
 
     @Override
     public void close() throws Exception {
         super.close();
-        clearOperator();
-
-        // Clean up UDF instances
+        TransformExpressionCompiler.cleanUp();
         destroyUdf();
-        udfFunctionInstances.clear();
     }
 
     @Override
     public void processElement(StreamRecord<Event> element) throws Exception {
-        Event event = element.getValue();
-
         try {
-            processEvent(event);
+            processElementInternal(element);
         } catch (Exception e) {
+            Event event = element.getValue();
             TableId tableId = null;
             Schema schemaBefore = null;
             Schema schemaAfter = null;
 
             if (event instanceof ChangeEvent) {
                 tableId = ((ChangeEvent) event).tableId();
-
-                PostTransformChangeInfo info = postTransformChangeInfoMap.get(tableId);
+                PostTransformChangeInfo info = postTransformInfoMap.get(tableId);
                 if (info != null) {
                     schemaBefore = info.getPreTransformedSchema();
                     schemaAfter = info.getPostTransformedSchema();
                 }
             }
+
             throw new TransformException(
                     "post-transform", event, tableId, schemaBefore, schemaAfter, e);
         }
     }
 
-    private void processEvent(Event event) throws Exception {
-        if (event instanceof SchemaChangeEvent) {
-            SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            transformProjectionProcessorMap
-                    .keySet()
-                    .removeIf(e -> Objects.equals(e.f0, schemaChangeEvent.tableId()));
-            transformFilterProcessorMap
-                    .keySet()
-                    .removeIf(e -> Objects.equals(e.f0, schemaChangeEvent.tableId()));
-            cacheSchema(schemaChangeEvent).ifPresent(e -> output.collect(new StreamRecord<>(e)));
+    private void processElementInternal(StreamRecord<Event> element) {
+        Event event = element.getValue();
+        if (event == null) {
+            return;
+        }
+
+        // Reject processing non-schema or data change events.
+        if (!(event instanceof ChangeEvent)) {
+            throw new UnsupportedOperationException("Unexpected stream record event: " + event);
+        }
+
+        ChangeEvent changeEvent = (ChangeEvent) event;
+        TableId tableId = changeEvent.tableId();
+        List<PostTransformer> transformers = getEffectiveTransformers(tableId);
+
+        // Short-circuit if there's no effective transformers.
+        if (transformers.isEmpty()) {
+            output.collect(element);
+            return;
+        }
+
+        if (event instanceof CreateTableEvent) {
+            processCreateTableEvent((CreateTableEvent) event, transformers)
+                    .map(StreamRecord::new)
+                    .ifPresent(output::collect);
+            invalidateCache(tableId);
+        } else if (event instanceof SchemaChangeEvent) {
+            processSchemaChangeEvent((SchemaChangeEvent) event, transformers)
+                    .map(StreamRecord::new)
+                    .ifPresent(output::collect);
+            invalidateCache(tableId);
         } else if (event instanceof DataChangeEvent) {
-            Optional<DataChangeEvent> dataChangeEventOptional =
-                    processDataChangeEvent(((DataChangeEvent) event));
-            if (dataChangeEventOptional.isPresent()) {
-                output.collect(new StreamRecord<>(dataChangeEventOptional.get()));
-            }
+            processDataChangeEvent((DataChangeEvent) event, transformers)
+                    .map(StreamRecord::new)
+                    .ifPresent(output::collect);
+        } else {
+            throw new UnsupportedOperationException("Unexpected stream record event: " + event);
         }
     }
 
-    private Optional<SchemaChangeEvent> cacheSchema(SchemaChangeEvent event) throws Exception {
+    // -------------------
+    // Key methods for processing upstream events.
+    // -------------------
+
+    /**
+     * Apply effective transform rules to {@link CreateTableEvent}s based on effective transformers.
+     */
+    private Optional<Event> processCreateTableEvent(
+            CreateTableEvent event, List<PostTransformer> effectiveTransformers) {
         TableId tableId = event.tableId();
-        List<String> columnNamesBeforeChange = Collections.emptyList();
+        Schema preSchema = event.getSchema();
 
-        if (event instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) event;
-            Set<String> projectedColumnsSet =
-                    transforms.stream()
-                            .filter(t -> t.getSelectors().isMatch(tableId))
-                            .flatMap(
-                                    rule ->
-                                            TransformParser.generateProjectionColumns(
-                                                    rule.getProjection()
-                                                            .map(TransformProjection::getProjection)
-                                                            .orElse(null),
-                                                    createTableEvent.getSchema().getColumns(),
-                                                    udfDescriptors,
-                                                    rule.getSupportedMetadataColumns())
-                                                    .stream())
-                            .map(ProjectionColumn::getColumnName)
-                            .collect(Collectors.toSet());
+        // Apply transform rules and verify we can get a deterministic post schema
+        List<Schema> schemas =
+                effectiveTransformers.stream()
+                        .map(trans -> transformSchema(preSchema, trans))
+                        .collect(Collectors.toList());
 
-            boolean notTransformed =
-                    transforms.stream().noneMatch(t -> t.getSelectors().isMatch(tableId));
+        Schema postSchema =
+                SchemaUtils.ensurePkNonNull(SchemaMergingUtils.strictlyMergeSchemas(schemas));
 
-            if (notTransformed) {
-                // If this TableId isn't presented in any transform block, it should behave like a
-                // "*" projection and should be regarded as asterisk-ful.
-                hasAsteriskMap.put(tableId, true);
-            } else {
-                boolean hasAsterisk =
-                        transforms.stream()
-                                .filter(t -> t.getSelectors().isMatch(tableId))
-                                .anyMatch(
-                                        t ->
-                                                TransformParser.hasAsterisk(
-                                                        t.getProjection()
-                                                                .map(
-                                                                        TransformProjection
-                                                                                ::getProjection)
-                                                                .orElse(null)));
+        // Update transform info map
+        postTransformInfoMap.put(
+                tableId, PostTransformChangeInfo.of(tableId, preSchema, postSchema));
 
-                hasAsteriskMap.put(tableId, hasAsterisk);
-            }
-            projectedColumnsMap.put(
-                    tableId,
-                    createTableEvent.getSchema().getColumnNames().stream()
-                            .filter(projectedColumnsSet::contains)
-                            .collect(Collectors.toList()));
-        } else {
-            columnNamesBeforeChange =
-                    getPostTransformChangeInfo(tableId).getPreTransformedSchema().getColumnNames();
-        }
+        // Update "if-table-has-been–wildcard–matched" map
+        boolean wildcardMatched =
+                effectiveTransformers.stream()
+                        .map(PostTransformer::getProjection)
+                        .flatMap(this::optionalToStream)
+                        .map(TransformProjection::getProjection)
+                        .anyMatch(TransformParser::hasAsterisk);
+        hasAsteriskMap.put(tableId, wildcardMatched);
+        projectedColumnsMap.put(
+                tableId,
+                preSchema.getColumnNames().stream()
+                        .filter(postSchema.getColumnNames()::contains)
+                        .collect(Collectors.toList()));
 
-        Schema schema;
-        if (event instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) event;
-            schema = createTableEvent.getSchema();
-        } else {
-            schema =
-                    SchemaUtils.applySchemaChangeEvent(
-                            getPostTransformChangeInfo(tableId).getPreTransformedSchema(), event);
-        }
+        return Optional.of(new CreateTableEvent(tableId, postSchema));
+    }
 
-        Schema projectedSchema = transformSchema(tableId, schema);
-        postTransformChangeInfoMap.put(
-                tableId, PostTransformChangeInfo.of(tableId, projectedSchema, schema));
+    /**
+     * Apply effective transform rules to other {@link SchemaChangeEvent}s based on effective
+     * transformers and existing {@link PostTransformChangeInfo}.
+     */
+    private Optional<Event> processSchemaChangeEvent(
+            SchemaChangeEvent event, List<PostTransformer> effectiveTransformers) {
+        TableId tableId = event.tableId();
+        PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
 
-        if (event instanceof CreateTableEvent) {
-            return Optional.of(new CreateTableEvent(tableId, projectedSchema));
-        } else if (hasAsteriskMap.getOrDefault(tableId, true)) {
+        // Apply schema change event to the pre-transformed schema
+        Schema prevPreSchema = info.getPreTransformedSchema();
+        Schema nextPreSchema = SchemaUtils.applySchemaChangeEvent(prevPreSchema, event);
+
+        // Apply transform rules and verify we can get a deterministic post schema
+        List<Schema> schemas =
+                effectiveTransformers.stream()
+                        .map(trans -> transformSchema(nextPreSchema, trans))
+                        .collect(Collectors.toList());
+
+        Schema nextPostSchema =
+                SchemaUtils.ensurePkNonNull(SchemaMergingUtils.strictlyMergeSchemas(schemas));
+
+        // Update transform info map
+        postTransformInfoMap.put(
+                tableId, PostTransformChangeInfo.of(tableId, nextPreSchema, nextPostSchema));
+
+        // Prepare transformed schema change events
+        Schema prevPostSchema = info.getPostTransformedSchema();
+        List<String> columnNamesBeforeChange = prevPostSchema.getColumnNames();
+
+        if (hasAsteriskMap.getOrDefault(tableId, true)) {
             // See comments in PreTransformOperator#cacheChangeSchema method.
-            return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event);
+            return SchemaUtils.transformSchemaChangeEvent(true, columnNamesBeforeChange, event)
+                    .map(Event.class::cast);
         } else {
             return SchemaUtils.transformSchemaChangeEvent(
-                    false, projectedColumnsMap.get(tableId), event);
+                            false, projectedColumnsMap.get(tableId), event)
+                    .map(Event.class::cast);
         }
     }
 
-    private PostTransformChangeInfo getPostTransformChangeInfo(TableId tableId) {
-        PostTransformChangeInfo tableInfo = postTransformChangeInfoMap.get(tableId);
-        if (tableInfo == null) {
-            throw new RuntimeException(
-                    "Schema for " + tableId + " not found. This shouldn't happen.");
-        }
-        return tableInfo;
-    }
+    /** Apply projection rules to given {@link DataChangeEvent}. */
+    private Optional<Event> processDataChangeEvent(
+            DataChangeEvent event, List<PostTransformer> effectiveTransformers) {
+        TableId tableId = event.tableId();
+        PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
 
-    private Schema transformSchema(TableId tableId, Schema schema) {
-        List<Schema> newSchemas = new ArrayList<>();
-        for (PostTransformer transform : transforms) {
-            Selectors selectors = transform.getSelectors();
-            if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
-                TransformProjection transformProjection =
-                        TransformProjection.of(transform.getProjection().get().getProjection())
-                                .get();
-                if (transformProjection.isValid()) {
-                    if (!transformProjectionProcessorMap.containsKey(
-                            Tuple2.of(tableId, transformProjection.getProjection()))) {
-                        transformProjectionProcessorMap.put(
-                                Tuple2.of(tableId, transformProjection.getProjection()),
-                                TransformProjectionProcessor.of(
-                                        transformProjection,
-                                        timezone,
-                                        udfDescriptors,
-                                        getUdfFunctionInstances(),
-                                        transform.getSupportedMetadataColumns()));
-                    }
-                    TransformProjectionProcessor postTransformProcessor =
-                            transformProjectionProcessorMap.get(
-                                    Tuple2.of(tableId, transformProjection.getProjection()));
-                    // update the columns of projection and add the column of projection into Schema
-                    newSchemas.add(
-                            postTransformProcessor.processSchema(
-                                    schema, transform.getSupportedMetadataColumns()));
+        // Prepare transform context
+        TransformContext context = new TransformContext();
+        context.epochTime = System.currentTimeMillis();
+        context.meta = event.meta();
+
+        String beforeOp = event.opTypeString(false);
+        String afterOp = event.opTypeString(true);
+
+        for (PostTransformer transformer : effectiveTransformers) {
+            TransformProjectionProcessor projectionProcessor =
+                    getProjectionProcessor(tableId, transformer);
+            TransformFilterProcessor filterProcessor = getFilterProcessor(tableId, transformer);
+
+            RecordData beforeRow = null;
+            RecordData afterRow = null;
+            boolean filterPassed = true;
+
+            if (event.before() != null) {
+                context.opType = beforeOp;
+                Tuple2<BinaryRecordData, Boolean> result =
+                        transformRecord(
+                                event.before(),
+                                info,
+                                projectionProcessor,
+                                filterProcessor,
+                                context);
+                beforeRow = result.f0;
+                filterPassed = result.f1;
+            }
+
+            if (event.after() != null) {
+                context.opType = afterOp;
+                Tuple2<BinaryRecordData, Boolean> result =
+                        transformRecord(
+                                event.after(), info, projectionProcessor, filterProcessor, context);
+                afterRow = result.f0;
+                filterPassed = result.f1;
+            }
+
+            if (filterPassed) {
+                DataChangeEvent finalEvent =
+                        DataChangeEvent.projectRecords(event, beforeRow, afterRow);
+                if (transformer.getPostTransformConverter().isPresent()) {
+                    return transformer
+                            .getPostTransformConverter()
+                            .get()
+                            .convert(finalEvent)
+                            .map(Event.class::cast);
+                } else {
+                    return Optional.of(finalEvent);
                 }
             }
         }
-        if (newSchemas.isEmpty()) {
-            return schema;
-        }
 
-        return SchemaMergingUtils.getCommonSchema(newSchemas);
-    }
-
-    private List<Object> getUdfFunctionInstances() {
-        return udfDescriptors.stream()
-                .map(e -> udfFunctionInstances.get(e.getName()))
-                .collect(Collectors.toList());
-    }
-
-    private Optional<DataChangeEvent> processDataChangeEvent(DataChangeEvent dataChangeEvent)
-            throws Exception {
-        TableId tableId = dataChangeEvent.tableId();
-        PostTransformChangeInfo tableInfo = getPostTransformChangeInfo(tableId);
-        List<Optional<DataChangeEvent>> transformedDataChangeEventOptionalList = new ArrayList<>();
-        long epochTime = System.currentTimeMillis();
-        for (PostTransformer transform : transforms) {
-            Selectors selectors = transform.getSelectors();
-
-            if (selectors.isMatch(tableId)) {
-                Optional<DataChangeEvent> dataChangeEventOptional = Optional.of(dataChangeEvent);
-                Optional<TransformProjection> transformProjectionOptional =
-                        transform.getProjection();
-                Optional<TransformFilter> transformFilterOptional = transform.getFilter();
-
-                if (transformFilterOptional.isPresent()
-                        && transformFilterOptional.get().isValid()) {
-                    TransformFilter transformFilter = transformFilterOptional.get();
-                    if (!transformFilterProcessorMap.containsKey(
-                            Tuple2.of(tableId, transformFilter))) {
-                        transformFilterProcessorMap.put(
-                                Tuple2.of(tableId, transformFilter),
-                                TransformFilterProcessor.of(
-                                        tableInfo,
-                                        transformFilter,
-                                        timezone,
-                                        udfDescriptors,
-                                        getUdfFunctionInstances(),
-                                        transform.getSupportedMetadataColumns()));
-                    }
-                    TransformFilterProcessor transformFilterProcessor =
-                            transformFilterProcessorMap.get(Tuple2.of(tableId, transformFilter));
-                    dataChangeEventOptional =
-                            processFilter(
-                                    transformFilterProcessor,
-                                    dataChangeEventOptional.get(),
-                                    epochTime);
-                }
-                if (dataChangeEventOptional.isPresent()
-                        && transformProjectionOptional.isPresent()
-                        && transformProjectionOptional.get().isValid()) {
-                    TransformProjection transformProjection = transformProjectionOptional.get();
-                    if (!transformProjectionProcessorMap.containsKey(
-                            Tuple2.of(tableId, transformProjection.getProjection()))) {
-                        transformProjectionProcessorMap.put(
-                                Tuple2.of(tableId, transformProjection.getProjection()),
-                                TransformProjectionProcessor.of(
-                                        tableInfo,
-                                        transformProjection,
-                                        timezone,
-                                        udfDescriptors,
-                                        getUdfFunctionInstances(),
-                                        transform.getSupportedMetadataColumns()));
-                    } else if (!transformProjectionProcessorMap
-                            .get(Tuple2.of(tableId, transformProjection.getProjection()))
-                            .hasTableInfo()) {
-                        TransformProjectionProcessor transformProjectionProcessorWithoutTableInfo =
-                                transformProjectionProcessorMap.get(
-                                        Tuple2.of(tableId, transformProjection.getProjection()));
-                        transformProjectionProcessorMap.put(
-                                Tuple2.of(tableId, transformProjection.getProjection()),
-                                TransformProjectionProcessor.of(
-                                        tableInfo,
-                                        transformProjectionProcessorWithoutTableInfo
-                                                .getTransformProjection(),
-                                        timezone,
-                                        udfDescriptors,
-                                        getUdfFunctionInstances(),
-                                        transform.getSupportedMetadataColumns()));
-                    }
-                    TransformProjectionProcessor postTransformProcessor =
-                            transformProjectionProcessorMap.get(
-                                    Tuple2.of(tableId, transformProjection.getProjection()));
-                    dataChangeEventOptional =
-                            processProjection(
-                                    postTransformProcessor,
-                                    dataChangeEventOptional.get(),
-                                    epochTime);
-                }
-                if (dataChangeEventOptional.isPresent()
-                        && transform.getPostTransformConverter().isPresent()) {
-                    dataChangeEventOptional =
-                            convertDataChangeEvent(
-                                    dataChangeEventOptional.get(),
-                                    transform.getPostTransformConverter().get());
-                }
-                transformedDataChangeEventOptionalList.add(dataChangeEventOptional);
-            }
-        }
-
-        if (transformedDataChangeEventOptionalList.isEmpty()) {
-            return processPostProjection(tableInfo, dataChangeEvent);
-        } else {
-            for (Optional<DataChangeEvent> dataChangeEventOptional :
-                    transformedDataChangeEventOptionalList) {
-                if (dataChangeEventOptional.isPresent()) {
-                    return processPostProjection(tableInfo, dataChangeEventOptional.get());
-                }
-            }
-            return Optional.empty();
-        }
-    }
-
-    private Optional<DataChangeEvent> convertDataChangeEvent(
-            DataChangeEvent dataChangeEvent, PostTransformConverter postTransformConverter) {
-        return postTransformConverter.convert(dataChangeEvent);
-    }
-
-    private Optional<DataChangeEvent> processFilter(
-            TransformFilterProcessor transformFilterProcessor,
-            DataChangeEvent dataChangeEvent,
-            long epochTime)
-            throws Exception {
-        BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        Map<String, String> meta = dataChangeEvent.meta();
-        // insert and update event only process afterData, delete only process beforeData
-        if (after != null) {
-            if (transformFilterProcessor.process(
-                    after, epochTime, opTypeToRowKind(dataChangeEvent.op(), '+'), meta)) {
-                return Optional.of(dataChangeEvent);
-            } else {
-                return Optional.empty();
-            }
-        } else if (before != null) {
-            if (transformFilterProcessor.process(
-                    before, epochTime, opTypeToRowKind(dataChangeEvent.op(), '-'), meta)) {
-                return Optional.of(dataChangeEvent);
-            } else {
-                return Optional.empty();
-            }
-        }
+        // Return original event if no transform predicate is satisfied/.
         return Optional.empty();
     }
 
-    private Optional<DataChangeEvent> processProjection(
-            TransformProjectionProcessor postTransformProcessor,
-            DataChangeEvent dataChangeEvent,
-            long epochTime) {
-        BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        if (before != null) {
-            BinaryRecordData projectedBefore =
-                    postTransformProcessor.processData(
-                            before,
-                            epochTime,
-                            opTypeToRowKind(dataChangeEvent.op(), '-'),
-                            dataChangeEvent.meta());
-            dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
-        }
-        if (after != null) {
-            BinaryRecordData projectedAfter =
-                    postTransformProcessor.processData(
-                            after,
-                            epochTime,
-                            opTypeToRowKind(dataChangeEvent.op(), '+'),
-                            dataChangeEvent.meta());
-            dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
-        }
-        return Optional.of(dataChangeEvent);
+    /**
+     * Generates transformed version of schema based on upstream schema and effective transformer.
+     */
+    private Schema transformSchema(Schema preSchema, PostTransformer transformer) {
+        List<ProjectionColumn> projectionColumns =
+                TransformParser.generateProjectionColumns(
+                        transformer
+                                .getProjection()
+                                .map(TransformProjection::getProjection)
+                                .orElse(null),
+                        preSchema.getColumns(),
+                        udfDescriptors,
+                        transformer.getSupportedMetadataColumns());
+        return preSchema.copy(
+                projectionColumns.stream()
+                        .map(ProjectionColumn::getColumn)
+                        .collect(Collectors.toList()));
     }
 
-    private Optional<DataChangeEvent> processPostProjection(
-            PostTransformChangeInfo tableInfo, DataChangeEvent dataChangeEvent) throws Exception {
-        BinaryRecordData before = (BinaryRecordData) dataChangeEvent.before();
-        BinaryRecordData after = (BinaryRecordData) dataChangeEvent.after();
-        if (before != null) {
-            BinaryRecordData projectedBefore = projectRecord(tableInfo, before);
-            dataChangeEvent = DataChangeEvent.projectBefore(dataChangeEvent, projectedBefore);
+    /** Projects given {@link RecordData} based on given processor. */
+    private Tuple2<BinaryRecordData, Boolean> transformRecord(
+            RecordData recordData,
+            PostTransformChangeInfo info,
+            @Nullable TransformProjectionProcessor projectionProcessor,
+            @Nullable TransformFilterProcessor filterProcessor,
+            TransformContext context) {
+        RecordData.FieldGetter[] preFieldGetters = info.getPreTransformedFieldGetters();
+        Schema preSchema = info.getPreTransformedSchema();
+        Schema postSchema = info.getPostTransformedSchema();
+        BinaryRecordDataGenerator postGenerator = info.getPostTransformedRecordDataGenerator();
+
+        Object[] preRow = new Object[preFieldGetters.length];
+        for (int i = 0; i < preFieldGetters.length; i++) {
+            preRow[i] =
+                    DataTypeConverter.convertToOriginal(
+                            preFieldGetters[i].getFieldOrNull(recordData),
+                            preSchema.getColumnDataTypes().get(i));
         }
-        if (after != null) {
-            BinaryRecordData projectedAfter = projectRecord(tableInfo, after);
-            dataChangeEvent = DataChangeEvent.projectAfter(dataChangeEvent, projectedAfter);
+
+        Object[] postRow =
+                projectionProcessor != null ? projectionProcessor.project(preRow, context) : preRow;
+
+        // Filter predicate test might refer to both PreTransformed only columns (that have been
+        // eliminated from transform result) and PostTransformed only columns (that do not exist
+        // until expression evaluation finishes). So we need pass both rows to FilterProcessor.
+        boolean filterPassed =
+                filterProcessor == null || filterProcessor.test(preRow, postRow, context);
+
+        Object[] postRowBinary = new Object[postSchema.getColumnCount()];
+        for (int i = 0; i < postRow.length; i++) {
+            postRowBinary[i] =
+                    DataTypeConverter.convert(postRow[i], postSchema.getColumnDataTypes().get(i));
         }
-        return Optional.of(dataChangeEvent);
+        return Tuple2.of(postGenerator.generate(postRowBinary), filterPassed);
     }
 
-    private BinaryRecordData projectRecord(
-            PostTransformChangeInfo tableInfo, BinaryRecordData recordData) {
-        List<Object> valueList = new ArrayList<>();
-        RecordData.FieldGetter[] fieldGetters = tableInfo.getPostTransformedFieldGetters();
+    // -------------------
+    // Convenience methods for coping with transient fields.
+    // -------------------
 
-        for (RecordData.FieldGetter fieldGetter : fieldGetters) {
-            valueList.add(fieldGetter.getFieldOrNull(recordData));
-        }
-
-        return tableInfo
-                .getRecordDataGenerator()
-                .generate(valueList.toArray(new Object[valueList.size()]));
+    /** Obtain effective transformers based on given {@link TableId}. */
+    private List<PostTransformer> getEffectiveTransformers(TableId tableId) {
+        return transformers.stream()
+                .filter(trans -> trans.getSelectors().isMatch(tableId))
+                .collect(Collectors.toList());
     }
 
-    private void clearOperator() {
-        this.transforms = null;
-        this.transformProjectionProcessorMap = null;
-        this.transformFilterProcessorMap = null;
-        TransformExpressionCompiler.cleanUp();
+    /**
+     * Get the unique {@link TransformProjectionProcessor} based on provided {@link TableId} and
+     * {@link PostTransformer}.
+     */
+    private TransformProjectionProcessor getProjectionProcessor(
+            TableId tableId, PostTransformer postTransformer) {
+        if (!projectionProcessors.contains(tableId, postTransformer)) {
+            PostTransformChangeInfo changeInfo = postTransformInfoMap.get(tableId);
+            projectionProcessors.put(
+                    tableId,
+                    postTransformer,
+                    new TransformProjectionProcessor(
+                            changeInfo,
+                            postTransformer
+                                    .getProjection()
+                                    .map(TransformProjection::getProjection)
+                                    .orElse(null),
+                            timezone,
+                            udfDescriptors,
+                            udfFunctionInstances,
+                            postTransformer.getSupportedMetadataColumns()));
+        }
+        return projectionProcessors.get(tableId, postTransformer);
+    }
+
+    /**
+     * Get the unique {@link TransformFilterProcessor} based on provided {@link TableId} and {@link
+     * PostTransformer}.
+     */
+    private TransformFilterProcessor getFilterProcessor(
+            TableId tableId, PostTransformer postTransformer) {
+        if (!filterProcessors.contains(tableId, postTransformer)) {
+            if (!postTransformer.getFilter().isPresent()) {
+                filterProcessors.put(tableId, postTransformer, TransformFilterProcessor.ofNoOp());
+            } else {
+                PostTransformChangeInfo changeInfo = postTransformInfoMap.get(tableId);
+                filterProcessors.put(
+                        tableId,
+                        postTransformer,
+                        TransformFilterProcessor.of(
+                                changeInfo,
+                                postTransformer.getFilter().orElse(null),
+                                timezone,
+                                udfDescriptors,
+                                udfFunctionInstances,
+                                postTransformer.getSupportedMetadataColumns()));
+            }
+        }
+        return filterProcessors.get(tableId, postTransformer);
+    }
+
+    /**
+     * Flush caches saved for given {@link TableId}. Be sure to invalidate caches after its schema
+     * has been changed!
+     */
+    private void invalidateCache(TableId tableId) {
+        projectionProcessors.row(tableId).clear();
+        filterProcessors.row(tableId).clear();
+    }
+
+    private List<PostTransformer> createTransformers() {
+        List<PostTransformer> list = new ArrayList<>();
+        for (TransformRule rule : transformRules) {
+            String projection = rule.getProjection();
+            String filterExpression = rule.getFilter();
+            String tableInclusions = rule.getTableInclusions();
+            Selectors selectors =
+                    new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
+            PostTransformer apply =
+                    new PostTransformer(
+                            selectors,
+                            TransformProjection.of(projection).orElse(null),
+                            TransformFilter.of(filterExpression, udfDescriptors).orElse(null),
+                            PostTransformConverters.of(rule.getPostTransformConverter())
+                                    .orElse(null),
+                            rule.getSupportedMetadataColumns());
+            list.add(apply);
+        }
+        return list;
     }
 
     private void initializeUdf() {
-        udfDescriptors.forEach(
-                udf -> {
-                    try {
-                        if (udf.isCdcPipelineUdf()) {
-                            // We use reflection to invoke UDF methods since we may add more methods
-                            // into UserDefinedFunction interface, thus the provided UDF classes
-                            // might not be compatible with the interface definition in CDC common.
-                            Object udfInstance = udfFunctionInstances.get(udf.getName());
-                            UserDefinedFunctionContext userDefinedFunctionContext =
-                                    () -> Configuration.fromMap(udf.getParameters());
-                            udfInstance
-                                    .getClass()
-                                    .getMethod("open", UserDefinedFunctionContext.class)
-                                    .invoke(udfInstance, userDefinedFunctionContext);
-                        } else {
-                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
-                        }
-                    } catch (InvocationTargetException
-                            | NoSuchMethodException
-                            | IllegalAccessException ex) {
-                        throw new RuntimeException("Failed to initialize UDF " + udf, ex);
-                    }
-                });
+        this.udfDescriptors =
+                udfFunctions.stream()
+                        .map(UserDefinedFunctionDescriptor::new)
+                        .collect(Collectors.toList());
+        this.udfFunctionInstances = new ArrayList<>();
+
+        for (UserDefinedFunctionDescriptor udf : udfDescriptors) {
+            try {
+                Class<?> clazz = Class.forName(udf.getClasspath());
+                Object udfInstance = clazz.getDeclaredConstructor().newInstance();
+                udfFunctionInstances.add(udfInstance);
+
+                if (udf.isCdcPipelineUdf()) {
+                    // We use reflection to invoke UDF methods since we may add more methods
+                    // into UserDefinedFunction interface, thus the provided UDF classes
+                    // might not be compatible with the interface definition in CDC common.
+                    UserDefinedFunctionContext userDefinedFunctionContext =
+                            () -> Configuration.fromMap(udf.getParameters());
+                    udfInstance
+                            .getClass()
+                            .getMethod("open", UserDefinedFunctionContext.class)
+                            .invoke(udfInstance, userDefinedFunctionContext);
+                }
+                // Do nothing for Flink-style UDF since their lifecycle hooks are not supported
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Failed to instantiate UDF function " + udf, e);
+            }
+        }
     }
 
     private void destroyUdf() {
-        udfDescriptors.forEach(
-                udf -> {
-                    try {
-                        if (udf.isCdcPipelineUdf()) {
-                            // We use reflection to invoke UDF methods since we may add more methods
-                            // into UserDefinedFunction interface, thus the provided UDF classes
-                            // might not be compatible with the interface definition in CDC common.
-                            Object udfInstance = udfFunctionInstances.get(udf.getName());
-                            udfInstance.getClass().getMethod("close").invoke(udfInstance);
-                        } else {
-                            // Do nothing, Flink-style UDF lifecycle hooks are not supported
-                        }
-                    } catch (InvocationTargetException
-                            | NoSuchMethodException
-                            | IllegalAccessException ex) {
-                        throw new RuntimeException("Failed to destroy UDF " + udf, ex);
-                    }
-                });
+        if (udfDescriptors == null || udfFunctionInstances == null) {
+            return;
+        }
+        for (int i = 0; i < udfDescriptors.size(); i++) {
+            UserDefinedFunctionDescriptor udf = udfDescriptors.get(i);
+            try {
+                if (udf.isCdcPipelineUdf()) {
+                    Object udfInstance = udfFunctionInstances.get(i);
+                    udfInstance.getClass().getMethod("close").invoke(udfInstance);
+                }
+                // Do nothing for Flink-style UDF since their lifecycle hooks are not supported
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Failed to destroy UDF " + udf, e);
+            }
+        }
+        udfDescriptors.clear();
+        udfFunctionInstances.clear();
     }
 
-    private String opTypeToRowKind(OperationType opType, char beforeOrAfter) {
-        return String.format("%c%c", beforeOrAfter, opType.name().charAt(0));
+    /** Backport of {@code Optional#stream} before Java 11. */
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    private <T> Stream<T> optionalToStream(Optional<T> optional) {
+        return optional.map(Stream::of).orElseGet(Stream::empty);
     }
 }
