@@ -578,6 +578,10 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             MongoDBTestUtils.waitForSinkSize("sink", fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+            // sleep 1s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
+            // Otherwise, the restart job won't read newly added tables, and this test will be
+            // stuck.
+            Thread.sleep(1000L);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
@@ -824,7 +828,7 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             // the result size of sink may arrive fetchedDataList.size() with old data, wait one
             // checkpoint to wait retract old record and send new record
-            Thread.sleep(1000);
+            Thread.sleep(1000L);
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
 

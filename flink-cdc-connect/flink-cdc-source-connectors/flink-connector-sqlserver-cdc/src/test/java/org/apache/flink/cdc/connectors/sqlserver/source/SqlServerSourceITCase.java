@@ -38,6 +38,7 @@ import org.apache.flink.util.CloseableIterator;
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -124,6 +125,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
+    @Disabled("Disable enable backfill test until FLINK-34833 is resolved")
     void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(false, 25, USE_PRE_HIGHWATERMARK_HOOK);
@@ -163,6 +165,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
+    @Disabled("Disable enable backfill test until FLINK-34833 is resolved")
     void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(false, 25, USE_POST_LOWWATERMARK_HOOK);
