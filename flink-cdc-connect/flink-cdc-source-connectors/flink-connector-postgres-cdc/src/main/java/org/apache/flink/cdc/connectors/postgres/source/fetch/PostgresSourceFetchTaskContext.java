@@ -383,11 +383,8 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     private boolean isBackFillSplit(SourceSplitBase sourceSplitBase) {
-        if (sourceSplitBase instanceof StreamSplit) {
-            StreamSplit streamSplit = (StreamSplit) sourceSplitBase;
-            // when backfilled, will send specified table schema.
-            return !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(streamSplit.splitId());
-        }
-        return false;
+        return sourceSplitBase.isStreamSplit()
+                && !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(
+                        sourceSplitBase.asStreamSplit().splitId());
     }
 }
