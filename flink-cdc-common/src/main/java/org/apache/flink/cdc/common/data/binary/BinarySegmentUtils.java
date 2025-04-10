@@ -88,23 +88,6 @@ public final class BinarySegmentUtils {
         return bytes;
     }
 
-    public static char[] allocateReuseChars(int length) {
-        char[] chars = CHARS_LOCAL.get();
-
-        if (chars == null) {
-            if (length <= MAX_CHARS_LENGTH) {
-                chars = new char[MAX_CHARS_LENGTH];
-                CHARS_LOCAL.set(chars);
-            } else {
-                chars = new char[length];
-            }
-        } else if (chars.length < length) {
-            chars = new char[length];
-        }
-
-        return chars;
-    }
-
     /**
      * Copy segments to a new byte[].
      *
