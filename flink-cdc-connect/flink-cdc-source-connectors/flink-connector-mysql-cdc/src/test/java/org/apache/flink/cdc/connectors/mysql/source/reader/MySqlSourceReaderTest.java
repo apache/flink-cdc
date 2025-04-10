@@ -69,6 +69,8 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,6 +103,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isH
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isSchemaChangeEvent;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isWatermarkEvent;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
+import static org.apache.flink.core.io.InputStatus.END_OF_INPUT;
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -184,8 +187,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         // Step 2: wait the snapshot splits finished reading
-        Thread.sleep(5000L);
-        List<String> actualRecords = consumeRecords(reader, dataType);
+        List<String> actualRecords = consumeSnapshotRecords(reader, dataType);
         assertEqualsInAnyOrder(Arrays.asList(expectedRecords), actualRecords);
         reader.handleSourceEvents(
                 new FinishedSnapshotSplitsAckEvent(
@@ -213,10 +215,12 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         restartReader.close();
     }
 
-    @Test
-    void testFinishedUnackedSplitsUsingStateFromSnapshotPhase() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testFinishedUnackedSplitsUsingStateFromSnapshotPhase(boolean skipBackFill)
+            throws Exception {
         customerDatabase.createAndInitialize();
-        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"});
+        final MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers"}, skipBackFill);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -294,8 +298,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+I[2000, user_21, Shanghai, 123567891234]"
                 };
         // Step 2: wait the snapshot splits finished reading
-        Thread.sleep(5000L);
-        List<String> actualRecords = consumeRecords(reader, dataType);
+        List<String> actualRecords = consumeSnapshotRecords(reader, dataType);
         assertEqualsInAnyOrder(Arrays.asList(expectedRecords), actualRecords);
 
         // Step 3: snapshot reader's state
@@ -352,7 +355,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Hangzhou, 123567891234]"
                 };
         // the 2 records are produced by 1 operations
-        List<String> actualRecords = consumeRecords(reader, dataType);
+        List<String> actualRecords = consumeBinlogRecords(reader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRecords), actualRecords);
         List<MySqlSplit> splitsState = reader.snapshotState(1L);
         // check the binlog split state
@@ -373,7 +376,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+U[103, user_3, Shanghai, 123567891234]"
                 };
         // the 4 records are produced by 3 operations
-        List<String> restRecords = consumeRecords(restartReader, dataType);
+        List<String> restRecords = consumeBinlogRecords(restartReader, dataType);
         assertEqualsInOrder(Arrays.asList(expectedRestRecords), restRecords);
         restartReader.close();
     }
@@ -610,6 +613,10 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
     }
 
     private MySqlSourceConfig getConfig(String[] captureTables) {
+        return getConfig(captureTables, false);
+    }
+
+    private MySqlSourceConfig getConfig(String[] captureTables, boolean skipBackFill) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> customerDatabase.getDatabaseName() + "." + tableName)
@@ -627,16 +634,29 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 .username(customerDatabase.getUsername())
                 .password(customerDatabase.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
+                .skipSnapshotBackfill(skipBackFill)
                 .createConfig(0);
     }
 
-    private List<String> consumeRecords(
+    private List<String> consumeSnapshotRecords(
             MySqlSourceReader<SourceRecord> sourceReader, DataType recordType) throws Exception {
-        // Poll all the n records of the single split.
+        // Poll all the  records of the multiple assigned snapshot split.
+        sourceReader.notifyNoMoreSplits();
         final SimpleReaderOutput output = new SimpleReaderOutput();
         InputStatus status = MORE_AVAILABLE;
-        while (MORE_AVAILABLE == status || output.getResults().size() == 0) {
+        while (END_OF_INPUT != status) {
             status = sourceReader.pollNext(output);
+        }
+        final RecordsFormatter formatter = new RecordsFormatter(recordType);
+        return formatter.format(output.getResults());
+    }
+
+    private List<String> consumeBinlogRecords(
+            MySqlSourceReader<SourceRecord> sourceReader, DataType recordType) throws Exception {
+        // Poll one batch records of the binlog split.
+        final SimpleReaderOutput output = new SimpleReaderOutput();
+        while (output.getResults().isEmpty()) {
+            sourceReader.pollNext(output);
         }
         final RecordsFormatter formatter = new RecordsFormatter(recordType);
         return formatter.format(output.getResults());
