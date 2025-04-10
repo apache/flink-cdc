@@ -43,8 +43,6 @@ import org.apache.flink.cdc.connectors.sqlserver.source.offset.LsnFactory;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.RecordsFormatter;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 import org.apache.flink.core.io.InputStatus;
 import org.apache.flink.table.api.DataTypes;
@@ -202,8 +200,6 @@ class SqlserverSourceReaderTest extends SqlServerSourceTestBase {
             int limit)
             throws Exception {
         // create source config for the given subtask (e.g. unique server id)
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
-                new FutureCompletingBlockingQueue<>();
 
         IncrementalSourceReaderContext incrementalSourceReaderContext =
                 new IncrementalSourceReaderContext(readerContext);
@@ -226,7 +222,6 @@ class SqlserverSourceReaderTest extends SqlServerSourceTestBase {
                         limit);
 
         return new IncrementalSourceReaderWithCommit(
-                elementsQueue,
                 splitReaderSupplier,
                 recordEmitter,
                 readerContext.getConfiguration(),
