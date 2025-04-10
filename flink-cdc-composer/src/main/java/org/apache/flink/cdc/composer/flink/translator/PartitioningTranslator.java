@@ -45,16 +45,19 @@ public class PartitioningTranslator {
             int upstreamParallelism,
             int downstreamParallelism,
             OperatorID schemaOperatorID,
-            HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
+            HashFunctionProvider<DataChangeEvent> hashFunctionProvider,
+            OperatorUidGenerator operatorUidGenerator) {
         return input.transform(
                         "PrePartition",
                         new PartitioningEventTypeInfo(),
                         new RegularPrePartitionOperator(
                                 schemaOperatorID, downstreamParallelism, hashFunctionProvider))
+                .uid(operatorUidGenerator.generateUid("pre-partition"))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector())
                 .map(new PostPartitionProcessor(), new EventTypeInfo())
-                .name("PostPartition");
+                .name("PostPartition")
+                .uid(operatorUidGenerator.generateUid("post-partition"));
     }
 
     public DataStream<PartitioningEvent> translateDistributed(
