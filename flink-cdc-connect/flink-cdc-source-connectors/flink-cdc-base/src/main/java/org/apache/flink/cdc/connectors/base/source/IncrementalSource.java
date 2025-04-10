@@ -49,8 +49,6 @@ import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceSplit
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.util.FlinkRuntimeException;
 
@@ -115,9 +113,6 @@ public class IncrementalSource<T, C extends SourceConfig>
             throws Exception {
         // create source config for the given subtask (e.g. unique server id)
         C sourceConfig = configFactory.create(readerContext.getIndexOfSubtask());
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
-                new FutureCompletingBlockingQueue<>();
-
         final SourceReaderMetrics sourceReaderMetrics =
                 new SourceReaderMetrics(readerContext.metricGroup());
 
@@ -132,7 +127,6 @@ public class IncrementalSource<T, C extends SourceConfig>
                                 incrementalSourceReaderContext,
                                 snapshotHooks);
         return new IncrementalSourceReader<>(
-                elementsQueue,
                 splitReaderSupplier,
                 createRecordEmitter(sourceConfig, sourceReaderMetrics),
                 readerContext.getConfiguration(),

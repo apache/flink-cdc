@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.base.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
@@ -43,10 +44,8 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -109,7 +108,6 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     private final IncrementalSourceReaderContext incrementalSourceReaderContext;
 
     public IncrementalSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier,
             RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter,
             Configuration config,
@@ -118,8 +116,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect<C> dialect) {
         super(
-                elementQueue,
-                new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
+                new ReuseSingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
                 config,
                 incrementalSourceReaderContext.getSourceReaderContext());
@@ -539,6 +536,26 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             }
             Offset offset = split.asStreamSplit().getStartingOffset();
             LOG.info("Stream split offset on checkpoint {}: {}", checkpointId, offset);
+        }
+    }
+
+    /**
+     * A fetcher manager that reuse fetcher thread when fetcher thread is idle.
+     *
+     * @param <E>
+     * @param <SplitT>
+     */
+    public static class ReuseSingleThreadFetcherManager<E, SplitT extends SourceSplit>
+            extends SingleThreadFetcherManager<E, SplitT> {
+        public ReuseSingleThreadFetcherManager(Supplier supplier) {
+            super(supplier);
+        }
+
+        @Override
+        public boolean maybeShutdownFinishedFetchers() {
+            LOG.info(
+                    "Ignore the idle thread shutdown and recycled, reduce fetchers reconstruction.");
+            return fetchers.isEmpty();
         }
     }
 }

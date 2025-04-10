@@ -26,7 +26,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSeriali
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,6 @@ public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
     private long maxCompletedCheckpointId;
 
     public IncrementalSourceReaderWithCommit(
-            FutureCompletingBlockingQueue elementQueue,
             Supplier supplier,
             RecordEmitter recordEmitter,
             Configuration config,
@@ -56,7 +54,6 @@ public class IncrementalSourceReaderWithCommit extends IncrementalSourceReader {
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect dialect) {
         super(
-                elementQueue,
                 supplier,
                 recordEmitter,
                 config,
