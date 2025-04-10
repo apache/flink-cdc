@@ -366,6 +366,7 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .put("runtime-mode", "STREAMING")
                                     .build()));
 
     @Test
@@ -502,6 +503,7 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .put("runtime-mode", "STREAMING")
                                     .build()));
 
     private final PipelineDef defWithOptional =
