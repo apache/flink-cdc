@@ -386,9 +386,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         if (sourceSplitBase instanceof StreamSplit) {
             StreamSplit streamSplit = (StreamSplit) sourceSplitBase;
             // when backfilled, will send specified table schema.
-            return !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(streamSplit.splitId())
-                    && streamSplit.getTableSchemas() != null
-                    && streamSplit.getTableSchemas().size() == 1;
+            return !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(streamSplit.splitId());
         }
         return false;
     }
