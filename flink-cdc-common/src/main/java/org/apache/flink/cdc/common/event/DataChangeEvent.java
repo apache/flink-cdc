@@ -79,6 +79,19 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return op;
     }
 
+    public String opTypeString(boolean isAfter) {
+        switch (op) {
+            case INSERT:
+                return "+I";
+            case UPDATE:
+                return isAfter ? "+U" : "-U";
+            case DELETE:
+                return "-D";
+            default:
+                throw new UnsupportedOperationException("Unknown operation type: " + op);
+        }
+    }
+
     public Map<String, String> meta() {
         return meta;
     }
@@ -163,6 +176,22 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         return new DataChangeEvent(
                 dataChangeEvent.tableId,
                 dataChangeEvent.before,
+                projectedAfter,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
+    /**
+     * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
+     * info.
+     */
+    public static DataChangeEvent projectRecords(
+            DataChangeEvent dataChangeEvent,
+            RecordData projectedBefore,
+            RecordData projectedAfter) {
+        return new DataChangeEvent(
+                dataChangeEvent.tableId,
+                projectedBefore,
                 projectedAfter,
                 dataChangeEvent.op,
                 dataChangeEvent.meta);

@@ -24,7 +24,9 @@ import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
@@ -54,8 +56,7 @@ public class TransformTranslator {
             return input;
         }
 
-        PreTransformOperator.Builder preTransformFunctionBuilder =
-                PreTransformOperator.newBuilder();
+        PreTransformOperatorBuilder preTransformFunctionBuilder = PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             preTransformFunctionBuilder.addTransform(
                     transform.getSourceTable(),
@@ -92,7 +93,7 @@ public class TransformTranslator {
             return input;
         }
 
-        PostTransformOperator.Builder postTransformFunctionBuilder =
+        PostTransformOperatorBuilder postTransformFunctionBuilder =
                 PostTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {

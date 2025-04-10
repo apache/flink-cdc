@@ -94,4 +94,20 @@ public class TransformFilter implements Serializable {
     public boolean isValid() {
         return !columnNames.isEmpty();
     }
+
+    @Override
+    public String toString() {
+        return "TransformFilter{"
+                + "expression='"
+                + expression
+                + '\''
+                + ", scriptExpression='"
+                + scriptExpression
+                + '\''
+                + ", columnNames="
+                + columnNames
+                + ", columnNameMap="
+                + columnNameMap
+                + '}';
+    }
 }

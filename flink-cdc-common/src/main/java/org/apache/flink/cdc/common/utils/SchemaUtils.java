@@ -41,11 +41,13 @@ import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -387,6 +389,20 @@ public class SchemaUtils {
                             // before. Just assume it's not.
                             return false;
                         }));
+    }
+
+    @CheckReturnValue
+    public static Schema ensurePkNonNull(Schema schema) {
+        Set<String> pkColumns = new HashSet<>(schema.primaryKeys());
+        List<Column> columns =
+                schema.getColumns().stream()
+                        .map(
+                                col ->
+                                        pkColumns.contains(col.getName())
+                                                ? col.copy(col.getType().notNull())
+                                                : col)
+                        .collect(Collectors.toList());
+        return schema.copy(columns);
     }
 
     // Schema merging related utility methods have been moved to SchemaMergingUtils class.

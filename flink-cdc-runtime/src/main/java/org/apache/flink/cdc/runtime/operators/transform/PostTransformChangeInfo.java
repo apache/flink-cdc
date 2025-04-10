@@ -24,33 +24,78 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
+import javax.annotation.Nullable;
+
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * PostTransformChangeInfo caches pre-transformed / pre-transformed schema, schema field getters,
  * and binary record data generator for post-transform schema.
  */
 public class PostTransformChangeInfo {
-    private TableId tableId;
-    private Schema preTransformedSchema;
-    private Schema postTransformedSchema;
-    private RecordData.FieldGetter[] preTransformedFieldGetters;
-    private RecordData.FieldGetter[] postTransformedFieldGetters;
-    private BinaryRecordDataGenerator recordDataGenerator;
 
-    public PostTransformChangeInfo(
+    private final TableId tableId;
+
+    private final Schema preTransformedSchema;
+    private final Schema postTransformedSchema;
+    private final Map<String, Integer> preTransformedSchemaFieldNameToIndexMap;
+
+    private final RecordData.FieldGetter[] preTransformedFieldGetters;
+    private final RecordData.FieldGetter[] postTransformedFieldGetters;
+    private final BinaryRecordDataGenerator postTransformedRecordDataGenerator;
+    private final Map<String, Integer> postTransformedSchemaFieldNameToIndexMap;
+
+    public static PostTransformChangeInfo of(
+            TableId tableId, Schema preTransformedSchema, Schema postTransformedSchema) {
+
+        List<RecordData.FieldGetter> preTransformedFieldGetters =
+                SchemaUtils.createFieldGetters(preTransformedSchema.getColumns());
+
+        List<RecordData.FieldGetter> postTransformedFieldGetters =
+                SchemaUtils.createFieldGetters(postTransformedSchema.getColumns());
+
+        BinaryRecordDataGenerator postTransformedRecordDataGenerator =
+                new BinaryRecordDataGenerator(
+                        DataTypeConverter.toRowType(postTransformedSchema.getColumns()));
+
+        return new PostTransformChangeInfo(
+                tableId,
+                preTransformedSchema,
+                preTransformedFieldGetters.toArray(new RecordData.FieldGetter[0]),
+                postTransformedSchema,
+                postTransformedFieldGetters.toArray(new RecordData.FieldGetter[0]),
+                postTransformedRecordDataGenerator);
+    }
+
+    private PostTransformChangeInfo(
             TableId tableId,
-            Schema postTransformedSchema,
-            RecordData.FieldGetter[] postTransformedFieldGetters,
             Schema preTransformedSchema,
             RecordData.FieldGetter[] preTransformedFieldGetters,
-            BinaryRecordDataGenerator recordDataGenerator) {
+            Schema postTransformedSchema,
+            RecordData.FieldGetter[] postTransformedFieldGetters,
+            BinaryRecordDataGenerator postTransformedRecordDataGenerator) {
+
         this.tableId = tableId;
-        this.postTransformedSchema = postTransformedSchema;
-        this.postTransformedFieldGetters = postTransformedFieldGetters;
+
         this.preTransformedSchema = preTransformedSchema;
         this.preTransformedFieldGetters = preTransformedFieldGetters;
-        this.recordDataGenerator = recordDataGenerator;
+        this.preTransformedSchemaFieldNameToIndexMap = new HashMap<>();
+        for (int i = 0; i < preTransformedSchema.getColumns().size(); i++) {
+            preTransformedSchemaFieldNameToIndexMap.put(
+                    preTransformedSchema.getColumns().get(i).getName(), i);
+        }
+
+        this.postTransformedSchema = postTransformedSchema;
+        this.postTransformedFieldGetters = postTransformedFieldGetters;
+        this.postTransformedRecordDataGenerator = postTransformedRecordDataGenerator;
+        this.postTransformedSchemaFieldNameToIndexMap = new HashMap<>();
+
+        for (int i = 0; i < postTransformedSchema.getColumns().size(); i++) {
+            postTransformedSchemaFieldNameToIndexMap.put(
+                    postTransformedSchema.getColumns().get(i).getName(), i);
+        }
     }
 
     public String getName() {
@@ -73,45 +118,27 @@ public class PostTransformChangeInfo {
         return tableId;
     }
 
-    public Schema getPostTransformedSchema() {
-        return postTransformedSchema;
-    }
-
     public Schema getPreTransformedSchema() {
         return preTransformedSchema;
     }
 
-    public RecordData.FieldGetter[] getPostTransformedFieldGetters() {
-        return postTransformedFieldGetters;
+    public Schema getPostTransformedSchema() {
+        return postTransformedSchema;
+    }
+
+    public @Nullable Integer getPreTransformedSchemaFieldIndex(String fieldName) {
+        return preTransformedSchemaFieldNameToIndexMap.get(fieldName);
+    }
+
+    public @Nullable Integer getPostTransformedSchemaFieldIndex(String fieldName) {
+        return postTransformedSchemaFieldNameToIndexMap.get(fieldName);
     }
 
     public RecordData.FieldGetter[] getPreTransformedFieldGetters() {
         return preTransformedFieldGetters;
     }
 
-    public BinaryRecordDataGenerator getRecordDataGenerator() {
-        return recordDataGenerator;
-    }
-
-    public static PostTransformChangeInfo of(
-            TableId tableId, Schema postTransformedSchema, Schema preTransformedSchema) {
-
-        List<RecordData.FieldGetter> postTransformedFieldGetters =
-                SchemaUtils.createFieldGetters(postTransformedSchema.getColumns());
-
-        List<RecordData.FieldGetter> preTransformedFieldGetters =
-                SchemaUtils.createFieldGetters(preTransformedSchema.getColumns());
-
-        BinaryRecordDataGenerator postTransformedRecordDataGenerator =
-                new BinaryRecordDataGenerator(
-                        DataTypeConverter.toRowType(postTransformedSchema.getColumns()));
-
-        return new PostTransformChangeInfo(
-                tableId,
-                postTransformedSchema,
-                postTransformedFieldGetters.toArray(new RecordData.FieldGetter[0]),
-                preTransformedSchema,
-                preTransformedFieldGetters.toArray(new RecordData.FieldGetter[0]),
-                postTransformedRecordDataGenerator);
+    public BinaryRecordDataGenerator getPostTransformedRecordDataGenerator() {
+        return postTransformedRecordDataGenerator;
     }
 }

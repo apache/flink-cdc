@@ -1085,19 +1085,6 @@ class FlinkPipelineComposerITCase {
                         .primaryKey("id")
                         .build();
 
-        // Create test dataset:
-        // Create table 1 [id, name, age]
-        // Create table 2 [id, name, age, description]
-        // Table 1: +I[1, Alice, 18]
-        // Table 1: +I[2, Bob, 20]
-        // Table 1: -U[2, Bob, 20] +U[2, Bob, 30]
-        // Table 2: +I[3, Charlie, 15, student]
-        // Table 2: +I[4, Donald, 25, student]
-        // Table 2: -D[4, Donald, 25, student]
-        // Rename column for table 1: name -> last_name
-        // Add column for table 2: gender
-        // Table 1: +I[5, Eliza, 24]
-        // Table 2: +I[6, Frank, 30, student, male]
         List<Event> events = new ArrayList<>();
         BinaryRecordDataGenerator table1dataGenerator =
                 new BinaryRecordDataGenerator(
