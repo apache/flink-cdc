@@ -91,7 +91,11 @@ public abstract class OceanBaseCatalog implements Serializable {
             String schemaName, String tableName, List<String> dropColumns);
 
     public abstract void alterColumnType(
-            String schemaName, String tableName, String columnName, DataType dataType);
+            String schemaName,
+            String tableName,
+            String columnName,
+            DataType dataType,
+            String comment);
 
     public abstract void renameColumn(
             String schemaName, String tableName, String oldColumnName, String newColumnName);
@@ -99,6 +103,8 @@ public abstract class OceanBaseCatalog implements Serializable {
     public abstract void dropTable(String schemaName, String tableName);
 
     public abstract void truncateTable(String schemaName, String tableName);
+
+    public abstract void alterTable(String schemaName, String tableName, String comment);
 
     public void close() {
         LOG.info("Close OceanBase catalog");
