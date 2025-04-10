@@ -44,8 +44,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderContext;
 import org.apache.flink.connector.testutils.source.reader.TestingReaderOutput;
 import org.apache.flink.core.io.InputStatus;
@@ -554,8 +552,6 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
             int limit,
             SnapshotPhaseHooks snapshotHooks)
             throws Exception {
-        final FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
-                new FutureCompletingBlockingQueue<>();
         // make  SourceReaderContext#metricGroup compatible between Flink 1.13 and Flink 1.14
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
@@ -574,7 +570,6 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         final MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);
         return new MySqlSourceReader<>(
-                elementsQueue,
                 () -> createSplitReader(configuration, mySqlSourceReaderContext, snapshotHooks),
                 recordEmitter,
                 readerContext.getConfiguration(),

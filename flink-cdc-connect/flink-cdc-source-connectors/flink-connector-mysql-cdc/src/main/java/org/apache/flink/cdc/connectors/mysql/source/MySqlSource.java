@@ -52,8 +52,6 @@ import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.util.FlinkRuntimeException;
@@ -163,8 +161,6 @@ public class MySqlSource<T>
         // create source config for the given subtask (e.g. unique server id)
         MySqlSourceConfig sourceConfig =
                 configFactory.createConfig(readerContext.getIndexOfSubtask());
-        FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
-                new FutureCompletingBlockingQueue<>();
 
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
@@ -183,7 +179,6 @@ public class MySqlSource<T>
                                 mySqlSourceReaderContext,
                                 snapshotHooks);
         return new MySqlSourceReader<>(
-                elementsQueue,
                 splitReaderSupplier,
                 recordEmitterSupplier.get(sourceReaderMetrics, sourceConfig),
                 readerContext.getConfiguration(),
