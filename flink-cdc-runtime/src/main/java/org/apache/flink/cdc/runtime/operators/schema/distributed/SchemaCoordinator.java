@@ -61,6 +61,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -98,6 +99,9 @@ public class SchemaCoordinator extends SchemaRegistry {
     private transient Multimap<Tuple2<Integer, SchemaChangeEvent>, Integer>
             alreadyHandledSchemaChangeEvents;
 
+    /** Executor service to execute schema change. */
+    private final ExecutorService schemaChangeThreadPool;
+
     public SchemaCoordinator(
             String operatorName,
             OperatorCoordinator.Context context,
@@ -114,6 +118,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routingRules,
                 schemaChangeBehavior,
                 rpcTimeout);
+        this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
 
     // -----------------
@@ -129,6 +134,14 @@ public class SchemaCoordinator extends SchemaRegistry {
         this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+    }
+
+    @Override
+    public void close() throws Exception {
+        super.close();
+        if (schemaChangeThreadPool != null && !schemaChangeThreadPool.isShutdown()) {
+            schemaChangeThreadPool.shutdownNow();
+        }
     }
 
     // --------------------------
@@ -268,7 +281,20 @@ public class SchemaCoordinator extends SchemaRegistry {
             LOG.info(
                     "Received the last required schema change request {}. Switching from WAITING_FOR_FLUSH to EVOLVING.",
                     request);
-            startSchemaChange();
+
+            schemaChangeThreadPool.submit(
+                    () -> {
+                        try {
+                            startSchemaChange();
+                        } catch (Throwable t) {
+                            failJob(
+                                    "Schema change applying task",
+                                    new FlinkRuntimeException(
+                                            "Failed to apply schema change event.", t));
+                            throw new FlinkRuntimeException(
+                                    "Failed to apply schema change event.", t);
+                        }
+                    });
         }
     }
 
