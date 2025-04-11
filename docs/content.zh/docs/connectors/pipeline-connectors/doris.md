@@ -141,13 +141,6 @@ pipeline:
        <td>是否启用删除 </td>
      </tr>
      <tr>
-       <td>sink.enable-2pc</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">false</td>
-       <td>Boolean</td>
-       <td>是否开启两阶段提交 </td>
-     </tr>
-     <tr>
        <td>sink.max-retries</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">3</td>

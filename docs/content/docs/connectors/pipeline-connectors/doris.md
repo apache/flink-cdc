@@ -141,13 +141,6 @@ pipeline:
        <td>Whether to enable the delete function </td>
      </tr>
      <tr>
-       <td>sink.enable-2pc</td>
-       <td>optional</td>
-       <td style="word-wrap: break-word;">false</td>
-       <td>Boolean</td>
-       <td>Enable 2PC while loading </td>
-     </tr>
-     <tr>
        <td>sink.max-retries</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">3</td>
