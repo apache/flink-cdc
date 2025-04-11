@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.configuration.description.Description;
 import org.apache.flink.cdc.common.configuration.description.ListElement;
 
 import java.time.Duration;
+import java.util.List;
 
 import static org.apache.flink.cdc.common.configuration.description.TextElement.text;
 
@@ -99,6 +100,21 @@ public class PipelineOptions {
                     .defaultValue(DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT)
                     .withDescription(
                             "The timeout time for SchemaOperator to wait downstream SchemaChangeEvent applying finished, the default value is 3 minutes.");
+
+    public static final ConfigOption<String> SHADE_IDENTIFIER_OPTION =
+            ConfigOptions.key("shade.identifier")
+                    .stringType()
+                    .defaultValue("default")
+                    .withDescription(
+                            "The identifier of the encryption method for decryption. Defaults to \"default\", indicating no encryption");
+
+    public static final ConfigOption<List<String>> SHADE_SENSITIVE_KEYWORDS =
+            ConfigOptions.key("shade.sensitive.keywords")
+                    .stringType()
+                    .asList()
+                    .defaultValues("password")
+                    .withDescription(
+                            "A semicolon-separated list of keywords of the configuration items to be decrypted.");
 
     private PipelineOptions() {}
 }
