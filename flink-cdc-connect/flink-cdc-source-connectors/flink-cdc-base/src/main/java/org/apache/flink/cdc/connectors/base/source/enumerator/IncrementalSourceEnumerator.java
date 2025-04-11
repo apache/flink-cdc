@@ -22,6 +22,7 @@ import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.cdc.common.annotation.Experimental;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.assigner.HybridSplitAssigner;
 import org.apache.flink.cdc.connectors.base.source.assigner.SplitAssigner;
@@ -79,24 +80,32 @@ public class IncrementalSourceEnumerator
     private List<List<FinishedSnapshotSplitInfo>> finishedSnapshotSplitMeta;
 
     private Boundedness boundedness;
-
-    @Nullable protected Integer streamSplitTaskId = null;
+    protected int numberOfStreamSplits;
+    protected List<Integer> streamSplitTaskIds;
     private boolean isStreamSplitUpdateRequestAlreadySent = false;
 
     public IncrementalSourceEnumerator(
             SplitEnumeratorContext<SourceSplitBase> context,
             SourceConfig sourceConfig,
             SplitAssigner splitAssigner,
-            Boundedness boundedness) {
+            Boundedness boundedness,
+            int numberOfStreamSplits) {
         this.context = context;
         this.sourceConfig = sourceConfig;
         this.splitAssigner = splitAssigner;
         this.readersAwaitingSplit = new TreeSet<>();
         this.boundedness = boundedness;
+        this.numberOfStreamSplits = numberOfStreamSplits;
     }
 
     @Override
     public void start() {
+        Preconditions.checkArgument(
+                context.currentParallelism() >= numberOfStreamSplits,
+                "%s stream splits generated, which is greater than current parallelism %s. Some splits might never be assigned.",
+                numberOfStreamSplits,
+                context.currentParallelism());
+        this.streamSplitTaskIds = new ArrayList<>();
         splitAssigner.open();
         requestStreamSplitUpdateIfNeed();
         this.context.callAsync(
@@ -124,7 +133,7 @@ public class IncrementalSourceEnumerator
                 splits.stream().filter(SourceSplitBase::isStreamSplit).findAny();
         if (streamSplit.isPresent()) {
             LOG.info("The enumerator adds add stream split back: {}", streamSplit);
-            this.streamSplitTaskId = null;
+            this.streamSplitTaskIds.clear();
         }
         splitAssigner.addSplits(splits);
     }
@@ -172,7 +181,7 @@ public class IncrementalSourceEnumerator
             LOG.info(
                     "The enumerator receives notice from subtask {} for the stream split assignment. ",
                     subtaskId);
-            this.streamSplitTaskId = subtaskId;
+            this.streamSplitTaskIds.add(subtaskId);
         }
     }
 
@@ -221,7 +230,7 @@ public class IncrementalSourceEnumerator
                 final SourceSplitBase sourceSplit = split.get();
                 context.assignSplit(sourceSplit, nextAwaiting);
                 if (sourceSplit instanceof StreamSplit) {
-                    this.streamSplitTaskId = nextAwaiting;
+                    this.streamSplitTaskIds.add(nextAwaiting);
                 }
                 awaitingReader.remove();
                 LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
@@ -243,8 +252,7 @@ public class IncrementalSourceEnumerator
         return splitAssigner.noMoreSplits()
                 && (boundedness == Boundedness.BOUNDED
                         || (sourceConfig.isCloseIdleReaders()
-                                && streamSplitTaskId != null
-                                && streamSplitTaskId != (nextAwaiting)));
+                                && !streamSplitTaskIds.contains(nextAwaiting)));
     }
 
     protected int[] getRegisteredReader() {
@@ -277,13 +285,15 @@ public class IncrementalSourceEnumerator
                 && isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
             // If enumerator knows which reader is assigned stream split, just send to this reader,
             // nor sends to all registered readers.
-            if (streamSplitTaskId != null) {
+            if (!streamSplitTaskIds.isEmpty()) {
                 isStreamSplitUpdateRequestAlreadySent = true;
                 LOG.info(
                         "The enumerator requests subtask {} to update the stream split after newly added table.",
-                        streamSplitTaskId);
-                context.sendEventToSourceReader(
-                        streamSplitTaskId, new StreamSplitUpdateRequestEvent());
+                        streamSplitTaskIds);
+                for (int streamSplitTaskId : streamSplitTaskIds) {
+                    context.sendEventToSourceReader(
+                            streamSplitTaskId, new StreamSplitUpdateRequestEvent());
+                }
             } else {
                 for (int reader : getRegisteredReader()) {
                     isStreamSplitUpdateRequestAlreadySent = true;

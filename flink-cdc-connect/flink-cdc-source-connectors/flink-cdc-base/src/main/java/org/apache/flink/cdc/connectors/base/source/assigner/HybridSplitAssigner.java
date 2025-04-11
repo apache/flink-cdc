@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.base.source.assigner;
 
 import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.HybridPendingSplitsState;
@@ -32,12 +33,14 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -58,14 +61,15 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     private final int splitMetaGroupSize;
     private final C sourceConfig;
 
-    private boolean isStreamSplitAssigned;
-
     private final SnapshotSplitAssigner<C> snapshotSplitAssigner;
 
     private final OffsetFactory offsetFactory;
 
     private final SplitEnumeratorContext<? extends SourceSplit> enumeratorContext;
     private SourceEnumeratorMetrics enumeratorMetrics;
+
+    private final int numberOfStreamSplits;
+    private transient int updatedStreamSplitCount;
 
     public HybridSplitAssigner(
             C sourceConfig,
@@ -87,7 +91,8 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 false,
                 sourceConfig.getSplitMetaGroupSize(),
                 offsetFactory,
-                enumeratorContext);
+                enumeratorContext,
+                dialect.getNumberOfStreamSplits(sourceConfig));
     }
 
     public HybridSplitAssigner(
@@ -108,29 +113,32 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 checkpoint.isStreamSplitAssigned(),
                 sourceConfig.getSplitMetaGroupSize(),
                 offsetFactory,
-                enumeratorContext);
+                enumeratorContext,
+                dialect.getNumberOfStreamSplits(sourceConfig));
     }
 
     private HybridSplitAssigner(
             C sourceConfig,
             SnapshotSplitAssigner<C> snapshotSplitAssigner,
-            boolean isStreamSplitAssigned,
+            boolean isStreamSplitAllAssigned,
             int splitMetaGroupSize,
             OffsetFactory offsetFactory,
-            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
+            SplitEnumeratorContext<? extends SourceSplit> enumeratorContext,
+            int numberOfStreamSplits) {
         this.sourceConfig = sourceConfig;
         this.snapshotSplitAssigner = snapshotSplitAssigner;
-        this.isStreamSplitAssigned = isStreamSplitAssigned;
+        this.isStreamSplitAllAssigned = isStreamSplitAllAssigned;
         this.splitMetaGroupSize = splitMetaGroupSize;
         this.offsetFactory = offsetFactory;
         this.enumeratorContext = enumeratorContext;
+        this.numberOfStreamSplits = numberOfStreamSplits;
     }
 
     @Override
     public void open() {
         this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
 
-        if (isStreamSplitAssigned) {
+        if (isStreamSplitAllAssigned) {
             enumeratorMetrics.enterStreamReading();
         } else {
             enumeratorMetrics.exitStreamReading();
@@ -139,6 +147,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
         snapshotSplitAssigner.open();
         // init enumerator metrics
         snapshotSplitAssigner.initEnumeratorMetrics(enumeratorMetrics);
+        updatedStreamSplitCount = 0;
     }
 
     @Override
@@ -150,7 +159,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
         if (snapshotSplitAssigner.noMoreSplits()) {
             enumeratorMetrics.exitSnapshotPhase();
             // stream split assigning
-            if (isStreamSplitAssigned) {
+            if (isStreamSplitAllAssigned) {
                 // no more splits for the assigner
                 LOG.trace(
                         "No more splits for the SnapshotSplitAssigner. StreamSplit is already assigned.");
@@ -159,16 +168,11 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 // we need to wait snapshot-assigner to be finished before
                 // assigning the stream split. Otherwise, records emitted from stream split
                 // might be out-of-order in terms of same primary key with snapshot splits.
-                isStreamSplitAssigned = true;
                 enumeratorMetrics.enterStreamReading();
-                StreamSplit streamSplit = createStreamSplit();
-                LOG.trace(
-                        "SnapshotSplitAssigner is finished: creating a new stream split {}",
-                        streamSplit);
-                return Optional.of(streamSplit);
+                return getNextStreamSplit();
             } else if (isNewlyAddedAssigningFinished(snapshotSplitAssigner.getAssignerStatus())) {
                 // do not need to create stream split, but send event to wake up the binlog reader
-                isStreamSplitAssigned = true;
+                isStreamSplitAllAssigned = true;
                 enumeratorMetrics.enterStreamReading();
                 return Optional.empty();
             } else {
@@ -206,19 +210,20 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                 snapshotSplits.add(split);
             } else {
                 // we don't store the split, but will re-create stream split later
-                isStreamSplitAssigned = false;
+                isStreamSplitAllAssigned = false;
+                pendingStreamSplits = null;
             }
         }
         if (!snapshotSplits.isEmpty()) {
             enumeratorMetrics.exitStreamReading();
+            snapshotSplitAssigner.addSplits(snapshotSplits);
         }
-        snapshotSplitAssigner.addSplits(snapshotSplits);
     }
 
     @Override
     public PendingSplitsState snapshotState(long checkpointId) {
         return new HybridPendingSplitsState(
-                snapshotSplitAssigner.snapshotState(checkpointId), isStreamSplitAssigned);
+                snapshotSplitAssigner.snapshotState(checkpointId), isStreamSplitAllAssigned);
     }
 
     @Override
@@ -238,12 +243,15 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     @Override
     public void onStreamSplitUpdated() {
-        snapshotSplitAssigner.onStreamSplitUpdated();
+        if (++updatedStreamSplitCount == numberOfStreamSplits) {
+            snapshotSplitAssigner.onStreamSplitUpdated();
+            updatedStreamSplitCount = 0;
+        }
     }
 
     @Override
     public boolean noMoreSplits() {
-        return snapshotSplitAssigner.noMoreSplits() && isStreamSplitAssigned;
+        return snapshotSplitAssigner.noMoreSplits() && isStreamSplitAllAssigned;
     }
 
     @Override
@@ -252,56 +260,106 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     // --------------------------------------------------------------------------------------------
+    // Overridable methods
+    // --------------------------------------------------------------------------------------------
+    protected boolean isStreamSplitAllAssigned;
+    protected List<SourceSplitBase> pendingStreamSplits = null;
 
-    public StreamSplit createStreamSplit() {
-        final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
-                snapshotSplitAssigner.getAssignedSplits().values().stream()
-                        .sorted(Comparator.comparing(SourceSplitBase::splitId))
-                        .collect(Collectors.toList());
+    private Optional<SourceSplitBase> getNextStreamSplit() {
+        if (pendingStreamSplits == null) {
+            final List<SchemalessSnapshotSplit> assignedSnapshotSplit =
+                    snapshotSplitAssigner.getAssignedSplits().values().stream()
+                            .sorted(Comparator.comparing(SourceSplitBase::splitId))
+                            .collect(Collectors.toList());
 
-        Map<String, Offset> splitFinishedOffsets = snapshotSplitAssigner.getSplitFinishedOffsets();
-        final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
+            Map<String, Offset> splitFinishedOffsets =
+                    snapshotSplitAssigner.getSplitFinishedOffsets();
+            final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
 
-        Offset minOffset = null, maxOffset = null;
-        for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
-            // find the min and max offset of change log
-            Offset changeLogOffset = splitFinishedOffsets.get(split.splitId());
-            if (minOffset == null || changeLogOffset.isBefore(minOffset)) {
-                minOffset = changeLogOffset;
+            Offset minOffset = null, maxOffset = null;
+            for (SchemalessSnapshotSplit split : assignedSnapshotSplit) {
+                // find the min and max offset of change log
+                Offset changeLogOffset = splitFinishedOffsets.get(split.splitId());
+                if (minOffset == null || changeLogOffset.isBefore(minOffset)) {
+                    minOffset = changeLogOffset;
+                }
+                if (maxOffset == null || changeLogOffset.isAfter(maxOffset)) {
+                    maxOffset = changeLogOffset;
+                }
+
+                finishedSnapshotSplitInfos.add(
+                        new FinishedSnapshotSplitInfo(
+                                split.getTableId(),
+                                split.splitId(),
+                                split.getSplitStart(),
+                                split.getSplitEnd(),
+                                changeLogOffset,
+                                offsetFactory));
             }
-            if (maxOffset == null || changeLogOffset.isAfter(maxOffset)) {
-                maxOffset = changeLogOffset;
+
+            // If the source is running in snapshot mode, we use the highest watermark among
+            // snapshot splits as the ending offset to provide a consistent snapshot view at the
+            // moment
+            // of high watermark.
+            Offset stoppingOffset = offsetFactory.createNoStoppingOffset();
+            if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+                stoppingOffset = maxOffset;
             }
 
-            finishedSnapshotSplitInfos.add(
-                    new FinishedSnapshotSplitInfo(
-                            split.getTableId(),
-                            split.splitId(),
-                            split.getSplitStart(),
-                            split.getSplitEnd(),
-                            changeLogOffset,
-                            offsetFactory));
+            // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
+            // then transfer them
+            boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
+            pendingStreamSplits =
+                    new ArrayList<>(
+                            createStreamSplits(
+                                    sourceConfig,
+                                    minOffset == null
+                                            ? offsetFactory.createInitialOffset()
+                                            : minOffset,
+                                    stoppingOffset,
+                                    divideMetaToGroups
+                                            ? new ArrayList<>()
+                                            : finishedSnapshotSplitInfos,
+                                    new HashMap<>(),
+                                    finishedSnapshotSplitInfos.size(),
+                                    false,
+                                    true));
+            Preconditions.checkArgument(
+                    pendingStreamSplits.size() <= enumeratorContext.currentParallelism(),
+                    "%s stream splits generated, which is greater than current parallelism %s. Some splits might never be assigned.",
+                    pendingStreamSplits.size(),
+                    enumeratorContext.currentParallelism());
         }
 
-        // If the source is running in snapshot mode, we use the highest watermark among
-        // snapshot splits as the ending offset to provide a consistent snapshot view at the moment
-        // of high watermark.
-        Offset stoppingOffset = offsetFactory.createNoStoppingOffset();
-        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
-            stoppingOffset = maxOffset;
+        if (pendingStreamSplits.isEmpty()) {
+            return Optional.empty();
+        } else {
+            SourceSplitBase nextSplit = pendingStreamSplits.remove(0);
+            if (pendingStreamSplits.isEmpty()) {
+                isStreamSplitAllAssigned = true;
+            }
+            return Optional.of(nextSplit);
         }
+    }
 
-        // the finishedSnapshotSplitInfos is too large for transmission, divide it to groups and
-        // then transfer them
-        boolean divideMetaToGroups = finishedSnapshotSplitInfos.size() > splitMetaGroupSize;
-        return new StreamSplit(
-                STREAM_SPLIT_ID,
-                minOffset == null ? offsetFactory.createInitialOffset() : minOffset,
-                stoppingOffset,
-                divideMetaToGroups ? new ArrayList<>() : finishedSnapshotSplitInfos,
-                new HashMap<>(),
-                finishedSnapshotSplitInfos.size(),
-                false,
-                true);
+    protected List<SourceSplitBase> createStreamSplits(
+            C sourceConfig,
+            Offset minOffset,
+            Offset stoppingOffset,
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
+            Map<TableId, TableChanges.TableChange> tableSchemas,
+            int totalFinishedSplitSize,
+            boolean isSuspended,
+            boolean isSnapshotCompleted) {
+        return Collections.singletonList(
+                new StreamSplit(
+                        STREAM_SPLIT_ID,
+                        minOffset,
+                        stoppingOffset,
+                        finishedSnapshotSplitInfos,
+                        tableSchemas,
+                        totalFinishedSplitSize,
+                        isSuspended,
+                        isSnapshotCompleted));
     }
 }

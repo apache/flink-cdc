@@ -168,12 +168,16 @@ public class IncrementalSource<T, C extends SourceConfig>
             }
         } else {
             splitAssigner =
-                    new StreamSplitAssigner(
+                    new StreamSplitAssigner<>(
                             sourceConfig, dataSourceDialect, offsetFactory, enumContext);
         }
 
         return new IncrementalSourceEnumerator(
-                enumContext, sourceConfig, splitAssigner, getBoundedness());
+                enumContext,
+                sourceConfig,
+                splitAssigner,
+                getBoundedness(),
+                dataSourceDialect.getNumberOfStreamSplits(sourceConfig));
     }
 
     @Override
@@ -205,7 +209,11 @@ public class IncrementalSource<T, C extends SourceConfig>
         }
 
         return new IncrementalSourceEnumerator(
-                enumContext, sourceConfig, splitAssigner, getBoundedness());
+                enumContext,
+                sourceConfig,
+                splitAssigner,
+                getBoundedness(),
+                dataSourceDialect.getNumberOfStreamSplits(sourceConfig));
     }
 
     @Override

@@ -85,6 +85,11 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable,
     /** Check if the tableId is included in SourceConfig. */
     boolean isIncludeDataCollection(C sourceConfig, TableId tableId);
 
+    /** Determine the number of stream splits. */
+    default int getNumberOfStreamSplits(C sourceConfig) {
+        return 1;
+    }
+
     @Override
     default void close() throws IOException {}
 }

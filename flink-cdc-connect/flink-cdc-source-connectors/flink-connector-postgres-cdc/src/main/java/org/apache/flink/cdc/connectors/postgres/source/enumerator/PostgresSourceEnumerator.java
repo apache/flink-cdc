@@ -56,7 +56,7 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
             SplitAssigner splitAssigner,
             PostgresDialect postgresDialect,
             Boundedness boundedness) {
-        super(context, sourceConfig, splitAssigner, boundedness);
+        super(context, sourceConfig, splitAssigner, boundedness, 1);
         this.postgresDialect = postgresDialect;
         this.sourceConfig = sourceConfig;
     }
@@ -72,7 +72,7 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
         // if scan newly added table is enable, can not assign new added table's snapshot splits
         // until source reader doesn't commit offset.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                && streamSplitTaskId != null
+                && !streamSplitTaskIds.isEmpty()
                 && !receiveOffsetCommitAck
                 && isNewlyAddedAssigning(splitAssigner.getAssignerStatus())) {
             // just return here, the reader has been put into readersAwaitingSplit, will be assigned
@@ -88,7 +88,7 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
             this.receiveOffsetCommitAck = false;
         }
         if (sourceEvent instanceof OffsetCommitAckEvent) {
-            if (streamSplitTaskId != null && streamSplitTaskId == subtaskId) {
+            if (streamSplitTaskIds.contains(subtaskId)) {
                 this.receiveOffsetCommitAck = true;
             } else {
                 throw new RuntimeException("Receive SyncAssignStatusAck from wrong subtask");
@@ -105,13 +105,15 @@ public class PostgresSourceEnumerator extends IncrementalSourceEnumerator {
         // to tell reader whether to start offset commit.
         if (!receiveOffsetCommitAck
                 && sourceConfig.isScanNewlyAddedTableEnabled()
-                && streamSplitTaskId != null) {
+                && !streamSplitTaskIds.isEmpty()) {
             AssignerStatus assignerStatus = splitAssigner.getAssignerStatus();
-            context.sendEventToSourceReader(
-                    streamSplitTaskId,
-                    new OffsetCommitEvent(
-                            !isNewlyAddedAssigning(assignerStatus)
-                                    && !isNewlyAddedAssigningSnapshotFinished(assignerStatus)));
+            for (int streamSplitTaskId : streamSplitTaskIds) {
+                context.sendEventToSourceReader(
+                        streamSplitTaskId,
+                        new OffsetCommitEvent(
+                                !isNewlyAddedAssigning(assignerStatus)
+                                        && !isNewlyAddedAssigningSnapshotFinished(assignerStatus)));
+            }
         }
     }
 

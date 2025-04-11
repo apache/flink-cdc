@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.base.source.assigner;
 
 import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
@@ -31,6 +32,9 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 
+import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -41,32 +45,31 @@ import java.util.Map;
 import java.util.Optional;
 
 /** Assigner for stream split. */
-public class StreamSplitAssigner implements SplitAssigner {
+public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigner {
 
     private static final String STREAM_SPLIT_ID = "stream-split";
 
-    private final SourceConfig sourceConfig;
+    private final C sourceConfig;
 
-    private boolean isStreamSplitAssigned;
-
-    private final DataSourceDialect dialect;
+    private final DataSourceDialect<C> dialect;
     private final OffsetFactory offsetFactory;
 
     private final SplitEnumeratorContext<? extends SourceSplit> enumeratorContext;
     private SourceEnumeratorMetrics enumeratorMetrics;
+    private final int numberOfStreamSplits;
 
     public StreamSplitAssigner(
-            SourceConfig sourceConfig,
-            DataSourceDialect dialect,
+            C sourceConfig,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
             SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this(sourceConfig, false, dialect, offsetFactory, enumeratorContext);
     }
 
     public StreamSplitAssigner(
-            SourceConfig sourceConfig,
+            C sourceConfig,
             StreamPendingSplitsState checkpoint,
-            DataSourceDialect dialect,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
             SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this(
@@ -78,36 +81,37 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     private StreamSplitAssigner(
-            SourceConfig sourceConfig,
-            boolean isStreamSplitAssigned,
-            DataSourceDialect dialect,
+            C sourceConfig,
+            boolean isStreamSplitAllAssigned,
+            DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
             SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
         this.sourceConfig = sourceConfig;
-        this.isStreamSplitAssigned = isStreamSplitAssigned;
+        this.isStreamSplitAllAssigned = isStreamSplitAllAssigned;
         this.dialect = dialect;
         this.offsetFactory = offsetFactory;
         this.enumeratorContext = enumeratorContext;
+        this.numberOfStreamSplits = dialect.getNumberOfStreamSplits(sourceConfig);
     }
 
     @Override
     public void open() {
         this.enumeratorMetrics = new SourceEnumeratorMetrics(enumeratorContext.metricGroup());
-        if (isStreamSplitAssigned) {
+        if (isStreamSplitAllAssigned) {
             enumeratorMetrics.enterStreamReading();
         } else {
             enumeratorMetrics.exitStreamReading();
         }
+        pendingStreamSplits = null;
     }
 
     @Override
     public Optional<SourceSplitBase> getNext() {
-        if (isStreamSplitAssigned) {
+        if (isStreamSplitAllAssigned) {
             return Optional.empty();
         } else {
-            isStreamSplitAssigned = true;
             enumeratorMetrics.enterStreamReading();
-            return Optional.of(createStreamSplit());
+            return getNextStreamSplit();
         }
     }
 
@@ -118,7 +122,7 @@ public class StreamSplitAssigner implements SplitAssigner {
 
     @Override
     public List<FinishedSnapshotSplitInfo> getFinishedSplitInfos() {
-        return Collections.EMPTY_LIST;
+        return Collections.emptyList();
     }
 
     @Override
@@ -129,13 +133,14 @@ public class StreamSplitAssigner implements SplitAssigner {
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
         // we don't store the split, but will re-create stream split later
-        isStreamSplitAssigned = false;
+        isStreamSplitAllAssigned = false;
+        pendingStreamSplits = null;
         enumeratorMetrics.exitStreamReading();
     }
 
     @Override
     public PendingSplitsState snapshotState(long checkpointId) {
-        return new StreamPendingSplitsState(isStreamSplitAssigned);
+        return new StreamPendingSplitsState(isStreamSplitAllAssigned);
     }
 
     @Override
@@ -156,7 +161,7 @@ public class StreamSplitAssigner implements SplitAssigner {
 
     @Override
     public boolean noMoreSplits() {
-        return isStreamSplitAssigned;
+        return isStreamSplitAllAssigned;
     }
 
     @Override
@@ -165,39 +170,89 @@ public class StreamSplitAssigner implements SplitAssigner {
     }
 
     // ------------------------------------------------------------------------------------------
+    protected boolean isStreamSplitAllAssigned;
+    protected List<SourceSplitBase> pendingStreamSplits = null;
 
-    public StreamSplit createStreamSplit() {
-        StartupOptions startupOptions = sourceConfig.getStartupOptions();
+    private Optional<SourceSplitBase> getNextStreamSplit() {
+        if (pendingStreamSplits == null) {
+            StartupOptions startupOptions = sourceConfig.getStartupOptions();
 
-        Offset startingOffset;
-        switch (startupOptions.startupMode) {
-            case LATEST_OFFSET:
-                startingOffset = dialect.displayCurrentOffset(sourceConfig);
-                break;
-            case EARLIEST_OFFSET:
-                startingOffset = offsetFactory.createInitialOffset();
-                break;
-            case TIMESTAMP:
-                startingOffset =
-                        offsetFactory.createTimestampOffset(startupOptions.startupTimestampMillis);
-                break;
-            case SPECIFIC_OFFSETS:
-                startingOffset =
-                        offsetFactory.newOffset(
-                                startupOptions.specificOffsetFile,
-                                startupOptions.specificOffsetPos.longValue());
-                break;
-            default:
-                throw new IllegalStateException(
-                        "Unsupported startup mode " + startupOptions.startupMode);
+            Offset startingOffset;
+            switch (startupOptions.startupMode) {
+                case LATEST_OFFSET:
+                    startingOffset = dialect.displayCurrentOffset(sourceConfig);
+                    break;
+                case EARLIEST_OFFSET:
+                    startingOffset = offsetFactory.createInitialOffset();
+                    break;
+                case TIMESTAMP:
+                    startingOffset =
+                            offsetFactory.createTimestampOffset(
+                                    startupOptions.startupTimestampMillis);
+                    break;
+                case SPECIFIC_OFFSETS:
+                    startingOffset =
+                            offsetFactory.newOffset(
+                                    startupOptions.specificOffsetFile,
+                                    startupOptions.specificOffsetPos.longValue());
+                    break;
+                default:
+                    throw new IllegalStateException(
+                            "Unsupported startup mode " + startupOptions.startupMode);
+            }
+
+            pendingStreamSplits =
+                    new ArrayList<>(
+                            createStreamSplits(
+                                    sourceConfig,
+                                    startingOffset,
+                                    offsetFactory.createNoStoppingOffset(),
+                                    new ArrayList<>(),
+                                    new HashMap<>(),
+                                    0,
+                                    false,
+                                    true));
+            Preconditions.checkArgument(
+                    pendingStreamSplits.size() == numberOfStreamSplits,
+                    "Inconsistent number of stream splits. Reported %s, but was %s",
+                    numberOfStreamSplits,
+                    pendingStreamSplits.size());
+            Preconditions.checkArgument(
+                    pendingStreamSplits.size() <= enumeratorContext.currentParallelism(),
+                    "%s stream splits generated, which is greater than current parallelism %s. Some splits might never be assigned.",
+                    pendingStreamSplits.size(),
+                    enumeratorContext.currentParallelism());
         }
 
-        return new StreamSplit(
-                STREAM_SPLIT_ID,
-                startingOffset,
-                offsetFactory.createNoStoppingOffset(),
-                new ArrayList<>(),
-                new HashMap<>(),
-                0);
+        if (pendingStreamSplits.isEmpty()) {
+            return Optional.empty();
+        } else {
+            SourceSplitBase nextSplit = pendingStreamSplits.remove(0);
+            if (pendingStreamSplits.isEmpty()) {
+                isStreamSplitAllAssigned = true;
+            }
+            return Optional.of(nextSplit);
+        }
+    }
+
+    protected List<SourceSplitBase> createStreamSplits(
+            C sourceConfig,
+            Offset minOffset,
+            Offset stoppingOffset,
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
+            Map<TableId, TableChanges.TableChange> tableSchemas,
+            int totalFinishedSplitSize,
+            boolean isSuspended,
+            boolean isSnapshotCompleted) {
+        return Collections.singletonList(
+                new StreamSplit(
+                        STREAM_SPLIT_ID,
+                        minOffset,
+                        stoppingOffset,
+                        finishedSnapshotSplitInfos,
+                        tableSchemas,
+                        totalFinishedSplitSize,
+                        isSuspended,
+                        isSnapshotCompleted));
     }
 }
