@@ -64,7 +64,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
     private static final String MODEL_KEY = "model";
-    private static final String FLINK_KEY = "flink";
+    private static final String FLINK_KEY = "flink-conf";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
