@@ -20,6 +20,7 @@ package org.apache.flink.cdc.pipeline.tests.utils;
 import org.apache.flink.api.common.time.Deadline;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.core.testutils.CommonTestUtils;
 import org.apache.flink.util.TestLogger;
@@ -193,7 +194,8 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         }
     }
 
-    public String submitPipelineJob(String pipelineJob, Path... jars) throws Exception {
+    public String submitPipelineJob(String pipelineJob, ComposeDeployment deployment, Path... jars)
+            throws Exception {
         ProcessBuilder processBuilder = new ProcessBuilder();
         Map<String, String> env = getEnv();
         processBuilder.environment().putAll(env);
@@ -203,7 +205,7 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         List<String> commandList = new ArrayList<>();
         commandList.add(env.get("FLINK_CDC_HOME") + "/bin/flink-cdc.sh");
         commandList.add("-t");
-        commandList.add("yarn-application");
+        commandList.add(deployment.name());
         commandList.add(yamlScript.toAbsolutePath().toString());
         for (Path jar : jars) {
             commandList.add("--jar");
