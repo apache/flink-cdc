@@ -205,7 +205,7 @@ public class PipelineTestOnYarnEnvironment extends TestLogger {
         List<String> commandList = new ArrayList<>();
         commandList.add(env.get("FLINK_CDC_HOME") + "/bin/flink-cdc.sh");
         commandList.add("-t");
-        commandList.add(deployment.name());
+        commandList.add(deployment.getName());
         commandList.add(yamlScript.toAbsolutePath().toString());
         for (Path jar : jars) {
             commandList.add("--jar");

@@ -132,6 +132,7 @@ public class MysqlE2eWithYarnApplicationITCase extends PipelineTestOnYarnEnviron
                 submitPipelineJob(
                         pipelineJob,
                         ComposeDeployment.YARN_APPLICATION,
+                        mysqlCdcJar,
                         valuesCdcJar,
                         mysqlDriverJar);
         LOG.info("Pipeline job is running");
