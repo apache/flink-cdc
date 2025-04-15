@@ -78,6 +78,8 @@ We could use following yaml file to define a concise Data Pipeline describing sy
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 ## With optional
@@ -124,6 +126,8 @@ We could use following yaml file to define a complicated Data Pipeline describin
          classpath: com.example.functions.AddOneFunctionClass
        - name: format
          classpath: com.example.functions.FormatFunctionClass
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 # Pipeline Configurations

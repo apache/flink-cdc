@@ -115,7 +115,7 @@ sink:
 pipeline:
  name: Sync MySQL Database to Doris
  parallelism: 2
- flink:
+ flink-conf:
    rest.bind-port: {{REST_PORT}}
    rest.address: {{NODE_IP}}
    execution.target: yarn-session

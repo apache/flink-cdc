@@ -46,7 +46,7 @@ sink:
 
 pipeline:
    parallelism: 1
-   flink:
+   flink-conf:
      execution.checkpointing.interval: 2min
 ```
 
