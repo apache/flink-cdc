@@ -131,18 +131,20 @@ public class FlinkEnvironmentUtils {
 
         LOG.info("Dynamic flink config items found from command-line: {}", commandLineProperties);
         commandLineProperties.forEach(
-                (key, value) -> {
-                    String keyStr = key.toString();
-                    String valueStr = value.toString();
-                    if (StringUtils.isNullOrWhitespaceOnly(keyStr)
-                            || StringUtils.isNullOrWhitespaceOnly(valueStr)) {
-                        throw new IllegalArgumentException(
-                                String.format(
-                                        "null or white space argument for key or value: %s=%s",
-                                        key, value));
-                    }
-                    flinkConfig.setString(keyStr.trim(), valueStr.trim());
-                });
+                (key, value) -> validateAndApplyCommandLineEntry(flinkConfig, key, value));
+    }
+
+    private static void validateAndApplyCommandLineEntry(
+            Configuration flinkConfig, Object key, Object value) {
+        String keyStr = key.toString();
+        String valueStr = value.toString();
+        if (StringUtils.isNullOrWhitespaceOnly(keyStr)
+                || StringUtils.isNullOrWhitespaceOnly(valueStr)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "null or white space argument for key or value: %s=%s", key, value));
+        }
+        flinkConfig.setString(keyStr.trim(), valueStr.trim());
     }
 
     private static void mergePipelineFlinkConfig(
