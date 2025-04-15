@@ -60,7 +60,7 @@ under the License.
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
-   flink:
+   flink-conf:
      execution.checkpointing.interval: 2min
 ```
 
