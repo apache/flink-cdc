@@ -2334,4 +2334,67 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
         result.getJobClient().get().cancel().get();
     }
+
+    @Test
+    public void testColumnFilters() throws Exception {
+        customerDatabase.createAndInitialize();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(200);
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE address ("
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " country STRING,"
+                                + " city STRING,"
+                                + " detail_address STRING,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'server-id' = '%s'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        customerDatabase.getUsername(),
+                        customerDatabase.getPassword(),
+                        customerDatabase.getDatabaseName(),
+                        "address",
+                        getServerId(true));
+        tEnv.executeSql(sourceDDL);
+        // async submit job
+        TableResult result = tEnv.executeSql("SELECT id,country from address");
+
+        CloseableIterator<Row> iterator = result.collect();
+        waitForSnapshotStarted(iterator);
+
+        try (Connection connection = customerDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE address SET city = 'Hangzhou' WHERE id=416927583791428523;");
+            statement.execute(
+                    "INSERT INTO address VALUES(418257940021724075, 'Germany', 'Berlin', 'West Town address 3')");
+        }
+
+        String[] expected =
+                new String[] {
+                    "+I[417271541558096811, America]",
+                    "+I[417272886855938987, America]",
+                    "+I[417111867899200427, America]",
+                    "+I[417420106184475563, Germany]",
+                    "+I[418161258277847979, Germany]",
+                    "+I[416874195632735147, China]",
+                    "+I[416927583791428523, China]",
+                    "+I[417022095255614379, China]",
+                    "-U[416927583791428523, China]",
+                    "+U[416927583791428523, China]",
+                    "+I[418257940021724075, Germany]"
+                };
+        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
 }

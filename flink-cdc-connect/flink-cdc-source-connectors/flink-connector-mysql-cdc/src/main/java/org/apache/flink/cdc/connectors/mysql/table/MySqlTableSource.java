@@ -27,10 +27,12 @@ import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
+import org.apache.flink.table.connector.Projection;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
 import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.SourceProvider;
+import org.apache.flink.table.connector.source.abilities.SupportsProjectionPushDown;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.DataType;
@@ -45,6 +47,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,7 +66,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
  * A {@link DynamicTableSource} that describes how to create a MySQL binlog source from a logical
  * description.
  */
-public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadata {
+public class MySqlTableSource
+        implements ScanTableSource, SupportsReadingMetadata, SupportsProjectionPushDown {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlTableSource.class);
     private final Set<String> exceptDbzProperties =
             Stream.of(
@@ -111,6 +115,8 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
 
     /** Metadata that is appended at the end of a physical source row. */
     protected List<String> metadataKeys;
+
+    protected DataType physicalDataType;
 
     public MySqlTableSource(
             ResolvedSchema physicalSchema,
@@ -168,6 +174,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.parseOnlineSchemaChanges = parseOnlineSchemaChanges;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        this.physicalDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
@@ -183,15 +190,13 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType physicalDataType =
-                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
         final TypeInformation<RowData> typeInfo =
                 scanContext.createTypeInformation(producedDataType);
 
         DebeziumDeserializationSchema<RowData> deserializer =
                 RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType(physicalDataType)
+                        .setPhysicalRowType((RowType) physicalDataType.getLogicalType())
                         .setMetadataConverters(metadataConverters)
                         .setResultTypeInfo(typeInfo)
                         .setServerTimeZone(serverTimeZone)
@@ -285,7 +290,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     @Override
     public void applyReadableMetadata(List<String> metadataKeys, DataType producedDataType) {
         this.metadataKeys = metadataKeys;
-        this.producedDataType = producedDataType;
+        if (!this.producedDataType.getChildren().containsAll(producedDataType.getChildren())) {
+            this.producedDataType = producedDataType;
+        }
     }
 
     @Override
@@ -425,5 +432,43 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             }
         }
         return newDbzProperties;
+    }
+
+    @Override
+    public boolean supportsNestedProjection() {
+        return false;
+    }
+
+    @Override
+    public void applyProjection(int[][] projectedFields, DataType producedDataType) {
+        int[] primaryKeyIndexes = physicalSchema.getPrimaryKeyIndexes();
+        if (primaryKeyIndexes.length > 0) {
+            // If there is a primary key, we need to use the primary key and the projected fields
+            Set<Integer> finalIndex = new LinkedHashSet<>();
+            for (int[] field : projectedFields) {
+                finalIndex.add(field[0]);
+            }
+
+            for (int pkIdx : primaryKeyIndexes) {
+                finalIndex.add(pkIdx);
+            }
+
+            int[][] newProjectedFields =
+                    finalIndex.stream().map(idx -> new int[] {idx}).toArray(int[][]::new);
+            this.physicalDataType = Projection.of(newProjectedFields).project(physicalDataType);
+            this.producedDataType = physicalDataType;
+        }
+
+        if (primaryKeyIndexes.length == 0) {
+            // If there is no primary key, we need use all columns to the projection
+            this.physicalDataType = physicalSchema.toPhysicalRowDataType();
+            this.producedDataType = physicalSchema.toPhysicalRowDataType();
+        }
+
+        List<String> fieldNames = DataType.getFieldNames(physicalDataType);
+        // db.table.(c1|c2)
+        String columnRegex =
+                database + "\\." + tableName + "\\.(" + String.join("|", fieldNames) + ")";
+        dbzProperties.put("column.include.list", columnRegex);
     }
 }
