@@ -306,7 +306,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false"));
     }
 
-    private void runInContainerAsRoot(GenericContainer<?> container, String... command)
+    public void runInContainerAsRoot(GenericContainer<?> container, String... command)
             throws InterruptedException {
         ToStringConsumer stdoutConsumer = new ToStringConsumer();
         ToStringConsumer stderrConsumer = new ToStringConsumer();
