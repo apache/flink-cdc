@@ -45,8 +45,11 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.lifecycle.Startables;
 
-import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -59,6 +62,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -104,7 +108,11 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
     @BeforeEach
     public void before() throws Exception {
         LOG.info("Starting containers...");
-        warehouse = new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        Set<PosixFilePermission> perms = PosixFilePermissions.fromString("rwxrwxrwx");
+        FileAttribute<Set<PosixFilePermission>> attr = PosixFilePermissions.asFileAttribute(perms);
+        warehouse =
+                Files.createDirectory(temporaryFolder.resolve(UUID.randomUUID().toString()), attr)
+                        .toString();
         jobManagerConsumer = new ToStringConsumer();
         jobManager =
                 new GenericContainer<>(getFlinkDockerImageTag())
@@ -341,6 +349,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
     private void validateSinkResult(
             String warehouse, String database, String table, List<String> expected)
             throws InterruptedException {
+        runInContainerAsRoot(jobManager, "chmod", "0777", "-R", warehouse);
         LOG.info("Verifying Iceberg {}::{}::{} results...", warehouse, database, table);
         long deadline = System.currentTimeMillis() + TESTCASE_TIMEOUT.toMillis();
         List<String> results = Collections.emptyList();
