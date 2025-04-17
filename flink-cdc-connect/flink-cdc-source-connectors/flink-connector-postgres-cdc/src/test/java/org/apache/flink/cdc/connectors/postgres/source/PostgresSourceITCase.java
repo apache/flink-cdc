@@ -348,6 +348,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s', "
                                 + " 'debezium.slot.drop.on.stop' = 'true'"
                                 + ")",
@@ -652,6 +653,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
                                 + ")",
@@ -774,6 +776,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'scan.newly-added-table.enabled' = 'true',"
@@ -837,6 +840,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                         .username(customDatabase.getUsername())
                         .password(customDatabase.getPassword())
                         .database(customDatabase.getDatabaseName())
+                        .decodingPluginName("pgoutput")
                         .slotName(slotName)
                         .tableList(tableId.toString())
                         .startupOptions(startupOptions)
@@ -976,6 +980,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
                                 + " %s"
