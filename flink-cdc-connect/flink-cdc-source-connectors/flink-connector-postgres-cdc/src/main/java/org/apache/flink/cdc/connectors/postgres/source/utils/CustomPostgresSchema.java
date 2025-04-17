@@ -24,6 +24,7 @@ import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
@@ -119,28 +120,24 @@ public class CustomPostgresSchema {
         }
 
         for (TableId tableId : tableIds) {
-            tables.tableIds()
-                    .forEach(
-                            id -> {
-                                Objects.requireNonNull(tables.forTable(tableId));
+            Table table = Objects.requireNonNull(tables.forTable(tableId));
+            // set the events to populate proper sourceInfo into offsetContext
+            offsetContext.event(tableId, Instant.now());
 
-                                // set the events to populate proper sourceInfo into offsetContext
-                                offsetContext.event(tableId, Instant.now());
-                                // TODO: check whether we always set isFromSnapshot = true
-                                SchemaChangeEvent schemaChangeEvent =
-                                        SchemaChangeEvent.ofCreate(
-                                                partition,
-                                                offsetContext,
-                                                dbzConfig.databaseName(),
-                                                id.schema(),
-                                                null,
-                                                tables.forTable(id),
-                                                true);
-                                for (TableChanges.TableChange tableChange :
-                                        schemaChangeEvent.getTableChanges()) {
-                                    this.schemasByTableId.put(id, tableChange);
-                                }
-                            });
+            // TODO: check whether we always set isFromSnapshot = true
+            SchemaChangeEvent schemaChangeEvent =
+                    SchemaChangeEvent.ofCreate(
+                            partition,
+                            offsetContext,
+                            dbzConfig.databaseName(),
+                            tableId.schema(),
+                            null,
+                            table,
+                            true);
+
+            for (TableChanges.TableChange tableChange : schemaChangeEvent.getTableChanges()) {
+                this.schemasByTableId.put(tableId, tableChange);
+            }
             tableChanges.add(this.schemasByTableId.get(tableId));
         }
         return tableChanges;

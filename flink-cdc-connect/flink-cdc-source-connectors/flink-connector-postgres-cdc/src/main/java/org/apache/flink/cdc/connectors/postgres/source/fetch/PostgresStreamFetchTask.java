@@ -242,10 +242,5 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                     .getLsn()
                     .equals(((PostgresOffset) streamSplit.getEndingOffset()).getLsn());
         }
-
-        @Override
-        public void init() {
-            // do nothing,ignore refresh schema.
-        }
     }
 }
