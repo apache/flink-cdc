@@ -1119,10 +1119,8 @@ class SchemaMergingUtilsTest {
     private static void assertTypeMergingVector(DataType incomingType, List<DataType> resultTypes) {
         Assertions.assertThat(ALL_TYPES)
                 .map(type -> getLeastCommonType(type, incomingType))
-                .containsExactlyElementsOf(resultTypes);
-
-        // Flip LHS and RHS should emit same outputs
-        Assertions.assertThat(ALL_TYPES)
+                .containsExactlyElementsOf(resultTypes)
+                // Flip LHS and RHS should emit same outputs
                 .map(type -> getLeastCommonType(incomingType, type))
                 .containsExactlyElementsOf(resultTypes);
     }

@@ -530,7 +530,11 @@ public class MySqlSourceReader<T>
                 return;
             }
             BinlogOffset offset = split.asBinlogSplit().getStartingOffset();
-            LOG.info("Binlog offset on checkpoint {}: {}", checkpointId, offset);
+            LOG.info(
+                    "Binlog offset for tables {} on checkpoint {}: {}",
+                    split.asBinlogSplit().getTables(),
+                    checkpointId,
+                    offset);
         }
     }
 

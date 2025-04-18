@@ -23,7 +23,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 public class DataStreamJob {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         MySqlSource<String> mySqlSource = MySqlSource.<String>builder()
                 .hostname("localhost")
                 .port(3306)
@@ -45,10 +45,6 @@ public class DataStreamJob {
                 .print()
                 .setParallelism(1);
 
-        try {
-            env.execute();
-        } catch (Exception e) {
-            // ... unfortunately
-        }
+        env.execute();
     }
 }

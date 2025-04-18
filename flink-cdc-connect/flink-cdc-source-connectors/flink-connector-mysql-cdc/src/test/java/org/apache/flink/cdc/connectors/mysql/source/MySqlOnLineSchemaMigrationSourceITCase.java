@@ -36,13 +36,12 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
-import org.apache.flink.types.Row;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
@@ -54,9 +53,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
@@ -73,7 +70,7 @@ import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
  * href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">doc/pt-osc</a> for
  * more details.
  */
-public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
+class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
@@ -99,24 +96,24 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
                     ? "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-amd64-20231207144046.tar.gz"
                     : "https://github.com/github/gh-ost/releases/download/v1.1.6/gh-ost-binary-linux-arm64-20231207144046.tar.gz";
 
-    @BeforeClass
-    public static void beforeClass() {
+    @BeforeAll
+    static void beforeClass() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         Startables.deepStart(Stream.of(PERCONA_TOOLKIT_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void afterClass() {
+    @AfterAll
+    static void afterClass() {
         LOG.info("Stopping containers...");
         MYSQL8_CONTAINER.stop();
         PERCONA_TOOLKIT_CONTAINER.close();
         LOG.info("Containers are stopped.");
     }
 
-    @Before
-    public void before() {
+    @BeforeEach
+    void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -124,8 +121,8 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
         System.setOut(new PrintStream(outCaptor));
     }
 
-    @After
-    public void after() {
+    @AfterEach
+    void after() {
         customerDatabase.dropDatabase();
         System.setOut(sysOut);
     }
@@ -161,7 +158,7 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
 
     @Test
-    public void testGhOstSchemaMigrationFromScratch() throws Exception {
+    void testGhOstSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Install gh-ost command line utility");
         installGhOstCli(MYSQL8_CONTAINER);
 
@@ -174,7 +171,7 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
                         .tableList(customerDatabase.getDatabaseName() + ".customers")
                         .username(customerDatabase.getUsername())
                         .password(customerDatabase.getPassword())
-                        .serverId("5401-5404")
+                        .serverId(getServerId())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .serverTimeZone("UTC")
                         .includeSchemaChanges(true) // output the schema changes as well
@@ -324,7 +321,7 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
     }
 
     @Test
-    public void testPtOscSchemaMigrationFromScratch() throws Exception {
+    void testPtOscSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Start pipeline job");
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
@@ -334,7 +331,7 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
                         .tableList(customerDatabase.getDatabaseName() + ".customers")
                         .username(customerDatabase.getUsername())
                         .password(customerDatabase.getPassword())
-                        .serverId("5401-5404")
+                        .serverId(getServerId())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .serverTimeZone("UTC")
                         .includeSchemaChanges(true) // output the schema changes as well
@@ -545,40 +542,5 @@ public class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase 
         final Random random = new Random();
         int serverId = random.nextInt(100) + 5400;
         return serverId + "-" + (serverId + env.getParallelism());
-    }
-
-    protected String getServerId(int base) {
-        return base + "-" + (base + DEFAULT_PARALLELISM);
-    }
-
-    private static void waitForSnapshotStarted(String sinkName) throws InterruptedException {
-        while (sinkSize(sinkName) == 0) {
-            Thread.sleep(100);
-        }
-    }
-
-    private static void waitForSinkSize(String sinkName, int expectedSize) {
-        TestCaseUtils.repeatedCheck(() -> sinkSize(sinkName) >= expectedSize);
-    }
-
-    private static int sinkSize(String sinkName) {
-        synchronized (TestValuesTableFactory.class) {
-            try {
-                return TestValuesTableFactory.getRawResults(sinkName).size();
-            } catch (IllegalArgumentException e) {
-                // job is not started yet
-                return 0;
-            }
-        }
-    }
-
-    private static List<String> fetchRows(Iterator<Row> iter, int size) {
-        List<String> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Row row = iter.next();
-            rows.add(row.toString());
-            size--;
-        }
-        return rows;
     }
 }

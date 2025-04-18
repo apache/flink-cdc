@@ -498,7 +498,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
             chunkEnd = nextChunkEnd(jdbc, chunkEnd, tableId, splitColumn, max, chunkSize);
         }
         // add the ending split
-        splits.add(ChunkRange.of(chunkStart, null));
+        splits.add(0, ChunkRange.of(chunkStart, null));
         return splits;
     }
 

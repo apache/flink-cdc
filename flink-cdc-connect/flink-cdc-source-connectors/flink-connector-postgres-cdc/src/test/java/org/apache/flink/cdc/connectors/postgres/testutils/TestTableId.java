@@ -15,21 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.composer.flink.deployment;
+package org.apache.flink.cdc.connectors.postgres.testutils;
 
-import org.apache.flink.cdc.composer.PipelineDeploymentExecutor;
+import static org.apache.flink.cdc.connectors.postgres.source.utils.PostgresQueryUtils.quote;
 
-import org.apache.commons.cli.CommandLine;
+/** Represents a qualified table name. */
+public class TestTableId {
+    private final String schemaName;
+    private final String tableName;
 
-/** Create deployment methods corresponding to different goals. */
-public class ComposeDeploymentFactory {
+    public TestTableId(String schemaName, String tableName) {
+        this.schemaName = schemaName;
+        this.tableName = tableName;
+    }
 
-    public PipelineDeploymentExecutor getFlinkComposeExecutor(CommandLine commandLine) {
-        String target = commandLine.getOptionValue("target");
-        if (target.equalsIgnoreCase("kubernetes-application")) {
-            return new K8SApplicationDeploymentExecutor();
-        }
-        throw new IllegalArgumentException(
-                String.format("Deployment target %s is not supported", target));
+    /** Returns the qualified name to be used in connector configuration. */
+    public String toString() {
+        return String.format("%s.%s", schemaName, tableName);
+    }
+
+    /** Returns the qualified name to be used in SQL. */
+    public String toSql() {
+        return String.format("%s.%s", quote(schemaName), quote(tableName));
     }
 }

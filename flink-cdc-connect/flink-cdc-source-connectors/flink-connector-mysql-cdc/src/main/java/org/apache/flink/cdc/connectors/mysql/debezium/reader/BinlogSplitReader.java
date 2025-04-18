@@ -139,13 +139,13 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                 changeEventSourceContext,
                                 statefulTaskContext.getMySqlPartition(),
                                 statefulTaskContext.getOffsetContext());
-                    } catch (Exception e) {
+                    } catch (Throwable t) {
                         LOG.error(
                                 String.format(
                                         "Execute binlog read task for mysql split %s fail",
                                         currentBinlogSplit),
-                                e);
-                        readException = e;
+                                t);
+                        readException = t;
                     } finally {
                         stopBinlogReadTask();
                     }
@@ -292,7 +292,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
         // the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
-                && position.isAtOrAfter(maxSplitHighWatermarkMap.get(tableId))) {
+                && position.isAfter(maxSplitHighWatermarkMap.get(tableId))) {
             pureBinlogPhaseTables.add(tableId);
             return true;
         }

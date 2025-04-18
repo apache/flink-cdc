@@ -134,6 +134,20 @@ pipeline:
       <td> 是否使用攒批方式写入Doris </td>
     </tr>
     <tr>
+       <td>sink.enable-delete</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>是否启用删除 </td>
+     </tr>
+     <tr>
+       <td>sink.max-retries</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">3</td>
+       <td>Integer</td>
+       <td>写入失败后最大重试次数</td>
+     </tr>
+    <tr>
       <td>sink.flush.queue-size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">2</td>
@@ -163,13 +177,20 @@ pipeline:
       <td>Flush的间隔时长，超过这个时间，将异步Flush数据</td>
     </tr>
     <tr>
+       <td>sink.ignore.update-before</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>在CDC场景中，当上游的主键与下游的主键不一致时，需要将 update-before 数据作为已删除数据传递给下游，否则数据将无法被删除。默认设置为忽略，即执行 upsert 语义 </td>
+     </tr>
+    <tr>
       <td>sink.properties.</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>StreamLoad的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad 的属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad 的属性</a></td> 
       </td>
     </tr>
     <tr>
@@ -179,7 +200,7 @@ pipeline:
       <td>String</td>
       <td>创建表的Properties配置。
         For example: <code> table.create.properties.replication_num: 1</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table 的属性</a></td> 
       </td>
     </tr>
     <tr>
@@ -297,6 +318,13 @@ pipeline:
       </td>
       <td>STRING</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>
+        TIME
+      </td>
+      <td>STRING</td>
+      <td> Doris 不支持 TIME 数据类型，需转换为 STRING 类型以兼容 </td>
     </tr>
     <tr>
       <td>STRING</td>

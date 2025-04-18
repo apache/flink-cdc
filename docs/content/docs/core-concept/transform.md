@@ -70,6 +70,30 @@ There are some hidden columns used to access metadata information. They will onl
 | __table_name__      | String    | Name of the table that contains the row.     |
 | __data_event_type__ | String    | Operation type of data change event.         |
 
+Besides these fields, pipeline connectors could parse more metadata and put them in the meta map of the DataChangeEvent.
+These metadata could be accessed in the transform module.
+For example, MySQL pipeline connector could parse `op_ts` and use it in the transform module.
+
+```yaml
+source:
+  type: mysql
+  hostname: localhost
+  port: 3306
+  username: testuser
+  password: testpwd
+  tables: testdb.customer
+  server-id: 5400-5404
+  server-time-zone: UTC
+  metadata.list: op_ts
+  
+transform:
+  - source-table: testdb.customer
+    projection: \*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts
+  
+sink:
+  type: values
+```
+
 ## Metadata relationship
 
 | Type                 | Namespace | SchemaName | Table |
@@ -119,18 +143,18 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Arithmetic Functions
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| numeric1 + numeric2  | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
-| numeric1 - numeric2  | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
-| numeric1 * numeric2  | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
-| numeric1 / numeric2  | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
-| numeric1 % numeric2  | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
-| ABS(numeric)         | abs(numeric)                | Returns the absolute value of numeric.                          |
-| CEIL(numeric)        | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
-| FLOOR(numeric)       | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
-| ROUND(numeric, int)  | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
-| UUID()               | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
+| Function                           | Janino Code                 | Description                                                     |
+|------------------------------------|-----------------------------|-----------------------------------------------------------------|
+| numeric1 + numeric2                | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
+| numeric1 - numeric2                | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
+| numeric1 * numeric2                | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
+| numeric1 / numeric2                | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
+| numeric1 % numeric2                | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
+| ABS(numeric)                       | abs(numeric)                | Returns the absolute value of numeric.                          |
+| CEIL(numeric)<br/>CEILING(numeric) | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
+| FLOOR(numeric)                     | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
+| ROUND(numeric, int)                | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
+| UUID()                             | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
 
 ## String Functions
 

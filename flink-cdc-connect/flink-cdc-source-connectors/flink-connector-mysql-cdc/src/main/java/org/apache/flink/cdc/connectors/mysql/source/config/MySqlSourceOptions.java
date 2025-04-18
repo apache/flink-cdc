@@ -191,6 +191,13 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
 
+    public static final ConfigOption<Boolean> SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED =
+            ConfigOptions.key("scan.read-changelog-as-append-only.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to convert the changelog data stream to an append-only data stream");
+
     // ----------------------------------------------------------------------------
     // experimental options, won't add them to documentation
     // ----------------------------------------------------------------------------
@@ -278,4 +285,12 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to use legacy json format. The default value is true, which means there is no whitespace before value and after comma in json format.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST =
+            ConfigOptions.key("scan.incremental.snapshot.unbounded-chunk-first.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk. Defaults to false.");
 }

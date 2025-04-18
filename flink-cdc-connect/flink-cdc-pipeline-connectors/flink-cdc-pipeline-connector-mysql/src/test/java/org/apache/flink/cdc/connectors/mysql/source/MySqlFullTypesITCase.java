@@ -40,10 +40,10 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.math.BigDecimal;
@@ -59,7 +59,7 @@ import java.util.stream.Stream;
 import static javax.xml.bind.DatatypeConverter.parseHexBinary;
 
 /** IT case for MySQL event source. */
-public class MySqlFullTypesITCase extends MySqlSourceTestBase {
+class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
@@ -80,21 +80,21 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -102,7 +102,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57CommonDataTypes() throws Throwable {
+    void testMysql57CommonDataTypes() throws Throwable {
         testCommonDataTypes(fullTypesMySql57Database);
     }
 
@@ -121,7 +121,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMySql8CommonDataTypes() throws Throwable {
+    void testMySql8CommonDataTypes() throws Throwable {
         testCommonDataTypes(fullTypesMySql8Database);
     }
 
@@ -140,7 +140,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57TimeDataTypes() throws Throwable {
+    void testMysql57TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -193,7 +193,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8TimeDataTypes() throws Throwable {
+    void testMysql8TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -252,16 +252,16 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57PrecisionTypes() throws Throwable {
+    void testMysql57PrecisionTypes() throws Throwable {
         testMysqlPrecisionTypes(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMysql8PrecisionTypes() throws Throwable {
+    void testMysql8PrecisionTypes() throws Throwable {
         testMysqlPrecisionTypes(fullTypesMySql8Database);
     }
 
-    public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
+    void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.tidb.table;
 
 import org.apache.flink.cdc.connectors.tidb.TiDBTestBase;
+import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
@@ -25,9 +26,10 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.utils.LegacyRowResource;
 
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,14 +38,9 @@ import java.sql.Statement;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /** Integration tests for TiDB change stream event SQL source. */
-public class TiDBConnectorITCase extends TiDBTestBase {
+class TiDBConnectorITCase extends TiDBTestBase {
 
     private static final Logger LOG = LoggerFactory.getLogger(TiDBConnectorITCase.class);
     private final StreamExecutionEnvironment env =
@@ -52,16 +49,18 @@ public class TiDBConnectorITCase extends TiDBTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    @ClassRule public static LegacyRowResource usesLegacyRows = LegacyRowResource.INSTANCE;
+    @RegisterExtension
+    public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
+            new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
-    @Before
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(1);
     }
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    void testConsumingAllEvents() throws Exception {
         initializeTidbTable("inventory");
         String sourceDDL =
                 String.format(
@@ -166,7 +165,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     @Test
-    public void testDeleteColumn() throws Exception {
+    void testDeleteColumn() throws Exception {
         initializeTidbTable("inventory");
         String sourceDDL =
                 String.format(
@@ -245,7 +244,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     @Test
-    public void testAddColumn() throws Exception {
+    void testAddColumn() throws Exception {
         initializeTidbTable("inventory");
         String sourceDDL =
                 String.format(
@@ -330,7 +329,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     @Test
-    public void testMetadataColumns() throws Exception {
+    void testMetadataColumns() throws Exception {
         initializeTidbTable("inventory");
 
         String sourceDDL =
@@ -403,7 +402,7 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     @Test
-    public void testAllDataTypes() throws Throwable {
+    void testAllDataTypes() throws Throwable {
         try (Connection connection = getJdbcConnection("");
                 Statement statement = connection.createStatement()) {
             statement.execute(String.format("SET GLOBAL time_zone = '%s';", "UTC"));
@@ -540,16 +539,16 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     @Test
-    public void testTiDBServerInBerlin() throws Exception {
+    void testTiDBServerInBerlin() throws Exception {
         testTiDBServerTimezone("Europe/Berlin");
     }
 
     @Test
-    public void testTiDBServerInShanghai() throws Exception {
+    void testTiDBServerInShanghai() throws Exception {
         testTiDBServerTimezone("Asia/Shanghai");
     }
 
-    public void testTiDBServerTimezone(String timezone) throws Exception {
+    void testTiDBServerTimezone(String timezone) throws Exception {
         try (Connection connection = getJdbcConnection("");
                 Statement statement = connection.createStatement()) {
             statement.execute(String.format("SET GLOBAL time_zone = '%s';", timezone));
@@ -638,15 +637,6 @@ public class TiDBConnectorITCase extends TiDBTestBase {
     }
 
     public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
     }
 }

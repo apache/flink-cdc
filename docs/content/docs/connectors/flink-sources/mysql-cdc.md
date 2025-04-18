@@ -415,6 +415,30 @@ During a snapshot operation, the connector will query each included table to pro
           When 'use.legacy.json.format' = 'false', the data would be converted to {"key1": "value1", "key2": "value2"}, with whitespace before values and after commas preserved.
       </td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+        Experimental option, defaults to false.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.read-changelog-as-append-only.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to convert the changelog stream to an append-only stream.<br>
+        This feature is only used in special scenarios where you need to save upstream table deletion messages. For example, in a logical deletion scenario, users are not allowed to physically delete downstream messages. In this case, this feature is used in conjunction with the row_kind metadata field. Therefore, the downstream can save all detailed data at first, and then use the row_kind field to determine whether to perform logical deletion.<br>
+        The option values are as follows:<br>
+          <li>true: All types of messages (including INSERT, DELETE, UPDATE_BEFORE, and UPDATE_AFTER) will be converted into INSERT messages.</li>
+          <li>false (default): All types of messages are sent as is.</li>
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -851,6 +875,26 @@ CREATE TABLE products (
 
 `binary_data` field in the database is of type VARBINARY(N). In some scenarios, we need to convert binary data to base64 encoded string data. This feature can be enabled by adding the parameter 'debezium.binary.handling.mode'='base64',
 By adding this parameter, we can map the binary field type to 'STRING' in Flink SQL, thereby obtaining base64 encoded string data.
+
+### Available Source metrics
+
+Metrics can help understand the progress of assignments, and the following are the supported [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description                                         |
+|------------------------|----------------------------|-------|-----------------------------------------------------|
+| namespace.schema.table | isSnapshotting             | Gauge | Weather the table is snapshotting or not            |
+| namespace.schema.table | isStreamReading            | Gauge | Weather the table is stream reading or not          |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | The number of tables that have been snapshotted     |
+| namespace.schema.table | numTablesRemaining         | Gauge | The number of tables that have not been snapshotted |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | The number of splits that is being processed        |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | The number of splits that have not been processed   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | The number of splits that have been processed       |
+| namespace.schema.table | snapshotStartTime          | Gauge | The time when the snapshot started                  |
+| namespace.schema.table | snapshotEndTime            | Gauge | The time when the snapshot ended                    |
+
+Notice:
+1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
+2. For MySQL, the `namespace` will be set to the default value "", and the group name will be like `test_database.test_table`.
 
 Data Type Mapping
 ----------------

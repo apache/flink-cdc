@@ -21,8 +21,8 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
@@ -37,7 +37,7 @@ public class OceanBaseMySQLCatalogTest {
                     .build();
 
     @Test
-    public void testBuildAlterAddColumnsSql() {
+    void testBuildAlterAddColumnsSql() {
         OceanBaseMySQLCatalog oceanBaseCatalog =
                 new OceanBaseMySQLCatalog(new OceanBaseConnectorOptions(configMap));
 
@@ -50,8 +50,8 @@ public class OceanBaseMySQLCatalogTest {
                         .setDataType("varchar(10)")
                         .build());
         String columnsSql = oceanBaseCatalog.buildAlterAddColumnsSql("test", "test", addColumns);
-        Assertions.assertEquals(
-                "ALTER TABLE `test`.`test` ADD COLUMN `age` VARCHAR(10) NULL COMMENT \"age\";",
-                columnsSql);
+        Assertions.assertThat(columnsSql)
+                .isEqualTo(
+                        "ALTER TABLE `test`.`test` ADD COLUMN `age` VARCHAR(10) NULL COMMENT \"age\";");
     }
 }

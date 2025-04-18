@@ -23,15 +23,13 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -44,8 +42,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 
 /** E2e tests for User-defined functions. */
-@RunWith(Parameterized.class)
-public class UdfE2eITCase extends PipelineTestEnvironment {
+class UdfE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(TransformE2eITCase.class);
 
     // ------------------------------------------------------------------------------------------
@@ -56,7 +53,7 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
 
-    @ClassRule
+    @Container
     public static final MySqlContainer MYSQL =
             (MySqlContainer)
                     new MySqlContainer(
@@ -73,35 +70,35 @@ public class UdfE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase transformRenameDatabase =
             new UniqueDatabase(MYSQL, "transform_test", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         transformRenameDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         transformRenameDatabase.dropDatabase();
     }
 
     @Test
-    public void testUserDefinedFunctionsInJava() throws Exception {
+    void testUserDefinedFunctionsInJava() throws Exception {
         testUserDefinedFunctions("java");
     }
 
     @Test
-    public void testUserDefinedFunctionsInScala() throws Exception {
+    void testUserDefinedFunctionsInScala() throws Exception {
         testUserDefinedFunctions("scala");
     }
 
     @Test
-    public void testFlinkCompatibleScalarFunctionsInJava() throws Exception {
+    void testFlinkCompatibleScalarFunctionsInJava() throws Exception {
         testFlinkCompatibleScalarFunctions("java");
     }
 
     @Test
-    public void testFlinkCompatibleScalarFunctionsInScala() throws Exception {
+    void testFlinkCompatibleScalarFunctionsInScala() throws Exception {
         testFlinkCompatibleScalarFunctions("scala");
     }
 

@@ -54,11 +54,11 @@ source:
 sink:
   type: maxcompute
   name: MaxCompute Sink
-  accessId: ak
-  accessKey: sk
+  access-id: ak
+  access-key: sk
   endpoint: endpoint
   project: flink_cdc
-  bucketSize: 8
+  buckets-num: 8
 
 pipeline:
   name: MySQL to MaxCompute Pipeline

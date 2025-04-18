@@ -36,15 +36,16 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
+import org.apache.flink.cdc.connectors.postgres.testutils.TestTableId;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
-import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,17 +53,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-
 /** Tests for {@link PostgresScanFetchTask}. */
-public class PostgresScanFetchTaskTest extends PostgresTestBase {
+class PostgresScanFetchTaskTest extends PostgresTestBase {
     protected static final int DEFAULT_PARALLELISM = 4;
     private static final int USE_POST_LOWWATERMARK_HOOK = 1;
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
 
     private static final String schemaName = "customer";
-    private static final String tableName = "customers";
+    private static final String tableName = "Customers";
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -73,18 +71,20 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getPassword());
 
     @Test
-    public void testChangingDataInSnapshotScan() throws Exception {
+    void testChangingDataInSnapshotScan() throws Exception {
         customDatabase.createAndInitialize();
 
-        String tableId = schemaName + "." + tableName;
+        TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 110",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 111",
                 };
 
         String[] expected =
@@ -106,13 +106,17 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testInsertDataInSnapshotScan() throws Exception {
+    void testInsertDataInSnapshotScan() throws Exception {
         customDatabase.createAndInitialize();
-        String tableId = schemaName + "." + tableName;
+        TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] insertDataSql =
                 new String[] {
-                    "INSERT INTO " + tableId + " VALUES(112, 'user_12','Shanghai','123567891234')",
-                    "INSERT INTO " + tableId + " VALUES(113, 'user_13','Shanghai','123567891234')",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(112, 'user_12','Shanghai','123567891234')",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(113, 'user_13','Shanghai','123567891234')",
                 };
         String[] expected =
                 new String[] {
@@ -135,13 +139,13 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testDeleteDataInSnapshotScan() throws Exception {
+    void testDeleteDataInSnapshotScan() throws Exception {
         customDatabase.createAndInitialize();
-        String tableId = schemaName + "." + tableName;
+        TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] deleteDataSql =
                 new String[] {
-                    "DELETE FROM " + tableId + " where id = 101",
-                    "DELETE FROM " + tableId + " where id = 102",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 101",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
                 };
         String[] expected =
                 new String[] {
@@ -160,18 +164,20 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
+    void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
         customDatabase.createAndInitialize();
 
-        String tableId = schemaName + "." + tableName;
+        TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 110",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 111",
                 };
 
         String[] expected =
@@ -195,18 +201,20 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     }
 
     @Test
-    public void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
+    void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
         customDatabase.createAndInitialize();
 
-        String tableId = schemaName + "." + tableName;
+        TestTableId tableId = new TestTableId(schemaName, tableName);
         String[] changingDataSql =
                 new String[] {
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 103",
-                    "DELETE FROM " + tableId + " where id = 102",
-                    "INSERT INTO " + tableId + " VALUES(102, 'user_2','hangzhou','123567891234')",
-                    "UPDATE " + tableId + " SET address = 'Shanghai' where id = 103",
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 110",
-                    "UPDATE " + tableId + " SET address = 'Hangzhou' where id = 111",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 103",
+                    "DELETE FROM " + tableId.toSql() + " where \"Id\" = 102",
+                    "INSERT INTO "
+                            + tableId.toSql()
+                            + " VALUES(102, 'user_2','hangzhou','123567891234')",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Shanghai' where \"Id\" = 103",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 110",
+                    "UPDATE " + tableId.toSql() + " SET address = 'Hangzhou' where \"Id\" = 111",
                 };
 
         String[] expected =
@@ -263,8 +271,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
 
             final DataType dataType =
                     DataTypes.ROW(
-                            DataTypes.FIELD("id", DataTypes.BIGINT()),
-                            DataTypes.FIELD("name", DataTypes.STRING()),
+                            DataTypes.FIELD("Id", DataTypes.BIGINT()),
+                            DataTypes.FIELD("Name", DataTypes.STRING()),
                             DataTypes.FIELD("address", DataTypes.STRING()),
                             DataTypes.FIELD("phone_number", DataTypes.STRING()));
 
@@ -306,8 +314,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
 
         sourceScanFetcher.close();
 
-        assertNotNull(sourceScanFetcher.getExecutorService());
-        assertTrue(sourceScanFetcher.getExecutorService().isTerminated());
+        Assertions.assertThat(sourceScanFetcher.getExecutorService()).isNotNull();
+        Assertions.assertThat(sourceScanFetcher.getExecutorService().isTerminated()).isTrue();
 
         return formatResult(result, dataType);
     }
@@ -320,7 +328,8 @@ public class PostgresScanFetchTaskTest extends PostgresTestBase {
     private List<SnapshotSplit> getSnapshotSplits(
             PostgresSourceConfig sourceConfig, JdbcDataSourceDialect sourceDialect)
             throws Exception {
-        List<TableId> discoverTables = sourceDialect.discoverDataCollections(sourceConfig);
+        List<io.debezium.relational.TableId> discoverTables =
+                sourceDialect.discoverDataCollections(sourceConfig);
         OffsetFactory offsetFactory = new PostgresOffsetFactory();
         final SnapshotSplitAssigner snapshotSplitAssigner =
                 new SnapshotSplitAssigner<JdbcSourceConfig>(

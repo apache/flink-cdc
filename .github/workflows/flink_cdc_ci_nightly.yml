@@ -16,7 +16,7 @@
 name: Flink CDC CI Nightly
 on:
   schedule:
-    - cron: '0 0 * * *' # Deploy every day
+    - cron: '43 0 * * *' # Run daily, but not at 00:00 UTC to avoid job failure due to network throttle
   workflow_dispatch:
 
 concurrency:
@@ -25,6 +25,7 @@ concurrency:
 
 jobs:
   license_check:
+    if: github.repository == 'apache/flink-cdc'
     name: License Check
     runs-on: ubuntu-latest
     steps:
@@ -47,7 +48,9 @@ jobs:
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
   ut:
+    if: github.repository == 'apache/flink-cdc'
     strategy:
+      fail-fast: false
       matrix:
         module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
     name: Unit Tests
@@ -56,26 +59,30 @@ jobs:
       java-version: "[11]"
       module: ${{ matrix.module }}
   pipeline_e2e:
+    if: github.repository == 'apache/flink-cdc'
     strategy:
+      fail-fast: false
       matrix:
         parallelism: [ 1, 4 ]
     name: Pipeline E2E Tests (${{ matrix.parallelism }} Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
-      flink-version: "['1.19.1', '1.20.0']"
+      flink-version: "['1.19.2', '1.20.1']"
       module: pipeline_e2e
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
+    if: github.repository == 'apache/flink-cdc'
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
-      flink-version: "['1.19.1', '1.20.0']"
+      flink-version: "['1.19.2', '1.20.1']"
       module: source_e2e
   migration_test:
+    if: github.repository == 'apache/flink-cdc'
     name: Migration Tests
     uses: ./.github/workflows/flink_cdc_migration_test_base.yml
     with:
       java-version: "[11]"
-      flink-version: "['1.19.1', '1.20.0']"
+      flink-version: "['1.19.2', '1.20.1']"

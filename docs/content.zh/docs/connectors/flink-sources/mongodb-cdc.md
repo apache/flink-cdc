@@ -296,6 +296,17 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>Boolean</td>
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这是一项实验特性，默认为 false。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -332,21 +343,28 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录对应的 changelog 类型。注意：当 Source 算子选择为每条记录输出 row_kind 字段后，下游 SQL 算子在处理消息撤回时会因为这个字段不同而比对失败，
+建议只在简单的同步作业中引用该元数据列。<br>'+I' 表示 INSERT 数据，'-D' 表示 DELETE 数据，'-U' 表示 UPDATE_BEFORE 数据，'+U' 表示 UPDATE_AFTER 数据。</td>
+    </tr>
   </tbody>
 </table>
 
 扩展的 CREATE TABLE 示例演示了用于公开这些元数据字段的语法：
 ```sql
 CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    db_name         STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    _id STRING, // 必须声明
-    name STRING,
-    weight DECIMAL(10,3),
-    tags ARRAY<STRING>, -- array
-    price ROW<amount DECIMAL(10,2), currency STRING>, -- 嵌入式文档
-    suppliers ARRAY<ROW<name STRING, address STRING>>, -- 嵌入式文档
+    operation_ts    TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation       STRING METADATA FROM 'row_kind' VIRTUAL,
+    _id             STRING, // 必须声明
+    name            STRING,
+    weight          DECIMAL(10,3),
+    tags            ARRAY<STRING>, -- array
+    price           ROW<amount DECIMAL(10,2), currency STRING>, -- 嵌入式文档
+    suppliers       ARRAY<ROW<name STRING, address STRING>>, -- 嵌入式文档
     PRIMARY KEY(_id) NOT ENFORCED
 ) WITH (
     'connector' = 'mongodb-cdc',
@@ -487,6 +505,82 @@ public class MongoDBIncrementalSourceExample {
 **注意:**
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
+
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 MongoDB，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
+
+### 完整的 Changelog
+
+MongoDB 6.0 以及更高的版本支持发送变更流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
+
+- 前镜像是指被替换、更新或删除之前的文档。对于插入操作没有前镜像。
+
+- 后镜像是指被替换、更新或删除之后的文档。对于删除操作没有后镜像。
+
+MongoDB CDC 能够使用前镜像和后镜像来生成完整的变更日志流，包括插入、更新前、更新后和删除的数据行，从而避免了额外的 `ChangelogNormalize` 下游节点。
+
+为了启用此功能，你需要满足以下条件：
+
+- MongoDB 的版本必须为 6.0 或更高版本。
+- 启用 `preAndPostImages` 功能。
+
+```javascript
+db.runCommand({
+  setClusterParameter: {
+    changeStreamOptions: {
+      preAndPostImages: {
+        expireAfterSeconds: 'off' // replace with custom image expiration time
+      }
+    }
+  }
+})
+```
+
+- 为希望监控的 collection 启用 `changeStreamPreAndPostImages` 功能：
+```javascript
+db.runCommand({
+  collMod: "<< collection name >>", 
+  changeStreamPreAndPostImages: {
+    enabled: true 
+  } 
+})
+```
+
+在 DataStream 中开启 MongoDB CDC 的 `scan.full-changelog` 功能：
+
+```java
+MongoDBSource.builder()
+    .scanFullChangelog(true)
+    ...
+    .build()
+```
+
+或者使用 Flink SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.full-changelog' = 'true',
+    ...
+)
+```
 
 数据类型映射
 ----------------

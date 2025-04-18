@@ -32,13 +32,9 @@ import com.fasterxml.jackson.core.Version;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.ExecCreateCmdResponse;
 import com.github.dockerjava.api.model.Volume;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.ClassRule;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -49,6 +45,7 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.FrameConsumerResultCallback;
 import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.output.ToStringConsumer;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.MountableFile;
 
@@ -62,8 +59,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -71,11 +68,9 @@ import java.util.stream.Stream;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Test environment running pipeline job on Flink containers. */
-@RunWith(Parameterized.class)
+@Testcontainers
 public abstract class PipelineTestEnvironment extends TestLogger {
     private static final Logger LOG = LoggerFactory.getLogger(PipelineTestEnvironment.class);
-
-    @Parameterized.Parameter public String flinkVersion;
 
     public Integer parallelism = getParallelism();
 
@@ -114,11 +109,12 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "restart-strategy.type: off");
     public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
-    @Rule public final TemporaryFolder temporaryFolder = new TemporaryFolder();
+    @TempDir public Path temporaryFolder;
 
     @Nullable protected RestClusterClient<StandaloneClusterId> restClusterClient;
+
     protected GenericContainer<?> jobManager;
     protected GenericContainer<?> taskManager;
     protected Volume sharedVolume = new Volume("/tmp/shared");
@@ -127,17 +123,18 @@ public abstract class PipelineTestEnvironment extends TestLogger {
 
     protected ToStringConsumer taskManagerConsumer;
 
-    @Parameterized.Parameters(name = "flinkVersion: {0}")
-    public static List<String> getFlinkVersion() {
+    protected String flinkVersion = getFlinkVersion();
+
+    public static String getFlinkVersion() {
         String flinkVersion = System.getProperty("specifiedFlinkVersion");
-        if (flinkVersion != null) {
-            return Collections.singletonList(flinkVersion);
-        } else {
-            return Arrays.asList("1.19.1", "1.20.0");
+        if (Objects.isNull(flinkVersion)) {
+            throw new IllegalArgumentException(
+                    "No Flink version specified to run this test. Please use -DspecifiedFlinkVersion to pass one.");
         }
+        return flinkVersion;
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         LOG.info("Starting containers...");
         jobManagerConsumer = new ToStringConsumer();
@@ -169,7 +166,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         LOG.info("TaskManager is started.");
     }
 
-    @After
+    @AfterEach
     public void after() {
         if (restClusterClient != null) {
             restClusterClient.close();
@@ -210,7 +207,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         jobManager.copyFileToContainer(
                 MountableFile.forHostPath(TestUtils.getResource("flink-cdc-dist.jar")),
                 "/tmp/flinkCDC/lib/flink-cdc-dist.jar");
-        Path script = temporaryFolder.newFile().toPath();
+        Path script = Files.createFile(temporaryFolder.resolve("pipeline.yaml"));
         Files.write(script, pipelineJob.getBytes());
         jobManager.copyFileToContainer(
                 MountableFile.forHostPath(script), "/tmp/flinkCDC/conf/pipeline.yaml");

@@ -20,7 +20,7 @@ package org.apache.flink.cdc.runtime.serializer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 
 /** A test for the {@link NullableSerializerWrapper}. */
-public class NullableSerializerWrapperTest extends SerializerTestBase<Long> {
+class NullableSerializerWrapperTest extends SerializerTestBase<Long> {
 
     @Override
     protected TypeSerializer<Long> createSerializer() {

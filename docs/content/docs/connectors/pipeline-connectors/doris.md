@@ -134,6 +134,20 @@ pipeline:
        <td> Whether to use the batch method to write to Doris </td>
      </tr>
      <tr>
+       <td>sink.enable-delete</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>Whether to enable the delete function </td>
+     </tr>
+     <tr>
+       <td>sink.max-retries</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">3</td>
+       <td>Integer</td>
+       <td>The max retry times if writing records to database failed. </td>
+     </tr>
+     <tr>
        <td>sink.flush.queue-size</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">2</td>
@@ -163,13 +177,21 @@ pipeline:
        <td>Flush interval duration. If this time is exceeded, the data will be flushed asynchronously</td>
      </tr>
      <tr>
+       <td>sink.ignore.update-before</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>In the CDC scenario, when the primary key of the upstream is inconsistent with that of the downstream, the update-before data needs to be passed to the downstream as deleted data, otherwise the data cannot be deleted.\n"
+                                    + "The default is to ignore, that is, perform upsert semantics.</td>
+     </tr>
+     <tr>
        <td>sink.properties.</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">(none)</td>
        <td>String</td>
        <td> Parameters of StreamLoad.
          For example: <code> sink.properties.strict_mode: true</code>.
-         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad Properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad Properties</a></td>
        </td>
      </tr>
      <tr>
@@ -179,7 +201,7 @@ pipeline:
        <td>String</td>
        <td>Create the Properties configuration of the table.
          For example: <code> table.create.properties.replication_num: 1</code>.
-         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table Properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table Properties</a></td>
        </td>
      </tr>
     <tr>
@@ -297,6 +319,13 @@ pipeline:
       </td>
       <td>STRING</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>
+        TIME
+      </td>
+      <td>STRING</td>
+      <td>Doris does not support the TIME data type, it needs to be converted to STRING type for compatibility.</td>
     </tr>
     <tr>
       <td>STRING</td>

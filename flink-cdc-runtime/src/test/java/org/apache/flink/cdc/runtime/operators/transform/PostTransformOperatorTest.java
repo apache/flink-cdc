@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -43,7 +44,7 @@ import java.math.BigDecimal;
 import java.time.format.DateTimeParseException;
 
 /** Unit tests for the {@link PostTransformOperator}. */
-public class PostTransformOperatorTest {
+class PostTransformOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -360,6 +361,20 @@ public class PostTransformOperatorTest {
                     .physicalColumn("double_equal", DataTypes.BOOLEAN())
                     .physicalColumn("timestamp_equal", DataTypes.BOOLEAN())
                     .primaryKey("id")
+                    .build();
+
+    private static final TableId COL_NAME_MAPPING_TABLEID =
+            TableId.tableId("my_company", "my_branch", "col_name_mapping_table");
+    private static final Schema COL_NAME_MAPPING_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("foo", DataTypes.INT())
+                    .physicalColumn("bar", DataTypes.INT())
+                    .physicalColumn("foo-bar", DataTypes.INT())
+                    .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("class", DataTypes.STRING())
+                    .physicalColumn("f0", DataTypes.INT())
+                    .physicalColumn("f1", DataTypes.INT())
+                    .physicalColumn("f2", DataTypes.INT())
                     .build();
 
     @Test
@@ -2735,10 +2750,18 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(new CreateTableEvent(CAST_TABLEID, CAST_SCHEMA)));
         Assertions.assertThatThrownBy(
-                        () -> {
-                            transform.processElement(new StreamRecord<>(insertEvent1));
-                        })
-                .isExactlyInstanceOf(RuntimeException.class)
+                        () -> transform.processElement(new StreamRecord<>(insertEvent1)))
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessageContaining(
+                        "Failed to post-transform with\n"
+                                + "\tDataChangeEvent{tableId=my_company.my_branch.data_cast, before=null, after={col1: STRING NOT NULL -> 1, castInt: INT -> null, castBoolean: BOOLEAN -> null, castTinyint: TINYINT -> null, castSmallint: SMALLINT -> null, castBigint: BIGINT -> null, castFloat: FLOAT -> 1.0, castDouble: DOUBLE -> null, castChar: STRING -> null, castVarchar: STRING -> null, castDecimal: DECIMAL(4, 2) -> null, castTimestamp: TIMESTAMP(3) -> null}, op=INSERT, meta=()}\n"
+                                + "for table\n"
+                                + "\tmy_company.my_branch.data_cast\n"
+                                + "from schema\n"
+                                + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=().")
+                .cause()
                 .hasRootCauseInstanceOf(DateTimeParseException.class)
                 .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
         transformFunctionEventEventOperatorTestHarness.close();
@@ -2836,6 +2859,17 @@ public class PostTransformOperatorTest {
                         () -> {
                             transform.processElement(new StreamRecord<>(createTableEvent));
                         })
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessageContaining(
+                        "Failed to post-transform with\n"
+                                + "\tCreateTableEvent{tableId=my_company.my_branch.compare_table, schema=columns={`col1` STRING NOT NULL,`numerical_equal` BOOLEAN,`string_equal` BOOLEAN,`time_equal` BOOLEAN,`timestamp_equal` BOOLEAN,`date_equal` BOOLEAN}, primaryKeys=col1, options=()}\n"
+                                + "for table\n"
+                                + "\tmy_company.my_branch.compare_table\n"
+                                + "from schema\n"
+                                + "\t(Unknown)\n"
+                                + "to schema\n"
+                                + "\t(Unknown).")
+                .cause()
                 .isExactlyInstanceOf(CalciteContextException.class)
                 .hasRootCauseInstanceOf(SqlValidatorException.class)
                 .hasRootCauseMessage(
@@ -2967,8 +3001,9 @@ public class PostTransformOperatorTest {
         testExpressionConditionTransform("'123' not like '^[a-zA-Z]'");
         testExpressionConditionTransform("abs(2) = 2");
         testExpressionConditionTransform("ceil(2.4) = 3.0");
+        testExpressionConditionTransform("ceiling(2.4) = 3.0");
         testExpressionConditionTransform("floor(2.5) = 2.0");
-        testExpressionConditionTransform("round(3.1415926,2) = 3.14");
+        testExpressionConditionTransform("round(3.1415926, 2) = 3.14");
         testExpressionConditionTransform("IF(2>0,1,0) = 1");
         testExpressionConditionTransform("COALESCE(null,1,2) = 1");
         testExpressionConditionTransform("1 + 1 = 2");
@@ -3050,7 +3085,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    public void testReduceSchemaTransform() throws Exception {
+    void testReduceSchemaTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
@@ -3153,7 +3188,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    public void testWildcardSchemaTransform() throws Exception {
+    void testWildcardSchemaTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
@@ -3247,5 +3282,101 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
         transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testColumnNameMapping() throws Exception {
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COL_NAME_MAPPING_TABLEID.identifier(),
+                                "*, class, foo-bar AS f0, bar-foo AS f1, `foo-bar`-`bar-foo` AS f2",
+                                "`foo-bar`-`bar-foo` <> 0")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COL_NAME_MAPPING_TABLEID, COL_NAME_MAPPING_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COL_NAME_MAPPING_SCHEMA.toRowDataType()));
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    2,
+                                    3,
+                                    4,
+                                    BinaryStringData.fromString("class0"),
+                                    null,
+                                    null,
+                                    null
+                                }));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, 2, 3, 4, BinaryStringData.fromString("class0"), -1, 1, -1
+                                }));
+        // Update
+        DataChangeEvent updateEvent =
+                DataChangeEvent.updateEvent(
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    2,
+                                    3,
+                                    4,
+                                    BinaryStringData.fromString("class0"),
+                                    null,
+                                    null,
+                                    null
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    2,
+                                    4,
+                                    6,
+                                    8,
+                                    BinaryStringData.fromString("class1"),
+                                    null,
+                                    null,
+                                    null
+                                }));
+        DataChangeEvent updateEventExpect =
+                DataChangeEvent.updateEvent(
+                        COL_NAME_MAPPING_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, 2, 3, 4, BinaryStringData.fromString("class0"), -1, 1, -1
+                                }),
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    2, 4, 6, 8, BinaryStringData.fromString("class1"), -2, 2, -2
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        COL_NAME_MAPPING_TABLEID, COL_NAME_MAPPING_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transform.processElement(new StreamRecord<>(updateEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(updateEventExpect));
     }
 }

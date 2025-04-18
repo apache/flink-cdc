@@ -78,6 +78,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
@@ -150,6 +151,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                 config.get(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
         boolean isParsingOnLineSchemaChanges = config.get(PARSE_ONLINE_SCHEMA_CHANGES);
         boolean useLegacyJsonFormat = config.get(USE_LEGACY_JSON_FORMAT);
+        boolean isAssignUnboundedChunkFirst =
+                config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -201,7 +204,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                         .parseOnLineSchemaChanges(isParsingOnLineSchemaChanges)
                         .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
-                        .useLegacyJsonFormat(useLegacyJsonFormat);
+                        .useLegacyJsonFormat(useLegacyJsonFormat)
+                        .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
@@ -336,6 +340,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(INCLUDE_COMMENTS_ENABLED);
         options.add(USE_LEGACY_JSON_FORMAT);
         options.add(TREAT_TINYINT1_AS_BOOLEAN_ENABLED);
+        options.add(PARSE_ONLINE_SCHEMA_CHANGES);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         return options;
     }
 

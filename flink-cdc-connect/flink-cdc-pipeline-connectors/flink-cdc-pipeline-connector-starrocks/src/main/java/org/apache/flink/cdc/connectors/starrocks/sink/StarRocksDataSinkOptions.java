@@ -73,6 +73,14 @@ public class StarRocksDataSinkOptions {
                     .defaultValue(30000)
                     .withDescription("Timeout in millisecond for connecting to the `load-url`.");
 
+    public static final ConfigOption<Integer> SINK_SOCKET_TIMEOUT =
+            ConfigOptions.key("sink.socket.timeout-ms")
+                    .intType()
+                    .defaultValue(-1)
+                    .withDescription(
+                            "The time duration for which the HTTP client waits for data."
+                                    + " Unit: ms. The default value -1 means there is no timeout.");
+
     public static final ConfigOption<Integer> SINK_WAIT_FOR_CONTINUE_TIMEOUT =
             ConfigOptions.key("sink.wait-for-continue.timeout-ms")
                     .intType()

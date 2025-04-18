@@ -75,6 +75,19 @@ public class SchemaUtils {
         return fieldGetters;
     }
 
+    /**
+     * create a list of {@link RecordData.FieldGetter} from given {@link Column} to get Object from
+     * RecordData.
+     */
+    @CheckReturnValue
+    public static List<RecordData.FieldGetter> createFieldGetters(DataType[] dataTypes) {
+        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>(dataTypes.length);
+        for (int i = 0; i < dataTypes.length; i++) {
+            fieldGetters.add(RecordData.createFieldGetter(dataTypes[i], i));
+        }
+        return fieldGetters;
+    }
+
     /** Restore original data fields from RecordData structure. */
     @CheckReturnValue
     public static List<Object> restoreOriginalData(

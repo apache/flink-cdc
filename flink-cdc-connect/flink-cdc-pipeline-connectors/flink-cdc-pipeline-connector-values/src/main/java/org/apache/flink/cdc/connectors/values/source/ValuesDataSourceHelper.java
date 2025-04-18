@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import java.util.ArrayList;
@@ -54,7 +55,8 @@ public class ValuesDataSourceHelper {
         SINGLE_SPLIT_MULTI_TABLES,
         MULTI_SPLITS_SINGLE_TABLE,
         CUSTOM_SOURCE_EVENTS,
-        TRANSFORM_TABLE
+        TRANSFORM_TABLE,
+        COMPLEX_COLUMN_NAME_TABLE
     }
 
     public static final TableId TABLE_1 =
@@ -118,6 +120,11 @@ public class ValuesDataSourceHelper {
             case TRANSFORM_TABLE:
                 {
                     sourceEvents = transformTable();
+                    break;
+                }
+            case COMPLEX_COLUMN_NAME_TABLE:
+                {
+                    sourceEvents = complexColumnNameTable();
                     break;
                 }
             default:
@@ -638,6 +645,128 @@ public class ValuesDataSourceHelper {
                         new HashMap<String, String>() {
                             {
                                 put("op_ts", "5");
+                            }
+                        }));
+
+        eventOfSplits.add(split1);
+        return eventOfSplits;
+    }
+
+    public static List<List<Event>> complexColumnNameTable() {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+
+        // create table
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("class", DataTypes.STRING())
+                        .physicalColumn("foo-bar", DataTypes.INT())
+                        .physicalColumn("bar-foo", DataTypes.INT())
+                        .primaryKey("class")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        split1.add(createTableEvent);
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator((RowType) schema.toRowDataType());
+        // insert
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("class0"), 0, 0,
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("timestamp-type", "type0");
+                            }
+                        });
+        split1.add(insertEvent1);
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("class1"), 1, 10,
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("timestamp-type", "type1");
+                            }
+                        });
+        split1.add(insertEvent2);
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {BinaryStringData.fromString("class2"), 2, 100}),
+                        new HashMap<String, String>() {
+                            {
+                                put("timestamp-type", "type2");
+                            }
+                        });
+        split1.add(insertEvent3);
+
+        // add column
+        AddColumnEvent.ColumnWithPosition columnWithPosition =
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("import-package", DataTypes.STRING()));
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(TABLE_1, Collections.singletonList(columnWithPosition));
+        split1.add(addColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+
+        // rename column
+        Map<String, String> nameMapping = new HashMap<>();
+        nameMapping.put("bar-foo", "bar-baz");
+        RenameColumnEvent renameColumnEvent = new RenameColumnEvent(TABLE_1, nameMapping);
+        split1.add(renameColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(schema, renameColumnEvent);
+
+        // drop column
+        DropColumnEvent dropColumnEvent =
+                new DropColumnEvent(TABLE_1, Collections.singletonList("bar-baz"));
+        split1.add(dropColumnEvent);
+        schema = SchemaUtils.applySchemaChangeEvent(schema, dropColumnEvent);
+
+        generator = new BinaryRecordDataGenerator((RowType) schema.toRowDataType());
+
+        // delete
+        split1.add(
+                DataChangeEvent.deleteEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("class1"),
+                                    1,
+                                    BinaryStringData.fromString(""),
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("timestamp-type", "type1");
+                            }
+                        }));
+
+        // update
+        split1.add(
+                DataChangeEvent.updateEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("class2"),
+                                    2,
+                                    BinaryStringData.fromString("")
+                                }),
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("new-class2"),
+                                    20,
+                                    BinaryStringData.fromString("new-package2"),
+                                }),
+                        new HashMap<String, String>() {
+                            {
+                                put("timestamp-type", "type2");
                             }
                         }));
 

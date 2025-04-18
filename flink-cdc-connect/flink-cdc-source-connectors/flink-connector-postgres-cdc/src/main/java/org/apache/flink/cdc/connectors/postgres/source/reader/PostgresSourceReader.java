@@ -119,9 +119,10 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
         }
         final long checkpointIdToCommit = this.minHeap.poll();
         LOG.info(
-                "Pending checkpoints '{}', to be committed checkpoint id '{}'.",
+                "Pending checkpoints '{}', to be committed checkpoint id '{}', isCommitOffset is {}.",
                 this.minHeap,
-                checkpointIdToCommit);
+                checkpointIdToCommit,
+                isCommitOffset());
 
         // After all snapshot splits are finished, update stream split's metadata and reset start
         // offset, which maybe smaller than before.
