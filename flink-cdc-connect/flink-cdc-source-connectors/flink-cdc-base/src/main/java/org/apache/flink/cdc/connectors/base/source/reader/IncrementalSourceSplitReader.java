@@ -198,7 +198,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                     LOG.info("It's turn to switch next fetch reader to snapshot split reader");
                     submitSnapshotSplit(nextSplit);
                 }
-                return ChangeEventRecords.forRecords(STREAM_SPLIT_ID, dataIt);
+                return ChangeEventRecords.forRecords(currentSplitId, dataIt);
             } else {
                 // null will be returned after receiving suspend stream event
                 // finish current stream split reading
