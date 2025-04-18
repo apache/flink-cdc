@@ -55,12 +55,14 @@ import java.io.DataOutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -98,6 +100,9 @@ public class SchemaCoordinator extends SchemaRegistry {
     private transient Multimap<Tuple2<Integer, SchemaChangeEvent>, Integer>
             alreadyHandledSchemaChangeEvents;
 
+    /** Executor service to execute schema change. */
+    private final ExecutorService schemaChangeThreadPool;
+
     public SchemaCoordinator(
             String operatorName,
             OperatorCoordinator.Context context,
@@ -114,6 +119,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 routingRules,
                 schemaChangeBehavior,
                 rpcTimeout);
+        this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();
     }
 
     // -----------------
@@ -129,6 +135,14 @@ public class SchemaCoordinator extends SchemaRegistry {
         this.alreadyHandledSchemaChangeEvents = HashMultimap.create();
         LOG.info(
                 "Started SchemaRegistry for {}. Parallelism: {}", operatorName, currentParallelism);
+    }
+
+    @Override
+    public void close() throws Exception {
+        super.close();
+        if (schemaChangeThreadPool != null && !schemaChangeThreadPool.isShutdown()) {
+            schemaChangeThreadPool.shutdownNow();
+        }
     }
 
     // --------------------------
@@ -268,7 +282,20 @@ public class SchemaCoordinator extends SchemaRegistry {
             LOG.info(
                     "Received the last required schema change request {}. Switching from WAITING_FOR_FLUSH to EVOLVING.",
                     request);
-            startSchemaChange();
+
+            schemaChangeThreadPool.submit(
+                    () -> {
+                        try {
+                            startSchemaChange();
+                        } catch (Throwable t) {
+                            failJob(
+                                    "Schema change applying task",
+                                    new FlinkRuntimeException(
+                                            "Failed to apply schema change event.", t));
+                            throw new FlinkRuntimeException(
+                                    "Failed to apply schema change event.", t);
+                        }
+                    });
         }
     }
 
@@ -301,34 +328,56 @@ public class SchemaCoordinator extends SchemaRegistry {
         LOG.info("All flushed. Going to evolve schema for pending requests: {}", pendingRequests);
         flushedSinkWriters.clear();
 
-        // Deduce what schema change events should be applied to sink table
-        List<SchemaChangeEvent> deducedSchemaChangeEvents = deduceEvolvedSchemaChanges();
+        // Deduce what schema change events should be applied to sink table, and affected sink
+        // tables' schema
+        Tuple2<Set<TableId>, List<SchemaChangeEvent>> deduceSummary = deduceEvolvedSchemaChanges();
 
         // And tries to apply it to external system
         List<SchemaChangeEvent> successfullyAppliedSchemaChangeEvents = new ArrayList<>();
-        for (SchemaChangeEvent appliedSchemaChangeEvent : deducedSchemaChangeEvents) {
+        for (SchemaChangeEvent appliedSchemaChangeEvent : deduceSummary.f1) {
             if (applyAndUpdateEvolvedSchemaChange(appliedSchemaChangeEvent)) {
                 successfullyAppliedSchemaChangeEvents.add(appliedSchemaChangeEvent);
             }
         }
 
-        // Then, we broadcast affected schema changes to mapper and release upstream
-        pendingRequests.forEach(
-                (subTaskId, tuple) -> {
-                    LOG.info("Coordinator finishes pending future from {}", subTaskId);
-                    tuple.f1.complete(
-                            wrap(new SchemaChangeResponse(successfullyAppliedSchemaChangeEvents)));
-                });
+        // Fetch refreshed view for affected tables. We can't rely on operator clients to do this
+        // because it might not have a complete schema view after restoring from previous states.
+        Set<TableId> affectedTableIds = deduceSummary.f0;
+        Map<TableId, Schema> evolvedSchemaView = new HashMap<>();
+        for (TableId tableId : affectedTableIds) {
+            schemaManager
+                    .getLatestEvolvedSchema(tableId)
+                    .ifPresent(schema -> evolvedSchemaView.put(tableId, schema));
+        }
 
+        List<Tuple2<SchemaChangeRequest, CompletableFuture<CoordinationResponse>>> futures =
+                new ArrayList<>(pendingRequests.values());
+
+        // Restore coordinator internal states first...
         pendingRequests.clear();
 
         LOG.info("Finished schema evolving. Switching from EVOLVING to IDLE.");
         Preconditions.checkState(
                 evolvingStatus.compareAndSet(RequestStatus.EVOLVING, RequestStatus.IDLE),
                 "RequestStatus should be EVOLVING when schema evolving finishes.");
+
+        // ... and broadcast affected schema changes to mapper and release upstream then.
+        // Make sure we've cleaned-up internal state before this, or we may receive new requests in
+        // a dirty state.
+        futures.forEach(
+                tuple -> {
+                    LOG.info(
+                            "Coordinator finishes pending future from {}",
+                            tuple.f0.getSinkSubTaskId());
+                    tuple.f1.complete(
+                            wrap(
+                                    new SchemaChangeResponse(
+                                            evolvedSchemaView,
+                                            successfullyAppliedSchemaChangeEvents)));
+                });
     }
 
-    private List<SchemaChangeEvent> deduceEvolvedSchemaChanges() {
+    private Tuple2<Set<TableId>, List<SchemaChangeEvent>> deduceEvolvedSchemaChanges() {
         List<SchemaChangeRequest> validSchemaChangeRequests =
                 pendingRequests.values().stream()
                         .map(e -> e.f0)
@@ -408,7 +457,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             evolvedSchemaChanges.addAll(normalizedEvents);
         }
 
-        return evolvedSchemaChanges;
+        return Tuple2.of(affectedSinkTableIds, evolvedSchemaChanges);
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
