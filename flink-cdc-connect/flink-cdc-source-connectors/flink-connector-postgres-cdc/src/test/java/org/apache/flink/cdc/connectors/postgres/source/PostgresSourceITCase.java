@@ -680,13 +680,13 @@ class PostgresSourceITCase extends PostgresTestBase {
     @ValueSource(strings = {"initial", "latest-offset"})
     public void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) throws Exception {
         Assumptions.assumeThat(scanStartupMode).isEqualTo(DEFAULT_SCAN_STARTUP_MODE);
-        String chunkColumn = "name";
+        String chunkColumn = "Name";
         testPostgresParallelSource(
                 1,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
-                new String[] {"customers"},
+                new String[] {"Customers"},
                 RestartStrategies.noRestart(),
                 Collections.singletonMap(
                         "scan.incremental.snapshot.chunk.key-column", chunkColumn));
