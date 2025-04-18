@@ -43,6 +43,7 @@ limitations under the License.
         <iceberg.version>1.6.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <fluss.version>0.7.0</fluss.version>
+        <jmh.version>1.37</jmh.version>
     </properties>
 
     <dependencies>
@@ -225,6 +226,21 @@ limitations under the License.
             <groupId>org.testcontainers</groupId>
             <artifactId>mysql</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- benchmark -->
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>${jmh.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
 
