@@ -25,8 +25,8 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -65,7 +65,7 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, TABLE_ID);
-        Assert.assertEquals(partitionInfo, new Tuple2<>("create_time", "year"));
+        Assertions.assertThat(partitionInfo).isEqualTo(new Tuple2<>("create_time", "year"));
     }
 
     @Test
@@ -79,7 +79,7 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, TABLE_ID);
-        Assert.assertNull(partitionInfo);
+        Assertions.assertThat(partitionInfo).isNull();
     }
 
     @Test
@@ -93,7 +93,7 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, TABLE_ID);
-        Assert.assertEquals(new Tuple2<>("create_time", "year"), partitionInfo);
+        Assertions.assertThat(partitionInfo).isEqualTo(new Tuple2<>("create_time", "year"));
     }
 
     @Test
@@ -118,7 +118,7 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, TABLE_ID);
-        Assert.assertEquals(new Tuple2<>("create_time", "year"), partitionInfo);
+        Assertions.assertThat(partitionInfo).isEqualTo(new Tuple2<>("create_time", "year"));
     }
 
     @Test
@@ -150,7 +150,7 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, schema, TABLE_ID);
-        Assert.assertNull(partitionInfo);
+        Assertions.assertThat(partitionInfo).isNull();
     }
 
     @Test
@@ -176,7 +176,7 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, TABLE_ID);
-        Assert.assertEquals(new Tuple2<>("create_time2", "month"), partitionInfo);
+        Assertions.assertThat(partitionInfo).isEqualTo(new Tuple2<>("create_time2", "month"));
     }
 
     @Test
@@ -203,11 +203,11 @@ public class DorisSchemaUtilsTest {
 
         Tuple2<String, String> partitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, TABLE_ID);
-        Assert.assertNull(partitionInfo);
+        Assertions.assertThat(partitionInfo).isNull();
 
         TableId newTableId = TableId.parse("doris_database.part_table");
         Tuple2<String, String> newPartitionInfo =
                 DorisSchemaUtils.getPartitionInfo(config, SCHEMA, newTableId);
-        Assert.assertEquals(new Tuple2<>("create_time", "year"), newPartitionInfo);
+        Assertions.assertThat(newPartitionInfo).isEqualTo(new Tuple2<>("create_time", "year"));
     }
 }

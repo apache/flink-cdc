@@ -33,8 +33,8 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.doris.flink.sink.writer.serializer.DorisRecord;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -94,7 +94,8 @@ public class DorisEventSerializerTest {
 
         DorisRecord dorisRecord = dorisEventSerializer.serialize(dataChangeEvent);
         JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
-        Assert.assertEquals("2025-01-16 08:00:00.000000", jsonNode.get("create_time").asText());
+        Assertions.assertThat(jsonNode.get("create_time").asText())
+                .isEqualTo("2025-01-16 08:00:00.000000");
     }
 
     @Test
@@ -123,8 +124,8 @@ public class DorisEventSerializerTest {
 
         DorisRecord dorisRecord = dorisEventSerializer.serialize(dataChangeEvent);
         JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
-        Assert.assertEquals(
-                DorisSchemaUtils.DEFAULT_DATETIME, jsonNode.get("create_time").asText());
+        Assertions.assertThat(jsonNode.get("create_time").asText())
+                .isEqualTo(DorisSchemaUtils.DEFAULT_DATETIME);
     }
 
     @Test
@@ -153,7 +154,7 @@ public class DorisEventSerializerTest {
 
         DorisRecord dorisRecord = dorisEventSerializer.serialize(dataChangeEvent);
         JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
-        Assert.assertEquals("2025-01-16", jsonNode.get("create_date").asText());
+        Assertions.assertThat(jsonNode.get("create_date").asText()).isEqualTo("2025-01-16");
     }
 
     @Test
@@ -182,6 +183,7 @@ public class DorisEventSerializerTest {
 
         DorisRecord dorisRecord = dorisEventSerializer.serialize(dataChangeEvent);
         JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
-        Assert.assertEquals(DorisSchemaUtils.DEFAULT_DATE, jsonNode.get("create_date").asText());
+        Assertions.assertThat(jsonNode.get("create_date").asText())
+                .isEqualTo(DorisSchemaUtils.DEFAULT_DATE);
     }
 }
