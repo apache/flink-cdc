@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterS
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
+import org.apache.flink.cdc.connectors.oracle.connection.OracleSourceConnection;
 import org.apache.flink.cdc.connectors.oracle.source.assigner.splitter.OracleChunkSplitter;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import org.apache.flink.cdc.connectors.oracle.source.reader.fetch.OracleScanFetchTask;
@@ -35,7 +36,6 @@ import org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleSchema;
 import org.apache.flink.util.FlinkRuntimeException;
 
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -75,7 +75,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
-            OracleConnection oracleConnection = (OracleConnection) jdbcConnection;
+            OracleSourceConnection oracleConnection = (OracleSourceConnection) jdbcConnection;
             return oracleConnection.getOracleVersion().getMajor() == 11;
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error reading oracle variables: " + e.getMessage(), e);
@@ -120,7 +120,8 @@ public class OracleDialect implements JdbcDataSourceDialect {
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
 
-        try (OracleConnection jdbc = createOracleConnection(sourceConfig.getDbzConfiguration())) {
+        try (OracleSourceConnection jdbc =
+                createOracleConnection(sourceConfig.getDbzConfiguration())) {
             // fetch table schemas
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {

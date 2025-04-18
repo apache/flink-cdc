@@ -741,7 +741,7 @@ class OracleConnectorITCase {
                                 + " VAL_F FLOAT,"
                                 + " VAL_F_10 FLOAT,"
                                 + " VAL_NUM DECIMAL(10, 6),"
-                                + " VAL_DP DOUBLE,"
+                                + " VAL_DP FLOAT,"
                                 + " VAL_R DECIMAL(38,2),"
                                 + " VAL_DECIMAL DECIMAL(10, 6),"
                                 + " VAL_NUMERIC DECIMAL(10, 6),"

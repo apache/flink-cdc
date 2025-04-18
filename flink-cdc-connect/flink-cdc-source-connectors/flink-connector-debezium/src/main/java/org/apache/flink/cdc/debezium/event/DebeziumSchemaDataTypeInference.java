@@ -185,6 +185,9 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
             if (precision > DecimalType.MAX_PRECISION) {
                 return DataTypes.STRING();
             }
+            if (scale < 0 || scale > 36) {
+                return DataTypes.STRING();
+            }
             return DataTypes.DECIMAL(precision, scale);
         }
         return DataTypes.BYTES();

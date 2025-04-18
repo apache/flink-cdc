@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
+import org.apache.flink.cdc.connectors.oracle.connection.OracleSourceConnection;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverPhase;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverType;
@@ -38,7 +39,6 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.jdbc.JdbcConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
@@ -549,7 +549,7 @@ public class OracleSourceITCase extends OracleSourceTestBase {
                                     .withUser("debezium")
                                     .withPassword("dbz")
                                     .build();
-                    try (OracleConnection oracleConnection =
+                    try (OracleSourceConnection oracleConnection =
                             OracleConnectionUtils.createOracleConnection(configuration)) {
                         oracleConnection.execute(statements);
                     }

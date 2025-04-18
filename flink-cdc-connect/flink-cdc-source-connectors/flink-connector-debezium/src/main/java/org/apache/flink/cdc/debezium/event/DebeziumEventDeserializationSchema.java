@@ -54,6 +54,7 @@ import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -371,7 +372,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         if (dbzObj instanceof String) {
             String str = (String) dbzObj;
             // TIMESTAMP_LTZ type is encoded in string type
-            Instant instant = Instant.parse(str);
+            Instant instant = ZonedTimestamp.FORMATTER.parse(str, Instant::from);
             return LocalZonedTimestampData.fromInstant(instant);
         }
         throw new IllegalArgumentException(
