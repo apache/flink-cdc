@@ -69,17 +69,21 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private transient CustomMySqlAntlrDdlParser customParser;
 
     private List<MySqlReadableMetadata> readableMetadataList;
+    private boolean isSourceTableNameCaseSensitive;
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
-            boolean tinyInt1isBit) {
+            boolean tinyInt1isBit,
+            boolean isSourceTableNameCaseSensitive) {
         this(
                 changelogMode,
                 includeSchemaChanges,
                 new ArrayList<>(),
                 includeSchemaChanges,
-                tinyInt1isBit);
+                tinyInt1isBit,
+                isSourceTableNameCaseSensitive);
+        this.isSourceTableNameCaseSensitive = isSourceTableNameCaseSensitive;
     }
 
     public MySqlEventDeserializer(
@@ -87,19 +91,23 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             boolean includeSchemaChanges,
             List<MySqlReadableMetadata> readableMetadataList,
             boolean includeComments,
-            boolean tinyInt1isBit) {
+            boolean tinyInt1isBit,
+            boolean isSourceTableNameCaseSensitive) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
         this.includeComments = includeComments;
         this.tinyInt1isBit = tinyInt1isBit;
+        this.isSourceTableNameCaseSensitive = isSourceTableNameCaseSensitive;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser(includeComments, tinyInt1isBit);
+                customParser =
+                        new CustomMySqlAntlrDdlParser(
+                                includeComments, tinyInt1isBit, isSourceTableNameCaseSensitive);
                 tables = new Tables();
             }
 
