@@ -322,4 +322,12 @@ public class MySqlDataSourceOptions {
                             .defaultValue(false)
                             .withDescription(
                                     "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SOURCE_TABLENAME_IS_CASE_SENSITIVE =
+            ConfigOptions.key("source.table-name.is-case-sensitive")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "When the source library supports case-sensitive table names, it is set to true. The purpose is to analyze that the case of table names is consistent with the actual table names when ddl changes.");
 }
