@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -65,18 +66,20 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private List<ColumnEditor> columnEditors;
     private CustomColumnDefinitionParserListener columnDefinitionListener;
     private TableEditor tableEditor;
-
+    private boolean isTableIdCaseInsensitive;
     private int parsingColumnIndex = STARTING_INDEX;
 
     public CustomAlterTableParserListener(
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners,
             LinkedList<SchemaChangeEvent> changes,
-            boolean tinyInt1isBit) {
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         this.parser = parser;
         this.listeners = listeners;
         this.changes = changes;
         this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
@@ -438,7 +441,13 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     }
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
-        return org.apache.flink.cdc.common.event.TableId.tableId(
-                dbzTableId.catalog(), dbzTableId.table());
+        if (isTableIdCaseInsensitive) {
+            return org.apache.flink.cdc.common.event.TableId.tableId(
+                    dbzTableId.catalog().toLowerCase(Locale.ROOT),
+                    dbzTableId.table().toLowerCase(Locale.ROOT));
+        } else {
+            return org.apache.flink.cdc.common.event.TableId.tableId(
+                    dbzTableId.catalog(), dbzTableId.table());
+        }
     }
 }
