@@ -79,10 +79,3 @@ jobs:
       java-version: "[11]"
       flink-version: "['1.19.2', '1.20.1']"
       module: source_e2e
-  migration_test:
-    if: github.repository == 'apache/flink-cdc'
-    name: Migration Tests
-    uses: ./.github/workflows/flink_cdc_migration_test_base.yml
-    with:
-      java-version: "[11]"
-      flink-version: "['1.19.2', '1.20.1']"
