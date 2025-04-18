@@ -364,6 +364,18 @@ pipeline:
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
       </td>
     </tr>
+    <tr>
+      <td>source.table-name.is-case-sensitive</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+The function of the lower_case_table_name parameter</br>
+0: Table and database names are case sensitive (Linux default)</br>
+1: Table and database names are not case sensitive and automatically converted to lowercase when stored (Windows default)</br>
+2: Table names are stored in their original case, but when queried, they are converted to lowercase for comparison (macOS default)
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

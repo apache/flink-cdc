@@ -344,6 +344,18 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>source.table-name.is-case-sensitive</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        lower_case_table_names参数作用‌</br>
+0‌：表名和数据库名区分大小写（Linux默认值）</br>
+1‌：表名和数据库名不区分大小写，存储时自动转为小写（Windows默认值）</br>
+2‌：表名按原始大小写存储，但查询时转为小写比较（macOS默认值）‌
+      </td>
+    </tr>
+    <tr>
       <td>use.legacy.json.format</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
