@@ -942,6 +942,7 @@ class NewlyAddedTableITCase extends PostgresTestBase {
                         + " 'username' = '%s',"
                         + " 'password' = '%s',"
                         + " 'database-name' = '%s',"
+                        + " 'decoding.plugin.name' = 'pgoutput', "
                         + " 'schema-name' = '%s',"
                         + " 'table-name' = '%s',"
                         + " 'slot.name' = '%s', "

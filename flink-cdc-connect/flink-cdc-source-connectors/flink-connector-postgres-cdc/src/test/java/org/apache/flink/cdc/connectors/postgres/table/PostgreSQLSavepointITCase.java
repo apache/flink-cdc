@@ -88,6 +88,7 @@ class PostgreSQLSavepointITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '2',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),

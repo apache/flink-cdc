@@ -60,14 +60,13 @@ import java.util.stream.Stream;
  * log.
  */
 public abstract class PostgresTestBase extends AbstractTestBase {
-    private static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
     public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     public static final String DEFAULT_DB = "postgres";
 
-    // use newer version of postgresql image to support pgoutput plugin
-    // when testing postgres 13, only 13-alpine supports both amd64 and arm64
+    // use official postgresql image to support pgoutput plugin
     protected static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
+            DockerImageName.parse("postgres:14").asCompatibleSubstituteFor("postgres");
 
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
@@ -81,7 +80,9 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                             // default
                             "fsync=off",
                             "-c",
-                            "max_replication_slots=20");
+                            "max_replication_slots=20",
+                            "-c",
+                            "wal_level=logical");
 
     @BeforeAll
     static void startContainers() throws Exception {
@@ -217,6 +218,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         postgresSourceConfigFactory.splitSize(splitSize);
         postgresSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
         postgresSourceConfigFactory.setLsnCommitCheckpointsDelay(1);
+        postgresSourceConfigFactory.decodingPluginName("pgoutput");
         return postgresSourceConfigFactory;
     }
 
