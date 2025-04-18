@@ -49,7 +49,8 @@ public class TransformTranslator {
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
-            boolean canContainDistributedTables) {
+            boolean canContainDistributedTables,
+            OperatorUidGenerator operatorUidGenerator) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -78,7 +79,10 @@ public class TransformTranslator {
                 .canContainDistributedTables(canContainDistributedTables);
 
         return input.transform(
-                "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
+                        "Transform:Schema",
+                        new EventTypeInfo(),
+                        preTransformFunctionBuilder.build())
+                .uid(operatorUidGenerator.generateUid("pre-transform"));
     }
 
     public DataStream<Event> translatePostTransform(
@@ -87,7 +91,8 @@ public class TransformTranslator {
             String timezone,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            OperatorUidGenerator operatorUidGenerator) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -113,7 +118,8 @@ public class TransformTranslator {
         postTransformFunctionBuilder.addUdfFunctions(
                 models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
         return input.transform(
-                "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
+                        "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
+                .uid(operatorUidGenerator.generateUid("post-transform"));
     }
 
     private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {

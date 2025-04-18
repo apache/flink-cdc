@@ -72,6 +72,7 @@ public class SchemaOperatorTranslator {
                 input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
     }
 
+    @Deprecated
     public String getSchemaOperatorUid() {
         return schemaOperatorUid;
     }
