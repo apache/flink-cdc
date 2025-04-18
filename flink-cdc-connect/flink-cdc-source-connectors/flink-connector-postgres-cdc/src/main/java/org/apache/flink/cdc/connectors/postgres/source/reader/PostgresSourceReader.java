@@ -69,7 +69,6 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect dialect) {
         super(
-                elementQueue,
                 supplier,
                 recordEmitter,
                 config,
