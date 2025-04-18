@@ -36,11 +36,12 @@ limitations under the License.
         <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
         <starrocks.connector.version>1.2.10_flink-${flink-major-1.19}</starrocks.connector.version>
         <paimon.version>1.0.1</paimon.version>
-        <flink.hadoop.version>3.3.4</flink.hadoop.version>
         <flink.release.download.skip>false</flink.release.download.skip>
         <flink.release.name>flink-${flink.version}-bin-scala_${scala.binary.version}.tgz</flink.release.name>
         <flink.release.mirror>https://dlcdn.apache.org/flink/flink-${flink.version}</flink.release.mirror>
         <maven.plugin.download.version>1.6.8</maven.plugin.download.version>
+        <iceberg.version>1.6.1</iceberg.version>
+        <hive.version>2.3.9</hive.version>
     </properties>
 
     <dependencies>
@@ -122,6 +123,13 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-iceberg</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
@@ -157,6 +165,12 @@ limitations under the License.
                     <artifactId>protobuf-java</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-flink-runtime-${flink-major-1.19}</artifactId>
+            <version>${iceberg.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -210,7 +224,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-yarn-api</artifactId>
-            <version>${flink.hadoop.version}</version>
+            <version>${hadoop.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -232,7 +246,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
-            <version>${flink.hadoop.version}</version>
+            <version>${hadoop.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -253,7 +267,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-yarn-client</artifactId>
-            <version>${flink.hadoop.version}</version>
+            <version>${hadoop.version}</version>
             <scope>test</scope>
             <exclusions>
                 <exclusion>
@@ -274,7 +288,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-yarn-server-tests</artifactId>
-            <version>${flink.hadoop.version}</version>
+            <version>${hadoop.version}</version>
             <scope>test</scope>
             <type>test-jar</type>
             <exclusions>
@@ -296,7 +310,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
-            <version>${flink.hadoop.version}</version>
+            <version>${hadoop.version}</version>
             <scope>test</scope>
             <type>test-jar</type>
             <exclusions>
@@ -526,6 +540,15 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-iceberg</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>iceberg-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-shaded-hadoop-2-uber</artifactId>
                             <version>2.8.3-10.0</version>
                             <destFileName>flink-shade-hadoop.jar</destFileName>
@@ -538,6 +561,15 @@ limitations under the License.
                             <artifactId>paimon-flink-${flink-major-1.19}</artifactId>
                             <version>${paimon.version}</version>
                             <destFileName>paimon-sql-connector-${flink-1.19}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.hive</groupId>
+                            <artifactId>hive-exec</artifactId>
+                            <version>${hive.version}</version>
+                            <destFileName>hive-exec.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
