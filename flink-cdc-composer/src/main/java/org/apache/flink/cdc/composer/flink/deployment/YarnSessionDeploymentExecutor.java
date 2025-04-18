@@ -46,10 +46,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** Deploy flink cdc job by yarn application mode. */
-public class YarnApplicationDeploymentExecutor extends AbstractDeploymentExecutor {
-    private static final Logger LOG =
-            LoggerFactory.getLogger(YarnApplicationDeploymentExecutor.class);
+/** Deploy flink cdc job by yarn session mode. */
+public class YarnSessionDeploymentExecutor extends AbstractDeploymentExecutor {
+    private static final Logger LOG = LoggerFactory.getLogger(YarnSessionDeploymentExecutor.class);
 
     @Override
     public PipelineExecution.ExecutionInfo deploy(
@@ -58,7 +57,7 @@ public class YarnApplicationDeploymentExecutor extends AbstractDeploymentExecuto
             List<Path> additionalJars,
             Path flinkHome)
             throws Exception {
-        LOG.info("Submitting application in 'Flink Yarn Application Mode'.");
+        LOG.info("Submitting flink job in 'Flink Yarn Session Mode'.");
         if (flinkConfig.get(PipelineOptions.JARS) == null) {
             flinkConfig.set(
                     PipelineOptions.JARS, Collections.singletonList(getFlinkCDCDistJarFromEnv()));
@@ -85,13 +84,11 @@ public class YarnApplicationDeploymentExecutor extends AbstractDeploymentExecuto
                 yarnClusterClientFactory.createClusterDescriptor(flinkConfig);
         ClusterSpecification specification =
                 yarnClusterClientFactory.getClusterSpecification(flinkConfig);
-        ApplicationConfiguration applicationConfiguration =
-                ApplicationConfiguration.fromConfiguration(flinkConfig);
 
         ClusterClient<ApplicationId> client = null;
         try {
             ClusterClientProvider<ApplicationId> clusterClientProvider =
-                    descriptor.deployApplicationCluster(specification, applicationConfiguration);
+                    descriptor.deploySessionCluster(specification);
             client = clusterClientProvider.getClusterClient();
             ApplicationId clusterId = client.getClusterId();
             LOG.info("Deployment Flink CDC From Cluster ID {}", clusterId);
