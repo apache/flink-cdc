@@ -443,7 +443,8 @@ class TransformParserTest {
                         Column.physicalColumn("address", DataTypes.VARCHAR(50), "newAddress"),
                         Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
-                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
+                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"),
+                        Column.physicalColumn("op_type", DataTypes.TINYINT(), "op_type"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
@@ -465,7 +466,7 @@ class TransformParserTest {
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(
-                        "*, __namespace_name__, __schema_name__, __table_name__",
+                        "*, __namespace_name__, __schema_name__, __table_name__, __data_event_type__ AS op_type",
                         testColumns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0]);
@@ -480,6 +481,7 @@ class TransformParserTest {
                         "ProjectionColumn{column=`deposit` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
                         "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='$0', originalColumnNames=[weight], columnNameMap={weight=$0}}",
                         "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='$0', originalColumnNames=[height], columnNameMap={height=$0}}",
+                        "ProjectionColumn{column=`op_type` STRING NOT NULL, expression='__data_event_type__', scriptExpression='$0', originalColumnNames=[__data_event_type__], columnNameMap={__data_event_type__=$0}}",
                         "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='$0', originalColumnNames=[__namespace_name__], columnNameMap={__namespace_name__=$0}}",
                         "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='$0', originalColumnNames=[__schema_name__], columnNameMap={__schema_name__=$0}}",
                         "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='$0', originalColumnNames=[__table_name__], columnNameMap={__table_name__=$0}}");
