@@ -596,6 +596,58 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
+    public void testParseAlterStatementWhenTableNameIsUpper() throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
+                        .startupOptions(StartupOptions.latest())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue())
+                        .isCaseSensitive(true);
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "products");
+        List<Event> expected = new ArrayList<>();
+        expected.add(getProductsCreateTableEvent(tableId));
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            expected.addAll(executeAlterAndProvideExpected(tableId, statement));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`PRODUCTS` ADD `cols1` VARCHAR(45);",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Arrays.asList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "cols1", DataTypes.VARCHAR(45))))));
+        }
+        List<Event> actual = fetchResults(events, expected.size());
+        assertThat(actual).isEqualTo(expected);
+    }
+
+    @Test
     void testSchemaChangeEventstinyInt1isBit() throws Exception {
         testSchemaChangeEvents(true);
     }
