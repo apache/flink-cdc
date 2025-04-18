@@ -17,24 +17,16 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
-import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
-import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
-import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -51,189 +43,73 @@ import java.util.stream.Collectors;
  */
 public class TransformProjectionProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(TransformProjectionProcessor.class);
-    private final PostTransformChangeInfo postTransformChangeInfo;
-    private final TransformProjection transformProjection;
+
+    private final PostTransformChangeInfo changeInfo;
+    private final String projectionExpression;
     private final String timezone;
-    private final List<ProjectionColumnProcessor> cachedProjectionColumnProcessors;
     private final List<UserDefinedFunctionDescriptor> udfDescriptors;
-    private final transient List<Object> udfFunctionInstances;
+    private final List<Object> udfFunctionInstances;
+    private final List<ProjectionColumnProcessor> columnProcessors;
+    private final SupportedMetadataColumn[] supportedMetadataColumns;
+    private final Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap;
 
     public TransformProjectionProcessor(
-            PostTransformChangeInfo postTransformChangeInfo,
-            TransformProjection transformProjection,
+            PostTransformChangeInfo changeInfo,
+            String projectionExpression,
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            final List<Object> udfFunctionInstances,
+            List<Object> udfFunctionInstances,
             SupportedMetadataColumn[] supportedMetadataColumns) {
-        this.postTransformChangeInfo = postTransformChangeInfo;
-        this.transformProjection = transformProjection;
+        this.changeInfo = changeInfo;
+        this.projectionExpression = projectionExpression;
         this.timezone = timezone;
         this.udfDescriptors = udfDescriptors;
         this.udfFunctionInstances = udfFunctionInstances;
+        this.supportedMetadataColumns = supportedMetadataColumns;
 
-        // Create cached projection column processors after setting all other fields.
-        this.cachedProjectionColumnProcessors =
-                cacheProjectionColumnProcessors(
-                        postTransformChangeInfo, transformProjection, supportedMetadataColumns);
+        // Construct a mapping table ad-hoc to accelerate looking-up
+        Map<String, SupportedMetadataColumn> supportedMetadataColumnsMap = new HashMap<>();
+        for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
+            supportedMetadataColumnsMap.put(
+                    supportedMetadataColumn.getName(), supportedMetadataColumn);
+        }
+        this.supportedMetadataColumnsMap = supportedMetadataColumnsMap;
+        this.columnProcessors = createProjectionColumnProcessors();
     }
 
-    public boolean hasTableInfo() {
-        return this.postTransformChangeInfo != null;
+    public Object[] project(Object[] rowData, TransformContext context) {
+        return columnProcessors.stream()
+                .map(processor -> processor.evaluate(rowData, context))
+                .toArray();
     }
 
-    public TransformProjection getTransformProjection() {
-        return transformProjection;
-    }
+    private List<ProjectionColumnProcessor> createProjectionColumnProcessors() {
+        Preconditions.checkNotNull(
+                changeInfo,
+                "Projection column processors could only be created if changeInfo is available.");
 
-    public static TransformProjectionProcessor of(
-            PostTransformChangeInfo tableInfo,
-            TransformProjection transformProjection,
-            String timezone,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
-        return new TransformProjectionProcessor(
-                tableInfo,
-                transformProjection,
-                timezone,
-                udfDescriptors,
-                udfFunctionInstances,
-                supportedMetadataColumns);
-    }
-
-    public static TransformProjectionProcessor of(
-            TransformProjection transformProjection,
-            String timezone,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
-        return new TransformProjectionProcessor(
-                null,
-                transformProjection,
-                timezone,
-                udfDescriptors,
-                udfFunctionInstances,
-                supportedMetadataColumns);
-    }
-
-    public static TransformProjectionProcessor of(
-            TransformProjection transformProjection,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
-        return new TransformProjectionProcessor(
-                null,
-                transformProjection,
-                null,
-                udfDescriptors,
-                udfFunctionInstances,
-                supportedMetadataColumns);
-    }
-
-    public Schema processSchema(Schema schema, SupportedMetadataColumn[] supportedMetadataColumns) {
         List<ProjectionColumn> projectionColumns =
                 TransformParser.generateProjectionColumns(
-                        transformProjection.getProjection(),
-                        schema.getColumns(),
+                        projectionExpression,
+                        changeInfo.getPreTransformedSchema().getColumns(),
                         udfDescriptors,
                         supportedMetadataColumns);
-        transformProjection.setProjectionColumns(projectionColumns);
-        Set<String> primaryKeys = new HashSet<>(schema.primaryKeys());
-        return schema.copy(
+
+        List<ProjectionColumnProcessor> columnProcessors =
                 projectionColumns.stream()
-                        .map(ProjectionColumn::getColumn)
-                        .map(column -> setPkNonNull(primaryKeys, column))
-                        .collect(Collectors.toList()));
-    }
+                        .map(
+                                column ->
+                                        ProjectionColumnProcessor.of(
+                                                changeInfo,
+                                                column,
+                                                timezone,
+                                                udfDescriptors,
+                                                udfFunctionInstances,
+                                                supportedMetadataColumnsMap))
+                        .collect(Collectors.toList());
 
-    private static Column setPkNonNull(Set<String> primaryKeys, Column column) {
-        if (primaryKeys.contains(column.getName())) {
-            return column.copy(column.getType().notNull());
-        } else {
-            return column;
-        }
-    }
-
-    public BinaryRecordData processData(
-            BinaryRecordData payload, long epochTime, String opType, Map<String, String> meta) {
-        List<Object> valueList = new ArrayList<>();
-        List<Column> columns = postTransformChangeInfo.getPostTransformedSchema().getColumns();
-
-        for (int i = 0; i < columns.size(); i++) {
-            ProjectionColumnProcessor projectionColumnProcessor =
-                    cachedProjectionColumnProcessors.get(i);
-            if (projectionColumnProcessor != null) {
-                ProjectionColumn projectionColumn = projectionColumnProcessor.getProjectionColumn();
-                valueList.add(
-                        DataTypeConverter.convert(
-                                projectionColumnProcessor.evaluate(
-                                        payload, epochTime, opType, meta),
-                                projectionColumn.getDataType()));
-            } else {
-                Column column = columns.get(i);
-                valueList.add(
-                        getValueFromBinaryRecordData(
-                                column.getName(),
-                                column.getType(),
-                                payload,
-                                postTransformChangeInfo.getPreTransformedSchema().getColumns(),
-                                postTransformChangeInfo.getPreTransformedFieldGetters()));
-            }
-        }
-
-        return postTransformChangeInfo
-                .getRecordDataGenerator()
-                .generate(valueList.toArray(new Object[0]));
-    }
-
-    private Object getValueFromBinaryRecordData(
-            String columnName,
-            DataType expectedType,
-            BinaryRecordData binaryRecordData,
-            List<Column> columns,
-            RecordData.FieldGetter[] fieldGetters) {
-        for (int i = 0; i < columns.size(); i++) {
-            if (columnName.equals(columns.get(i).getName())) {
-                return DataTypeConverter.convert(
-                        fieldGetters[i].getFieldOrNull(binaryRecordData), expectedType);
-            }
-        }
-        return null;
-    }
-
-    private List<ProjectionColumnProcessor> cacheProjectionColumnProcessors(
-            PostTransformChangeInfo tableInfo,
-            TransformProjection transformProjection,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
-        List<ProjectionColumnProcessor> cachedProjectionColumnProcessors = new ArrayList<>();
-        if (!hasTableInfo()) {
-            return cachedProjectionColumnProcessors;
-        }
-
-        for (Column column : tableInfo.getPostTransformedSchema().getColumns()) {
-            ProjectionColumn matchedProjectionColumn = null;
-            for (ProjectionColumn projectionColumn : transformProjection.getProjectionColumns()) {
-                if (column.getName().equals(projectionColumn.getColumnName())
-                        && projectionColumn.isValidTransformedProjectionColumn()) {
-                    matchedProjectionColumn = projectionColumn;
-                    break;
-                }
-            }
-
-            cachedProjectionColumnProcessors.add(
-                    Optional.ofNullable(matchedProjectionColumn)
-                            .map(
-                                    col ->
-                                            ProjectionColumnProcessor.of(
-                                                    tableInfo,
-                                                    col,
-                                                    timezone,
-                                                    udfDescriptors,
-                                                    udfFunctionInstances,
-                                                    supportedMetadataColumns))
-                            .orElse(null));
-        }
-
-        return cachedProjectionColumnProcessors;
+        LOG.info("Successfully created projection column processors cache.");
+        LOG.info("Cached results: {}", columnProcessors);
+        return columnProcessors;
     }
 }

@@ -1002,7 +1002,7 @@ class FlinkPipelineTransformITCase {
                         sourceDef,
                         sinkDef,
                         Collections.emptyList(),
-                        new ArrayList<>(Arrays.asList(transformDef)),
+                        Collections.singletonList(transformDef),
                         Collections.emptyList(),
                         pipelineConfig);
 
@@ -2030,8 +2030,7 @@ class FlinkPipelineTransformITCase {
             execution.execute();
 
             // Check the order and content of all received events
-            String[] outputEvents = outCaptor.toString().trim().split("\n");
-            return outputEvents;
+            return outCaptor.toString().trim().split("\n");
         } finally {
             outCaptor.reset();
         }
@@ -2569,6 +2568,52 @@ class FlinkPipelineTransformITCase {
                                         null,
                                         null)),
                         Collections.emptyList());
+    }
+
+    @Test
+    void testShadeOriginalColumnsWithDifferentType() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.TRANSFORM_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+        Configuration sinkConfig = new Configuration();
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        "\\.*.\\.*.\\.*",
+                                        "*, 0.5 + CAST(col1 AS DOUBLE) AS col1",
+                                        "col1 > 1.5",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` DOUBLE NOT NULL,`col2` STRING}, primaryKeys=col1, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2.5, 2], op=INSERT, meta=({op_ts=2})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3.5, 3], op=INSERT, meta=({op_ts=3})}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=AFTER, existedColumnName=col2}]}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2.5, ], after=[2.5, x], op=UPDATE, meta=({op_ts=5})}");
     }
 
     private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {
