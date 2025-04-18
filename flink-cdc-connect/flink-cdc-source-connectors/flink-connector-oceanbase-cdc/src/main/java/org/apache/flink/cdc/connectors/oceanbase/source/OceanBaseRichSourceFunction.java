@@ -26,6 +26,7 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.oceanbase.source.config.OceanBaseConnectorConfig;
 import org.apache.flink.cdc.connectors.oceanbase.source.connection.OceanBaseConnection;
+import org.apache.flink.cdc.connectors.oceanbase.source.converter.OceanBaseValueConverters;
 import org.apache.flink.cdc.connectors.oceanbase.source.offset.OceanBaseSourceInfo;
 import org.apache.flink.cdc.connectors.oceanbase.source.schema.OceanBaseDatabaseSchema;
 import org.apache.flink.cdc.connectors.oceanbase.source.schema.OceanBaseSchema;
@@ -289,7 +290,11 @@ public class OceanBaseRichSourceFunction<T> extends RichSourceFunction<T>
     private TableSchema getTableSchema(TableId tableId) {
         if (databaseSchema == null) {
             databaseSchema =
-                    new OceanBaseDatabaseSchema(connectorConfig, t -> tableSet.contains(t), false);
+                    new OceanBaseDatabaseSchema(
+                            connectorConfig,
+                            new OceanBaseValueConverters(connectorConfig),
+                            t -> tableSet.contains(t),
+                            false);
         }
         TableSchema tableSchema = databaseSchema.schemaFor(tableId);
         if (tableSchema != null) {
