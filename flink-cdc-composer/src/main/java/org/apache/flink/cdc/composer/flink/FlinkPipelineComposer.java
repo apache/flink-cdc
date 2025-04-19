@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.composer.flink;
 
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
@@ -111,6 +113,15 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaChangeBehavior schemaChangeBehavior =
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
+        boolean isBatchMode =
+                RuntimeMode.BATCH.equals(
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
+        if (isBatchMode) {
+            env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+        } else {
+            env.setRuntimeMode(RuntimeExecutionMode.STREAMING);
+        }
+
         // Initialize translators
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         TransformTranslator transformTranslator = new TransformTranslator();
@@ -145,7 +156,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
-                        isParallelMetadataSource);
+                        isParallelMetadataSource,
+                        isBatchMode);
 
         // PreTransform ---> PostTransform
         stream =
@@ -186,6 +198,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                     schemaOperatorTranslator.translateRegular(
                             stream,
                             parallelism,
+                            isBatchMode,
                             dataSink.getMetadataApplier()
                                     .setAcceptedSchemaEvolutionTypes(
                                             pipelineDef
@@ -199,13 +212,18 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             stream,
                             parallelism,
                             parallelism,
+                            isBatchMode,
                             schemaOperatorIDGenerator.generate(),
                             dataSink.getDataChangeEventHashFunctionProvider(parallelism));
         }
 
         // Schema Operator -> Sink -> X
         sinkTranslator.translate(
-                pipelineDef.getSink(), stream, dataSink, schemaOperatorIDGenerator.generate());
+                pipelineDef.getSink(),
+                stream,
+                dataSink,
+                isBatchMode,
+                schemaOperatorIDGenerator.generate());
     }
 
     private void addFrameworkJars() {
