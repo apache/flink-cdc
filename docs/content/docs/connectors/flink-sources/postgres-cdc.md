@@ -296,8 +296,7 @@ The following options is available only when `scan.incremental.snapshot.enabled=
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"
-           and "latest-offset".
+      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset" and "committed-offset".
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
@@ -462,6 +461,16 @@ and then PostgreSQL CDC Source assigns the chunks to multiple readers to read th
 ### Exactly-Once Processing
 
 The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works).
+
+### Startup Reading Position
+
+The config option `scan.startup.mode` specifies the startup mode for PostgreSQL CDC consumer. The valid enumerations are:
+
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the replication slot.
+- `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
+  the end of the replication which means only have the changes since the connector was started.
+- `committed-offset`: Skip snapshot phase and start reading events from a `confirmed_flush_lsn` offset of replication slot.
+- `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
 
 ### DataStream Source
 

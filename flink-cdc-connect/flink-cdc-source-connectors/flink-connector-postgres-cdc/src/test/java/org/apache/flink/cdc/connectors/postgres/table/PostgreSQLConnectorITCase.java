@@ -31,7 +31,6 @@ import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -365,7 +364,6 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         secondRunResult.getJobClient().get().cancel().get();
     }
-
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
