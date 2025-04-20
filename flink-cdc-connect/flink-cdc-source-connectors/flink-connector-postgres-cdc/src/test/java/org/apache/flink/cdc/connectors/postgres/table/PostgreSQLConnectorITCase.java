@@ -31,7 +31,6 @@ import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -287,6 +286,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s',"
+                                + " 'scan.lsn-commit.checkpoints-num-delay' = '0',"
                                 + " 'scan.startup.mode' = 'committed-offset'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),
@@ -307,7 +307,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
 
-        // async submit job
+        // async submit first job run, this run is only meant to create an existing replication slot
         TableResult firstRunResult =
                 tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         // wait for the source startup, we don't have a better way to wait it, use sleep
@@ -332,6 +332,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         List<String> firstRunActual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(firstRunActual).containsExactlyInAnyOrder(firstRunExpected);
 
+        // stopping first job run and insert more record to database
         firstRunResult.getJobClient().get().cancel().get();
 
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
@@ -340,6 +341,10 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "INSERT INTO inventory.products VALUES (default,'third','third description',0.3);");
         }
 
+        /*
+        start the second job run, this run should consume all records from the confirmed_restart_lsn created by the
+        first run
+        */
         TableResult secondRunResult =
                 tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         Thread.sleep(10000L);
@@ -365,7 +370,6 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         secondRunResult.getJobClient().get().cancel().get();
     }
-
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
