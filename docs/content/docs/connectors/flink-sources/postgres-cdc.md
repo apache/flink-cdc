@@ -296,7 +296,7 @@ The following options is available only when `scan.incremental.snapshot.enabled=
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset" and "committed-offset".
+      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" and "snapshot".
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
