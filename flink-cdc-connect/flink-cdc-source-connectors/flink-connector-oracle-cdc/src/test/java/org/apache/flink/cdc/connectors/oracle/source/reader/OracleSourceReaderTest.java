@@ -58,6 +58,7 @@ import org.apache.flink.util.Collector;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
@@ -68,7 +69,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 import static org.apache.flink.core.io.InputStatus.MORE_AVAILABLE;
-import static org.junit.Assert.assertEquals;
 
 /** Tests for {@link IncrementalSourceReader}. */
 public class OracleSourceReaderTest extends OracleSourceTestBase {
@@ -211,7 +211,7 @@ public class OracleSourceReaderTest extends OracleSourceTestBase {
         restartReader.addSplits(splitsState);
 
         // Step 5: check the finished unacked splits between original reader and restarted reader
-        assertEquals(3, restartReader.getFinishedUnackedSplits().size());
+        Assertions.assertThat(restartReader.getFinishedUnackedSplits().size()).isEqualTo(3);
         reader.close();
         restartReader.close();
     }
