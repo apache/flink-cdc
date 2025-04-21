@@ -25,7 +25,7 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.pipeline.RuntimeMode;
+import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSink;
@@ -46,6 +46,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
     @Override
     public DataSource createDataSource(Context context) {
         FactoryHelper.createFactoryHelper(this, context).validate();
+        verifyRuntimeMode(context);
         ValuesDataSourceHelper.EventSetId eventType =
                 context.getFactoryConfiguration().get(ValuesDataSourceOptions.EVENT_SET_ID);
         int failAtPos =
@@ -54,13 +55,13 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
         return new ValuesDataSource(eventType, failAtPos);
     }
 
-    @Override
-    public void verifyRuntimeMode(Context context) {
+    private void verifyRuntimeMode(Context context) {
         Configuration pipelineConfiguration = context.getPipelineConfiguration();
         if (pipelineConfiguration == null
-                || !pipelineConfiguration.contains(PipelineOptions.PIPELINE_RUNTIME_MODE)
-                || !RuntimeMode.BATCH.equals(
-                        pipelineConfiguration.get(PipelineOptions.PIPELINE_RUNTIME_MODE))) {
+                || !pipelineConfiguration.contains(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE)
+                || !RuntimeExecutionMode.BATCH.equals(
+                        pipelineConfiguration.get(
+                                PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE))) {
             return;
         }
         if (context.getFactoryConfiguration().contains(ValuesDataSourceOptions.EVENT_SET_ID)) {
@@ -72,7 +73,7 @@ public class ValuesDataFactory implements DataSourceFactory, DataSinkFactory {
                                 .get(ValuesDataSourceOptions.BATCH_MODE_ENABLED);
                 if (!batchModeEnabled) {
                     throw new IllegalArgumentException(
-                            "Batch mode is only supported for Values Data source with configuration 'runtime-mode = BATCH'.");
+                            "Batch mode is only supported for Values Data source with configuration 'execution.runtime-mode = BATCH'.");
                 }
             } else if (!eventType.isBatchEvent()) {
                 throw new IllegalArgumentException(

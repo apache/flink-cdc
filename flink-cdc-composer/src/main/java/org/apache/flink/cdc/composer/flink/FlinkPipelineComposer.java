@@ -17,12 +17,11 @@
 
 package org.apache.flink.cdc.composer.flink;
 
-import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.pipeline.RuntimeMode;
+import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.source.DataSource;
@@ -114,12 +113,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR);
 
         boolean isBatchMode =
-                RuntimeMode.BATCH.equals(
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_RUNTIME_MODE));
+                RuntimeExecutionMode.BATCH.equals(
+                        pipelineDefConfig.get(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE));
         if (isBatchMode) {
-            env.setRuntimeMode(RuntimeExecutionMode.BATCH);
+            env.setRuntimeMode(org.apache.flink.api.common.RuntimeExecutionMode.BATCH);
         } else {
-            env.setRuntimeMode(RuntimeExecutionMode.STREAMING);
+            env.setRuntimeMode(org.apache.flink.api.common.RuntimeExecutionMode.STREAMING);
         }
 
         // Initialize translators

@@ -236,7 +236,7 @@ class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  name: oceanbase IT\n"
                                 + "  parallelism: 1\n"
-                                + "  runtime-mode: BATCH",
+                                + "  execution.runtime-mode: BATCH",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,

@@ -354,7 +354,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  runtime-mode: BATCH",
+                                + "  execution.runtime-mode: BATCH",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         databaseName,
@@ -599,7 +599,7 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
                                 + "    filter: id <> 3 AND id <> 4\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "  runtime-mode: BATCH",
+                                + "  execution.runtime-mode: BATCH",
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         databaseName,
