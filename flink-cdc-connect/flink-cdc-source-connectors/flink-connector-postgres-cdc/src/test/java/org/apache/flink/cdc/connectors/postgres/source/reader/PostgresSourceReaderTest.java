@@ -77,6 +77,7 @@ class PostgresSourceReaderTest {
         configFactory.database("pgdb");
         configFactory.username("username");
         configFactory.password("password");
+        configFactory.decodingPluginName("pgoutput");
         configFactory.setLsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay);
         final TestTable customerTable =
                 new TestTable(ResolvedSchema.of(Column.physical("id", BIGINT())));

@@ -19,8 +19,9 @@
 -- Generate a number of tables to cover as many of the PG types as possible
 DROP SCHEMA IF EXISTS inventory CASCADE;
 CREATE SCHEMA inventory;
-SET search_path TO inventory;
-CREATE EXTENSION postgis;
+-- postgis is installed into public schema
+SET search_path TO inventory, public;
+
 
 CREATE TABLE full_types
 (
@@ -48,10 +49,10 @@ CREATE TABLE full_types
     PRIMARY KEY (id)
 );
 
-ALTER TABLE full_types
+ALTER TABLE inventory.full_types
     REPLICA IDENTITY FULL;
 
-INSERT INTO full_types
+INSERT INTO inventory.full_types
 VALUES (1, '2', 32767, 65535, 2147483647, 5.5, 6.6, 123.12345, 404.4443, true,
         'Hello World', 'a', 'abc', 'abcd..xyz', '2020-07-17 18:00:22.123', '2020-07-17 18:00:22.123456',
         '2020-07-17', '18:00:22', 500, 'SRID=3187;POINT(174.9479 -36.7208)'::geometry,
