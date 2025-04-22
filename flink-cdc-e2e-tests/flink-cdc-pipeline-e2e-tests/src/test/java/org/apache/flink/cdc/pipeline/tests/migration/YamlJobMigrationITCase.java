@@ -82,6 +82,7 @@ class YamlJobMigrationITCase extends PipelineTestEnvironment {
         LOG.info("Submitted Job ID is {} ", jobID);
 
         validateResult(
+                dbNameFormatter,
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
                 "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2], op=INSERT, meta=()}",

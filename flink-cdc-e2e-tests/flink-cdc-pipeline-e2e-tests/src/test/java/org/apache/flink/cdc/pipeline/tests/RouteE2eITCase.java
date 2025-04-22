@@ -23,6 +23,8 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,8 +140,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 routeDbNameFormatter,
                 "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
@@ -165,11 +165,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-
-        // generate binlogs
         generateIncrementalChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[3007, 7], op=INSERT, meta=()}",
@@ -178,7 +174,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
         generateSchemaChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "AddColumnEvent{tableId=%s.TABLEALPHA, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
@@ -217,31 +212,17 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
+        validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}");
 
         validateResult(
+                routeDbNameFormatter,
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1008, 8], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEALPHA, before=[], after=[1010, 10], op=INSERT, meta=()}",
@@ -293,8 +274,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 routeDbNameFormatter,
                 "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
@@ -317,11 +296,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-
-        // generate binlogs
         generateIncrementalChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[3007, 7], op=INSERT, meta=()}",
@@ -330,7 +305,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.ALL, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
         generateSchemaChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
@@ -373,19 +347,11 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
         validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[1008, 8], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[1010, 10], op=INSERT, meta=()}",
@@ -437,8 +403,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 routeDbNameFormatter,
                 "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
@@ -462,12 +426,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
-
-        LOG.info("Begin incremental reading stage.");
-
-        // generate binlogs
         generateIncrementalChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
@@ -476,7 +435,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
         generateSchemaChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
@@ -521,29 +479,14 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
 
         validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
@@ -599,8 +542,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 routeDbNameFormatter,
                 "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
@@ -629,11 +570,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-
-        // generate binlogs
         generateIncrementalChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[3007, 7], op=INSERT, meta=()}",
@@ -643,7 +580,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEDELTA, before=[4024, Catalina], after=[], op=DELETE, meta=()}");
 
         generateSchemaChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "AddColumnEvent{tableId=NEW_%s.ALPHABET, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=VERSION}]}",
@@ -693,29 +629,14 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.BETAGAMM, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
 
         validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=NEW_%s.ALPHABET, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=NEW_%s.BETAGAMM, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=%s.TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1008, 8], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.ALPHABET, before=[], after=[1010, 10], op=INSERT, meta=()}",
@@ -779,8 +700,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 routeDbNameFormatter,
                 "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
@@ -799,8 +718,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1010, 10], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[1011, 11], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-        // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
@@ -824,7 +741,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=NEW_%s.TABLEC, before=[], after=[3007, 7], op=INSERT, meta=()}");
 
         generateSchemaChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "AddColumnEvent{tableId=NEW_%s.TABLEA, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=LAST, existedColumnName=null}]}",
@@ -881,29 +797,17 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.TABLEB, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.TABLEC, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
 
         validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=NEW_%s.TABLEA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=NEW_%s.TABLEB, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=NEW_%s.TABLEC, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}");
+
+        validateResult(
+                routeDbNameFormatter,
                 "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1008, 8], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.TABLEA, before=[], after=[1010, 10], op=INSERT, meta=()}",
@@ -953,8 +857,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 routeDbNameFormatter,
                 "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`EXTRAS` STRING}, primaryKeys=ID, options=()}",
@@ -977,11 +879,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[4023, Mojave, extras], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[4024, Catalina, extras], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-
-        // generate binlogs
         generateIncrementalChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[3007, 7, extras], op=INSERT, meta=()}",
@@ -989,9 +887,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[3019, Emerald, extras], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[4024, Catalina, extras], after=[], op=DELETE, meta=()}");
 
-        LOG.info("Begin schema changing stage.");
         generateSchemaChanges();
-
         validateResult(
                 routeDbNameFormatter,
                 "AddColumnEvent{tableId=%s.ALL, addedColumns=[ColumnWithPosition{column=`NAME` VARCHAR(17), position=AFTER, existedColumnName=EXTRAS}]}",
@@ -1038,19 +934,12 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`EXTRAS` STRING}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
 
         validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=%s.ALL, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`EXTRAS` STRING}, primaryKeys=ID, options=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[1008, 8, extras], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[1009, 8.1, extras], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.ALL, before=[], after=[1010, 10, extras], op=INSERT, meta=()}",
@@ -1103,7 +992,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
 
         validateResult(
                 routeDbNameFormatter,
@@ -1129,8 +1017,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4022, High Sierra], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4023, Mojave], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
-
-        LOG.info("Begin incremental reading stage.");
 
         generateIncrementalChanges();
 
@@ -1187,31 +1073,18 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "CreateTableEvent{tableId=NEW_%s.NEW_TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                        routeTestDatabase.getDatabaseName()));
 
         validateResult(
+                routeDbNameFormatter,
+                "CreateTableEvent{tableId=NEW_%s.NEW_TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=NEW_%s.NEW_TABLEBETA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=NEW_%s.NEW_TABLEGAMMA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
+                "CreateTableEvent{tableId=NEW_%s.NEW_TABLEDELTA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}");
+
+        validateResult(
+                routeDbNameFormatter,
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1008, 8], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1009, 8.1], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEALPHA, before=[], after=[1010, 10], op=INSERT, meta=()}",
@@ -1232,8 +1105,9 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=NEW_%s.NEW_TABLEDELTA, before=[], after=[4024, Catalina], op=INSERT, meta=()}");
     }
 
-    @Test
-    void testExtremeMergeTableRoute() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testExtremeMergeTableRoute(boolean batchMode) throws Exception {
         final String databaseName = extremeRouteTestDatabase.getDatabaseName();
         try (Connection conn =
                         DriverManager.getConnection(
@@ -1253,7 +1127,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
             LOG.error("Initialize table failed.", e);
             throw e;
         }
-        LOG.info("Table initialized successfully.");
 
         String pipelineJob =
                 String.format(
@@ -1271,7 +1144,8 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
+                                + "  parallelism: %d\n"
+                                + (batchMode ? "  execution.runtime-mode: BATCH" : ""),
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
@@ -1280,96 +1154,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
 
-        // In single parallelism mode, sink will not print out the "subTaskId>" prefix.
         String prefix = parallelism > 1 ? "> " : "";
-
-        LOG.info("Verifying CreateTableEvents...");
-        validateResult(
-                180_000L,
-                IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
-                        .mapToObj(
-                                i ->
-                                        String.format(
-                                                prefix
-                                                        + "CreateTableEvent{tableId=%s.TABLE%d, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17)}, primaryKeys=ID, options=()}",
-                                                databaseName,
-                                                i))
-                        .toArray(String[]::new));
-
-        LOG.info("Verifying DataChangeEvents...");
-        validateResult(
-                180_000L,
-                IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
-                        .mapToObj(
-                                i ->
-                                        String.format(
-                                                prefix
-                                                        + "DataChangeEvent{tableId=%s.TABLE%d, before=[], after=[%d, No.%d], op=INSERT, meta=()}",
-                                                databaseName,
-                                                i,
-                                                i,
-                                                i))
-                        .toArray(String[]::new));
-        extremeRouteTestDatabase.dropDatabase();
-    }
-
-    @Test
-    public void testExtremeMergeTableRouteInBatchMode() throws Exception {
-        final String databaseName = extremeRouteTestDatabase.getDatabaseName();
-        try (Connection conn =
-                        DriverManager.getConnection(
-                                MYSQL.getJdbcUrl(), MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
-                Statement stat = conn.createStatement()) {
-            stat.execute(String.format("CREATE DATABASE %s;", databaseName));
-            stat.execute(String.format("USE %s;", databaseName));
-            for (int i = 1; i <= TEST_TABLE_NUMBER; i++) {
-                stat.execute(String.format("DROP TABLE IF EXISTS TABLE%d;", i));
-                stat.execute(
-                        String.format(
-                                "CREATE TABLE TABLE%d (ID INT NOT NULL PRIMARY KEY,VERSION VARCHAR(17));",
-                                i));
-                stat.execute(String.format("INSERT INTO TABLE%d VALUES (%d, 'No.%d');", i, i, i));
-            }
-        } catch (SQLException e) {
-            LOG.error("Initialize table failed.", e);
-            throw e;
-        }
-        LOG.info("Table initialized successfully.");
-
-        String pipelineJob =
-                String.format(
-                        "source:\n"
-                                + "  type: mysql\n"
-                                + "  hostname: %s\n"
-                                + "  port: 3306\n"
-                                + "  username: %s\n"
-                                + "  password: %s\n"
-                                + "  tables: %s.\\.*\n"
-                                + "  server-id: 5400-5404\n"
-                                + "  server-time-zone: UTC\n"
-                                + "  scan.startup.mode: snapshot\n"
-                                + "\n"
-                                + "sink:\n"
-                                + "  type: values\n"
-                                + "\n"
-                                + "pipeline:\n"
-                                + "  parallelism: %d\n"
-                                + "  execution.runtime-mode: BATCH",
-                        INTER_CONTAINER_MYSQL_ALIAS,
-                        MYSQL_TEST_USER,
-                        MYSQL_TEST_PASSWORD,
-                        databaseName,
-                        parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
-        waitUntilJobRunning(Duration.ofSeconds(30));
-
-        // In single parallelism mode, sink will not print out the "subTaskId>" prefix.
-        String prefix = parallelism > 1 ? "> " : "";
-
-        LOG.info("Verifying CreateTableEvents...");
         validateResult(
                 IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
                         .mapToObj(
@@ -1380,8 +1165,6 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                                                 databaseName,
                                                 i))
                         .toArray(String[]::new));
-
-        LOG.info("Verifying DataChangeEvents...");
         validateResult(
                 IntStream.rangeClosed(1, TEST_TABLE_NUMBER)
                         .mapToObj(

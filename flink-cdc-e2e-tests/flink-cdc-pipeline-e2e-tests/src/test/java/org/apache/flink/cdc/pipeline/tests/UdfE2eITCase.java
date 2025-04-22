@@ -127,8 +127,6 @@ class UdfE2eITCase extends PipelineTestEnvironment {
         Path scalaLibJar = TestUtils.getResource("scala-library.jar");
         submitPipelineJob(pipelineJob, udfJar, scalaLibJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         waitUntilSpecificEvent("[ LifecycleFunction ] opened.");
 
         validateResult(
@@ -143,9 +141,6 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Forty-two, Integer: 2013], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-
-        // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
@@ -224,8 +219,6 @@ class UdfE2eITCase extends PipelineTestEnvironment {
         Path scalaLibJar = TestUtils.getResource("scala-library.jar");
         submitPipelineJob(pipelineJob, udfJar, scalaLibJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-
         validateResult(
                 dbNameFormatter,
                 "CreateTableEvent{tableId=%s.TABLEALPHA, schema=columns={`ID` INT NOT NULL,`VERSION` VARCHAR(17),`INC_ID` STRING,`FMT_VER` STRING}, primaryKeys=ID, options=()}",
@@ -238,8 +231,6 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Integer: 2013], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Integer: 2014], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-        // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",

@@ -37,6 +37,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
@@ -69,15 +70,10 @@ import java.util.stream.Stream;
 
 /** End-to-end tests for mysql cdc to Iceberg pipeline job. */
 public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
+
     private static final Logger LOG = LoggerFactory.getLogger(MySqlToIcebergE2eITCase.class);
 
-    public static final Duration TESTCASE_TIMEOUT = Duration.ofMinutes(3);
-
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
+    @TempDir public Path temporaryFolder;
 
     @org.testcontainers.junit.jupiter.Container
     public static final MySqlContainer MYSQL =
@@ -351,7 +347,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
             throws InterruptedException {
         runInContainerAsRoot(jobManager, "chmod", "0777", "-R", warehouse);
         LOG.info("Verifying Iceberg {}::{}::{} results...", warehouse, database, table);
-        long deadline = System.currentTimeMillis() + TESTCASE_TIMEOUT.toMillis();
+        long deadline = System.currentTimeMillis() + EVENT_WAITING_TIMEOUT.toMillis();
         List<String> results = Collections.emptyList();
         while (System.currentTimeMillis() < deadline) {
             try {
@@ -364,7 +360,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
                 LOG.info(
                         "Successfully verified {} records in {} seconds.",
                         expected.size(),
-                        (System.currentTimeMillis() - deadline + TESTCASE_TIMEOUT.toMillis())
+                        (System.currentTimeMillis() - deadline + EVENT_WAITING_TIMEOUT.toMillis())
                                 / 1000);
                 return;
             } catch (Exception e) {
