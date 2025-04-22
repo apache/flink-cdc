@@ -21,7 +21,6 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -44,14 +43,14 @@ import java.util.stream.Stream;
 import static java.util.Collections.singletonList;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.cdc.common.utils.TestCaseUtils.repeatedCheckAndValidate;
-import static org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH;
 
 /** Integrated test cases with {@link MockedIncrementalSource}. */
 public class MockedSourceITCase {
 
     private final PrintStream standardOut = System.out;
     private final ByteArrayOutputStream outCaptor = new ByteArrayOutputStream();
-    private StreamExecutionEnvironment env;
+    private static final StreamExecutionEnvironment env =
+            StreamExecutionEnvironment.getExecutionEnvironment();
 
     private static final int TABLE_COUNT = 3;
     private static final int RECORD_COUNT = 5;
@@ -59,18 +58,14 @@ public class MockedSourceITCase {
     @BeforeEach
     void before() {
         System.setOut(new PrintStream(outCaptor));
-        Configuration config = new Configuration();
-        config.set(ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH, true);
-        env = StreamExecutionEnvironment.getExecutionEnvironment(config);
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
     }
 
     @AfterEach
-    void after() throws Exception {
+    void after() {
         System.setOut(standardOut);
         outCaptor.reset();
-        env.close();
     }
 
     @ParameterizedTest(name = "multipleStreamSplits: {0}")
@@ -129,7 +124,6 @@ public class MockedSourceITCase {
         } finally {
             source.getDialect().getMockedDatabase().stop();
             client.cancel().get();
-            env.close();
         }
     }
 
@@ -155,7 +149,7 @@ public class MockedSourceITCase {
                 .print()
                 .setParallelism(1);
 
-        Assertions.assertThatThrownBy(() -> env.execute())
+        Assertions.assertThatThrownBy(env::execute)
                 .rootCause()
                 .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
