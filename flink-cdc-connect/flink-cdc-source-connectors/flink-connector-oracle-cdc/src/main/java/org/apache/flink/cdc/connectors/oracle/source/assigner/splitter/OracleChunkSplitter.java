@@ -106,12 +106,29 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
 
     /** ChunkEnd less than or equal to max. */
     @Override
-    protected boolean isChunkEndLeMax(Object chunkEnd, Object max, Column splitColumn) {
+    protected boolean isChunkEndLeMax(
+            JdbcConnection jdbc, Object chunkEnd, Object max, Column splitColumn)
+            throws SQLException {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
-            chunkEndMaxCompare =
-                    ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
-                            <= 0;
+            String query =
+                    String.format(
+                            "SELECT CHARTOROWID(?) ROWIDS FROM DUAL UNION SELECT CHARTOROWID(?) ROWIDS FROM DUAL ORDER BY ROWIDS ASC");
+            return jdbc.prepareQueryAndMap(
+                    query,
+                    ps -> {
+                        ps.setObject(1, chunkEnd.toString());
+                        ps.setObject(2, max.toString());
+                    },
+                    rs -> {
+                        if (rs.next()) {
+                            Object obj = rs.getObject(1);
+                            return obj.toString().equals(chunkEnd.toString())
+                                    || chunkEnd.toString().equals(max.toString());
+                        } else {
+                            throw new RuntimeException("compare rowid error");
+                        }
+                    });
         } else {
             chunkEndMaxCompare = chunkEnd != null && ObjectUtils.compare(chunkEnd, max) <= 0;
         }
@@ -120,12 +137,29 @@ public class OracleChunkSplitter extends JdbcSourceChunkSplitter {
 
     /** ChunkEnd greater than or equal to max. */
     @Override
-    protected boolean isChunkEndGeMax(Object chunkEnd, Object max, Column splitColumn) {
+    protected boolean isChunkEndGeMax(
+            JdbcConnection jdbc, Object chunkEnd, Object max, Column splitColumn)
+            throws SQLException {
         boolean chunkEndMaxCompare;
         if (chunkEnd instanceof ROWID && max instanceof ROWID) {
-            chunkEndMaxCompare =
-                    ROWID.compareBytes(((ROWID) chunkEnd).getBytes(), ((ROWID) max).getBytes())
-                            >= 0;
+            String query =
+                    String.format(
+                            "SELECT CHARTOROWID(?) ROWIDS FROM DUAL UNION SELECT CHARTOROWID(?) ROWIDS FROM DUAL ORDER BY ROWIDS DESC");
+            return jdbc.prepareQueryAndMap(
+                    query,
+                    ps -> {
+                        ps.setObject(1, chunkEnd.toString());
+                        ps.setObject(2, max.toString());
+                    },
+                    rs -> {
+                        if (rs.next()) {
+                            Object obj = rs.getObject(1);
+                            return obj.toString().equals(chunkEnd.toString())
+                                    || chunkEnd.toString().equals(max.toString());
+                        } else {
+                            throw new RuntimeException("compare rowid error");
+                        }
+                    });
         } else {
             chunkEndMaxCompare = chunkEnd != null && ObjectUtils.compare(chunkEnd, max) >= 0;
         }
