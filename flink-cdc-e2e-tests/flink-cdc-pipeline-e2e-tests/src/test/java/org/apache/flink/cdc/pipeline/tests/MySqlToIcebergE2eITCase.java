@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
+import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
@@ -141,6 +142,9 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         runInContainerAsRoot(taskManager, "chmod", "0777", "-R", sharedVolume.toString());
         runInContainerAsRoot(taskManager, "chmod", "0777", "-R", warehouse);
         inventoryDatabase.createAndInitialize();
+
+        TarballFetcher.fetchLatest(jobManager);
+        LOG.info("CDC executables deployed.");
     }
 
     @AfterEach

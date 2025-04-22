@@ -231,6 +231,10 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2013, 13, Integer: 2013], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Integer: 2014], op=INSERT, meta=()}");
 
+        if (batchMode) {
+            return;
+        }
+
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",

@@ -1139,6 +1139,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
@@ -1150,6 +1151,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
                         databaseName,
+                        batchMode ? "snapshot" : "initial",
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
