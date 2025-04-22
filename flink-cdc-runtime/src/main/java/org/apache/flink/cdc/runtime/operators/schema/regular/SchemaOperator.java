@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.regular;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -32,6 +33,10 @@ import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponse
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.EvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.EvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.OriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.OriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -52,8 +57,10 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -81,6 +88,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private transient int subTaskId;
     private transient TaskOperatorEventGateway toCoordinator;
     private transient SchemaOperatorMetrics schemaOperatorMetrics;
+    private transient volatile Set<TableId> initializedOriginalSchemas;
+    private transient volatile Set<TableId> initializedEvolvedSchemas;
     private transient volatile Map<TableId, Schema> originalSchemaMap;
     private transient volatile Map<TableId, Schema> evolvedSchemaMap;
     private transient TableIdRouter router;
@@ -132,6 +141,8 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
         this.subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        this.initializedOriginalSchemas = new HashSet<>();
+        this.initializedEvolvedSchemas = new HashSet<>();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
         this.router = new TableIdRouter(routingRules);
@@ -144,6 +155,10 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void processElement(StreamRecord<Event> streamRecord) throws Exception {
         Event event = streamRecord.getValue();
+        if (event instanceof ChangeEvent) {
+            ensureSchemasAreInitialized((ChangeEvent) event);
+        }
+
         if (event instanceof SchemaChangeEvent) {
             handleSchemaChangeEvent((SchemaChangeEvent) event);
         } else if (event instanceof DataChangeEvent) {
@@ -151,6 +166,51 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         } else {
             throw new RuntimeException("Unknown event type in Stream record: " + event);
         }
+    }
+
+    private void ensureSchemasAreInitialized(ChangeEvent event) {
+        TableId originalTableId = event.tableId();
+        if (!initializedOriginalSchemas.contains(originalTableId)) {
+            initializeOriginalSchema(originalTableId);
+            initializedOriginalSchemas.add(originalTableId);
+        }
+
+        for (TableId evolvedTableId : router.route(originalTableId)) {
+            if (!initializedEvolvedSchemas.contains(evolvedTableId)) {
+                initializeEvolvedSchema(evolvedTableId);
+                initializedEvolvedSchemas.add(evolvedTableId);
+            }
+        }
+    }
+
+    private void initializeOriginalSchema(TableId tableId) {
+        LOG.info("{}> Requesting original schema for table {}", subTaskId, tableId);
+
+        OriginalSchemaResponse response = requestOriginalSchema(tableId);
+        Schema schema = response.getSchema();
+
+        LOG.info(
+                "{}> Successfully received original schema for table {}: {}",
+                subTaskId,
+                tableId,
+                schema);
+
+        originalSchemaMap.put(tableId, schema);
+    }
+
+    private void initializeEvolvedSchema(TableId tableId) {
+        LOG.info("{}> Requesting evolved schema for table {}", subTaskId, tableId);
+
+        EvolvedSchemaResponse response = requestEvolvedSchema(tableId);
+        Schema schema = response.getSchema();
+
+        LOG.info(
+                "{}> Successfully received evolved schema for table {}: {}",
+                subTaskId,
+                tableId,
+                schema);
+
+        evolvedSchemaMap.put(tableId, schema);
     }
 
     private void handleSchemaChangeEvent(SchemaChangeEvent originalEvent) throws Exception {
@@ -219,6 +279,14 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
                                                             evolvedSchema)));
             output.collect(new StreamRecord<>(coercedDataRecord));
         }
+    }
+
+    private OriginalSchemaResponse requestOriginalSchema(TableId tableId) {
+        return sendRequestToCoordinator(new OriginalSchemaRequest(tableId));
+    }
+
+    private EvolvedSchemaResponse requestEvolvedSchema(TableId tableId) {
+        return sendRequestToCoordinator(new EvolvedSchemaRequest(tableId));
     }
 
     private SchemaChangeResponse requestSchemaChange(
