@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -44,6 +45,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isEndWatermarkEvent;
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
@@ -115,64 +117,91 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         checkReadException();
 
         if (hasNextElement.get()) {
-            // eg:
-            // data input: [low watermark event][snapshot events][high watermark event][change
-            // events][end watermark event]
-            // data output: [low watermark event][normalized events][high watermark event]
-            boolean reachChangeLogStart = false;
-            boolean reachChangeLogEnd = false;
-            SourceRecord lowWatermark = null;
-            SourceRecord highWatermark = null;
-            Map<Struct, SourceRecord> outputBuffer = new HashMap<>();
-            while (!reachChangeLogEnd) {
-                checkReadException();
-                List<DataChangeEvent> batch = queue.poll();
-                for (DataChangeEvent event : batch) {
-                    SourceRecord record = event.getRecord();
-                    if (lowWatermark == null) {
-                        lowWatermark = record;
-                        assertLowWatermark(lowWatermark);
-                        continue;
-                    }
-
-                    if (highWatermark == null && isHighWatermarkEvent(record)) {
-                        highWatermark = record;
-                        // snapshot events capture end and begin to capture stream events
-                        reachChangeLogStart = true;
-                        continue;
-                    }
-
-                    if (reachChangeLogStart && isEndWatermarkEvent(record)) {
-                        // capture to end watermark events, stop the loop
-                        reachChangeLogEnd = true;
-                        break;
-                    }
-
-                    if (!reachChangeLogStart) {
-                        outputBuffer.put((Struct) record.key(), record);
-                    } else {
-                        if (isChangeRecordInChunkRange(record)) {
-                            // rewrite overlapping snapshot records through the record key
-                            taskContext.rewriteOutputBuffer(outputBuffer, record);
-                        }
-                    }
-                }
+            if (taskContext.getSourceConfig().isSkipSnapshotBackfill()) {
+                return pollWithoutBuffer();
+            } else {
+                return pollWithBuffer();
             }
-            // snapshot split return its data once
-            hasNextElement.set(false);
-
-            final List<SourceRecord> normalizedRecords = new ArrayList<>();
-            normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(taskContext.formatMessageTimestamp(outputBuffer.values()));
-            normalizedRecords.add(highWatermark);
-
-            final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
-            sourceRecordsSet.add(new SourceRecords(normalizedRecords));
-            return sourceRecordsSet.iterator();
         }
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
         return null;
+    }
+
+    public Iterator<SourceRecords> pollWithoutBuffer() throws InterruptedException {
+        List<DataChangeEvent> batch = queue.poll();
+        boolean reachChangeLogEnd =
+                batch.stream().anyMatch(event -> isEndWatermarkEvent(event.getRecord()));
+        if (reachChangeLogEnd) {
+            hasNextElement.set(false);
+        }
+
+        final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+        if (!CollectionUtil.isNullOrEmpty(batch)) {
+            sourceRecordsSet.add(
+                    new SourceRecords(
+                            batch.stream()
+                                    .map(DataChangeEvent::getRecord)
+                                    .collect(Collectors.toList())));
+        }
+        return sourceRecordsSet.iterator();
+    }
+
+    public Iterator<SourceRecords> pollWithBuffer() throws InterruptedException {
+        // eg:
+        // data input: [low watermark event][snapshot events][high watermark event][change
+        // events][end watermark event]
+        // data output: [low watermark event][normalized events][high watermark event]
+        boolean reachChangeLogStart = false;
+        boolean reachChangeLogEnd = false;
+        SourceRecord lowWatermark = null;
+        SourceRecord highWatermark = null;
+        Map<Struct, SourceRecord> outputBuffer = new HashMap<>();
+        while (!reachChangeLogEnd) {
+            checkReadException();
+            List<DataChangeEvent> batch = queue.poll();
+            for (DataChangeEvent event : batch) {
+                SourceRecord record = event.getRecord();
+                if (lowWatermark == null) {
+                    lowWatermark = record;
+                    assertLowWatermark(lowWatermark);
+                    continue;
+                }
+
+                if (highWatermark == null && isHighWatermarkEvent(record)) {
+                    highWatermark = record;
+                    // snapshot events capture end and begin to capture stream events
+                    reachChangeLogStart = true;
+                    continue;
+                }
+
+                if (reachChangeLogStart && isEndWatermarkEvent(record)) {
+                    // capture to end watermark events, stop the loop
+                    reachChangeLogEnd = true;
+                    break;
+                }
+
+                if (!reachChangeLogStart) {
+                    outputBuffer.put((Struct) record.key(), record);
+                } else {
+                    if (isChangeRecordInChunkRange(record)) {
+                        // rewrite overlapping snapshot records through the record key
+                        taskContext.rewriteOutputBuffer(outputBuffer, record);
+                    }
+                }
+            }
+        }
+        // snapshot split return its data once
+        hasNextElement.set(false);
+
+        final List<SourceRecord> normalizedRecords = new ArrayList<>();
+        normalizedRecords.add(lowWatermark);
+        normalizedRecords.addAll(taskContext.formatMessageTimestamp(outputBuffer.values()));
+        normalizedRecords.add(highWatermark);
+
+        final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+        sourceRecordsSet.add(new SourceRecords(normalizedRecords));
+        return sourceRecordsSet.iterator();
     }
 
     private void checkReadException() {

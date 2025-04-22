@@ -76,14 +76,9 @@ public final class MySqlRecords implements RecordsWithSplitIds<SourceRecords> {
         return finishedSnapshotSplits;
     }
 
-    public static MySqlRecords forBinlogRecords(
+    public static MySqlRecords forRecords(
             final String splitId, final Iterator<SourceRecords> recordsForSplit) {
         return new MySqlRecords(splitId, recordsForSplit, Collections.emptySet());
-    }
-
-    public static MySqlRecords forSnapshotRecords(
-            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
-        return new MySqlRecords(splitId, recordsForSplit, Collections.singleton(splitId));
     }
 
     public static MySqlRecords forFinishedSplit(final String splitId) {

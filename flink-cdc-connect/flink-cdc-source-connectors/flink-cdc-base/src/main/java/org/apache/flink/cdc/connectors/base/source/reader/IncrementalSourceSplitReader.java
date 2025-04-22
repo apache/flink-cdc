@@ -92,7 +92,6 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
 
     @Override
     public RecordsWithSplitIds<SourceRecords> fetch() throws IOException {
-
         try {
             suspendStreamReaderIfNeed();
             return pollSplitRecords();
@@ -145,13 +144,13 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         Iterator<SourceRecords> dataIt = null;
         if (currentFetcher == null) {
             // (1) Reads stream split firstly and then read snapshot split
-            if (streamSplits.size() > 0) {
+            if (!streamSplits.isEmpty()) {
                 // the stream split may come from:
                 // (a) the initial stream split
                 // (b) added back stream-split in newly added table process
                 StreamSplit nextSplit = streamSplits.poll();
                 submitStreamSplit(nextSplit);
-            } else if (snapshotSplits.size() > 0) {
+            } else if (!snapshotSplits.isEmpty()) {
                 submitSnapshotSplit(snapshotSplits.poll());
             } else {
                 LOG.info("No available split to read.");
@@ -162,19 +161,21 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
             } else {
                 currentSplitId = null;
             }
-            return dataIt == null ? finishedSplit() : forRecords(dataIt);
+            return dataIt == null ? finishedSplit(true) : forRecords(dataIt);
         } else if (currentFetcher instanceof IncrementalSourceScanFetcher) {
-            // (2) try to switch to stream split reading util current snapshot split finished
             dataIt = currentFetcher.pollSplitRecords();
             if (dataIt != null) {
                 // first fetch data of snapshot split, return and emit the records of snapshot split
-                ChangeEventRecords records;
+                return forRecords(dataIt);
+            } else {
+                // (2) try to switch to stream split reading util current snapshot split finished
+                ChangeEventRecords finishedRecords;
                 if (context.isHasAssignedStreamSplit()) {
-                    records = forNewAddedTableFinishedSplit(currentSplitId, dataIt);
+                    finishedRecords = forNewAddedTableFinishedSplit(currentSplitId);
                     closeScanFetcher();
                     closeStreamFetcher();
                 } else {
-                    records = forRecords(dataIt);
+                    finishedRecords = finishedSplit(false);
                     SnapshotSplit nextSplit = snapshotSplits.poll();
                     if (nextSplit != null) {
                         checkState(reusedScanFetcher != null);
@@ -183,9 +184,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                         closeScanFetcher();
                     }
                 }
-                return records;
-            } else {
-                return finishedSplit();
+                return finishedRecords;
             }
         } else if (currentFetcher instanceof IncrementalSourceStreamFetcher) {
             // (3) switch to snapshot split reading if there are newly added snapshot splits
@@ -203,7 +202,7 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
                 // null will be returned after receiving suspend stream event
                 // finish current stream split reading
                 closeStreamFetcher();
-                return finishedSplit();
+                return finishedSplit(true);
             }
         } else {
             throw new IllegalStateException("Unsupported reader type.");
@@ -215,9 +214,12 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         return currentFetcher == null || currentFetcher.isFinished();
     }
 
-    private ChangeEventRecords finishedSplit() {
+    private ChangeEventRecords finishedSplit(boolean recycle) {
         final ChangeEventRecords finishedRecords =
                 ChangeEventRecords.forFinishedSplit(currentSplitId);
+        if (recycle) {
+            closeScanFetcher();
+        }
         currentSplitId = null;
         return finishedRecords;
     }
@@ -226,24 +228,16 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
      * Finishes new added snapshot split, mark the stream split as finished too, we will add the
      * stream split back in {@code MySqlSourceReader}.
      */
-    private ChangeEventRecords forNewAddedTableFinishedSplit(
-            final String splitId, final Iterator<SourceRecords> recordsForSplit) {
+    private ChangeEventRecords forNewAddedTableFinishedSplit(final String splitId) {
         final Set<String> finishedSplits = new HashSet<>();
         finishedSplits.add(splitId);
         finishedSplits.add(STREAM_SPLIT_ID);
         currentSplitId = null;
-        return new ChangeEventRecords(splitId, recordsForSplit, finishedSplits);
+        return new ChangeEventRecords(null, null, finishedSplits);
     }
 
     private ChangeEventRecords forRecords(Iterator<SourceRecords> dataIt) {
-        if (currentFetcher instanceof IncrementalSourceScanFetcher) {
-            final ChangeEventRecords finishedRecords =
-                    ChangeEventRecords.forSnapshotRecords(currentSplitId, dataIt);
-            closeScanFetcher();
-            return finishedRecords;
-        } else {
-            return ChangeEventRecords.forRecords(currentSplitId, dataIt);
-        }
+        return ChangeEventRecords.forRecords(currentSplitId, dataIt);
     }
 
     private void submitSnapshotSplit(SnapshotSplit snapshotSplit) {
