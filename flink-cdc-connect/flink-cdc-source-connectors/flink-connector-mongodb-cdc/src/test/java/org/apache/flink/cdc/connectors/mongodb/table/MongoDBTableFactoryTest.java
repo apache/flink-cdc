@@ -35,7 +35,6 @@ import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
-import org.apache.flink.util.ExceptionUtils;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -64,6 +63,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}. */
 class MongoDBTableFactoryTest {
@@ -289,53 +289,48 @@ class MongoDBTableFactoryTest {
     @Test
     public void testCopyExistingPipelineConflictWithIncrementalSnapshotMode() {
         // test with 'initial.snapshotting.pipeline' configuration
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put(
-                    "initial.snapshotting.pipeline", "[{\"$match\": {\"closed\": \"false\"}}]");
-
-            createTableSource(SCHEMA, properties);
-        } catch (Throwable t) {
-            Assertions.assertThat(
-                            ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The initial.snapshotting.*/copy.existing.* config only applies to "
-                                            + "Debezium mode, not incremental snapshot mode"))
-                    .isPresent();
-        }
+        assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put(
+                                    "initial.snapshotting.pipeline",
+                                    "[{\"$match\": {\"closed\": \"false\"}}]");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "The initial.snapshotting.*/copy.existing.* config only applies to "
+                                + "Debezium mode, not incremental snapshot mode");
 
         // test with 'initial.snapshotting.max.threads' configuration
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("initial.snapshotting.max.threads", "20");
-
-            createTableSource(SCHEMA, properties);
-        } catch (Throwable t) {
-            Assertions.assertThat(
-                            ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The initial.snapshotting.*/copy.existing.* config only applies to "
-                                            + "Debezium mode, not incremental snapshot mode"))
-                    .isPresent();
-        }
+        assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("initial.snapshotting.max.threads", "20");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "The initial.snapshotting.*/copy.existing.* config only applies to "
+                                + "Debezium mode, not incremental snapshot mode");
 
         // test with 'initial.snapshotting.queue.size' configuration
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("scan.incremental.snapshot.enabled", "true");
-            properties.put("initial.snapshotting.queue.size", "20480");
-
-            createTableSource(SCHEMA, properties);
-        } catch (Throwable t) {
-            Assertions.assertThat(
-                            ExceptionUtils.findThrowableWithMessage(
-                                    t,
-                                    "The initial.snapshotting.*/copy.existing.* config only applies to "
-                                            + "Debezium mode, not incremental snapshot mode"))
-                    .isPresent();
-        }
+        assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("initial.snapshotting.queue.size", "20480");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "The initial.snapshotting.*/copy.existing.* config only applies to "
+                                + "Debezium mode, not incremental snapshot mode");
     }
 
     @Test
