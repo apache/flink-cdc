@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
-import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -36,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -45,7 +45,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isEndWatermarkEvent;
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isHighWatermarkEvent;
@@ -130,21 +129,16 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
 
     public Iterator<SourceRecords> pollWithoutBuffer() throws InterruptedException {
         List<DataChangeEvent> batch = queue.poll();
-        boolean reachChangeLogEnd =
-                batch.stream().anyMatch(event -> isEndWatermarkEvent(event.getRecord()));
-        if (reachChangeLogEnd) {
-            hasNextElement.set(false);
+        final List<SourceRecord> records = new ArrayList<>();
+        for (DataChangeEvent event : batch) {
+            if (isHighWatermarkEvent(event.getRecord())) {
+                hasNextElement.set(false);
+                break;
+            }
+            records.add(event.getRecord());
         }
 
-        final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
-        if (!CollectionUtil.isNullOrEmpty(batch)) {
-            sourceRecordsSet.add(
-                    new SourceRecords(
-                            batch.stream()
-                                    .map(DataChangeEvent::getRecord)
-                                    .collect(Collectors.toList())));
-        }
-        return sourceRecordsSet.iterator();
+        return Collections.singletonList(new SourceRecords(records)).iterator();
     }
 
     public Iterator<SourceRecords> pollWithBuffer() throws InterruptedException {

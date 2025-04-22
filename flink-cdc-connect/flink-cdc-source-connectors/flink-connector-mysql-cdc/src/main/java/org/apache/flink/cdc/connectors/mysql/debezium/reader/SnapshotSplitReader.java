@@ -30,7 +30,6 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
-import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -70,6 +69,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isHighWatermarkEvent;
 
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
@@ -297,22 +297,16 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
     public Iterator<SourceRecords> pollWithoutBuffer() throws InterruptedException {
         List<DataChangeEvent> batch = queue.poll();
-        boolean reachChangeLogEnd =
-                batch.stream()
-                        .anyMatch(event -> RecordUtils.isHighWatermarkEvent(event.getRecord()));
-        if (reachChangeLogEnd) {
-            hasNextElement.set(false);
+        final List<SourceRecord> records = new ArrayList<>();
+        for (DataChangeEvent event : batch) {
+            if (isHighWatermarkEvent(event.getRecord())) {
+                hasNextElement.set(false);
+                break;
+            }
+            records.add(event.getRecord());
         }
 
-        final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
-        if (!CollectionUtil.isNullOrEmpty(batch)) {
-            sourceRecordsSet.add(
-                    new SourceRecords(
-                            batch.stream()
-                                    .map(DataChangeEvent::getRecord)
-                                    .collect(Collectors.toList())));
-        }
-        return sourceRecordsSet.iterator();
+        return Collections.singletonList(new SourceRecords(records)).iterator();
     }
 
     public Iterator<SourceRecords> pollWithBuffer() throws InterruptedException {
@@ -336,7 +330,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                     continue;
                 }
 
-                if (highWatermark == null && RecordUtils.isHighWatermarkEvent(record)) {
+                if (highWatermark == null && isHighWatermarkEvent(record)) {
                     highWatermark = record;
                     // snapshot events capture end and begin to capture binlog events
                     reachBinlogStart = true;
