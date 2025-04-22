@@ -36,10 +36,13 @@ public class DataSinkWriterOperatorFactory<CommT>
                 YieldingOperatorFactory<CommittableMessage<CommT>> {
 
     private final Sink<Event> sink;
+    private final boolean isBounded;
     private final OperatorID schemaOperatorID;
 
-    public DataSinkWriterOperatorFactory(Sink<Event> sink, OperatorID schemaOperatorID) {
+    public DataSinkWriterOperatorFactory(
+            Sink<Event> sink, boolean isBounded, OperatorID schemaOperatorID) {
         this.sink = sink;
+        this.isBounded = isBounded;
         this.schemaOperatorID = schemaOperatorID;
     }
 
@@ -47,6 +50,17 @@ public class DataSinkWriterOperatorFactory<CommT>
     @Override
     public <T extends StreamOperator<CommittableMessage<CommT>>> T createStreamOperator(
             StreamOperatorParameters<CommittableMessage<CommT>> parameters) {
+
+        if (isBounded) {
+            BatchDataSinkWriterOperator<CommT> writerOperator =
+                    new BatchDataSinkWriterOperator<>(
+                            sink, processingTimeService, getMailboxExecutor());
+            writerOperator.setup(
+                    parameters.getContainingTask(),
+                    parameters.getStreamConfig(),
+                    parameters.getOutput());
+            return (T) writerOperator;
+        }
         DataSinkWriterOperator<CommT> writerOperator =
                 new DataSinkWriterOperator<>(
                         sink, processingTimeService, getMailboxExecutor(), schemaOperatorID);
@@ -59,6 +73,10 @@ public class DataSinkWriterOperatorFactory<CommT>
 
     @Override
     public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-        return DataSinkWriterOperator.class;
+        if (isBounded) {
+            return BatchDataSinkWriterOperator.class;
+        } else {
+            return DataSinkWriterOperator.class;
+        }
     }
 }

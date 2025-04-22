@@ -329,6 +329,93 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
+    void testSyncWholeDatabaseInBatchMode() throws Exception {
+        String databaseName = mysqlInventoryDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: snapshot\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: doris\n"
+                                + "  fenodes: doris:8030\n"
+                                + "  benodes: doris:8040\n"
+                                + "  username: %s\n"
+                                + "  password: \"%s\"\n"
+                                + "  table.create.properties.replication_num: 1\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  execution.runtime-mode: BATCH",
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        databaseName,
+                        DORIS.getUsername(),
+                        DORIS.getPassword(),
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        validateSinkSchema(
+                databaseName,
+                "products",
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(765) | Yes | false | flink",
+                        "description | VARCHAR(1536) | Yes | false | null",
+                        "weight | FLOAT | Yes | false | null",
+                        "enum_c | TEXT | Yes | false | red",
+                        "json_c | TEXT | Yes | false | null",
+                        "point_c | TEXT | Yes | false | null"));
+
+        validateSinkSchema(
+                databaseName,
+                "customers",
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(765) | Yes | false | flink",
+                        "address | VARCHAR(3072) | Yes | false | null",
+                        "phone_number | VARCHAR(1536) | Yes | false | null"));
+
+        validateSinkResult(
+                databaseName,
+                "products",
+                7,
+                Arrays.asList(
+                        "101 | scooter | Small 2-wheel scooter | 3.14 | red | {\"key1\": \"value1\"} | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                        "102 | car battery | 12V car battery | 8.1 | white | {\"key2\": \"value2\"} | {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                        "103 | 12-pack drill bits | 12-pack of drill bits with sizes ranging from #40 to #3 | 0.8 | red | {\"key3\": \"value3\"} | {\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                        "104 | hammer | 12oz carpenter's hammer | 0.75 | white | {\"key4\": \"value4\"} | {\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                        "105 | hammer | 14oz carpenter's hammer | 0.875 | red | {\"k1\": \"v1\", \"k2\": \"v2\"} | {\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                        "106 | hammer | 16oz carpenter's hammer | 1.0 | null | null | null",
+                        "107 | rocks | box of assorted rocks | 5.3 | null | null | null",
+                        "108 | jacket | water resistent black wind breaker | 0.1 | null | null | null",
+                        "109 | spare tire | 24 inch spare tire | 22.2 | null | null | null"));
+
+        validateSinkResult(
+                databaseName,
+                "customers",
+                4,
+                Arrays.asList(
+                        "101 | user_1 | Shanghai | 123567891234",
+                        "102 | user_2 | Shanghai | 123567891234",
+                        "103 | user_3 | Shanghai | 123567891234",
+                        "104 | user_4 | Shanghai | 123567891234"));
+    }
+
+    @Test
     void testComplexDataTypes() throws Exception {
         String databaseName = complexDataTypesDatabase.getDatabaseName();
         String pipelineJob =
@@ -480,6 +567,115 @@ class MySqlToDorisE2eITCase extends PipelineTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
+    }
+
+    @Test
+    public void testComplexDataTypesInBatchMode() throws Exception {
+        String databaseName = complexDataTypesDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: snapshot\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: doris\n"
+                                + "  fenodes: doris:8030\n"
+                                + "  benodes: doris:8040\n"
+                                + "  username: %s\n"
+                                + "  password: \"%s\"\n"
+                                + "  table.create.properties.replication_num: 1\n"
+                                + "\n"
+                                + "transform:\n"
+                                + "  - source-table: %s.DATA_TYPES_TABLE\n"
+                                + "    projection: \\*, 'fine' AS FINE\n"
+                                + "    filter: id <> 3 AND id <> 4\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d\n"
+                                + "  execution.runtime-mode: BATCH",
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        databaseName,
+                        DORIS.getUsername(),
+                        DORIS.getPassword(),
+                        databaseName,
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path dorisCdcConnector = TestUtils.getResource("doris-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, dorisCdcConnector, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+
+        LOG.info("Verifying snapshot stage of DATA_TYPES_TABLE...");
+        validateSinkSchema(
+                databaseName,
+                "DATA_TYPES_TABLE",
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "tiny_c | TINYINT | Yes | false | null",
+                        "tiny_un_c | SMALLINT | Yes | false | null",
+                        "tiny_un_z_c | SMALLINT | Yes | false | null",
+                        "small_c | SMALLINT | Yes | false | null",
+                        "small_un_c | INT | Yes | false | null",
+                        "small_un_z_c | INT | Yes | false | null",
+                        "medium_c | INT | Yes | false | null",
+                        "medium_un_c | INT | Yes | false | null",
+                        "medium_un_z_c | INT | Yes | false | null",
+                        "int_c | INT | Yes | false | null",
+                        "int_un_c | BIGINT | Yes | false | null",
+                        "int_un_z_c | BIGINT | Yes | false | null",
+                        "int11_c | INT | Yes | false | null",
+                        "big_c | BIGINT | Yes | false | null",
+                        "varchar_c | VARCHAR(765) | Yes | false | null",
+                        "char_c | CHAR(9) | Yes | false | null",
+                        "real_c | DOUBLE | Yes | false | null",
+                        "float_c | FLOAT | Yes | false | null",
+                        "float_un_c | FLOAT | Yes | false | null",
+                        "float_un_z_c | FLOAT | Yes | false | null",
+                        "double_c | DOUBLE | Yes | false | null",
+                        "double_un_c | DOUBLE | Yes | false | null",
+                        "double_un_z_c | DOUBLE | Yes | false | null",
+                        "decimal_c | DECIMAL(8, 4) | Yes | false | null",
+                        "decimal_un_c | DECIMAL(8, 4) | Yes | false | null",
+                        "decimal_un_z_c | DECIMAL(8, 4) | Yes | false | null",
+                        "numeric_c | DECIMAL(6, 0) | Yes | false | null",
+                        "big_decimal_c | TEXT | Yes | false | null",
+                        "bit1_c | BOOLEAN | Yes | false | null",
+                        "tiny1_c | BOOLEAN | Yes | false | null",
+                        "boolean_c | BOOLEAN | Yes | false | null",
+                        "date_c | DATE | Yes | false | null",
+                        "datetime3_c | DATETIME(3) | Yes | false | null",
+                        "datetime6_c | DATETIME(6) | Yes | false | null",
+                        "timestamp_c | DATETIME | Yes | false | null",
+                        "text_c | TEXT | Yes | false | null",
+                        "tiny_blob_c | TEXT | Yes | false | null",
+                        "blob_c | TEXT | Yes | false | null",
+                        "medium_blob_c | TEXT | Yes | false | null",
+                        "long_blob_c | TEXT | Yes | false | null",
+                        "year_c | INT | Yes | false | null",
+                        "enum_c | TEXT | Yes | false | red",
+                        "point_c | TEXT | Yes | false | null",
+                        "geometry_c | TEXT | Yes | false | null",
+                        "linestring_c | TEXT | Yes | false | null",
+                        "polygon_c | TEXT | Yes | false | null",
+                        "multipoint_c | TEXT | Yes | false | null",
+                        "multiline_c | TEXT | Yes | false | null",
+                        "multipolygon_c | TEXT | Yes | false | null",
+                        "geometrycollection_c | TEXT | Yes | false | null",
+                        "FINE | TEXT | Yes | false | null"));
+        validateSinkResult(
+                databaseName,
+                "DATA_TYPES_TABLE",
+                52,
+                Collections.singletonList(
+                        "1 | 127 | 255 | 255 | 32767 | 65535 | 65535 | 8388607 | 16777215 | 16777215 | 2147483647 | 4294967295 | 4294967295 | 2147483647 | 9223372036854775807 | Hello World | abc | 123.102 | 123.102 | 123.103 | 123.104 | 404.4443 | 404.4444 | 404.4445 | 123.4567 | 123.4568 | 123.4569 | 346 | 34567892.1 | 0 | 1 | 1 | 2020-07-17 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22.0 | 2020-07-17 18:00:22 | text | EA== | EA== | EA== | EA== | 2021 | red | {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[3,0],[3,3],[3,5]],\"type\":\"LineString\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,1],[2,2],[1,2],[1,1]]],\"type\":\"Polygon\",\"srid\":0} | {\"coordinates\":[[1,1],[2,2]],\"type\":\"MultiPoint\",\"srid\":0} | {\"coordinates\":[[[1,1],[2,2],[3,3]],[[4,4],[5,5]]],\"type\":\"MultiLineString\",\"srid\":0} | {\"coordinates\":[[[[0,0],[10,0],[10,10],[0,10],[0,0]]],[[[5,5],[7,5],[7,7],[5,7],[5,5]]]],\"type\":\"MultiPolygon\",\"srid\":0} | {\"geometries\":[{\"type\":\"Point\",\"coordinates\":[10,10]},{\"type\":\"Point\",\"coordinates\":[30,30]},{\"type\":\"LineString\",\"coordinates\":[[15,15],[20,20]]}],\"type\":\"GeometryCollection\",\"srid\":0} | fine"));
     }
 
     @Test
