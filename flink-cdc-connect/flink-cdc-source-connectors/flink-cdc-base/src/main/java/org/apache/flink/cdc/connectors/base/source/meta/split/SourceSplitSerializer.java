@@ -109,6 +109,7 @@ public abstract class SourceSplitSerializer
             writeTableSchemas(streamSplit.getTableSchemas(), out);
             out.writeInt(streamSplit.getTotalFinishedSplitSize());
             out.writeBoolean(streamSplit.isSuspended());
+            out.writeBoolean(streamSplit.isSnapshotCompleted());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
@@ -173,7 +174,7 @@ public abstract class SourceSplitSerializer
             }
 
             boolean isSuspended = false;
-            if (version == 5) {
+            if (version >= 5) {
                 isSuspended = in.readBoolean();
             }
 
