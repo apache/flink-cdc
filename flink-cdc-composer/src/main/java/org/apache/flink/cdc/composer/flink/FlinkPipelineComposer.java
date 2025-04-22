@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -29,6 +30,7 @@ import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
+import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
@@ -41,6 +43,7 @@ import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import javax.annotation.Nullable;
 
@@ -59,6 +62,7 @@ import java.util.Set;
 public class FlinkPipelineComposer implements PipelineComposer {
 
     private static final String SCHEMA_OPERATOR_UID_SUFFIX = "schema-operator";
+    private static final String MULTIPLE_SOURCE_UNIQUE_ID = "source.unique.id";
     private final StreamExecutionEnvironment env;
     private final boolean isBlocking;
 
@@ -164,21 +168,62 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // And required constructors
         OperatorIDGenerator schemaOperatorIDGenerator = new OperatorIDGenerator(schemaOperatorUid);
-        DataSource dataSource =
-                sourceTranslator.createDataSource(pipelineDef.getSource(), pipelineDefConfig, env);
-        DataSink dataSink =
-                sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
-
-        boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
+        List<SourceDef> sourceDefs = pipelineDef.getSources();
 
         // O ---> Source
-        DataStream<Event> stream =
-                sourceTranslator.translate(
-                        pipelineDef.getSource(),
-                        dataSource,
-                        env,
-                        parallelism,
-                        operatorUidGenerator);
+        DataStream<Event> stream = null;
+        DataSource dataSource = null;
+        boolean isParallelMetadataSource;
+
+        // O ---> Source
+        if (sourceDefs != null) {
+            for (SourceDef source : sourceDefs) {
+                String multipleSourceUniqueId =
+                        source.getConfig()
+                                .get(
+                                        ConfigOptions.key(MULTIPLE_SOURCE_UNIQUE_ID)
+                                                .stringType()
+                                                .noDefaultValue());
+                if (operatorUidPrefix == null || multipleSourceUniqueId == null) {
+                    throw new FlinkRuntimeException(
+                            "When there are multiple sources, the values of source option 'source.unique.id' and pipeline 'operator.uid.refix' cannot be empty!");
+                }
+                dataSource = sourceTranslator.createDataSource(source, pipelineDefConfig, env);
+                OperatorUidGenerator operatorUidGeneratorForMultipleSource =
+                        new OperatorUidGenerator(operatorUidPrefix + multipleSourceUniqueId);
+                DataStream<Event> streamBranch =
+                        sourceTranslator.translate(
+                                source,
+                                dataSource,
+                                env,
+                                parallelism,
+                                operatorUidGeneratorForMultipleSource);
+                if (stream == null) {
+                    stream = streamBranch;
+                } else {
+                    stream = stream.union(streamBranch);
+                }
+            }
+            if (sourceDefs.size() > 1) {
+                isParallelMetadataSource = true;
+            } else {
+                isParallelMetadataSource = dataSource.isParallelMetadataSource();
+            }
+        } else {
+            dataSource =
+                    sourceTranslator.createDataSource(
+                            pipelineDef.getSource(), pipelineDefConfig, env);
+            stream =
+                    sourceTranslator.translate(
+                            pipelineDef.getSource(),
+                            dataSource,
+                            env,
+                            parallelism,
+                            operatorUidGenerator);
+            isParallelMetadataSource = dataSource.isParallelMetadataSource();
+        }
+        DataSink dataSink =
+                sinkTranslator.createDataSink(pipelineDef.getSink(), pipelineDefConfig, env);
 
         // Source ---> PreTransform
         stream =
