@@ -77,7 +77,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
-    private final boolean canContainDistributedTables;
+    private final boolean shouldStoreSchemasInState;
 
     private transient ListState<byte[]> state;
     private transient List<PreTransformer> transforms;
@@ -92,7 +92,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     PreTransformOperator(
             List<TransformRule> transformRules,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions,
-            boolean canContainDistributedTables) {
+            boolean shouldStoreSchemasInState) {
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.alreadySentCreateTableEvents = new HashSet<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
@@ -101,7 +101,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
         this.transformRules = transformRules;
         this.udfFunctions = udfFunctions;
-        this.canContainDistributedTables = canContainDistributedTables;
+        this.shouldStoreSchemasInState = shouldStoreSchemasInState;
     }
 
     @Override
@@ -144,10 +144,9 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
-        if (canContainDistributedTables) {
-            // In distributed mode, we don't have a globally consistent schema for each partition.
-            // It's not meaningful to persist them to state. Instead, we rely on each source
-            // partition to send fresh CreateTableEvent to instantiate each event flow.
+        if (!shouldStoreSchemasInState) {
+            // Skip schema persistency if we're in the distributed schema mode or the batch
+            // execution mode.
             return;
         }
         OperatorStateStore stateStore = context.getOperatorStateStore();
@@ -176,7 +175,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
-        if (canContainDistributedTables) {
+        if (!shouldStoreSchemasInState) {
             // Same reason in this#initializeState.
             return;
         }
