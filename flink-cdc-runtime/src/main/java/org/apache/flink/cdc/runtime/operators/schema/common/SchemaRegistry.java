@@ -89,7 +89,8 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected final SchemaChangeBehavior behavior;
 
     // -------------------------
-    // Dynamically initialized transient fields (after coordinator starts)
+    // Dynamically initialized transient fields (restored from a checkpoint or initialized during
+    // coordinator startup)
     // -------------------------
     protected transient int currentParallelism;
     protected transient Set<Integer> activeSinkWriters;
@@ -112,6 +113,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.routingRules = routingRules;
         this.rpcTimeout = rpcTimeout;
         this.behavior = schemaChangeBehavior;
+        this.schemaManager = new SchemaManager();
     }
 
     // ---------------
@@ -123,7 +125,6 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.currentParallelism = context.currentParallelism();
         this.activeSinkWriters = ConcurrentHashMap.newKeySet();
         this.failedReasons = new ConcurrentHashMap<>();
-        this.schemaManager = new SchemaManager();
         this.router = new TableIdRouter(routingRules);
     }
 

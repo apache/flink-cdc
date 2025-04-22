@@ -34,6 +34,10 @@ import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaRegistry;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.EvolvedSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.EvolvedSchemaResponse;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.OriginalSchemaRequest;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.OriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
@@ -185,7 +189,11 @@ public class SchemaCoordinator extends SchemaRegistry {
     @Override
     protected void handleCustomCoordinationRequest(
             CoordinationRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
-        if (request instanceof SchemaChangeRequest) {
+        if (request instanceof OriginalSchemaRequest) {
+            handleOriginalSchemasRequest((OriginalSchemaRequest) request, responseFuture);
+        } else if (request instanceof EvolvedSchemaRequest) {
+            handleEvolvedSchemasRequest((EvolvedSchemaRequest) request, responseFuture);
+        } else if (request instanceof SchemaChangeRequest) {
             handleSchemaChangeRequest((SchemaChangeRequest) request, responseFuture);
         } else {
             throw new UnsupportedOperationException(
@@ -228,6 +236,20 @@ public class SchemaCoordinator extends SchemaRegistry {
                 (index, tuple) -> {
                     tuple.f1.completeExceptionally(t);
                 });
+    }
+
+    /** Handle an {@link OriginalSchemaRequest}. */
+    public void handleOriginalSchemasRequest(
+            OriginalSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
+        Schema schema = schemaManager.getLatestOriginalSchema(request.getTableId()).orElse(null);
+        responseFuture.complete(wrap(OriginalSchemaResponse.success(schema)));
+    }
+
+    /** Handle an {@link EvolvedSchemaRequest}. */
+    public void handleEvolvedSchemasRequest(
+            EvolvedSchemaRequest request, CompletableFuture<CoordinationResponse> responseFuture) {
+        Schema schema = schemaManager.getLatestEvolvedSchema(request.getTableId()).orElse(null);
+        responseFuture.complete(wrap(EvolvedSchemaResponse.success(schema)));
     }
 
     /**
