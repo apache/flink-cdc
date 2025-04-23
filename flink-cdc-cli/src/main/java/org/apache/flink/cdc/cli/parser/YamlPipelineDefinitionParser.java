@@ -66,7 +66,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     // Source / sink keys
     private static final String TYPE_KEY = "type";
     private static final String NAME_KEY = "name";
-    private static final String PARALLELISM_KEY = "parallelism";
     private static final String INCLUDE_SCHEMA_EVOLUTION_TYPES = "include.schema.changes";
     private static final String EXCLUDE_SCHEMA_EVOLUTION_TYPES = "exclude.schema.changes";
 

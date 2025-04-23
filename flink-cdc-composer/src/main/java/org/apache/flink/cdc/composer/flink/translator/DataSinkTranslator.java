@@ -84,7 +84,7 @@ public class DataSinkTranslator {
             DataStream<Event> input,
             DataSink dataSink,
             OperatorID schemaOperatorID,
-            int parallelism) {
+            Integer parallelism) {
         translate(sinkDef, input, dataSink, false, schemaOperatorID, parallelism);
     }
 
@@ -119,10 +119,15 @@ public class DataSinkTranslator {
             String sinkName,
             boolean isBatchMode,
             OperatorID schemaOperatorID,
-            int parallelism) {
+            Integer parallelism) {
         DataStream<Event> stream = input;
-        stream.getExecutionEnvironment().setParallelism(parallelism);
-
+        if (parallelism != null) {
+            try (StreamExecutionEnvironment environment = stream.getExecutionEnvironment()) {
+                environment.setParallelism(parallelism);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
         // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
             stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
