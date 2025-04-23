@@ -34,7 +34,6 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
-import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
@@ -71,92 +70,29 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private static final long serialVersionUID = 1L;
 
-    private final List<TransformRule> transformRules;
-    private transient List<PreTransformer> transforms;
-    private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
-
     /** All tables which have been sent {@link CreateTableEvent} to downstream. */
     private final Set<TableId> alreadySentCreateTableEvents;
 
+    private final List<TransformRule> transformRules;
+    private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
     private final List<Tuple2<Selectors, SchemaMetadataTransform>> schemaMetadataTransformers;
-    private transient ListState<byte[]> state;
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions;
-    private List<UserDefinedFunctionDescriptor> udfDescriptors;
-    private Map<TableId, PreTransformProcessor> preTransformProcessorMap;
-    private Map<TableId, Boolean> hasAsteriskMap;
-    private final boolean canContainDistributedTables;
+    private final boolean shouldStoreSchemasInState;
 
-    public static PreTransformOperator.Builder newBuilder() {
-        return new PreTransformOperator.Builder();
+    private transient ListState<byte[]> state;
+    private transient List<PreTransformer> transforms;
+    private transient List<UserDefinedFunctionDescriptor> udfDescriptors;
+    private transient Map<TableId, PreTransformProcessor> preTransformProcessorMap;
+    private transient Map<TableId, Boolean> hasAsteriskMap;
+
+    public static PreTransformOperatorBuilder newBuilder() {
+        return new PreTransformOperatorBuilder();
     }
 
-    /** Builder of {@link PreTransformOperator}. */
-    public static class Builder {
-        private final List<TransformRule> transformRules = new ArrayList<>();
-        private boolean canContainDistributedTables;
-
-        private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
-                new ArrayList<>();
-
-        public PreTransformOperator.Builder addTransform(
-                String tableInclusions, @Nullable String projection, @Nullable String filter) {
-            transformRules.add(
-                    new TransformRule(
-                            tableInclusions,
-                            projection,
-                            filter,
-                            "",
-                            "",
-                            "",
-                            null,
-                            new SupportedMetadataColumn[0]));
-            return this;
-        }
-
-        public PreTransformOperator.Builder addTransform(
-                String tableInclusions,
-                @Nullable String projection,
-                @Nullable String filter,
-                String primaryKey,
-                String partitionKey,
-                String tableOption,
-                @Nullable String postTransformConverter,
-                SupportedMetadataColumn[] supportedMetadataColumns) {
-            transformRules.add(
-                    new TransformRule(
-                            tableInclusions,
-                            projection,
-                            filter,
-                            primaryKey,
-                            partitionKey,
-                            tableOption,
-                            postTransformConverter,
-                            supportedMetadataColumns));
-            return this;
-        }
-
-        public PreTransformOperator.Builder addUdfFunctions(
-                List<Tuple3<String, String, Map<String, String>>> udfFunctions) {
-            this.udfFunctions.addAll(udfFunctions);
-            return this;
-        }
-
-        public PreTransformOperator.Builder canContainDistributedTables(
-                boolean canContainDistributedTables) {
-            this.canContainDistributedTables = canContainDistributedTables;
-            return this;
-        }
-
-        public PreTransformOperator build() {
-            return new PreTransformOperator(
-                    transformRules, udfFunctions, canContainDistributedTables);
-        }
-    }
-
-    private PreTransformOperator(
+    PreTransformOperator(
             List<TransformRule> transformRules,
             List<Tuple3<String, String, Map<String, String>>> udfFunctions,
-            boolean canContainDistributedTables) {
+            boolean shouldStoreSchemasInState) {
         this.preTransformChangeInfoMap = new ConcurrentHashMap<>();
         this.alreadySentCreateTableEvents = new HashSet<>();
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
@@ -165,7 +101,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
         this.transformRules = transformRules;
         this.udfFunctions = udfFunctions;
-        this.canContainDistributedTables = canContainDistributedTables;
+        this.shouldStoreSchemasInState = shouldStoreSchemasInState;
     }
 
     @Override
@@ -208,10 +144,9 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
         super.initializeState(context);
-        if (canContainDistributedTables) {
-            // In distributed mode, we don't have a globally consistent schema for each partition.
-            // It's not meaningful to persist them to state. Instead, we rely on each source
-            // partition to send fresh CreateTableEvent to instantiate each event flow.
+        if (!shouldStoreSchemasInState) {
+            // Skip schema persistency if we're in the distributed schema mode or the batch
+            // execution mode.
             return;
         }
         OperatorStateStore stateStore = context.getOperatorStateStore();
@@ -240,7 +175,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
-        if (canContainDistributedTables) {
+        if (!shouldStoreSchemasInState) {
             // Same reason in this#initializeState.
             return;
         }

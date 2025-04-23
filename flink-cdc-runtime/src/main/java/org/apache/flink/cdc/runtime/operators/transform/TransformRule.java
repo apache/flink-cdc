@@ -24,8 +24,6 @@ import javax.annotation.Nullable;
 
 import java.io.Serializable;
 
-import static org.apache.flink.cdc.runtime.parser.TransformParser.normalizeFilter;
-
 /** A rule defining pre-transformations where filtered rows and irrelevant columns are removed. */
 public class TransformRule implements Serializable {
     private static final long serialVersionUID = 1L;
@@ -50,7 +48,7 @@ public class TransformRule implements Serializable {
             SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInclusions = tableInclusions;
         this.projection = StringUtils.isNullOrWhitespaceOnly(projection) ? "*" : projection;
-        this.filter = normalizeFilter(projection, filter);
+        this.filter = filter;
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
         this.tableOption = tableOption;
