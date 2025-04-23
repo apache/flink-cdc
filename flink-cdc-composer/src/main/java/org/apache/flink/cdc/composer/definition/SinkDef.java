@@ -44,7 +44,6 @@ import java.util.stream.Collectors;
 public class SinkDef {
     private final String type;
     @Nullable private final String name;
-    @Nullable private final Integer parallelism;
     private final Configuration config;
     private final Set<SchemaChangeEventType> includedSchemaEvolutionTypes;
 
@@ -61,20 +60,10 @@ public class SinkDef {
             @Nullable String name,
             Configuration config,
             Set<SchemaChangeEventType> includedSchemaEvolutionTypes) {
-        this(type, name, config, includedSchemaEvolutionTypes, null);
-    }
-
-    public SinkDef(
-            String type,
-            @Nullable String name,
-            Configuration config,
-            Set<SchemaChangeEventType> includedSchemaEvolutionTypes,
-            @Nullable Integer parallelism) {
         this.type = type;
         this.name = name;
         this.config = config;
         this.includedSchemaEvolutionTypes = includedSchemaEvolutionTypes;
-        this.parallelism = parallelism;
     }
 
     public String getType() {
@@ -93,10 +82,6 @@ public class SinkDef {
         return includedSchemaEvolutionTypes;
     }
 
-    public Optional<Integer> getParallelism() {
-        return Optional.ofNullable(parallelism);
-    }
-
     @Override
     public String toString() {
         return "SinkDef{"
@@ -106,8 +91,6 @@ public class SinkDef {
                 + ", name='"
                 + name
                 + '\''
-                + ", parallelism="
-                + parallelism
                 + ", config="
                 + config
                 + ", includedSchemaEvolutionTypes="
@@ -126,7 +109,6 @@ public class SinkDef {
         SinkDef sinkDef = (SinkDef) o;
         return Objects.equals(type, sinkDef.type)
                 && Objects.equals(name, sinkDef.name)
-                && Objects.equals(parallelism, sinkDef.parallelism)
                 && Objects.equals(config, sinkDef.config)
                 && Objects.equals(
                         includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes);
@@ -134,6 +116,6 @@ public class SinkDef {
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, config, includedSchemaEvolutionTypes, parallelism);
+        return Objects.hash(type, name, config, includedSchemaEvolutionTypes);
     }
 }

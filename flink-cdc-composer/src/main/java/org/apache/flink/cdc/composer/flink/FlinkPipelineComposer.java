@@ -134,12 +134,14 @@ public class FlinkPipelineComposer implements PipelineComposer {
         boolean isParallelMetadataSource = dataSource.isParallelMetadataSource();
 
         // O ---> Source
+        int sourceParallelism = parallelism;
+        if (pipelineDef.getSource().getConfig().contains(PipelineOptions.PIPELINE_PARALLELISM)) {
+            sourceParallelism =
+                    pipelineDef.getSource().getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
+        }
         DataStream<Event> stream =
                 sourceTranslator.translate(
-                        pipelineDef.getSource(),
-                        dataSource,
-                        env,
-                        pipelineDef.getSource().getParallelism().orElse(parallelism));
+                        pipelineDef.getSource(), dataSource, env, sourceParallelism);
 
         // Source ---> PreTransform
         stream =
@@ -208,12 +210,17 @@ public class FlinkPipelineComposer implements PipelineComposer {
         }
 
         // Schema Operator -> Sink -> X
+        int sinkParallelism = parallelism;
+        if (pipelineDef.getSink().getConfig().contains(PipelineOptions.PIPELINE_PARALLELISM)) {
+            sinkParallelism =
+                    pipelineDef.getSink().getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
+        }
         sinkTranslator.translate(
                 pipelineDef.getSink(),
                 stream,
                 dataSink,
                 schemaOperatorIDGenerator.generate(),
-                pipelineDef.getSink().getParallelism().orElse(parallelism));
+                sinkParallelism);
     }
 
     private void addFrameworkJars() {

@@ -46,9 +46,4 @@ public class FlinkPipelineExecution implements PipelineExecution {
         }
         return new ExecutionInfo(jobClient.getJobID().toString(), jobName);
     }
-
-    @Override
-    public String getPlan() throws Exception {
-        return env.getExecutionPlan();
-    }
 }

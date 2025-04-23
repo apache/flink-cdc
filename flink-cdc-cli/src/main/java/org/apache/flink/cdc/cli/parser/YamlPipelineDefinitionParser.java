@@ -146,7 +146,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         checkNotNull(
                                 pipelineDefJsonNode.get(SOURCE_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
-                                SOURCE_KEY));
+                                SOURCE_KEY),
+                        globalPipelineConfig);
 
         // Sink is required
         SinkDef sinkDef =
@@ -155,7 +156,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 pipelineDefJsonNode.get(SINK_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
                                 SINK_KEY),
-                        schemaChangeBehavior);
+                        schemaChangeBehavior,
+                        globalPipelineConfig);
 
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
@@ -179,7 +181,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
     }
 
-    private SourceDef toSourceDef(JsonNode sourceNode) {
+    private SourceDef toSourceDef(JsonNode sourceNode, Configuration globalPipelineConfig) {
         Map<String, String> sourceMap =
                 mapper.convertValue(sourceNode, new TypeReference<Map<String, String>>() {});
 
@@ -193,17 +195,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sourceMap.remove(NAME_KEY);
 
-        // "parallelism" field is optional
-        Integer parallelismValue = null;
-        String parallelism = sourceMap.remove(PARALLELISM_KEY);
-        if (parallelism != null) {
-            parallelismValue = Integer.parseInt(parallelism);
-        }
-
-        return new SourceDef(type, name, Configuration.fromMap(sourceMap), parallelismValue);
+        return new SourceDef(type, name, Configuration.fromMap(sourceMap));
     }
 
-    private SinkDef toSinkDef(JsonNode sinkNode, SchemaChangeBehavior schemaChangeBehavior) {
+    private SinkDef toSinkDef(
+            JsonNode sinkNode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            Configuration globalPipelineConfig) {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
         boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
@@ -251,15 +249,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        // "parallelism" field is optional
-        Integer parallelismValue = null;
-        String parallelism = sinkMap.remove(PARALLELISM_KEY);
-        if (parallelism != null) {
-            parallelismValue = Integer.parseInt(parallelism);
-        }
-
-        return new SinkDef(
-                type, name, Configuration.fromMap(sinkMap), declaredSETypes, parallelismValue);
+        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {

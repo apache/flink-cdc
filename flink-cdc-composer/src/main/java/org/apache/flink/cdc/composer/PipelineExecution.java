@@ -17,21 +17,11 @@
 
 package org.apache.flink.cdc.composer;
 
-import org.apache.flink.cdc.common.annotation.VisibleForTesting;
-
 /** A pipeline execution that can be executed by a computing engine. */
 public interface PipelineExecution {
 
     /** Execute the pipeline. */
     ExecutionInfo execute() throws Exception;
-
-    /**
-     * Get the plan of the pipeline.
-     *
-     * @return The plan of the pipeline.
-     */
-    @VisibleForTesting
-    String getPlan() throws Exception;
 
     /** Information of the execution. */
     class ExecutionInfo {

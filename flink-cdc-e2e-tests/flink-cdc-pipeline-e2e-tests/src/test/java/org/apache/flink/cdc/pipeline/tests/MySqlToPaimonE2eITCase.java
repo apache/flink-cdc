@@ -27,7 +27,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -105,8 +106,16 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         inventoryDatabase.dropDatabase();
     }
 
-    @Test
-    void testSyncWholeDatabase() throws Exception {
+    @ParameterizedTest
+    @CsvSource({
+        "1", "1",
+        "2", "1",
+        "4", "1",
+        "1", "4",
+        "2", "4",
+        "4", "4"
+    })
+    void testSyncWholeDatabase(int sourceParallelism, int sinkParallelism) throws Exception {
         String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
         String pipelineJob =
@@ -120,17 +129,24 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
-                                + "\n"
+                                + "  parallelism: "
+                                + sourceParallelism
+                                + "\n\n"
                                 + "sink:\n"
                                 + "  type: paimon\n"
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.metastore: filesystem\n"
                                 + "  catalog.properties.cache-enabled: false\n"
-                                + "\n"
+                                + "  parallelism: "
+                                + sinkParallelism
+                                + "\n\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: 4",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse);
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        database,
+                        warehouse);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
@@ -211,8 +227,17 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
     }
 
-    @Test
-    public void testSinkToAppendOnlyTable() throws Exception {
+    @ParameterizedTest
+    @CsvSource({
+        "1", "1",
+        "2", "1",
+        "4", "1",
+        "1", "4",
+        "2", "4",
+        "4", "4"
+    })
+    public void testSinkToAppendOnlyTable(int sourceParallelism, int sinkParallelism)
+            throws Exception {
         String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
         String pipelineJob =
@@ -227,17 +252,25 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
                                 + "  scan.incremental.snapshot.chunk.key-column: %s.appendOnlySource:id\n"
-                                + "\n"
+                                + "  parallelism: "
+                                + sourceParallelism
+                                + "\n\n"
                                 + "sink:\n"
                                 + "  type: paimon\n"
                                 + "  catalog.properties.warehouse: %s\n"
                                 + "  catalog.properties.metastore: filesystem\n"
                                 + "  catalog.properties.cache-enabled: false\n"
-                                + "\n"
+                                + "  parallelism: "
+                                + sinkParallelism
+                                + "\n\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: 4",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, database, warehouse);
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        database,
+                        database,
+                        warehouse);
         Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
