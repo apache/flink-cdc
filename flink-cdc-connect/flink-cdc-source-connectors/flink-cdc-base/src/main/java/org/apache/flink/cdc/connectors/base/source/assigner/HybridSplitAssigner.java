@@ -43,9 +43,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus.isInitialAssigningFinished;
@@ -69,7 +71,10 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     private SourceEnumeratorMetrics enumeratorMetrics;
 
     private final int numberOfStreamSplits;
-    private transient int updatedStreamSplitCount;
+    private transient Set<Integer> updatedStreamSplits;
+
+    protected boolean isStreamSplitAllAssigned;
+    protected List<SourceSplitBase> pendingStreamSplits = null;
 
     public HybridSplitAssigner(
             C sourceConfig,
@@ -147,7 +152,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
         snapshotSplitAssigner.open();
         // init enumerator metrics
         snapshotSplitAssigner.initEnumeratorMetrics(enumeratorMetrics);
-        updatedStreamSplitCount = 0;
+        updatedStreamSplits = new HashSet<>();
     }
 
     @Override
@@ -242,10 +247,11 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     }
 
     @Override
-    public void onStreamSplitUpdated() {
-        if (++updatedStreamSplitCount == numberOfStreamSplits) {
-            snapshotSplitAssigner.onStreamSplitUpdated();
-            updatedStreamSplitCount = 0;
+    public void onStreamSplitUpdated(StreamSplit streamSplit) {
+        updatedStreamSplits.add(streamSplit.getIndexOfStreamSplit());
+        if (updatedStreamSplits.size() == numberOfStreamSplits) {
+            snapshotSplitAssigner.onStreamSplitUpdated(streamSplit);
+            updatedStreamSplits.clear();
         }
     }
 
@@ -258,12 +264,6 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
     public void close() throws IOException {
         snapshotSplitAssigner.close();
     }
-
-    // --------------------------------------------------------------------------------------------
-    // Overridable methods
-    // --------------------------------------------------------------------------------------------
-    protected boolean isStreamSplitAllAssigned;
-    protected List<SourceSplitBase> pendingStreamSplits = null;
 
     private Optional<SourceSplitBase> getNextStreamSplit() {
         if (pendingStreamSplits == null) {

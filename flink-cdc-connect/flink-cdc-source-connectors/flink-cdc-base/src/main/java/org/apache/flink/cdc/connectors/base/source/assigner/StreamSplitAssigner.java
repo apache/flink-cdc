@@ -36,6 +36,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -43,6 +44,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 
 /** Assigner for stream split. */
 public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigner {
@@ -102,7 +104,7 @@ public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigne
         } else {
             enumeratorMetrics.exitStreamReading();
         }
-        pendingStreamSplits = null;
+        isStreamSplitsCreated = false;
     }
 
     @Override
@@ -134,7 +136,7 @@ public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigne
     public void addSplits(Collection<SourceSplitBase> splits) {
         // we don't store the split, but will re-create stream split later
         isStreamSplitAllAssigned = false;
-        pendingStreamSplits = null;
+        pendingStreamSplits.addAll(splits);
         enumeratorMetrics.exitStreamReading();
     }
 
@@ -157,7 +159,7 @@ public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigne
     public void startAssignNewlyAddedTables() {}
 
     @Override
-    public void onStreamSplitUpdated() {}
+    public void onStreamSplitUpdated(StreamSplit streamSplit) {}
 
     @Override
     public boolean noMoreSplits() {
@@ -171,10 +173,13 @@ public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigne
 
     // ------------------------------------------------------------------------------------------
     protected boolean isStreamSplitAllAssigned;
-    protected List<SourceSplitBase> pendingStreamSplits = null;
+
+    // We create stream splits lazily because offsets are not available at the very beginning.
+    protected boolean isStreamSplitsCreated = false;
+    protected Queue<SourceSplitBase> pendingStreamSplits = null;
 
     private Optional<SourceSplitBase> getNextStreamSplit() {
-        if (pendingStreamSplits == null) {
+        if (!isStreamSplitsCreated) {
             StartupOptions startupOptions = sourceConfig.getStartupOptions();
 
             Offset startingOffset;
@@ -201,8 +206,9 @@ public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigne
                             "Unsupported startup mode " + startupOptions.startupMode);
             }
 
+            isStreamSplitsCreated = true;
             pendingStreamSplits =
-                    new ArrayList<>(
+                    new ArrayDeque<>(
                             createStreamSplits(
                                     sourceConfig,
                                     startingOffset,
@@ -227,7 +233,7 @@ public class StreamSplitAssigner<C extends SourceConfig> implements SplitAssigne
         if (pendingStreamSplits.isEmpty()) {
             return Optional.empty();
         } else {
-            SourceSplitBase nextSplit = pendingStreamSplits.remove(0);
+            SourceSplitBase nextSplit = pendingStreamSplits.poll();
             if (pendingStreamSplits.isEmpty()) {
                 isStreamSplitAllAssigned = true;
             }

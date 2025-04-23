@@ -22,13 +22,43 @@ import org.apache.flink.cdc.connectors.base.source.enumerator.IncrementalSourceE
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
 
+import java.util.Objects;
+
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceReader} sends to {@link
  * IncrementalSourceEnumerator} to notify the {@link StreamSplit} assigned to itself.
  */
 public class StreamSplitAssignedEvent implements SourceEvent {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
-    public StreamSplitAssignedEvent() {}
+    private final StreamSplit streamSplit;
+
+    public StreamSplitAssignedEvent(StreamSplit streamSplit) {
+        this.streamSplit = streamSplit;
+    }
+
+    public StreamSplit getStreamSplit() {
+        return streamSplit;
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+        if (!(o instanceof StreamSplitAssignedEvent)) {
+            return false;
+        }
+
+        StreamSplitAssignedEvent that = (StreamSplitAssignedEvent) o;
+        return Objects.equals(streamSplit, that.streamSplit);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(streamSplit);
+    }
+
+    @Override
+    public String toString() {
+        return "StreamSplitAssignedEvent{" + "streamSplit=" + streamSplit + '}';
+    }
 }

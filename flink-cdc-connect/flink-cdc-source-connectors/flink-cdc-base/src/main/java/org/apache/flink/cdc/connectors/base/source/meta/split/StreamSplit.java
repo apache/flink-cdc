@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,9 @@ public class StreamSplit extends SourceSplitBase {
 
     private final boolean isSuspended;
 
+    private final int indexOfStreamSplit;
+    private final int numberOfStreamSplits;
+
     /**
      * Indicates whether initial state snapshot was completed right before this split. See
      * io.debezium.connector.sqlserver.SqlServerOffsetContext#isSnapshotCompleted().
@@ -65,6 +69,30 @@ public class StreamSplit extends SourceSplitBase {
             int totalFinishedSplitSize,
             boolean isSuspended,
             boolean isSnapshotCompleted) {
+        this(
+                splitId,
+                startingOffset,
+                endingOffset,
+                finishedSnapshotSplitInfos,
+                tableSchemas,
+                totalFinishedSplitSize,
+                isSuspended,
+                isSnapshotCompleted,
+                0,
+                1);
+    }
+
+    public StreamSplit(
+            String splitId,
+            Offset startingOffset,
+            Offset endingOffset,
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
+            Map<TableId, TableChange> tableSchemas,
+            int totalFinishedSplitSize,
+            boolean isSuspended,
+            boolean isSnapshotCompleted,
+            int indexOfStreamSplit,
+            int numberOfStreamSplits) {
         super(splitId);
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
@@ -73,6 +101,8 @@ public class StreamSplit extends SourceSplitBase {
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = isSuspended;
         this.isSnapshotCompleted = isSnapshotCompleted;
+        this.indexOfStreamSplit = indexOfStreamSplit;
+        this.numberOfStreamSplits = numberOfStreamSplits;
     }
 
     public StreamSplit(
@@ -82,6 +112,26 @@ public class StreamSplit extends SourceSplitBase {
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
             Map<TableId, TableChange> tableSchemas,
             int totalFinishedSplitSize) {
+        this(
+                splitId,
+                startingOffset,
+                endingOffset,
+                finishedSnapshotSplitInfos,
+                tableSchemas,
+                totalFinishedSplitSize,
+                0,
+                1);
+    }
+
+    public StreamSplit(
+            String splitId,
+            Offset startingOffset,
+            Offset endingOffset,
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
+            Map<TableId, TableChange> tableSchemas,
+            int totalFinishedSplitSize,
+            int indexOfStreamSplit,
+            int numberOfStreamSplits) {
         super(splitId);
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
@@ -90,6 +140,8 @@ public class StreamSplit extends SourceSplitBase {
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = false;
         this.isSnapshotCompleted = false;
+        this.indexOfStreamSplit = indexOfStreamSplit;
+        this.numberOfStreamSplits = numberOfStreamSplits;
     }
 
     public Offset getStartingOffset() {
@@ -125,6 +177,14 @@ public class StreamSplit extends SourceSplitBase {
         return isSnapshotCompleted;
     }
 
+    public int getIndexOfStreamSplit() {
+        return indexOfStreamSplit;
+    }
+
+    public int getNumberOfStreamSplits() {
+        return numberOfStreamSplits;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -143,7 +203,9 @@ public class StreamSplit extends SourceSplitBase {
                 && Objects.equals(startingOffset, that.startingOffset)
                 && Objects.equals(endingOffset, that.endingOffset)
                 && Objects.equals(finishedSnapshotSplitInfos, that.finishedSnapshotSplitInfos)
-                && Objects.equals(tableSchemas, that.tableSchemas);
+                && Objects.equals(tableSchemas, that.tableSchemas)
+                && indexOfStreamSplit == that.indexOfStreamSplit
+                && numberOfStreamSplits == that.numberOfStreamSplits;
     }
 
     @Override
@@ -156,23 +218,34 @@ public class StreamSplit extends SourceSplitBase {
                 tableSchemas,
                 totalFinishedSplitSize,
                 isSuspended,
-                isSnapshotCompleted);
+                isSnapshotCompleted,
+                indexOfStreamSplit,
+                numberOfStreamSplits);
     }
 
     @Override
     public String toString() {
         return "StreamSplit{"
-                + "splitId='"
-                + splitId
-                + '\''
-                + ", offset="
+                + "startingOffset="
                 + startingOffset
-                + ", endOffset="
+                + ", endingOffset="
                 + endingOffset
+                + ", finishedSnapshotSplitInfos="
+                + finishedSnapshotSplitInfos
+                + ", tableSchemas="
+                + tableSchemas
+                + ", totalFinishedSplitSize="
+                + totalFinishedSplitSize
                 + ", isSuspended="
                 + isSuspended
+                + ", indexOfStreamSplit="
+                + indexOfStreamSplit
+                + ", numberOfStreamSplits="
+                + numberOfStreamSplits
                 + ", isSnapshotCompleted="
                 + isSnapshotCompleted
+                + ", serializedFormCache="
+                + Arrays.toString(serializedFormCache)
                 + '}';
     }
 
@@ -198,7 +271,9 @@ public class StreamSplit extends SourceSplitBase {
                 streamSplit.getTableSchemas(),
                 streamSplit.getTotalFinishedSplitSize(),
                 streamSplit.isSuspended(),
-                streamSplit.isSnapshotCompleted());
+                streamSplit.isSnapshotCompleted(),
+                streamSplit.getIndexOfStreamSplit(),
+                streamSplit.getNumberOfStreamSplits());
     }
 
     /**
@@ -245,7 +320,9 @@ public class StreamSplit extends SourceSplitBase {
                         - (streamSplit.getFinishedSnapshotSplitInfos().size()
                                 - allFinishedSnapshotSplitInfos.size()),
                 streamSplit.isSuspended(),
-                streamSplit.isSnapshotCompleted());
+                streamSplit.isSnapshotCompleted(),
+                streamSplit.getIndexOfStreamSplit(),
+                streamSplit.getNumberOfStreamSplits());
     }
 
     public static StreamSplit fillTableSchemas(
@@ -259,7 +336,9 @@ public class StreamSplit extends SourceSplitBase {
                 tableSchemas,
                 streamSplit.getTotalFinishedSplitSize(),
                 streamSplit.isSuspended(),
-                streamSplit.isSnapshotCompleted());
+                streamSplit.isSnapshotCompleted(),
+                streamSplit.getIndexOfStreamSplit(),
+                streamSplit.getNumberOfStreamSplits());
     }
 
     public static StreamSplit toNormalStreamSplit(
@@ -272,7 +351,9 @@ public class StreamSplit extends SourceSplitBase {
                 suspendedStreamSplit.getTableSchemas(),
                 totalFinishedSplitSize,
                 false,
-                suspendedStreamSplit.isSnapshotCompleted());
+                suspendedStreamSplit.isSnapshotCompleted(),
+                suspendedStreamSplit.getIndexOfStreamSplit(),
+                suspendedStreamSplit.getNumberOfStreamSplits());
     }
 
     public static StreamSplit toSuspendedStreamSplit(StreamSplit normalStreamSplit) {
@@ -286,7 +367,9 @@ public class StreamSplit extends SourceSplitBase {
                 normalStreamSplit.getTableSchemas(),
                 normalStreamSplit.getTotalFinishedSplitSize(),
                 true,
-                normalStreamSplit.isSnapshotCompleted());
+                normalStreamSplit.isSnapshotCompleted(),
+                normalStreamSplit.getIndexOfStreamSplit(),
+                normalStreamSplit.getNumberOfStreamSplits());
     }
 
     /**

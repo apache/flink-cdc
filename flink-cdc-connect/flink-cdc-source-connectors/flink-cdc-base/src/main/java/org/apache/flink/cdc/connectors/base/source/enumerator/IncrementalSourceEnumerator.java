@@ -52,6 +52,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,7 @@ public class IncrementalSourceEnumerator
 
     private Boundedness boundedness;
     protected int numberOfStreamSplits;
-    protected List<Integer> streamSplitTaskIds;
+    protected Map<Integer, Integer> streamSplitAssignedToTaskIdMap;
     private boolean isStreamSplitUpdateRequestAlreadySent = false;
 
     public IncrementalSourceEnumerator(
@@ -105,7 +106,7 @@ public class IncrementalSourceEnumerator
                 "%s stream splits generated, which is greater than current parallelism %s. Some splits might never be assigned.",
                 numberOfStreamSplits,
                 context.currentParallelism());
-        this.streamSplitTaskIds = new ArrayList<>();
+        this.streamSplitAssignedToTaskIdMap = new HashMap<>();
         splitAssigner.open();
         requestStreamSplitUpdateIfNeed();
         this.context.callAsync(
@@ -129,11 +130,14 @@ public class IncrementalSourceEnumerator
     @Override
     public void addSplitsBack(List<SourceSplitBase> splits, int subtaskId) {
         LOG.debug("Incremental Source Enumerator adds splits back: {}", splits);
-        Optional<SourceSplitBase> streamSplit =
-                splits.stream().filter(SourceSplitBase::isStreamSplit).findAny();
+        Optional<StreamSplit> streamSplit =
+                splits.stream()
+                        .filter(SourceSplitBase::isStreamSplit)
+                        .map(SourceSplitBase::asStreamSplit)
+                        .findAny();
         if (streamSplit.isPresent()) {
             LOG.info("The enumerator adds add stream split back: {}", streamSplit);
-            this.streamSplitTaskIds.clear();
+            this.streamSplitAssignedToTaskIdMap.remove(streamSplit.get().getIndexOfStreamSplit());
         }
         splitAssigner.addSplits(splits);
     }
@@ -176,12 +180,15 @@ public class IncrementalSourceEnumerator
             LOG.info(
                     "The enumerator receives event that the streamSplit split has been updated from subtask {}. ",
                     subtaskId);
-            splitAssigner.onStreamSplitUpdated();
+            splitAssigner.onStreamSplitUpdated(
+                    ((StreamSplitUpdateAckEvent) sourceEvent).getStreamSplit());
         } else if (sourceEvent instanceof StreamSplitAssignedEvent) {
             LOG.info(
                     "The enumerator receives notice from subtask {} for the stream split assignment. ",
                     subtaskId);
-            this.streamSplitTaskIds.add(subtaskId);
+            StreamSplitAssignedEvent assignedEvent = (StreamSplitAssignedEvent) sourceEvent;
+            this.streamSplitAssignedToTaskIdMap.put(
+                    assignedEvent.getStreamSplit().getIndexOfStreamSplit(), subtaskId);
         }
     }
 
@@ -230,7 +237,8 @@ public class IncrementalSourceEnumerator
                 final SourceSplitBase sourceSplit = split.get();
                 context.assignSplit(sourceSplit, nextAwaiting);
                 if (sourceSplit instanceof StreamSplit) {
-                    this.streamSplitTaskIds.add(nextAwaiting);
+                    this.streamSplitAssignedToTaskIdMap.put(
+                            sourceSplit.asStreamSplit().getIndexOfStreamSplit(), nextAwaiting);
                 }
                 awaitingReader.remove();
                 LOG.info("Assign split {} to subtask {}", sourceSplit, nextAwaiting);
@@ -252,7 +260,7 @@ public class IncrementalSourceEnumerator
         return splitAssigner.noMoreSplits()
                 && (boundedness == Boundedness.BOUNDED
                         || (sourceConfig.isCloseIdleReaders()
-                                && !streamSplitTaskIds.contains(nextAwaiting)));
+                                && !streamSplitAssignedToTaskIdMap.containsValue(nextAwaiting)));
     }
 
     protected int[] getRegisteredReader() {
@@ -285,12 +293,12 @@ public class IncrementalSourceEnumerator
                 && isNewlyAddedAssigningSnapshotFinished(splitAssigner.getAssignerStatus())) {
             // If enumerator knows which reader is assigned stream split, just send to this reader,
             // nor sends to all registered readers.
-            if (!streamSplitTaskIds.isEmpty()) {
+            if (streamSplitAssignedToTaskIdMap.size() == numberOfStreamSplits) {
                 isStreamSplitUpdateRequestAlreadySent = true;
                 LOG.info(
                         "The enumerator requests subtask {} to update the stream split after newly added table.",
-                        streamSplitTaskIds);
-                for (int streamSplitTaskId : streamSplitTaskIds) {
+                        streamSplitAssignedToTaskIdMap);
+                for (int streamSplitTaskId : streamSplitAssignedToTaskIdMap.keySet()) {
                     context.sendEventToSourceReader(
                             streamSplitTaskId, new StreamSplitUpdateRequestEvent());
                 }

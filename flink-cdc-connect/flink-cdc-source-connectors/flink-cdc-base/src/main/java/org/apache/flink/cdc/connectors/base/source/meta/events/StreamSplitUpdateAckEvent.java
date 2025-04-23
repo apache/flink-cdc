@@ -19,7 +19,10 @@ package org.apache.flink.cdc.connectors.base.source.meta.events;
 
 import org.apache.flink.api.connector.source.SourceEvent;
 import org.apache.flink.cdc.connectors.base.source.enumerator.IncrementalSourceEnumerator;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReader;
+
+import java.util.Objects;
 
 /**
  * The {@link SourceEvent} that {@link IncrementalSourceReader} sends to {@link
@@ -27,7 +30,35 @@ import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReade
  */
 public class StreamSplitUpdateAckEvent implements SourceEvent {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
-    public StreamSplitUpdateAckEvent() {}
+    private final StreamSplit streamSplit;
+
+    public StreamSplitUpdateAckEvent(StreamSplit streamSplit) {
+        this.streamSplit = streamSplit;
+    }
+
+    public StreamSplit getStreamSplit() {
+        return streamSplit;
+    }
+
+    @Override
+    public final boolean equals(Object o) {
+        if (!(o instanceof StreamSplitUpdateAckEvent)) {
+            return false;
+        }
+
+        StreamSplitUpdateAckEvent that = (StreamSplitUpdateAckEvent) o;
+        return Objects.equals(streamSplit, that.streamSplit);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(streamSplit);
+    }
+
+    @Override
+    public String toString() {
+        return "StreamSplitUpdateAckEvent{" + "streamSplit=" + streamSplit + '}';
+    }
 }

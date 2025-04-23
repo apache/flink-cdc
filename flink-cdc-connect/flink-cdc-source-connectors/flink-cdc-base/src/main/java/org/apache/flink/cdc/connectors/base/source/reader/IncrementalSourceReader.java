@@ -312,7 +312,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
 
                 LOG.info(
                         "Source reader {} received the stream split : {}.", subtaskId, streamSplit);
-                context.sendSourceEventToCoordinator(new StreamSplitAssignedEvent());
+                context.sendSourceEventToCoordinator(new StreamSplitAssignedEvent(streamSplit));
             }
         }
         // notify split enumerator again about the finished unacked snapshot splits
@@ -488,7 +488,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             suspendedStreamSplit = null;
             this.addSplits(Collections.singletonList(streamSplit), false);
 
-            context.sendSourceEventToCoordinator(new StreamSplitUpdateAckEvent());
+            context.sendSourceEventToCoordinator(new StreamSplitUpdateAckEvent(streamSplit));
             LOG.info(
                     "Source reader {} notifies enumerator that stream split has been updated.",
                     subtaskId);

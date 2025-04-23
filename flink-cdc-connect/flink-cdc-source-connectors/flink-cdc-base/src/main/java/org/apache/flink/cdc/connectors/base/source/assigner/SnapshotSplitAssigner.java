@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceEnumeratorMetrics;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
@@ -628,7 +629,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     }
 
     @Override
-    public void onStreamSplitUpdated() {
+    public void onStreamSplitUpdated(StreamSplit streamSplit) {
         Preconditions.checkState(
                 isNewlyAddedAssigningSnapshotFinished(assignerStatus),
                 "Invalid assigner status %s",

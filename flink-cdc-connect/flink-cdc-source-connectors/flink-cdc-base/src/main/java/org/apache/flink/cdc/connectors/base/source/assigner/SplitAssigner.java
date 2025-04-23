@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.PendingSplitsS
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -116,7 +117,7 @@ public interface SplitAssigner extends Closeable {
      * Callback to handle the stream split has been updated in the newly added tables process. This
      * is useful to check the newly added tables has been finished or not.
      */
-    void onStreamSplitUpdated();
+    void onStreamSplitUpdated(StreamSplit streamSplit);
 
     /**
      * Called to close the assigner, in case it holds on to any resources, like threads or network
