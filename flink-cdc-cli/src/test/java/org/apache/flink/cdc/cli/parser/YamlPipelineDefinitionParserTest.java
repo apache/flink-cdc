@@ -364,6 +364,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("execution.runtime-mode", "STREAMING")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
@@ -415,6 +416,7 @@ class YamlPipelineDefinitionParserTest {
                         + "  parallelism: 4\n"
                         + "  schema.change.behavior: evolve\n"
                         + "  schema-operator.rpc-timeout: 1 h\n"
+                        + "  execution.runtime-mode: STREAMING\n"
                         + "  model:\n"
                         + "    - model-name: GET_EMBEDDING\n"
                         + "      class-name: OpenAIEmbeddingModel\n"
@@ -502,6 +504,7 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .put("execution.runtime-mode", "STREAMING")
                                     .build()));
 
     private final PipelineDef defWithOptional =

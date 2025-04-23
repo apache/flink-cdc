@@ -24,7 +24,9 @@ import org.apache.flink.cdc.composer.definition.ModelDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
+import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperatorBuilder;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
@@ -49,13 +51,29 @@ public class TransformTranslator {
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
-            boolean canContainDistributedTables) {
+            boolean shouldStoreSchemasInState) {
         if (transforms.isEmpty()) {
             return input;
         }
+        return input.transform(
+                "Transform:Schema",
+                new EventTypeInfo(),
+                generatePreTransform(
+                        transforms,
+                        udfFunctions,
+                        models,
+                        supportedMetadataColumns,
+                        shouldStoreSchemasInState));
+    }
 
-        PreTransformOperator.Builder preTransformFunctionBuilder =
-                PreTransformOperator.newBuilder();
+    private PreTransformOperator generatePreTransform(
+            List<TransformDef> transforms,
+            List<UdfDef> udfFunctions,
+            List<ModelDef> models,
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            boolean shouldStoreSchemasInState) {
+
+        PreTransformOperatorBuilder preTransformFunctionBuilder = PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             preTransformFunctionBuilder.addTransform(
                     transform.getSourceTable(),
@@ -75,10 +93,9 @@ public class TransformTranslator {
                                 .collect(Collectors.toList()))
                 .addUdfFunctions(
                         models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
-                .canContainDistributedTables(canContainDistributedTables);
+                .shouldStoreSchemasInState(shouldStoreSchemasInState);
 
-        return input.transform(
-                "Transform:Schema", new EventTypeInfo(), preTransformFunctionBuilder.build());
+        return preTransformFunctionBuilder.build();
     }
 
     public DataStream<Event> translatePostTransform(
@@ -92,7 +109,7 @@ public class TransformTranslator {
             return input;
         }
 
-        PostTransformOperator.Builder postTransformFunctionBuilder =
+        PostTransformOperatorBuilder postTransformFunctionBuilder =
                 PostTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
             if (transform.isValidProjection() || transform.isValidFilter()) {

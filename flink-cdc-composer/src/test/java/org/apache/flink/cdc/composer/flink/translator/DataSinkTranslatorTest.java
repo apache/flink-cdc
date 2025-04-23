@@ -53,6 +53,7 @@ class DataSinkTranslatorTest {
                 inputStream,
                 mockPreWriteWithoutCommitSink,
                 "testPreWriteWithoutCommitSink",
+                false,
                 new OperatorID(),
                 inputStream.getParallelism());
 

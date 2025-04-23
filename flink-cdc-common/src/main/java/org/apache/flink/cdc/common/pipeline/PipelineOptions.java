@@ -45,6 +45,12 @@ public class PipelineOptions {
                     .defaultValue(1)
                     .withDescription("Parallelism of the pipeline");
 
+    public static final ConfigOption<RuntimeExecutionMode> PIPELINE_EXECUTION_RUNTIME_MODE =
+            ConfigOptions.key("execution.runtime-mode")
+                    .enumType(RuntimeExecutionMode.class)
+                    .defaultValue(RuntimeExecutionMode.STREAMING)
+                    .withDescription("Runtime execution mode of the pipeline");
+
     public static final ConfigOption<SchemaChangeBehavior> PIPELINE_SCHEMA_CHANGE_BEHAVIOR =
             ConfigOptions.key("schema.change.behavior")
                     .enumType(SchemaChangeBehavior.class)

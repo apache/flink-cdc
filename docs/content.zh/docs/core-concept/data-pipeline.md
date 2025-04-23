@@ -111,8 +111,9 @@ under the License.
 # Pipeline 配置
 下面 是 Data Pipeline 的一些可选配置：
 
-| 参数              | 含义                                    | optional/required |
-|-----------------|---------------------------------------|-------------------|
-| name            | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。 | optional          |
-| parallelism     | pipeline的全局并发度，默认值是1。                 | optional          |
-| local-time-zone | 作业级别的本地时区。                            | optional          |
+| 参数                      | 含义                                                  | optional/required |
+|-------------------------|-----------------------------------------------------|-------------------|
+| name                    | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。               | optional          |
+| parallelism             | pipeline的全局并发度，默认值是1。                               | optional          |
+| local-time-zone         | 作业级别的本地时区。                                          | optional          |
+| execution.runtime-mode  | pipeline 的运行模式，包含 STREAMING 和 BATCH，默认值是 STREAMING。 | optional          |

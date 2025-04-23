@@ -25,7 +25,9 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -40,6 +42,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 /** E2e tests for User-defined functions. */
 class UdfE2eITCase extends PipelineTestEnvironment {
@@ -82,27 +85,19 @@ class UdfE2eITCase extends PipelineTestEnvironment {
         transformRenameDatabase.dropDatabase();
     }
 
-    @Test
-    void testUserDefinedFunctionsInJava() throws Exception {
-        testUserDefinedFunctions("java");
+    private static Stream<Arguments> variants() {
+        return Stream.of(
+                Arguments.of("java", true),
+                Arguments.of("java", false),
+                Arguments.of("scala", true),
+                Arguments.of("scala", false));
     }
 
-    @Test
-    void testUserDefinedFunctionsInScala() throws Exception {
-        testUserDefinedFunctions("scala");
-    }
-
-    @Test
-    void testFlinkCompatibleScalarFunctionsInJava() throws Exception {
-        testFlinkCompatibleScalarFunctions("java");
-    }
-
-    @Test
-    void testFlinkCompatibleScalarFunctionsInScala() throws Exception {
-        testFlinkCompatibleScalarFunctions("scala");
-    }
-
-    private void testUserDefinedFunctions(String language) throws Exception {
+    @ParameterizedTest(name = "language: {0}, batchMode: {1}")
+    @MethodSource(value = "variants")
+    void testUserDefinedFunctions(String language, boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -111,6 +106,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -126,6 +122,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
+                                + "  execution.runtime-mode: %s\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: addone\n"
                                 + "      classpath: org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass\n"
@@ -140,10 +137,12 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         parallelism,
+                        runtimeMode,
                         language,
                         language,
                         language,
@@ -203,7 +202,12 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Forty-two, Integer: 2014], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()));
         validateResult(expectedEvents);
+
+        if (batchMode) {
+            return;
+        }
         LOG.info("Begin incremental reading stage.");
+
         // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
@@ -242,7 +246,11 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                 20000L);
     }
 
-    private void testFlinkCompatibleScalarFunctions(String language) throws Exception {
+    @ParameterizedTest(name = "language: {0}, batchMode: {1}")
+    @MethodSource(value = "variants")
+    void testFlinkCompatibleScalarFunctions(String language, boolean batchMode) throws Exception {
+        String startupMode = batchMode ? "snapshot" : "initial";
+        String runtimeMode = batchMode ? "BATCH" : "STREAMING";
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -251,6 +259,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "  port: 3306\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
+                                + "  scan.startup.mode: %s\n"
                                 + "  tables: %s.\\.*\n"
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
@@ -266,6 +275,7 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
+                                + "  execution.runtime-mode: %s\n"
                                 + "  user-defined-function:\n"
                                 + "    - name: addone\n"
                                 + "      classpath: org.apache.flink.udf.examples.%s.AddOneFunctionClass\n"
@@ -276,10 +286,12 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MYSQL_TEST_USER,
                         MYSQL_TEST_PASSWORD,
+                        startupMode,
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         transformRenameDatabase.getDatabaseName(),
                         parallelism,
+                        runtimeMode,
                         language,
                         language,
                         language);
@@ -335,6 +347,10 @@ class UdfE2eITCase extends PipelineTestEnvironment {
                                 "DataChangeEvent{tableId=%s.TABLEBETA, before=[], after=[2014, 14, Integer: 2014], op=INSERT, meta=()}",
                                 transformRenameDatabase.getDatabaseName()));
         validateResult(expectedEvents);
+
+        if (batchMode) {
+            return;
+        }
         LOG.info("Begin incremental reading stage.");
         // generate binlogs
         String mysqlJdbcUrl =

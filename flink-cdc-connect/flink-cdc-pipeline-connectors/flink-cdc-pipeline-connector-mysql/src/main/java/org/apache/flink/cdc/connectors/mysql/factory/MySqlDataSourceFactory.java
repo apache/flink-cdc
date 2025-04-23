@@ -24,6 +24,8 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -128,7 +130,18 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
         StartupOptions startupOptions = getStartupOptions(config);
-
+        // Batch mode only supports StartupMode.SNAPSHOT.
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE)
+                && RuntimeExecutionMode.BATCH.equals(
+                        pipelineConfiguration.get(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE))
+                && !StartupOptions.snapshot().equals(startupOptions)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Only \"snapshot\" of MySQLDataSource StartupOption is supported in BATCH pipeline, but actual MySQLDataSource StartupOption is {}.",
+                            startupOptions.startupMode));
+        }
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
 
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);

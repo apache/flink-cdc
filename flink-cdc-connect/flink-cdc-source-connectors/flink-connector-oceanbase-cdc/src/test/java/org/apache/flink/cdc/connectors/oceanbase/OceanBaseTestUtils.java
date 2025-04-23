@@ -32,7 +32,8 @@ public class OceanBaseTestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseTestUtils.class);
 
-    private static final String LATEST_VERSION = "latest";
+    private static final String OB_4_3_3_VERSION = "4.3.3.0-100000142024101215";
+    private static final String OB_LOG_PROXY_2_0_2_VERSION = "2.0.2-101000142024080121";
     private static final String CDC_TEST_OB_VERSION = "4.2.1.6-106000012024042515";
 
     private static final String SYS_PASSWORD = "123456";
@@ -45,7 +46,7 @@ public class OceanBaseTestUtils {
     }
 
     public static OceanBaseContainer createOceanBaseContainerForJdbc() {
-        return createOceanBaseContainer(LATEST_VERSION, "mini")
+        return createOceanBaseContainer(OB_4_3_3_VERSION, "mini")
                 .withStartupTimeout(Duration.ofMinutes(4));
     }
 
@@ -59,7 +60,7 @@ public class OceanBaseTestUtils {
     }
 
     public static LogProxyContainer createLogProxyContainer() {
-        return new LogProxyContainer(LATEST_VERSION)
+        return new LogProxyContainer(OB_LOG_PROXY_2_0_2_VERSION)
                 .withSysPassword(SYS_PASSWORD)
                 .withStartupTimeout(Duration.ofMinutes(1))
                 .withLogConsumer(new Slf4jLogConsumer(LOG));
