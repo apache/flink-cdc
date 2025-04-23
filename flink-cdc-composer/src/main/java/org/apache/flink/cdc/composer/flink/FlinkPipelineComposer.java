@@ -145,9 +145,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // O ---> Source
         int sourceParallelism = parallelism;
-        if (pipelineDef.getSource().getConfig().contains(PipelineOptions.PIPELINE_PARALLELISM)) {
-            sourceParallelism =
-                    pipelineDef.getSource().getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
+        if (pipelineDef.getSource().getParallelism() != null) {
+            sourceParallelism = pipelineDef.getSource().getParallelism();
         }
         DataStream<Event> stream =
                 sourceTranslator.translate(
@@ -223,9 +222,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
 
         // Schema Operator -> Sink -> X
         int sinkParallelism = parallelism;
-        if (pipelineDef.getSink().getConfig().contains(PipelineOptions.PIPELINE_PARALLELISM)) {
-            sinkParallelism =
-                    pipelineDef.getSink().getConfig().get(PipelineOptions.PIPELINE_PARALLELISM);
+        if (pipelineDef.getSink().getParallelism() != null) {
+            sinkParallelism = pipelineDef.getSink().getParallelism();
         }
         sinkTranslator.translate(
                 pipelineDef.getSink(),

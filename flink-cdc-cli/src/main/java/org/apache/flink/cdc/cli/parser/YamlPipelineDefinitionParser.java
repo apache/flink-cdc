@@ -48,6 +48,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_PARALLELISM;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
 import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -194,7 +195,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sourceMap.remove(NAME_KEY);
 
-        return new SourceDef(type, name, Configuration.fromMap(sourceMap));
+        int parallelism = globalPipelineConfig.get(PIPELINE_PARALLELISM);
+        if (sourceMap.containsKey(PIPELINE_PARALLELISM.key())) {
+            parallelism = Integer.parseInt(sourceMap.remove(PIPELINE_PARALLELISM.key()));
+        }
+
+        return new SourceDef(type, name, Configuration.fromMap(sourceMap), parallelism);
     }
 
     private SinkDef toSinkDef(
@@ -248,7 +254,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
+        int parallelism = globalPipelineConfig.get(PIPELINE_PARALLELISM);
+        if (sinkMap.containsKey(PIPELINE_PARALLELISM.key())) {
+            parallelism = Integer.parseInt(sinkMap.remove(PIPELINE_PARALLELISM.key()));
+        }
+
+        return new SinkDef(
+                type, name, Configuration.fromMap(sinkMap), declaredSETypes, parallelism);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {

@@ -38,12 +38,16 @@ import java.util.stream.Collectors;
  *   <li>type: connector type of the sink, which will be used for discovering sink implementation.
  *       Required in the definition.
  *   <li>name: name of the sink. Optional in the definition.
+ *   <li>parallelism: parallelism of the sink. Optional in the definition.
  *   <li>config: configuration of the sink
+ *   <li>includedSchemaEvolutionTypes: the schema evolution types that the sink will process.
+ *       Optional in the definition.
  * </ul>
  */
 public class SinkDef {
     private final String type;
     @Nullable private final String name;
+    @Nullable private final Integer parallelism;
     private final Configuration config;
     private final Set<SchemaChangeEventType> includedSchemaEvolutionTypes;
 
@@ -60,10 +64,20 @@ public class SinkDef {
             @Nullable String name,
             Configuration config,
             Set<SchemaChangeEventType> includedSchemaEvolutionTypes) {
+        this(type, name, config, includedSchemaEvolutionTypes, null);
+    }
+
+    public SinkDef(
+            String type,
+            @Nullable String name,
+            Configuration config,
+            Set<SchemaChangeEventType> includedSchemaEvolutionTypes,
+            Integer parallelism) {
         this.type = type;
         this.name = name;
         this.config = config;
         this.includedSchemaEvolutionTypes = includedSchemaEvolutionTypes;
+        this.parallelism = parallelism;
     }
 
     public String getType() {
@@ -82,6 +96,10 @@ public class SinkDef {
         return includedSchemaEvolutionTypes;
     }
 
+    public Integer getParallelism() {
+        return parallelism;
+    }
+
     @Override
     public String toString() {
         return "SinkDef{"
@@ -95,6 +113,8 @@ public class SinkDef {
                 + config
                 + ", includedSchemaEvolutionTypes="
                 + includedSchemaEvolutionTypes
+                + ", parallelism="
+                + parallelism
                 + '}';
     }
 
@@ -111,11 +131,12 @@ public class SinkDef {
                 && Objects.equals(name, sinkDef.name)
                 && Objects.equals(config, sinkDef.config)
                 && Objects.equals(
-                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes);
+                        includedSchemaEvolutionTypes, sinkDef.includedSchemaEvolutionTypes)
+                && Objects.equals(parallelism, sinkDef.parallelism);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, config, includedSchemaEvolutionTypes);
+        return Objects.hash(type, name, config, includedSchemaEvolutionTypes, parallelism);
     }
 }
