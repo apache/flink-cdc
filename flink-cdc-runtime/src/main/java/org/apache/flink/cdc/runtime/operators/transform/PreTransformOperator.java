@@ -411,18 +411,16 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
     private CreateTableEvent transformCreateTableEvent(CreateTableEvent createTableEvent) {
         TableId tableId = createTableEvent.tableId();
-        for (Tuple2<Selectors, SchemaMetadataTransform> transform : schemaMetadataTransformers) {
-            Selectors selectors = transform.f0;
-            if (selectors.isMatch(tableId)) {
-                createTableEvent =
-                        new CreateTableEvent(
-                                tableId,
-                                transformSchemaMetaData(
-                                        createTableEvent.getSchema(), transform.f1));
-            }
-        }
-
-        cachePreTransformProcessor(tableId, createTableEvent.getSchema());
+        Schema originalSchema = createTableEvent.getSchema();
+        LinkedHashSet<Schema> newSchemas =
+                schemaMetadataTransformers.stream()
+                        .filter(transform -> transform.f0.isMatch(tableId))
+                        .map(transform -> transformSchemaMetaData(originalSchema, transform.f1))
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+        SchemaUtils.validateMetaSchemaCompatibility(newSchemas);
+        Schema commonSchema = newSchemas.isEmpty() ? originalSchema : newSchemas.iterator().next();
+        createTableEvent = new CreateTableEvent(tableId, commonSchema);
+        cachePreTransformProcessor(tableId, commonSchema);
         if (preTransformProcessorMap.containsKey(tableId)) {
             return preTransformProcessorMap
                     .get(tableId)

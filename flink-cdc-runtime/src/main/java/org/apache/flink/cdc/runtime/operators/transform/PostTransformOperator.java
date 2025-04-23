@@ -55,6 +55,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -376,7 +377,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     }
 
     private Schema transformSchema(TableId tableId, Schema schema) {
-        List<Schema> newSchemas = new ArrayList<>();
+        LinkedHashSet<Schema> newSchemas = new LinkedHashSet<>();
         for (PostTransformer transform : transforms) {
             Selectors selectors = transform.getSelectors();
             if (selectors.isMatch(tableId) && transform.getProjection().isPresent()) {
