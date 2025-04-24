@@ -17,6 +17,11 @@ import java.util.function.Predicate;
 import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_BLACKLIST;
 import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
 
+/**
+ * Copied from Debezium 1.9.8.Final.
+ *
+ * <p>Line 146: add a method to update the tableFilter variable.
+ */
 public class RelationalTableFilters implements DataCollectionFilters {
 
     // Filter that filters tables based only on datbase/schema/system table filters but not table
