@@ -43,6 +43,7 @@ import org.testcontainers.lifecycle.Startables;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Stream;
 
 /** Basic class for testing {@link MySqlSource}. */
@@ -179,5 +180,11 @@ public abstract class MySqlSourceTestBase extends TestLogger {
                 return 0;
             }
         }
+    }
+
+    protected String getServerId(int parallelism) {
+        final Random random = new Random();
+        int serverId = random.nextInt(100) + 5400;
+        return serverId + "-" + (serverId + parallelism);
     }
 }

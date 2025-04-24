@@ -65,4 +65,16 @@ public class SchemaChangeRequest implements CoordinationRequest {
                 !isNoOpRequest(), "Unable to fetch source subTaskId for an align event.");
         return schemaChangeEvent;
     }
+
+    @Override
+    public String toString() {
+        return "SchemaChangeRequest{"
+                + "sourceSubTaskId="
+                + sourceSubTaskId
+                + ", sinkSubTaskId="
+                + sinkSubTaskId
+                + ", schemaChangeEvent="
+                + schemaChangeEvent
+                + '}';
+    }
 }

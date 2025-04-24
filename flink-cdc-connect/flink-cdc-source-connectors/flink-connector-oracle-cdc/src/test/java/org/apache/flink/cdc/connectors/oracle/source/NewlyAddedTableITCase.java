@@ -492,7 +492,9 @@ class NewlyAddedTableITCase extends OracleSourceTestBase {
             waitForSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
-            // wait task to stream phase
+            // sleep 10s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
+            // Otherwise, the restart job won't read newly added tables, and this test will be
+            // stuck.
             sleepMs(10000);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();

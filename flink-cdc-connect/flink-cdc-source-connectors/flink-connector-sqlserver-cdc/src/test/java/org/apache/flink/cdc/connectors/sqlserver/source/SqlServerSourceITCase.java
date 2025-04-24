@@ -37,7 +37,7 @@ import org.apache.flink.util.CloseableIterator;
 
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
-import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -124,6 +124,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
+    @Disabled("Disable enable backfill test until FLINK-34833 is resolved")
     void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(false, 25, USE_PRE_HIGHWATERMARK_HOOK);
@@ -163,6 +164,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
+    @Disabled("Disable enable backfill test until FLINK-34833 is resolved")
     void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
         List<String> records = testBackfillWhenWritingEvents(false, 25, USE_POST_LOWWATERMARK_HOOK);
@@ -277,24 +279,18 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    void testTableWithChunkColumnOfNoPrimaryKey() {
+    public void testTableWithChunkColumnOfNoPrimaryKey() throws Exception {
         String chunkColumn = "name";
-        try {
-            testSqlServerParallelSource(
-                    1,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
-                    new String[] {"dbo.customers"},
-                    false,
-                    RestartStrategies.noRestart(),
-                    chunkColumn);
-        } catch (Exception e) {
-            Assertions.assertThat(e)
-                    .hasStackTraceContaining(
-                            String.format(
-                                    "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                    chunkColumn, "id", "customer.dbo.customers"));
-        }
+        testSqlServerParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"dbo.customers"},
+                false,
+                RestartStrategies.noRestart(),
+                chunkColumn);
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     private List<String> testBackfillWhenWritingEvents(

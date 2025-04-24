@@ -17,25 +17,20 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
-import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
-import org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.runtime.operators.transform.TransformContext.lookupObjectByName;
 import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
 
 /**
@@ -43,16 +38,14 @@ import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METAD
  * computed columns.
  */
 public class ProjectionColumnProcessor {
-    private static final Logger LOG = LoggerFactory.getLogger(ProjectionColumnProcessor.class);
 
-    private PostTransformChangeInfo tableInfo;
-    private ProjectionColumn projectionColumn;
-    private String timezone;
-    private TransformExpressionKey transformExpressionKey;
-    private final List<UserDefinedFunctionDescriptor> udfDescriptors;
-    private final SupportedMetadataColumn[] supportedMetadataColumns;
-    private final transient List<Object> udfFunctionInstances;
-    private transient ExpressionEvaluator expressionEvaluator;
+    private final PostTransformChangeInfo tableInfo;
+    private final ProjectionColumn projectionColumn;
+    private final String timezone;
+    private final TransformExpressionKey transformExpressionKey;
+    private final Map<String, SupportedMetadataColumn> supportedMetadataColumns;
+    private final List<Object> udfFunctionInstances;
+    private final ExpressionEvaluator expressionEvaluator;
 
     public ProjectionColumnProcessor(
             PostTransformChangeInfo tableInfo,
@@ -60,11 +53,10 @@ public class ProjectionColumnProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             final List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
         this.tableInfo = tableInfo;
         this.projectionColumn = projectionColumn;
         this.timezone = timezone;
-        this.udfDescriptors = udfDescriptors;
         this.supportedMetadataColumns = supportedMetadataColumns;
         this.transformExpressionKey = generateTransformExpressionKey();
         this.expressionEvaluator =
@@ -79,7 +71,7 @@ public class ProjectionColumnProcessor {
             String timezone,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             List<Object> udfFunctionInstances,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            Map<String, SupportedMetadataColumn> supportedMetadataColumns) {
         return new ProjectionColumnProcessor(
                 tableInfo,
                 projectionColumn,
@@ -89,14 +81,10 @@ public class ProjectionColumnProcessor {
                 supportedMetadataColumns);
     }
 
-    public ProjectionColumn getProjectionColumn() {
-        return projectionColumn;
-    }
-
-    public Object evaluate(
-            BinaryRecordData record, long epochTime, String opType, Map<String, String> meta) {
+    public Object evaluate(Object[] rowData, TransformContext context) {
         try {
-            return expressionEvaluator.evaluate(generateParams(record, epochTime, opType, meta));
+            Object[] params = generateParams(rowData, context);
+            return expressionEvaluator.evaluate(params);
         } catch (InvocationTargetException e) {
             throw new RuntimeException(
                     String.format(
@@ -110,63 +98,26 @@ public class ProjectionColumnProcessor {
         }
     }
 
-    private Object[] generateParams(
-            BinaryRecordData record, long epochTime, String opType, Map<String, String> meta) {
+    private Object[] generateParams(Object[] rowData, TransformContext context) {
         List<Object> params = new ArrayList<>();
-        List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
 
         // 1 - Add referenced columns
-        RecordData.FieldGetter[] fieldGetters = tableInfo.getPreTransformedFieldGetters();
         LinkedHashSet<String> originalColumnNames =
                 new LinkedHashSet<>(projectionColumn.getOriginalColumnNames());
-        for (String originalColumnName : originalColumnNames) {
-            switch (originalColumnName) {
-                case MetadataColumns.DEFAULT_NAMESPACE_NAME:
-                    params.add(tableInfo.getNamespace());
-                    continue;
-                case MetadataColumns.DEFAULT_SCHEMA_NAME:
-                    params.add(tableInfo.getSchemaName());
-                    continue;
-                case MetadataColumns.DEFAULT_TABLE_NAME:
-                    params.add(tableInfo.getTableName());
-                    continue;
-                case MetadataColumns.DEFAULT_DATA_EVENT_TYPE:
-                    params.add(opType);
-                    continue;
-            }
-
-            boolean foundInMeta = false;
-            for (SupportedMetadataColumn supportedMetadataColumn : supportedMetadataColumns) {
-                if (supportedMetadataColumn.getName().equals(originalColumnName)) {
-                    params.add(supportedMetadataColumn.read(meta));
-                    foundInMeta = true;
-                    break;
-                }
-            }
-            if (foundInMeta) {
-                continue;
-            }
-
-            boolean argumentFound = false;
-            for (int i = 0; i < columns.size(); i++) {
-                Column column = columns.get(i);
-                if (column.getName().equals(originalColumnName)) {
-                    params.add(
-                            DataTypeConverter.convertToOriginal(
-                                    fieldGetters[i].getFieldOrNull(record), column.getType()));
-                    argumentFound = true;
-                    break;
-                }
-            }
-            if (!argumentFound) {
-                throw new IllegalArgumentException(
-                        "Failed to evaluate argument " + originalColumnName);
-            }
+        for (String columnName : originalColumnNames) {
+            params.add(
+                    lookupObjectByName(
+                            columnName,
+                            tableInfo,
+                            supportedMetadataColumns,
+                            rowData,
+                            null,
+                            context));
         }
 
         // 2 - Add time-sensitive function arguments
         params.add(timezone);
-        params.add(epochTime);
+        params.add(context.epochTime);
 
         // 3 - Add UDF function instances
         params.addAll(udfFunctionInstances);
@@ -176,6 +127,7 @@ public class ProjectionColumnProcessor {
     private TransformExpressionKey generateTransformExpressionKey() {
         List<String> argumentNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
+
         List<Column> columns = tableInfo.getPreTransformedSchema().getColumns();
         String scriptExpression = projectionColumn.getScriptExpression();
         Map<String, String> columnNameMap = projectionColumn.getColumnNameMap();
@@ -198,18 +150,20 @@ public class ProjectionColumnProcessor {
                                 argumentNames.add(columnNameMap.get(col.f0));
                                 paramTypes.add(col.f2);
                             });
-            Stream.of(supportedMetadataColumns)
-                    .filter(col -> col.getName().equals(originalColumnName))
+
+            supportedMetadataColumns.entrySet().stream()
+                    .filter(col -> col.getValue().getName().equals(originalColumnName))
                     .findFirst()
                     .ifPresent(
                             col -> {
-                                argumentNames.add(columnNameMap.get(col.getName()));
-                                paramTypes.add(col.getJavaClass());
+                                argumentNames.add(columnNameMap.get(col.getValue().getName()));
+                                paramTypes.add(col.getValue().getJavaClass());
                             });
         }
 
         argumentNames.add(JaninoCompiler.DEFAULT_TIME_ZONE);
         paramTypes.add(String.class);
+
         argumentNames.add(JaninoCompiler.DEFAULT_EPOCH_TIME);
         paramTypes.add(Long.class);
 
