@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -57,6 +58,7 @@ import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -1049,23 +1051,24 @@ class FlinkParallelizedPipelineITCase {
         sourceConfig.set(
                 DistributedSourceOptions.DISTRIBUTED_TABLES, traits == SourceTraits.DISTRIBUTED);
         sourceConfig.set(DistributedSourceOptions.TABLE_COUNT, UPSTREAM_TABLE_COUNT);
-        if (sourceParallelism != null) {
-            sourceConfig.set(PipelineOptions.PIPELINE_PARALLELISM, sourceParallelism);
-        }
         SourceDef sourceDef =
                 new SourceDef(
                         DistributedDataSourceFactory.IDENTIFIER,
                         "Distributed Source",
-                        sourceConfig);
+                        sourceConfig,
+                        sourceParallelism);
 
         // Setup value sink
         Configuration sinkConfig = new Configuration();
-        if (sinkParallelism != null) {
-            sinkConfig.set(PipelineOptions.PIPELINE_PARALLELISM, sinkParallelism);
-        }
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
         sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
-        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+        SinkDef sinkDef =
+                new SinkDef(
+                        ValuesDataFactory.IDENTIFIER,
+                        "Value Sink",
+                        sinkConfig,
+                        Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
+                        sinkParallelism);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
