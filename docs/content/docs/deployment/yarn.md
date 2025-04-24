@@ -79,17 +79,6 @@ echo "stop" | ./bin/yarn-session.sh -id application_XXXXX_XXX
 
 After starting YARN session, you can now access the Flink Web UI through the URL printed in the last lines of the command output, or through the YARN ResourceManager web UI.
 
-Then, you need to add some configs to your flink-conf.yaml:
-
-```yaml
-rest.bind-port: {{REST_PORT}}
-rest.address: {{NODE_IP}}
-execution.target: yarn-session
-yarn.application.id: {{YARN_APPLICATION_ID}}
-```
-
-{{REST_PORT}} and {{NODE_IP}} should be replaced by the actual values of your JobManager Web Interface, and {{YARN_APPLICATION_ID}} should be replaced by the actual YARN application ID of Flink.
-
 ### Set up Flink CDC
 Download the tar file of Flink CDC from [release page](https://github.com/apache/flink-cdc/releases), then extract the archive:
 
@@ -128,8 +117,16 @@ sink:
 pipeline:
  name: Sync MySQL Database to Doris
  parallelism: 2
-
+ flink-conf:
+   rest.bind-port: {{REST_PORT}}
+   rest.address: {{NODE_IP}}
+   execution.target: yarn-session
+   yarn.application.id: {{YARN_APPLICATION_ID}}
+   execution.checkpointing.interval: 2min
+   #If you need to restore from a savepoint, configure the following parameters:
+   #execution.savepoint.path: hdfs:///flink/savepoint-1537
 ```
+{{REST_PORT}} and {{NODE_IP}} should be replaced by the actual values of your JobManager Web Interface, and {{YARN_APPLICATION_ID}} should be replaced by the actual YARN application ID of Flink.
 
 You need to modify the configuration file according to your needs.
 Finally, submit job to Flink Yarn Session cluster using Cli.
@@ -149,19 +146,28 @@ Job Description: Sync MySQL Database to Doris
 
 You can find a job named `Sync MySQL Database to Doris` running through Flink Web UI.
 
-# Yarn Application Mode
+## Yarn Application Mode
 The Yarn Application mode is the recommended approach for running Flink jobs on a Yarn cluster. It offers more flexible resource management and allocation, enabling better utilization of cluster resources.
+
+Modify the running mode of the `mysql-to-doris.yaml` job to Yarn Application mode:
+```yaml
+...
+pipeline:
+ name: Sync MySQL Database to Doris
+ parallelism: 2
+ flink:
+   execution.target: yarn-application
+   execution.checkpointing.interval: 2min
+   #If you need to restore from a savepoint, configure the following parameters:
+   #execution.savepoint.path: hdfs:///flink/savepoint-1537
+```
 
 To submit a job to a Flink Yarn Application cluster using the CLI:
 ```bash
 cd /path/flink-cdc-*
-./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
+./bin/flink-cdc.sh mysql-to-doris.yaml
 ````
-Or resuming Flink-CDC job from Savepoint:
-```bash
-cd /path/flink-cdc-*
-./bin/flink-cdc.sh -t yarn-application -s hdfs:///flink/savepoint-1537 -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
-```
+
 After successful submission, the return information is as follows:
 ```bash
 Pipeline has been submitted to cluster.

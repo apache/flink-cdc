@@ -77,17 +77,6 @@ echo "stop" | ./bin/yarn-session.sh -id application_XXXXX_XXX
 
 启动 Yarn 会话之后，即可通过命令输出最后一行打印的 URL 或者 YARN ResourceManager Web UI 访问 Flink Web UI。
 
-然后，需要向 flink-conf.yaml 添加一些配置：
-
-```yaml
-rest.bind-port: {{REST_PORT}}
-rest.address: {{NODE_IP}}
-execution.target: yarn-session
-yarn.application.id: {{YARN_APPLICATION_ID}}
-```
-
-{{REST_PORT}} 和 {{NODE_IP}} 需要替换为 JobManager Web 接口的实际值，{{YARN_APPLICATION_ID}} 则需替换为 Flink 实际的 Yarn 应用 ID。
-
 ### 配置 Flink CDC
 从[发布页面](https://github.com/apache/flink-cdc/releases)下载 Flink CDC 的 tar 文件，然后提取该归档文件：
 
@@ -126,8 +115,16 @@ sink:
 pipeline:
  name: Sync MySQL Database to Doris
  parallelism: 2
-
+ flink-conf:
+   rest.bind-port: {{REST_PORT}}
+   rest.address: {{NODE_IP}}
+   execution.target: yarn-session
+   yarn.application.id: {{YARN_APPLICATION_ID}}
+   execution.checkpointing.interval: 2min
+   #如果需要从savepoint恢复，则配置以下参数
+   #execution.savepoint.path: hdfs:///flink/savepoint-1537
 ```
+{{REST_PORT}} 和 {{NODE_IP}} 需要替换为 JobManager Web 接口的实际值，{{YARN_APPLICATION_ID}} 则需替换为 Flink 实际的 Yarn 应用 ID。
 
 你可以按需修改配置文件。
 最后，通过 Cli 将作业提交至 Flink Yarn Session 集群。
@@ -147,19 +144,28 @@ Job Description: Sync MySQL Database to Doris
 
 你可以通过 Flink Web UI 找到一个名为 `Sync MySQL Database to Doris` 的作业。
 
-# Yarn Application 模式
+## Yarn Application 模式
 Yarn Application 模式是 Yarn 集群上运行 Flink 作业的推荐模式。对资源的管理和分配更加灵活，可以更好地利用集群资源。
+
+修改mysql-to-doris.yaml作业的运行方式为Yarn Application模式：
+```yaml
+...
+pipeline:
+ name: Sync MySQL Database to Doris
+ parallelism: 2
+ flink:
+   execution.target: yarn-application
+   execution.checkpointing.interval: 2min
+   #如果需要从savepoint恢复，则配置以下参数
+   #execution.savepoint.path: hdfs:///flink/savepoint-1537
+```
 
 通过Cli将作业提交至 Flink Yarn Application 集群。
 ```bash
 cd /path/flink-cdc-*
-./bin/flink-cdc.sh -t yarn-application -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
+./bin/flink-cdc.sh mysql-to-doris.yaml
 ```
-或者从savepoint恢复Flink-CDC作业：
-```bash
-cd /path/flink-cdc-*
-./bin/flink-cdc.sh -t yarn-application -s hdfs:///flink/savepoint-1537 -Dexecution.checkpointing.interval=2min mysql-to-doris.yaml
-```
+
 提交成功将返回如下信息：
 ```bash
 Pipeline has been submitted to cluster.

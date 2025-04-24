@@ -40,8 +40,10 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,6 +64,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
     private static final String MODEL_KEY = "model";
+    private static final String FLINK_KEY = "flink-conf";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
@@ -99,7 +102,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
 
-    private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+    private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
     /** Parse the specified pipeline definition file. */
     @Override
@@ -116,9 +119,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         return parse(mapper.readTree(pipelineDefText), globalPipelineConfig);
     }
 
-    private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
-            throws Exception {
-
+    private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig) {
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
         List<UdfDef> udfDefs = new ArrayList<>();
@@ -131,6 +132,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
+
+            ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(FLINK_KEY);
         }
 
         // Pipeline configs are optional
@@ -376,5 +379,20 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         .asText();
         Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
         return new ModelDef(name, model, properties);
+    }
+
+    public static Map<String, String> getFlinkConfigFromPipelineDef(Path pipelineDefPath)
+            throws IOException {
+        FileSystem fileSystem = FileSystem.get(pipelineDefPath.toUri());
+        try (FSDataInputStream pipelineInStream = fileSystem.open(pipelineDefPath)) {
+            JsonNode pipelineDefJsonNode = mapper.readTree(pipelineInStream);
+            return Optional.ofNullable(pipelineDefJsonNode.get(PIPELINE_KEY))
+                    .map(node -> node.get(FLINK_KEY))
+                    .map(
+                            flinkNode ->
+                                    mapper.convertValue(
+                                            flinkNode, new TypeReference<Map<String, String>>() {}))
+                    .orElse(Collections.emptyMap());
+        }
     }
 }
