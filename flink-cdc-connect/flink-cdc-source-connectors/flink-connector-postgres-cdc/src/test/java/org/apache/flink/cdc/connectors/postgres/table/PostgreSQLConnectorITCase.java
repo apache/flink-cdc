@@ -264,8 +264,36 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true})
     public void testStartupFromCommittedOffset(boolean parallelismSnapshot) throws Exception {
-        setup(parallelismSnapshot);
+        setup(true);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'first','first description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'second','second description',0.2);");
+        }
+
+        // newly create slot's confirmed lsn is latest. We will test whether committed mode starts
+        // from here.
+        String slotName = getSlotName();
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            // TODO: Remove it after adding publication to an existing replication slot.
+            statement.execute("CREATE PUBLICATION dbz_publication FOR TABLE inventory.products");
+            statement.execute(
+                    String.format(
+                            "select pg_create_logical_replication_slot('%s','pgoutput');",
+                            slotName));
+        }
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'thirth','thirth description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'forth','forth description',0.2);");
+        }
 
         String sourceDDL =
                 String.format(
@@ -284,7 +312,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'database-name' = '%s',"
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '0',"
                                 + " 'scan.startup.mode' = 'committed-offset'"
@@ -296,8 +325,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
-                        parallelismSnapshot,
-                        getSlotName());
+                        slotName);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -307,68 +335,17 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
 
-        // async submit first job run, this run is only meant to create an existing replication slot
-        TableResult firstRunResult =
-                tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        // wait for the source startup, we don't have a better way to wait it, use sleep
-        // for now
-        Thread.sleep(10000L);
-
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'first','first description',0.1);");
-            statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'second','second description',0.2);");
-        }
-
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
         waitForSinkSize("sink", 2);
 
-        String[] firstRunExpected =
+        String[] expected =
                 new String[] {
-                    "110,first,first description,0.100", "111,second,second description,0.200"
+                    "112,thirth,thirth description,0.100", "113,forth,forth description,0.200"
                 };
 
-        List<String> firstRunActual = TestValuesTableFactory.getResultsAsStrings("sink");
-        Assertions.assertThat(firstRunActual).containsExactlyInAnyOrder(firstRunExpected);
-
-        // stopping first job run and insert more record to database
-        firstRunResult.getJobClient().get().cancel().get();
-
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'third','third description',0.3);");
-        }
-
-        /*
-        start the second job run, this run should consume all records from the confirmed_restart_lsn created by the
-        first run
-        */
-        TableResult secondRunResult =
-                tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        Thread.sleep(10000L);
-
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
-                Statement statement = connection.createStatement()) {
-            statement.execute(
-                    "INSERT INTO inventory.products VALUES (default,'fourth','fourth description',0.4);");
-        }
-
-        waitForSinkSize("sink", 4);
-
-        String[] secondRunExpected =
-                new String[] {
-                    "110,first,first description,0.100",
-                    "111,second,second description,0.200",
-                    "112,third,third description,0.300",
-                    "113,fourth,fourth description,0.400"
-                };
-
-        List<String> secondRunActual = TestValuesTableFactory.getResultsAsStrings("sink");
-        Assertions.assertThat(secondRunActual).containsExactlyInAnyOrder(secondRunExpected);
-
-        secondRunResult.getJobClient().get().cancel().get();
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+        result.getJobClient().get().cancel().get();
     }
 
     @ParameterizedTest
