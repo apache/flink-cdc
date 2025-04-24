@@ -426,6 +426,19 @@ During a snapshot operation, the connector will query each included table to pro
         Experimental option, defaults to false.
       </td>
     </tr>
+    <tr>
+      <td>scan.read-changelog-as-append-only.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to convert the changelog stream to an append-only stream.<br>
+        This feature is only used in special scenarios where you need to save upstream table deletion messages. For example, in a logical deletion scenario, users are not allowed to physically delete downstream messages. In this case, this feature is used in conjunction with the row_kind metadata field. Therefore, the downstream can save all detailed data at first, and then use the row_kind field to determine whether to perform logical deletion.<br>
+        The option values are as follows:<br>
+          <li>true: All types of messages (including INSERT, DELETE, UPDATE_BEFORE, and UPDATE_AFTER) will be converted into INSERT messages.</li>
+          <li>false (default): All types of messages are sent as is.</li>
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

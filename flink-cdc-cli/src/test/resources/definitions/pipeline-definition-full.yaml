@@ -58,6 +58,7 @@ pipeline:
   parallelism: 4
   schema.change.behavior: evolve
   schema-operator.rpc-timeout: 1 h
+  execution.runtime-mode: STREAMING
   model:
     model-name: GET_EMBEDDING
     class-name: OpenAIEmbeddingModel

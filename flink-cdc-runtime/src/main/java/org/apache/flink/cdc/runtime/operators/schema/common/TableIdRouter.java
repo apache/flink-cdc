@@ -31,6 +31,7 @@ import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
@@ -94,5 +95,34 @@ public class TableIdRouter {
             return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
         }
         return TableId.parse(route.f1);
+    }
+
+    /**
+     * Group the source tables that conform to the same routing rule together. The total number of
+     * groups is less than or equal to the number of routing rules. For the source tables within
+     * each group, their table structures will be merged to obtain the widest table structure in
+     * that group. The structures of all tables within the group will be expanded to this widest
+     * table structure.
+     *
+     * @param tableIdSet The tables need to be grouped by the router
+     * @return The tables grouped by the router
+     */
+    public List<Set<TableId>> groupSourceTablesByRouteRule(Set<TableId> tableIdSet) {
+        if (routes.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Set<TableId>> routedTableIds =
+                routes.stream()
+                        .map(
+                                route -> {
+                                    return tableIdSet.stream()
+                                            .filter(
+                                                    tableId -> {
+                                                        return route.f0.isMatch(tableId);
+                                                    })
+                                            .collect(Collectors.toSet());
+                                })
+                        .collect(Collectors.toList());
+        return routedTableIds;
     }
 }

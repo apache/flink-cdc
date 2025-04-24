@@ -83,7 +83,6 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
@@ -128,6 +127,8 @@ public class TransformParser {
                 Class<?> clazz = Class.forName(udf.getClasspath());
                 SqlReturnTypeInference returnTypeInference;
                 ScalarFunction function = ScalarFunctionImpl.create(clazz, "eval");
+                Preconditions.checkNotNull(
+                        function, "UDF function must provide at least one `eval` method.");
                 if (udf.getReturnTypeHint() != null) {
                     // This UDF has return type hint annotation
                     returnTypeInference =
@@ -186,7 +187,7 @@ public class TransformParser {
     }
 
     public static SqlSelect parseSelect(String statement) {
-        SqlNode sqlNode = null;
+        SqlNode sqlNode;
         try {
             sqlNode = getCalciteParser(statement).parseQuery();
         } catch (SqlParseException e) {
@@ -285,17 +286,19 @@ public class TransformParser {
 
         expandWildcard(sqlSelect, columns);
         RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
-        Map<String, RelDataType> relDataTypeMap =
+        RelDataType[] relDataTypes =
                 relNode.getRowType().getFieldList().stream()
-                        .collect(
-                                Collectors.toMap(
-                                        RelDataTypeField::getName, RelDataTypeField::getType));
+                        .map(RelDataTypeField::getType)
+                        .toArray(RelDataType[]::new);
         Map<String, Column> originalColumnMap =
                 columns.stream().collect(Collectors.toMap(Column::getName, column -> column));
         List<ProjectionColumn> projectionColumns = new ArrayList<>();
         Map<String, Integer> addedProjectionColumnNames = new HashMap<>();
 
-        for (SqlNode sqlNode : sqlSelect.getSelectList()) {
+        SqlNodeList selectExpressionList = sqlSelect.getSelectList();
+        for (int i = 0; i < selectExpressionList.size(); i++) {
+            SqlNode sqlNode = selectExpressionList.get(i);
+            RelDataType relDataType = relDataTypes[i];
             ProjectionColumn projectionColumn;
 
             // A projection column could be <EXPR> AS <IDENTIFIER>...
@@ -330,7 +333,7 @@ public class TransformParser {
                             identifierExprNode.names.get(identifierExprNode.names.size() - 1);
                     projectionColumn =
                             resolveProjectionColumnFromIdentifier(
-                                    relDataTypeMap,
+                                    relDataType,
                                     originalColumnMap,
                                     originalName,
                                     columnName,
@@ -342,7 +345,7 @@ public class TransformParser {
                             ProjectionColumn.ofCalculated(
                                     columnName,
                                     DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                            relDataTypeMap.get(columnName)),
+                                            relDataType),
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
                                             exprNode, udfDescriptors, columnNameMap),
@@ -356,7 +359,7 @@ public class TransformParser {
                 String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
                 projectionColumn =
                         resolveProjectionColumnFromIdentifier(
-                                relDataTypeMap,
+                                relDataType,
                                 originalColumnMap,
                                 columnName,
                                 columnName,
@@ -384,7 +387,7 @@ public class TransformParser {
      * column or a metadata column).
      */
     public static ProjectionColumn resolveProjectionColumnFromIdentifier(
-            Map<String, RelDataType> relDataTypeMap,
+            RelDataType relDataType,
             Map<String, Column> originalColumnMap,
             String identifier,
             String projectedColumnName,
@@ -396,9 +399,7 @@ public class TransformParser {
             return ProjectionColumn.ofCalculated(
                     projectedColumnName,
                     // Metadata columns should never be null
-                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
-                                    relDataTypeMap.get(projectedColumnName))
-                            .notNull(),
+                    DataTypeConverter.convertCalciteRelDataTypeToDataType(relDataType).notNull(),
                     identifier,
                     columnNameMap.get(identifier),
                     Collections.singletonList(identifier),
@@ -462,7 +463,7 @@ public class TransformParser {
                     }
                     columnNames.add(columnName);
                 } else {
-                    throw new ParseException("Unrecognized projection: " + sqlBasicCall.toString());
+                    throw new ParseException("Unrecognized projection: " + sqlBasicCall);
                 }
             } else if (sqlNode instanceof SqlIdentifier) {
                 String columnName = sqlNode.toString();
@@ -559,77 +560,6 @@ public class TransformParser {
             statement.append(filterExpression);
         }
         return parseSelect(statement.toString());
-    }
-
-    public static SqlNode rewriteExpression(SqlNode sqlNode, Map<String, SqlNode> replaceMap) {
-        if (sqlNode instanceof SqlCall) {
-            SqlCall sqlCall = (SqlCall) sqlNode;
-
-            List<SqlNode> operands = sqlCall.getOperandList();
-            IntStream.range(0, sqlCall.operandCount())
-                    .forEach(
-                            i ->
-                                    sqlCall.setOperand(
-                                            i, rewriteExpression(operands.get(i), replaceMap)));
-            return sqlCall;
-        } else if (sqlNode instanceof SqlIdentifier) {
-            SqlIdentifier sqlIdentifier = (SqlIdentifier) sqlNode;
-            if (sqlIdentifier.names.size() == 1) {
-                String name = sqlIdentifier.names.get(0);
-                if (replaceMap.containsKey(name)) {
-                    return replaceMap.get(name);
-                }
-            }
-            return sqlIdentifier;
-        } else if (sqlNode instanceof SqlNodeList) {
-            SqlNodeList sqlNodeList = (SqlNodeList) sqlNode;
-            IntStream.range(0, sqlNodeList.size())
-                    .forEach(
-                            i ->
-                                    sqlNodeList.set(
-                                            i, rewriteExpression(sqlNodeList.get(i), replaceMap)));
-            return sqlNodeList;
-        } else {
-            return sqlNode;
-        }
-    }
-
-    // Filter expression might hold reference to a calculated column, which causes confusion about
-    // the sequence of projection and filtering operations. This function rewrites filtering about
-    // calculated columns to circumvent this problem.
-    public static String normalizeFilter(String projection, String filter) {
-        if (isNullOrWhitespaceOnly(projection) || isNullOrWhitespaceOnly(filter)) {
-            return filter;
-        }
-
-        SqlSelect sqlSelect = parseProjectionExpression(projection);
-        if (sqlSelect.getSelectList().isEmpty()) {
-            return filter;
-        }
-
-        Map<String, SqlNode> calculatedExpression = new HashMap<>();
-        for (SqlNode sqlNode : sqlSelect.getSelectList()) {
-            if (sqlNode instanceof SqlBasicCall) {
-                SqlBasicCall sqlBasicCall = (SqlBasicCall) sqlNode;
-                if (SqlKind.AS.equals(sqlBasicCall.getOperator().kind)) {
-                    List<SqlNode> operandList = sqlBasicCall.getOperandList();
-                    if (operandList.size() == 2) {
-                        SqlIdentifier alias = (SqlIdentifier) operandList.get(1);
-                        String name = alias.names.get(alias.names.size() - 1);
-                        SqlNode expression = operandList.get(0);
-                        calculatedExpression.put(name, expression);
-                    }
-                }
-            }
-        }
-
-        SqlNode sqlFilter = parseFilterExpression(filter).getWhere();
-        sqlFilter = rewriteExpression(sqlFilter, calculatedExpression);
-        if (sqlFilter != null) {
-            return sqlFilter.toString();
-        } else {
-            return filter;
-        }
     }
 
     public static boolean hasAsterisk(@Nullable String projection) {

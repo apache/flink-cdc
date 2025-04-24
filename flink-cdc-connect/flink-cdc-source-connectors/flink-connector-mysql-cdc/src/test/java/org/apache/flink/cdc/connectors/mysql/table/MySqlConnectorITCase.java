@@ -41,9 +41,9 @@ import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import org.assertj.core.api.Assertions;
-import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -65,7 +65,7 @@ import java.util.stream.Stream;
 import static org.apache.flink.api.common.JobStatus.RUNNING;
 import static org.apache.flink.cdc.connectors.mysql.LegacyMySqlSourceTest.currentMySqlLatestOffset;
 import static org.apache.flink.cdc.connectors.mysql.MySqlTestUtils.waitForJobStatus;
-import static org.assertj.core.api.Assumptions.assumeThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Integration tests for MySQL Table source. */
 class MySqlConnectorITCase extends MySqlSourceTestBase {
@@ -330,8 +330,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
         // async submit job
         TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
-        // wait until the snapshot phase finished
-        waitForSinkSize("sink", 11);
+        // wait until the snapshot phase finished so that binlog will be read later in binlog phase.
+        waitForSinkSize("sink", 12);
 
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -405,12 +405,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testCheckpointIsOptionalUnderSingleParallelism(boolean incrementalSnapshot)
-            throws Exception {
-        setup(incrementalSnapshot);
-        assumeThat(incrementalSnapshot).isTrue();
+    @Test
+    void testCheckpointIsOptionalUnderSingleParallelism() throws Exception {
+        setup(true);
         env.setParallelism(1);
         // check the checkpoint is optional when parallelism is 1
         env.getCheckpointConfig().disableCheckpointing();
@@ -431,7 +428,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'server-id' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
@@ -442,9 +439,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        incrementalSnapshot,
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
 
         // async submit job
@@ -831,12 +827,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testBigTableWithHugeSplits(boolean incrementalSnapshot) throws Exception {
-        // only check when incremental snapshot is enabled
-        Assumptions.assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+    @Test
+    void testBigTableWithHugeSplits() throws Exception {
+        setup(true);
         final int tableRowNumber = 10;
         fullTypesMySql57Database.createAndInitialize();
         try (Connection connection = fullTypesMySql57Database.getJdbcConnection();
@@ -877,7 +870,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         fullTypesMySql57Database.getUsername(),
                         fullTypesMySql57Database.getPassword(),
                         fullTypesMySql57Database.getDatabaseName(),
-                        getServerId(incrementalSnapshot));
+                        getServerId(true));
         String sinkDDL =
                 "CREATE TABLE sink ("
                         + " `id` BIGINT NOT NULL,"
@@ -917,7 +910,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Lists.newArrayList("+U[0, 1024]", "+U[1, 1025]", "+U[2, 2048]", "+U[3, 2049]"));
 
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
@@ -1021,7 +1014,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         //  keyby shuffle before "values" upsert sink. We should assert merged result once
         //  https://issues.apache.org/jira/browse/FLINK-24511 is fixed.
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
-        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 
@@ -1098,11 +1091,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testPrimaryKeyWithVarbinaryType(boolean incrementalSnapshot) throws Exception {
-        Assumptions.assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+    @Test
+    void testPrimaryKeyWithVarbinaryType() throws Exception {
+        setup(true);
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -1131,8 +1122,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "varbinary_pk_table",
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
 
         // async submit job
@@ -1245,11 +1236,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testReadingWithDotTableName(boolean incrementalSnapshot) throws Exception {
-        Assumptions.assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+    @Test
+    void testReadingWithDotTableName() throws Exception {
+        setup(true);
         customer3_0Database.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -1267,7 +1256,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
@@ -1278,9 +1267,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         customer3_0Database.getPassword(),
                         customer3_0Database.getDatabaseName(),
                         "customers3.0",
-                        incrementalSnapshot,
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
         // async submit job
         TableResult result =
@@ -1387,11 +1375,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testDdlWithDefaultStringValue(boolean incrementalSnapshot) throws Exception {
-        Assumptions.assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+    @Test
+    void testDdlWithDefaultStringValue() throws Exception {
+        setup(true);
         env.setRestartStrategy(RestartStrategies.noRestart());
         customerDatabase.createAndInitialize();
         String sourceDDL =
@@ -1410,7 +1396,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
@@ -1421,9 +1407,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
                         "default_value_test.*",
-                        incrementalSnapshot,
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
         // async submit job
         TableResult result = tEnv.executeSql("SELECT * FROM default_value_test");
@@ -1525,11 +1510,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         jobClient.cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testAlterWithDefaultStringValue(boolean incrementalSnapshot) throws Exception {
-        Assumptions.assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+    @Test
+    void testAlterWithDefaultStringValue() throws Exception {
+        setup(true);
         env.setRestartStrategy(RestartStrategies.noRestart());
         customerDatabase.createAndInitialize();
         String sourceDDL =
@@ -1548,7 +1531,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'password' = '%s',"
                                 + " 'database-name' = '%s',"
                                 + " 'table-name' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
@@ -1559,9 +1542,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         customerDatabase.getPassword(),
                         customerDatabase.getDatabaseName(),
                         "default_value_test",
-                        incrementalSnapshot,
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
         // async submit job
         TableResult result = tEnv.executeSql("SELECT * FROM default_value_test");
@@ -1682,13 +1664,11 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testStartupFromSpecificGtidSet(boolean incrementalSnapshot) throws Exception {
+    @Test
+    void testStartupFromSpecificGtidSet() throws Exception {
         // Unfortunately the legacy MySQL source without incremental snapshot does not support
         // starting from GTID set
-        Assumptions.assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+        setup(true);
 
         inventoryDatabase.createAndInitialize();
 
@@ -1731,7 +1711,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'scan.startup.mode' = 'specific-offset',"
                                 + " 'scan.startup.specific-offset.gtid-set' = '%s',"
-                                + " 'scan.incremental.snapshot.enabled' = '%s'"
+                                + " 'scan.incremental.snapshot.enabled' = 'true'"
                                 + ")",
                         MYSQL_CONTAINER.getHost(),
                         MYSQL_CONTAINER.getDatabasePort(),
@@ -1739,8 +1719,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "products",
-                        offset.getGtidSet(),
-                        incrementalSnapshot);
+                        offset.getGtidSet());
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
@@ -2000,11 +1979,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testReadingWithMultiMaxValue(boolean incrementalSnapshot) throws Exception {
-        setup(incrementalSnapshot);
-        assumeThat(incrementalSnapshot).isTrue();
+    @Test
+    void testReadingWithMultiMaxValue() throws Exception {
+        setup(true);
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -2031,8 +2008,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "multi_max_table",
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
 
         // async submit job
@@ -2130,11 +2107,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "3. The server id has been used by other sync tools like canal, debezium and so on.\n");
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testBinlogTableMetadataDeserialization(boolean incrementalSnapshot) throws Exception {
-        setup(incrementalSnapshot);
-        assumeThat(incrementalSnapshot).isTrue();
+    @Test
+    void testBinlogTableMetadataDeserialization() throws Exception {
+        setup(true);
         binlogDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -2166,8 +2141,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         TEST_PASSWORD,
                         binlogDatabase.getDatabaseName(),
                         "binlog_metadata",
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
 
         // async submit job
@@ -2281,11 +2256,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         }
     }
 
-    @ParameterizedTest(name = "incrementalSnapshot = {0}")
-    @ValueSource(booleans = {true, false})
-    void testBinaryHandlingModeWithBase64(boolean incrementalSnapshot) throws Exception {
-        assumeThat(incrementalSnapshot).isTrue();
-        setup(incrementalSnapshot);
+    @Test
+    void testBinaryHandlingModeWithBase64() throws Exception {
+        setup(true);
         inventoryDatabase.createAndInitialize();
         String sourceDDL =
                 String.format(
@@ -2316,8 +2289,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                         TEST_PASSWORD,
                         inventoryDatabase.getDatabaseName(),
                         "varbinary_base64_table",
-                        getServerId(incrementalSnapshot),
-                        getSplitSize(incrementalSnapshot));
+                        getServerId(true),
+                        getSplitSize(true));
         tEnv.executeSql(sourceDDL);
 
         // async submit job
@@ -2359,6 +2332,108 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                     "-D[7, BAQEBAQEBAY=, 2021-03-08, 30, 500, flink-sql]"
                 };
         assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest(name = "incrementalSnapshot = {0}")
+    @ValueSource(booleans = {true, false})
+    public void testReadChangelogAppendOnly(boolean incrementalSnapshot) throws Exception {
+        setup(incrementalSnapshot);
+        userDatabase1.createAndInitialize();
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE mysql_users ("
+                                + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
+                                + " table_name STRING METADATA VIRTUAL,"
+                                + " row_kind STRING METADATA FROM 'row_kind' VIRTUAL,"
+                                + " `id` DECIMAL(20, 0) NOT NULL,"
+                                + " name STRING,"
+                                + " address STRING,"
+                                + " phone_number STRING,"
+                                + " email STRING,"
+                                + " age INT,"
+                                + " primary key (`id`) not enforced"
+                                + ") WITH ("
+                                + " 'connector' = 'mysql-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'server-id' = '%s',"
+                                + " 'server-time-zone' = 'UTC',"
+                                + " 'scan.incremental.snapshot.chunk.size' = '%s',"
+                                + " 'scan.read-changelog-as-append-only.enabled' = 'true'"
+                                + ")",
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
+                        userDatabase1.getUsername(),
+                        userDatabase1.getPassword(),
+                        userDatabase1.getDatabaseName(),
+                        "user_table_.*",
+                        incrementalSnapshot,
+                        getServerId(incrementalSnapshot),
+                        getSplitSize(incrementalSnapshot));
+
+        String sinkDDL =
+                "CREATE TABLE sink ("
+                        + " database_name STRING,"
+                        + " table_name STRING,"
+                        + " row_kind STRING,"
+                        + " `id` DECIMAL(20, 0) NOT NULL,"
+                        + " name STRING,"
+                        + " address STRING,"
+                        + " phone_number STRING,"
+                        + " email STRING,"
+                        + " age INT,"
+                        + " primary key (database_name, table_name, id) not enforced"
+                        + ") WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM mysql_users");
+
+        // wait for snapshot finished and begin binlog
+        waitForSinkSize("sink", 2);
+
+        try (Connection connection = userDatabase1.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+
+            statement.execute(
+                    "INSERT INTO user_table_1_2 VALUES (200,'user_200','Wuhan',123567891234);");
+            statement.execute(
+                    "INSERT INTO user_table_1_1 VALUES (300,'user_300','Hangzhou',123567891234, 'user_300@foo.com');");
+            statement.execute("UPDATE user_table_1_1 SET address='Beijing' WHERE id=300;");
+            statement.execute("UPDATE user_table_1_2 SET phone_number=88888888 WHERE id=121;");
+            statement.execute("DELETE FROM user_table_1_1 WHERE id=111;");
+        }
+
+        // waiting for binlog finished (5 more events)
+        waitForSinkSize("sink", 7);
+
+        List<String> expected =
+                Stream.of(
+                                "+I[%s, user_table_1_1, +I, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_2, +I, 121, user_121, Shanghai, 123567891234, null, null]",
+                                "+I[%s, user_table_1_2, +I, 200, user_200, Wuhan, 123567891234, null, null]",
+                                "+I[%s, user_table_1_1, +I, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+I[%s, user_table_1_1, +U, 300, user_300, Beijing, 123567891234, user_300@foo.com, null]",
+                                "+I[%s, user_table_1_2, +U, 121, user_121, Shanghai, 88888888, null, null]",
+                                "+I[%s, user_table_1_1, -D, 111, user_111, Shanghai, 123567891234, user_111@foo.com, null]",
+                                "+I[%s, user_table_1_1, -U, 300, user_300, Hangzhou, 123567891234, user_300@foo.com, null]",
+                                "+I[%s, user_table_1_2, -U, 121, user_121, Shanghai, 123567891234, null, null]")
+                        .map(s -> String.format(s, userDatabase1.getDatabaseName()))
+                        .sorted()
+                        .collect(Collectors.toList());
+
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
 }
