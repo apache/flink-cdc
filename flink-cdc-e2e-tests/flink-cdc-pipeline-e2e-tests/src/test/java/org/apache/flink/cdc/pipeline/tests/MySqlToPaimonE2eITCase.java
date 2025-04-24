@@ -107,14 +107,7 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "1", "1",
-        "2", "1",
-        "4", "1",
-        "1", "4",
-        "2", "4",
-        "4", "4"
-    })
+    @CsvSource({"1, 1", "2, 1", "4, 1", "1, 4", "2, 4", "4, 4"})
     void testSyncWholeDatabase(int sourceParallelism, int sinkParallelism) throws Exception {
         String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
@@ -228,14 +221,7 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     }
 
     @ParameterizedTest
-    @CsvSource({
-        "1", "1",
-        "2", "1",
-        "4", "1",
-        "1", "4",
-        "2", "4",
-        "4", "4"
-    })
+    @CsvSource({"1, 1", "2, 1", "4, 1", "1, 4", "2, 4", "4, 4"})
     public void testSinkToAppendOnlyTable(int sourceParallelism, int sinkParallelism)
             throws Exception {
         String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
