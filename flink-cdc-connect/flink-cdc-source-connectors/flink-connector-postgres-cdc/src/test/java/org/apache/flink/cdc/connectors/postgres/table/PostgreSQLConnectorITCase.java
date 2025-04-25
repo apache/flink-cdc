@@ -327,7 +327,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                 Statement statement = connection.createStatement()) {
             // TODO: Remove it after adding publication to an existing replication slot.
             statement.execute(
-                    String.format("CREATE PUBLICATION %s FOR TABLE inventory.products", publicName));
+                    String.format(
+                            "CREATE PUBLICATION %s FOR TABLE inventory.products", publicName));
             statement.execute(
                     String.format(
                             "select pg_create_logical_replication_slot('%s','pgoutput');",
