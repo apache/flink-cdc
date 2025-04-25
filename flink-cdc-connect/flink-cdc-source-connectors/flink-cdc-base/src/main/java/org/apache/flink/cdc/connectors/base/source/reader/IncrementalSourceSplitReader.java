@@ -45,6 +45,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -161,12 +162,12 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
             } else {
                 currentSplitId = null;
             }
-            return dataIt == null ? finishedSplit(true) : forRecords(dataIt);
+            return dataIt == null ? finishedSplit(true) : forUnfinishedRecords(dataIt);
         } else if (currentFetcher instanceof IncrementalSourceScanFetcher) {
             dataIt = currentFetcher.pollSplitRecords();
             if (dataIt != null) {
                 // first fetch data of snapshot split, return and emit the records of snapshot split
-                return forRecords(dataIt);
+                return forUnfinishedRecords(dataIt);
             } else {
                 // (2) try to switch to stream split reading util current snapshot split finished
                 ChangeEventRecords finishedRecords;
@@ -214,10 +215,10 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         return currentFetcher == null || currentFetcher.isFinished();
     }
 
-    private ChangeEventRecords finishedSplit(boolean recycle) {
+    private ChangeEventRecords finishedSplit(boolean recycleScanFetcher) {
         final ChangeEventRecords finishedRecords =
                 ChangeEventRecords.forFinishedSplit(currentSplitId);
-        if (recycle) {
+        if (recycleScanFetcher) {
             closeScanFetcher();
         }
         currentSplitId = null;
@@ -233,10 +234,10 @@ public class IncrementalSourceSplitReader<C extends SourceConfig>
         finishedSplits.add(splitId);
         finishedSplits.add(STREAM_SPLIT_ID);
         currentSplitId = null;
-        return new ChangeEventRecords(null, null, finishedSplits);
+        return new ChangeEventRecords(splitId, Collections.emptyIterator(), finishedSplits);
     }
 
-    private ChangeEventRecords forRecords(Iterator<SourceRecords> dataIt) {
+    private ChangeEventRecords forUnfinishedRecords(Iterator<SourceRecords> dataIt) {
         return ChangeEventRecords.forRecords(currentSplitId, dataIt);
     }
 

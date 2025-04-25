@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
@@ -119,12 +120,12 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
                 LOG.info("No available split to read.");
             }
             dataIt = currentReader.pollSplitRecords();
-            return dataIt == null ? finishedSplit(true) : forRecords(dataIt);
+            return dataIt == null ? finishedSplit(true) : forUnfinishedRecords(dataIt);
         } else if (currentReader instanceof SnapshotSplitReader) {
             dataIt = currentReader.pollSplitRecords();
             if (dataIt != null) {
                 // first fetch data of snapshot split, return and emit the records of snapshot split
-                return forRecords(dataIt);
+                return forUnfinishedRecords(dataIt);
             } else {
                 // (2) try to switch to binlog split reading util current snapshot split finished
                 MySqlRecords finishedRecords;
@@ -157,7 +158,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
                     currentReader = getSnapshotSplitReader();
                     currentReader.submitSplit(nextSplit);
                 }
-                return MySqlRecords.forRecords(BINLOG_SPLIT_ID, dataIt);
+                return MySqlRecords.forUnfinishedRecords(BINLOG_SPLIT_ID, dataIt);
             } else {
                 // null will be returned after receiving suspend binlog event
                 // finish current binlog split reading
@@ -169,17 +170,17 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
         }
     }
 
-    private MySqlRecords finishedSplit(boolean recycle) {
+    private MySqlRecords finishedSplit(boolean recycleScanFetcher) {
         final MySqlRecords finishedRecords = MySqlRecords.forFinishedSplit(currentSplitId);
-        if (recycle) {
+        if (recycleScanFetcher) {
             closeSnapshotReader();
         }
         currentSplitId = null;
         return finishedRecords;
     }
 
-    private MySqlRecords forRecords(Iterator<SourceRecords> dataIt) {
-        return MySqlRecords.forRecords(currentSplitId, dataIt);
+    private MySqlRecords forUnfinishedRecords(Iterator<SourceRecords> dataIt) {
+        return MySqlRecords.forUnfinishedRecords(currentSplitId, dataIt);
     }
 
     /**
@@ -191,7 +192,7 @@ public class MySqlSplitReader implements SplitReader<SourceRecords, MySqlSplit> 
         finishedSplits.add(splitId);
         finishedSplits.add(BINLOG_SPLIT_ID);
         currentSplitId = null;
-        return new MySqlRecords(null, null, finishedSplits);
+        return new MySqlRecords(splitId, Collections.emptyIterator(), finishedSplits);
     }
 
     @Override

@@ -295,6 +295,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     }
 
     public Iterator<SourceRecords> pollWithoutBuffer() throws InterruptedException {
+        checkReadException();
         List<DataChangeEvent> batch = queue.poll();
         final List<SourceRecord> records = new ArrayList<>();
         for (DataChangeEvent event : batch) {
