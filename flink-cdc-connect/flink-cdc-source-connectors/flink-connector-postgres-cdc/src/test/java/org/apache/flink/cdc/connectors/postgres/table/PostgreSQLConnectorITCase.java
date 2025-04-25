@@ -47,6 +47,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
@@ -321,10 +322,12 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         // newly create slot's confirmed lsn is latest. We will test whether committed mode starts
         // from here.
         String slotName = getSlotName();
+        String publicName = "dbz_publication_" + new Random().nextInt(1000);
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             // TODO: Remove it after adding publication to an existing replication slot.
-            statement.execute("CREATE PUBLICATION dbz_publication FOR TABLE inventory.products");
+            statement.execute(
+                    String.format("CREATE PUBLICATION %s FOR TABLE inventory.products", publicName));
             statement.execute(
                     String.format(
                             "select pg_create_logical_replication_slot('%s','pgoutput');",
@@ -357,8 +360,9 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
-                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'decoding.plugin.name' = 'pgoutput',"
                                 + " 'slot.name' = '%s',"
+                                + " 'debezium.publication.name'  = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '0',"
                                 + " 'scan.startup.mode' = 'committed-offset'"
                                 + ")",
@@ -369,7 +373,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         POSTGRES_CONTAINER.getDatabaseName(),
                         "inventory",
                         "products",
-                        slotName);
+                        slotName,
+                        publicName);
         String sinkDDL =
                 "CREATE TABLE sink "
                         + " WITH ("
