@@ -331,7 +331,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '0',"
-                                + " 'scan.startup.mode' = 'committed-offset'"
+                                + " 'scan.startup.mode' = 'committed-offset',"
+                                + " 'decoding.plugin.name' = 'pgoutput'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),
                         POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
