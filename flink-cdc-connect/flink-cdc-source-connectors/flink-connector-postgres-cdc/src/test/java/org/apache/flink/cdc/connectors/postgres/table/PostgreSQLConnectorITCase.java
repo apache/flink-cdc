@@ -309,7 +309,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     @ParameterizedTest
     @ValueSource(booleans = {true})
     public void testStartupFromCommittedOffset(boolean parallelismSnapshot) throws Exception {
-        setup(true);
+        setup(parallelismSnapshot);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
