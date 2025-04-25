@@ -378,6 +378,21 @@ class PostgresSourceITCase extends PostgresTestBase {
     }
 
     @Test
+    void testReadSingleTableMutilpleFetch() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.snapshot.fetch.size", "2");
+        options.put("debezium.max.batch.size", "3");
+        testPostgresParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                options);
+    }
+
+    @Test
     void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
         // The data num is 21, set fetchSize = 22 to test the job is bounded.
         List<String> records =
@@ -1069,7 +1084,6 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
         Optional<JobClient> optionalJobClient = tableResult.getJobClient();
