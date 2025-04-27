@@ -50,6 +50,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,17 +185,10 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @ArgumentsSource(CustomArgumentsProvider.class)
+    @EnumSource
     void testDistributedTablesSourceInSingleParallelismWithLenientBehavior(
-            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
-            throws Exception {
-        runPipelineJob(
-                sinkApi,
-                sourceParallelism,
-                sinkParallelism,
-                1,
-                SourceTraits.DISTRIBUTED,
-                SchemaChangeBehavior.LENIENT);
+            ValuesDataSink.SinkApi sinkApi) throws Exception {
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -445,17 +439,10 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @ArgumentsSource(CustomArgumentsProvider.class)
+    @EnumSource
     void testDistributedTablesSourceInSingleParallelismWithIgnoreBehavior(
-            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
-            throws Exception {
-        runPipelineJob(
-                sinkApi,
-                sourceParallelism,
-                sinkParallelism,
-                1,
-                SourceTraits.DISTRIBUTED,
-                SchemaChangeBehavior.IGNORE);
+            ValuesDataSink.SinkApi sinkApi) throws Exception {
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.IGNORE);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -558,17 +545,10 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @ArgumentsSource(CustomArgumentsProvider.class)
-    void testRegularTablesSourceInSingleParallelism(
-            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
+    @EnumSource
+    void testRegularTablesSourceInSingleParallelism(ValuesDataSink.SinkApi sinkApi)
             throws Exception {
-        runPipelineJob(
-                sinkApi,
-                sourceParallelism,
-                sinkParallelism,
-                1,
-                SourceTraits.REGULAR,
-                SchemaChangeBehavior.LENIENT);
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.REGULAR, SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -774,17 +754,10 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @ArgumentsSource(CustomArgumentsProvider.class)
-    void testRegularTablesSourceMergedInSingleParallelism(
-            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
+    @EnumSource
+    void testRegularTablesSourceMergedInSingleParallelism(ValuesDataSink.SinkApi sinkApi)
             throws Exception {
-        runPipelineJob(
-                sinkApi,
-                sourceParallelism,
-                sinkParallelism,
-                1,
-                SourceTraits.MERGING,
-                SchemaChangeBehavior.LENIENT);
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.MERGING, SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
