@@ -68,7 +68,7 @@ class PostgresSourceExampleTest extends PostgresTestBase {
     private static final String TABLE_ID = SCHEMA_NAME + ".products";
 
     private static final String SLOT_NAME = "flink";
-    private static final String PLUGIN_NAME = "decoderbufs";
+    private static final String PLUGIN_NAME = "pgoutput";
     private static final long CHECKPOINT_INTERVAL_MS = 3000;
 
     private static final int DEFAULT_PARALLELISM = 2;

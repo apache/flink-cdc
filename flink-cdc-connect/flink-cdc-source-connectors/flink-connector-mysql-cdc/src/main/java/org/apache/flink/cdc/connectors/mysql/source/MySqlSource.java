@@ -32,6 +32,7 @@ import org.apache.flink.cdc.connectors.mysql.MySqlValidator;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
@@ -200,7 +201,22 @@ public class MySqlSource<T>
         validator.validate();
 
         final MySqlSplitAssigner splitAssigner;
-        if (!sourceConfig.getStartupOptions().isStreamOnly()) {
+        // In snapshot-only startup option, only split snapshots.
+        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+                boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                splitAssigner =
+                        new MySqlSnapshotSplitAssigner(
+                                sourceConfig,
+                                enumContext.currentParallelism(),
+                                new ArrayList<>(),
+                                isTableIdCaseSensitive,
+                                enumContext);
+            } catch (Exception e) {
+                throw new FlinkRuntimeException(
+                        "Failed to discover captured tables for enumerator", e);
+            }
+        } else if (!sourceConfig.getStartupOptions().isStreamOnly()) {
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
                 splitAssigner =

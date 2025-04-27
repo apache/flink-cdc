@@ -231,7 +231,8 @@ class TransformParserTest {
         testFilterExpression("QUARTER(dt)", "quarter(dt)");
         testFilterExpression("MONTH(dt)", "month(dt)");
         testFilterExpression("WEEK(dt)", "week(dt)");
-        testFilterExpression("DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\")");
+        testFilterExpression(
+                "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression(
                 "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
@@ -443,7 +444,8 @@ class TransformParserTest {
                         Column.physicalColumn("address", DataTypes.VARCHAR(50), "newAddress"),
                         Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
-                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
+                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"),
+                        Column.physicalColumn("op_type", DataTypes.TINYINT(), "op_type"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
@@ -465,7 +467,7 @@ class TransformParserTest {
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(
-                        "*, __namespace_name__, __schema_name__, __table_name__",
+                        "*, __namespace_name__, __schema_name__, __table_name__, __data_event_type__ AS op_type",
                         testColumns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0]);
@@ -480,6 +482,7 @@ class TransformParserTest {
                         "ProjectionColumn{column=`deposit` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
                         "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='$0', originalColumnNames=[weight], columnNameMap={weight=$0}}",
                         "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='$0', originalColumnNames=[height], columnNameMap={height=$0}}",
+                        "ProjectionColumn{column=`op_type` STRING NOT NULL, expression='__data_event_type__', scriptExpression='$0', originalColumnNames=[__data_event_type__], columnNameMap={__data_event_type__=$0}}",
                         "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='$0', originalColumnNames=[__namespace_name__], columnNameMap={__namespace_name__=$0}}",
                         "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='$0', originalColumnNames=[__schema_name__], columnNameMap={__schema_name__=$0}}",
                         "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='$0', originalColumnNames=[__table_name__], columnNameMap={__table_name__=$0}}");
@@ -570,25 +573,6 @@ class TransformParserTest {
                                 TransformParser.generateReferencedColumns(
                                         "id, 1 + 1", null, testColumns))
                 .isExactlyInstanceOf(ParseException.class);
-    }
-
-    @Test
-    void testNormalizeFilter() {
-        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", "a > 0 and b > 0"))
-                .isEqualTo("`a` > 0 AND `b` > 0");
-        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", null)).isNull();
-        Assertions.assertThat(
-                        TransformParser.normalizeFilter(
-                                "abs(a) as cal_a, char_length(b) as cal_b, c, d",
-                                "a > 4 and cal_a > 8 and cal_b < 17 and c != d"))
-                .isEqualTo("`a` > 4 AND ABS(`a`) > 8 AND CHAR_LENGTH(`b`) < 17 AND `c` <> `d`");
-
-        Assertions.assertThat(
-                        TransformParser.normalizeFilter(
-                                "x, y, z, 1 - x as u, 1 - y as v, 1 - z as w",
-                                "concat(u, concat(v, concat(w, x), y), z) != 10"))
-                .isEqualTo(
-                        "`concat`(1 - `x`, `concat`(1 - `y`, `concat`(1 - `z`, `x`), `y`), `z`) <> 10");
     }
 
     @Test

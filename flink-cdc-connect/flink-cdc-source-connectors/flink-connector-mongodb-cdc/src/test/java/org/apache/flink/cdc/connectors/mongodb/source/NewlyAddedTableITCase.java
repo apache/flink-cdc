@@ -786,6 +786,8 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             MongoDBAssertUtils.assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
+            // Wait 1s until snapshot phase finished, make sure the binlog data is not lost.
+            Thread.sleep(1000L);
 
             // step 3: make some changelog data for this round
             makeFirstPartOplogForAddressCollection(

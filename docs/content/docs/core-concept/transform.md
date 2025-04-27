@@ -472,9 +472,3 @@ The following built-in models are provided:
 | openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
 | openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
 | openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
-
-
-# Known limitations
-* Currently, transform doesn't work with route rules. It will be supported in future versions.
-* Computed columns cannot reference trimmed columns that do not present in final projection results. This will be fixed in future versions.
-* Regular matching of tables with different schemas is not supported. If necessary, multiple rules need to be written.

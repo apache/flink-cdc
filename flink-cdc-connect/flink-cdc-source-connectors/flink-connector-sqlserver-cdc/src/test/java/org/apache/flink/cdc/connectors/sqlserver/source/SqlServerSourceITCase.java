@@ -37,7 +37,6 @@ import org.apache.flink.util.CloseableIterator;
 
 import io.debezium.jdbc.JdbcConnection;
 import org.apache.commons.lang3.StringUtils;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -280,24 +279,18 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     }
 
     @Test
-    void testTableWithChunkColumnOfNoPrimaryKey() {
+    public void testTableWithChunkColumnOfNoPrimaryKey() throws Exception {
         String chunkColumn = "name";
-        try {
-            testSqlServerParallelSource(
-                    1,
-                    FailoverType.NONE,
-                    FailoverPhase.NEVER,
-                    new String[] {"dbo.customers"},
-                    false,
-                    RestartStrategies.noRestart(),
-                    chunkColumn);
-        } catch (Exception e) {
-            Assertions.assertThat(e)
-                    .hasStackTraceContaining(
-                            String.format(
-                                    "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                    chunkColumn, "id", "customer.dbo.customers"));
-        }
+        testSqlServerParallelSource(
+                1,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"dbo.customers"},
+                false,
+                RestartStrategies.noRestart(),
+                chunkColumn);
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     private List<String> testBackfillWhenWritingEvents(

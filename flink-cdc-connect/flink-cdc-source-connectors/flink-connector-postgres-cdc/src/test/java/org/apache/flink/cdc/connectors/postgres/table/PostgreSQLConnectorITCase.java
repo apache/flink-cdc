@@ -31,9 +31,15 @@ import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -41,7 +47,9 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Stream;
 
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
@@ -54,9 +62,44 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
+    /** Use postgis plugin to test the GIS type. */
+    protected static final DockerImageName POSTGIS_IMAGE =
+            DockerImageName.parse("postgis/postgis:14-3.5").asCompatibleSubstituteFor("postgres");
+
+    public static final PostgreSQLContainer<?> POSTGIS_CONTAINER =
+            new PostgreSQLContainer<>(POSTGIS_IMAGE)
+                    .withDatabaseName(DEFAULT_DB)
+                    .withUsername("postgres")
+                    .withPassword("postgres")
+                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .withCommand(
+                            "postgres",
+                            "-c",
+                            // default
+                            "fsync=off",
+                            "-c",
+                            "max_replication_slots=20",
+                            "-c",
+                            "wal_level=logical");
+
     @RegisterExtension
     public static StaticExternalResourceProxy<LegacyRowResource> usesLegacyRows =
             new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
+
+    @BeforeAll
+    static void startContainers() throws Exception {
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(POSTGRES_CONTAINER, POSTGIS_CONTAINER)).join();
+        LOG.info("Containers are started.");
+    }
+
+    @AfterAll
+    static void stopContainers() {
+        LOG.info("Stopping containers...");
+        POSTGIS_CONTAINER.stop();
+        POSTGIS_CONTAINER.stop();
+        LOG.info("Containers are stopped.");
+    }
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
@@ -92,6 +135,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),
@@ -211,6 +255,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.startup.mode' = 'latest-offset'"
                                 + ")",
@@ -262,6 +307,98 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     }
 
     @ParameterizedTest
+    @ValueSource(booleans = {true})
+    public void testStartupFromCommittedOffset(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'first','first description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'second','second description',0.2);");
+        }
+
+        // newly create slot's confirmed lsn is latest. We will test whether committed mode starts
+        // from here.
+        String slotName = getSlotName();
+        String publicName = "dbz_publication_" + new Random().nextInt(1000);
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            // TODO: Remove it after adding publication to an existing replication slot.
+            statement.execute(
+                    String.format(
+                            "CREATE PUBLICATION %s FOR TABLE inventory.products", publicName));
+            statement.execute(
+                    String.format(
+                            "select pg_create_logical_replication_slot('%s','pgoutput');",
+                            slotName));
+        }
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'thirth','thirth description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'forth','forth description',0.2);");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'decoding.plugin.name' = 'pgoutput',"
+                                + " 'slot.name' = '%s',"
+                                + " 'debezium.publication.name'  = '%s',"
+                                + " 'scan.lsn-commit.checkpoints-num-delay' = '0',"
+                                + " 'scan.startup.mode' = 'committed-offset'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products",
+                        slotName,
+                        publicName);
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE debezium_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        waitForSinkSize("sink", 2);
+
+        String[] expected =
+                new String[] {
+                    "112,thirth,thirth description,0.100", "113,forth,forth description,0.200"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+        result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void testExceptionForReplicaIdentity(boolean parallelismSnapshot) throws Exception {
         setup(parallelismSnapshot);
@@ -283,6 +420,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),
@@ -343,7 +481,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     @ValueSource(booleans = {true, false})
     void testAllTypes(boolean parallelismSnapshot) throws Throwable {
         setup(parallelismSnapshot);
-        initializePostgresTable(POSTGRES_CONTAINER, "column_type_test");
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
 
         String sourceDDL =
                 String.format(
@@ -379,13 +517,14 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
-                        POSTGRES_CONTAINER.getHost(),
-                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
-                        POSTGRES_CONTAINER.getUsername(),
-                        POSTGRES_CONTAINER.getPassword(),
-                        POSTGRES_CONTAINER.getDatabaseName(),
+                        POSTGIS_CONTAINER.getHost(),
+                        POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGIS_CONTAINER.getUsername(),
+                        POSTGIS_CONTAINER.getPassword(),
+                        POSTGIS_CONTAINER.getDatabaseName(),
                         "inventory",
                         "full_types",
                         parallelismSnapshot,
@@ -429,7 +568,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         Thread.sleep(5000);
 
         // generate WAL
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+        try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute("UPDATE inventory.full_types SET small_c=0 WHERE id=1;");
         }
@@ -474,6 +613,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),
@@ -612,6 +752,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'changelog-mode' = '%s'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),
@@ -739,6 +880,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + (parallelismSnapshot
                                         ? " 'scan.startup.mode' = 'latest-offset',"
                                         : "")
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
                         POSTGRES_CONTAINER.getHost(),

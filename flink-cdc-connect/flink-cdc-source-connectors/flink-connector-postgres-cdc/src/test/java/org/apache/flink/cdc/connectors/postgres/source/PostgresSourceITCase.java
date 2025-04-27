@@ -42,7 +42,6 @@ import org.apache.flink.table.data.RowData;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
-import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -264,23 +263,18 @@ class PostgresSourceITCase extends PostgresTestBase {
     @ValueSource(strings = {"initial", "latest-offset"})
     void testConsumingTableWithoutPrimaryKey(String scanStartupMode) throws Exception {
         if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
-            try {
-                testPostgresParallelSource(
-                        1,
-                        scanStartupMode,
-                        PostgresTestUtils.FailoverType.NONE,
-                        PostgresTestUtils.FailoverPhase.NEVER,
-                        new String[] {"customers_no_pk"},
-                        RestartStrategies.noRestart());
-            } catch (Exception e) {
-                Assertions.assertThat(
-                                ExceptionUtils.findThrowableWithMessage(
-                                        e,
-                                        String.format(
-                                                "Incremental snapshot for tables requires primary key, but table %s doesn't have primary key",
-                                                SCHEMA_NAME + ".customers_no_pk")))
-                        .isPresent();
-            }
+            Assertions.assertThatThrownBy(
+                            () -> {
+                                testPostgresParallelSource(
+                                        1,
+                                        scanStartupMode,
+                                        PostgresTestUtils.FailoverType.NONE,
+                                        PostgresTestUtils.FailoverPhase.NEVER,
+                                        new String[] {"customers_no_pk"},
+                                        RestartStrategies.noRestart());
+                            })
+                    .hasStackTraceContaining(
+                            "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         } else {
             testPostgresParallelSource(
                     1,
@@ -292,10 +286,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         }
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"initial", "latest-offset"})
-    void testReadSingleTableWithSingleParallelismAndSkipBackfill(String scanStartupMode)
-            throws Exception {
+    @Test
+    void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
@@ -348,6 +340,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s', "
                                 + " 'debezium.slot.drop.on.stop' = 'true'"
                                 + ")",
@@ -382,6 +375,21 @@ class PostgresSourceITCase extends PostgresTestBase {
         Optional<JobClient> optionalJobClient = tableResult.getJobClient();
         assertThat(optionalJobClient).isPresent();
         optionalJobClient.get().cancel().get();
+    }
+
+    @Test
+    void testReadSingleTableMutilpleFetch() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.snapshot.fetch.size", "2");
+        options.put("debezium.max.batch.size", "3");
+        testPostgresParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                options);
     }
 
     @Test
@@ -652,6 +660,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s'"
                                 + ")",
@@ -686,26 +695,20 @@ class PostgresSourceITCase extends PostgresTestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
-    void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) {
+    public void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) throws Exception {
         Assumptions.assumeThat(scanStartupMode).isEqualTo(DEFAULT_SCAN_STARTUP_MODE);
-        String chunkColumn = "name";
-        try {
-            testPostgresParallelSource(
-                    1,
-                    scanStartupMode,
-                    PostgresTestUtils.FailoverType.NONE,
-                    PostgresTestUtils.FailoverPhase.NEVER,
-                    new String[] {"Customers"},
-                    RestartStrategies.noRestart(),
-                    Collections.singletonMap(
-                            "scan.incremental.snapshot.chunk.key-column", chunkColumn));
-        } catch (Exception e) {
-            Assertions.assertThat(e)
-                    .hasStackTraceContaining(
-                            String.format(
-                                    "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
-                                    chunkColumn, "Id", "customer.Customers"));
-        }
+        String chunkColumn = "Name";
+        testPostgresParallelSource(
+                1,
+                scanStartupMode,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers"},
+                RestartStrategies.noRestart(),
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.chunk.key-column", chunkColumn));
+
+        // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
     }
 
     @ParameterizedTest
@@ -774,6 +777,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'scan.newly-added-table.enabled' = 'true',"
@@ -837,6 +841,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                         .username(customDatabase.getUsername())
                         .password(customDatabase.getPassword())
                         .database(customDatabase.getDatabaseName())
+                        .decodingPluginName("pgoutput")
                         .slotName(slotName)
                         .tableList(tableId.toString())
                         .startupOptions(startupOptions)
@@ -976,6 +981,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s',"
                                 + " 'scan.lsn-commit.checkpoints-num-delay' = '1'"
                                 + " %s"
@@ -1078,7 +1084,6 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
-
         waitUntilJobRunning(tableResult);
         CloseableIterator<Row> iterator = tableResult.collect();
         Optional<JobClient> optionalJobClient = tableResult.getJobClient();
