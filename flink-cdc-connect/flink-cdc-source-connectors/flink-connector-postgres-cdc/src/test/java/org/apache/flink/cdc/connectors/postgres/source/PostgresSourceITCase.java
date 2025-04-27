@@ -656,6 +656,20 @@ class PostgresSourceITCase extends PostgresTestBase {
                 this::checkStreamDataWithTestLsn);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"initial", "latest-offset"})
+    void testAppendOnly(String scanStartupMode) throws Exception {
+        testPostgresParallelSource(
+                1,
+                scanStartupMode,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                Collections.singletonMap("scan.read-changelog-as-append-only.enabled", "true"),
+                this::checkStreamDataAsAppend);
+    }
+
     private List<String> testBackfillWhenWritingEvents(
             boolean skipSnapshotBackfill,
             int fetchSize,
@@ -984,6 +998,69 @@ class PostgresSourceITCase extends PostgresTestBase {
         for (int i = 0; i < captureCustomerTables.length; i++) {
             expectedStreamData.addAll(firstPartStreamEvents);
             expectedStreamData.addAll(secondPartStreamEvents);
+        }
+        // wait for the stream reading
+        Thread.sleep(2000L);
+
+        assertEqualsInAnyOrder(expectedStreamData, fetchRows(iterator, expectedStreamData.size()));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
+    }
+
+    private void checkStreamDataAsAppend(
+            TableResult tableResult,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        checkStreamData(tableResult, failoverType, failoverPhase, captureCustomerTables, true);
+    }
+
+    private void checkStreamData(
+            TableResult tableResult,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables,
+            boolean appendOnly)
+            throws Exception {
+        waitUntilJobRunning(tableResult);
+        CloseableIterator<Row> iterator = tableResult.collect();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertThat(optionalJobClient).isPresent();
+        JobID jobId = optionalJobClient.get().getJobID();
+
+        for (String tableName : captureCustomerTables) {
+            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+        }
+
+        // wait for the stream reading
+        Thread.sleep(2000L);
+
+        if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
+            triggerFailover(
+                    failoverType,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(200));
+            waitUntilJobRunning(tableResult);
+        }
+        for (String tableName : captureCustomerTables) {
+            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+        }
+
+        List<String> expectedStreamData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedStreamData.addAll(
+                    appendOnly
+                            ? firstPartStreamEvents.stream()
+                                    .map(op -> op.replaceAll("(-U)|(\\+U)|(-D)", "+I"))
+                                    .collect(Collectors.toList())
+                            : firstPartStreamEvents);
+            expectedStreamData.addAll(
+                    appendOnly
+                            ? secondPartStreamEvents.stream()
+                                    .map(op -> op.replaceAll("(-U)|(\\+U)|(-D)", "+I"))
+                                    .collect(Collectors.toList())
+                            : secondPartStreamEvents);
         }
         // wait for the stream reading
         Thread.sleep(2000L);
