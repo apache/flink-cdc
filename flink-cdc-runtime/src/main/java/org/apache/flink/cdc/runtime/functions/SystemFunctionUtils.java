@@ -100,9 +100,22 @@ public class SystemFunctionUtils {
         return DateTimeUtils.unixTimestamp(dateTimeStr, format, TimeZone.getTimeZone(timezone));
     }
 
-    public static String dateFormat(TimestampData timestamp, String format) {
+    public static String dateFormat(TimestampData timestamp, String format, String timezone) {
+        if (timestamp == null) {
+            return null;
+        }
+        // `timezone` is ignored since TimestampData is time-zone insensitive
         return DateTimeUtils.formatTimestampMillis(
                 timestamp.getMillisecond(), format, TimeZone.getTimeZone("UTC"));
+    }
+
+    public static String dateFormat(
+            LocalZonedTimestampData timestamp, String format, String timezone) {
+        if (timestamp == null) {
+            return null;
+        }
+        return DateTimeUtils.formatTimestampMillis(
+                timestamp.getEpochMillisecond(), format, TimeZone.getTimeZone(timezone));
     }
 
     public static int toDate(String str, String timezone) {

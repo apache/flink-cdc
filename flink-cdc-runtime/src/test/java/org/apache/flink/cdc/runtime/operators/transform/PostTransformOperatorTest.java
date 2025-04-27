@@ -1669,7 +1669,7 @@ class PostTransformOperatorTest {
     }
 
     @Test
-    void testTimestampaddTransform() throws Exception {
+    void testTimestampAddTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(

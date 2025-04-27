@@ -41,6 +41,7 @@ import org.codehaus.janino.Java;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,7 +67,7 @@ public class JaninoCompiler {
                     "UNIX_TIMESTAMP");
 
     private static final List<String> TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS =
-            Arrays.asList("DATE_FORMAT");
+            Collections.emptyList();
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
             Arrays.asList(
@@ -75,7 +76,8 @@ public class JaninoCompiler {
                     "FROM_UNIXTIME",
                     "TIMESTAMPADD",
                     "TIMESTAMPDIFF",
-                    "TIMESTAMP_DIFF");
+                    "TIMESTAMP_DIFF",
+                    "DATE_FORMAT");
 
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";

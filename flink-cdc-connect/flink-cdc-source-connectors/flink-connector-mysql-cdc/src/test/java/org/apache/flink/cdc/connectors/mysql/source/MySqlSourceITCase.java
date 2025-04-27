@@ -168,7 +168,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     public static Stream<Arguments> parameters() {
         return Stream.of(
-                Arguments.of("customers", null, null),
+                Arguments.of("customers", null, "false"),
                 Arguments.of("customers", "id", "true"),
                 Arguments.of("customers_no_pk", "id", "true"));
     }
@@ -184,13 +184,18 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
     void testReadSingleTableWithSingleParallelismAndSkipBackFill(
             String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
+        HashMap<String, String> option = new HashMap<>();
+        option.put("scan.incremental.snapshot.backfill.skip", "true");
+        option.put("scan.incremental.snapshot.chunk.size", "1");
         testMySqlParallelSource(
                 1,
                 DEFAULT_SCAN_STARTUP_MODE,
@@ -198,10 +203,11 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 FailoverPhase.NEVER,
                 new String[] {tableName},
                 RestartStrategies.fixedDelayRestart(1, 0),
-                true,
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -215,7 +221,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -229,7 +237,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -243,7 +253,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     // Failover tests
@@ -257,7 +269,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -270,7 +284,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -286,7 +302,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -299,7 +317,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -312,7 +332,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName, "customers_1"},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -328,7 +350,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -342,7 +366,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
@@ -356,7 +382,26 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 new String[] {tableName},
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
+    }
+
+    @Test
+    public void testReadSingleTableMutilpleFetch() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.snapshot.fetch.size", "2");
+        options.put("debezium.max.batch.size", "3");
+        testMySqlParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                FailoverType.NONE,
+                FailoverPhase.NEVER,
+                new String[] {"customers"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                "customers",
+                "id",
+                options);
     }
 
     @ParameterizedTest
@@ -452,10 +497,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 StartupOptions.latest(), Collections.emptyList(), tableName, chunkColumnName);
     }
 
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testSnapshotOnlyModeWithDMLPostHighWaterMark(String tableName, String chunkColumnName)
-            throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPostHighWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         false, 21, USE_POST_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
@@ -485,10 +528,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testSnapshotOnlyModeWithDMLPreHighWaterMark(String tableName, String chunkColumnName)
-            throws Exception {
+    @Test
+    void testSnapshotOnlyModeWithDMLPreHighWaterMark() throws Exception {
         List<String> records =
                 testBackfillWhenWritingEvents(
                         false, 21, USE_PRE_HIGHWATERMARK_HOOK, StartupOptions.snapshot());
@@ -520,10 +561,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testEnableBackfillWithDMLPreHighWaterMark(String tableName, String chunkColumnName)
-            throws Exception {
+    @Test
+    void testEnableBackfillWithDMLPreHighWaterMark() throws Exception {
 
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -557,10 +596,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testEnableBackfillWithDMLPostLowWaterMark(String tableName, String chunkColumnName)
-            throws Exception {
+    @Test
+    void testEnableBackfillWithDMLPostLowWaterMark() throws Exception {
 
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -594,10 +631,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testSkipBackfillWithDMLPreHighWaterMark(String tableName, String chunkColumnName)
-            throws Exception {
+    @Test
+    void testSkipBackfillWithDMLPreHighWaterMark() throws Exception {
 
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -635,10 +670,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(expectedRecords, records);
     }
 
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testSkipBackfillWithDMLPostLowWaterMark(String tableName, String chunkColumnName)
-            throws Exception {
+    @Test
+    void testSkipBackfillWithDMLPostLowWaterMark() throws Exception {
 
         List<String> records =
                 testBackfillWhenWritingEvents(
@@ -675,106 +708,6 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         // seen as stream event. This will occur data duplicate. For example, user_20 will be
         // deleted twice, and user_15213 will be inserted twice.
         assertEqualsInAnyOrder(expectedRecords, records);
-    }
-
-    @SuppressWarnings("unchecked")
-    @ParameterizedTest
-    @MethodSource("parameters")
-    void testSourceMetrics(String tableName, String chunkColumnName) throws Exception {
-        customDatabase.createAndInitialize();
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
-        MySqlSource<String> source =
-                MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .databaseList(customDatabase.getDatabaseName())
-                        .tableList(customDatabase.getDatabaseName() + ".customers")
-                        .username(customDatabase.getUsername())
-                        .password(customDatabase.getPassword())
-                        .deserializer(new StringDebeziumDeserializationSchema())
-                        .serverId(getServerId())
-                        .serverTimeZone("UTC")
-                        .build();
-        DataStreamSource<String> stream =
-                env.fromSource(source, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
-        CollectResultIterator<String> iterator = addCollector(env, stream);
-        JobClient jobClient = env.executeAsync();
-        iterator.setJobClient(jobClient);
-
-        // ---------------------------- Snapshot phase ------------------------------
-        // Wait until we receive all 21 snapshot records
-        int numSnapshotRecordsExpected = 21;
-        int numSnapshotRecordsReceived = 0;
-        while (numSnapshotRecordsReceived < numSnapshotRecordsExpected && iterator.hasNext()) {
-            iterator.next();
-            numSnapshotRecordsReceived++;
-        }
-
-        // Check metrics
-        List<OperatorMetricGroup> metricGroups =
-                metricReporter.findOperatorMetricGroups(jobClient.getJobID(), "MySQL CDC Source");
-        // There should be only 1 parallelism of source, so it's safe to get the only group
-        OperatorMetricGroup group = metricGroups.get(0);
-        Map<String, Metric> metrics = metricReporter.getMetricsByGroup(group);
-
-        // numRecordsOut
-        Assertions.assertThat(group.getIOMetricGroup().getNumRecordsOutCounter().getCount())
-                .isEqualTo(numSnapshotRecordsExpected);
-
-        // currentEmitEventTimeLag should be UNDEFINED during snapshot phase
-        Assertions.assertThat(metrics).containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
-        Gauge<Long> currentEmitEventTimeLag =
-                (Gauge<Long>) metrics.get(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
-        Assertions.assertThat((long) currentEmitEventTimeLag.getValue())
-                .isEqualTo(InternalSourceReaderMetricGroup.UNDEFINED);
-
-        // currentFetchEventTimeLag should be UNDEFINED during snapshot phase
-        Assertions.assertThat(metrics).containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
-        Gauge<Long> currentFetchEventTimeLag =
-                (Gauge<Long>) metrics.get(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
-        Assertions.assertThat((long) currentFetchEventTimeLag.getValue())
-                .isEqualTo(MySqlSourceReaderMetrics.UNDEFINED);
-
-        // sourceIdleTime should be positive (we can't know the exact value)
-        Assertions.assertThat(metrics).containsKey(MetricNames.SOURCE_IDLE_TIME);
-        Gauge<Long> sourceIdleTime = (Gauge<Long>) metrics.get(MetricNames.SOURCE_IDLE_TIME);
-        Assertions.assertThat(sourceIdleTime.getValue())
-                .isPositive()
-                .isLessThan(TIMEOUT.toMillis());
-
-        // --------------------------------- Binlog phase -----------------------------
-        makeFirstPartBinlogEvents(getConnection(), customDatabase.qualifiedTableName("customers"));
-        // Wait until we receive 4 changes made above
-        int numBinlogRecordsExpected = 4;
-        int numBinlogRecordsReceived = 0;
-        while (numBinlogRecordsReceived < numBinlogRecordsExpected && iterator.hasNext()) {
-            iterator.next();
-            numBinlogRecordsReceived++;
-        }
-
-        // Check metrics
-        // numRecordsOut
-        Assertions.assertThat(group.getIOMetricGroup().getNumRecordsOutCounter().getCount())
-                .isEqualTo(numSnapshotRecordsExpected + numBinlogRecordsExpected);
-
-        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        Assertions.assertThat(currentEmitEventTimeLag.getValue())
-                .isPositive()
-                .isLessThan(TIMEOUT.toMillis());
-
-        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        Assertions.assertThat(currentFetchEventTimeLag.getValue())
-                .isPositive()
-                .isLessThan(TIMEOUT.toMillis());
-
-        // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        Assertions.assertThat(sourceIdleTime.getValue())
-                .isPositive()
-                .isLessThan(TIMEOUT.toMillis());
-
-        jobClient.cancel().get();
-        iterator.close();
     }
 
     private List<String> testBackfillWhenWritingEvents(
@@ -1077,7 +1010,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             String[] captureCustomerTables,
             String tableName,
             String chunkColumnName,
-            String assignEndingFirst)
+            Map<String, String> options)
             throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
@@ -1086,7 +1019,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 captureCustomerTables,
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                options);
     }
 
     private void testMySqlParallelSource(
@@ -1096,7 +1029,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             String[] captureCustomerTables,
             String tableName,
             String chunkColumnName,
-            String assignEndingFirst)
+            Map<String, String> options)
             throws Exception {
         testMySqlParallelSource(
                 parallelism,
@@ -1107,7 +1040,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                 RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
                 chunkColumnName,
-                assignEndingFirst);
+                options);
     }
 
     private void testMySqlParallelSource(
@@ -1119,32 +1052,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
             String tableName,
             String chunkColumnName,
-            String assignEndingFirst)
-            throws Exception {
-        testMySqlParallelSource(
-                parallelism,
-                scanStartupMode,
-                failoverType,
-                failoverPhase,
-                captureCustomerTables,
-                restartStrategyConfiguration,
-                false,
-                tableName,
-                chunkColumnName,
-                assignEndingFirst);
-    }
-
-    private void testMySqlParallelSource(
-            int parallelism,
-            String scanStartupMode,
-            FailoverType failoverType,
-            FailoverPhase failoverPhase,
-            String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
-            boolean skipSnapshotBackfill,
-            String tableName,
-            String chunkColumnName,
-            String assignEndingFirst)
+            Map<String, String> otherOptions)
             throws Exception {
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -1174,9 +1082,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.startup.mode' = '%s',"
                                 + " 'scan.incremental.snapshot.chunk.size' = '100',"
-                                + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'scan.incremental.snapshot.unbounded-chunk-first.enabled' = '%s',"
                                 + " 'server-id' = '%s'"
                                 + " %s"
                                 + ")",
@@ -1187,14 +1093,22 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                         customDatabase.getDatabaseName(),
                         getTableNameRegex(captureCustomerTables),
                         scanStartupMode,
-                        skipSnapshotBackfill,
-                        assignEndingFirst == null ? "false" : "true",
                         getServerId(),
                         chunkColumnName == null
                                 ? ""
                                 : String.format(
                                         ", 'scan.incremental.snapshot.chunk.key-column' = '%s'",
-                                        chunkColumnName));
+                                        chunkColumnName),
+                        otherOptions.isEmpty()
+                                ? ""
+                                : ","
+                                        + otherOptions.entrySet().stream()
+                                                .map(
+                                                        e ->
+                                                                String.format(
+                                                                        "'%s'='%s'",
+                                                                        e.getKey(), e.getValue()))
+                                                .collect(Collectors.joining(",")));
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 

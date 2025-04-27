@@ -725,6 +725,8 @@ class NewlyAddedTableITCase extends PostgresTestBase {
             PostgresTestUtils.waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
+            // Wait 1s until snapshot phase finished, make sure the binlog data is not lost.
+            Thread.sleep(1000L);
 
             // step 3: make some wal log data for this round
             makeFirstPartWalLogForAddressTable(getConnection(), newlyAddedTable);
