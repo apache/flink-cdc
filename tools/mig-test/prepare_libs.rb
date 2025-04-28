@@ -39,9 +39,10 @@ RELEASED_VERSIONS = {
   '3.2.0': gen_version('3.2.0'),
   '3.2.1': gen_version('3.2.1'),
   '3.3.0': gen_version('3.3.0'),
+  '3.4.0': gen_version('3.4.0'),
 }.freeze
 
-HEAD_VERSION = '3.4-SNAPSHOT'
+HEAD_VERSION = '3.5-SNAPSHOT'
 
 def download_or_get(link)
   `mkdir -p cache`

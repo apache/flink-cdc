@@ -58,6 +58,7 @@ pygmentsUseClasses = true
   ]
 
   PreviousDocs = [
+    ["3.4", "https://nightlies.apache.org/flink/flink-cdc-docs-release-3.3"],
     ["3.3", "https://nightlies.apache.org/flink/flink-cdc-docs-release-3.3"],
     ["3.2", "https://nightlies.apache.org/flink/flink-cdc-docs-release-3.2"],
     ["3.1", "https://nightlies.apache.org/flink/flink-cdc-docs-release-3.1"]
