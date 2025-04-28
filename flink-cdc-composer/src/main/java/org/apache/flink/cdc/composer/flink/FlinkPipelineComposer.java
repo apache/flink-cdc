@@ -308,4 +308,9 @@ public class FlinkPipelineComposer implements PipelineComposer {
                     }
                 });
     }
+
+    @VisibleForTesting
+    public StreamExecutionEnvironment getEnv() {
+        return env;
+    }
 }
