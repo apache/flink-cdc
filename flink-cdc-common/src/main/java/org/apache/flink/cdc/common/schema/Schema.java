@@ -113,7 +113,8 @@ public class Schema implements Serializable {
     public List<String> getColumnNames() {
         if (columnNames == null) {
             columnNames =
-                    columns.stream().map(Column::getName).collect(Collectors.toUnmodifiableList());
+                    Collections.unmodifiableList(
+                            columns.stream().map(Column::getName).collect(Collectors.toList()));
         }
         return columnNames;
     }
@@ -124,7 +125,8 @@ public class Schema implements Serializable {
     public List<DataType> getColumnDataTypes() {
         if (columnDataTypes == null) {
             columnDataTypes =
-                    columns.stream().map(Column::getType).collect(Collectors.toUnmodifiableList());
+                    Collections.unmodifiableList(
+                            columns.stream().map(Column::getType).collect(Collectors.toList()));
         }
         return columnDataTypes;
     }
