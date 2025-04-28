@@ -30,6 +30,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
 import org.apache.flink.cdc.common.utils.SchemaMergingUtils;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -362,16 +363,17 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             @Nullable TransformFilterProcessor filterProcessor,
             TransformContext context) {
         RecordData.FieldGetter[] preFieldGetters = info.getPreTransformedFieldGetters();
-        Schema preSchema = info.getPreTransformedSchema();
-        Schema postSchema = info.getPostTransformedSchema();
+
+        List<DataType> preDataTypes = info.getPreTransformedDataTypes();
+        List<DataType> postDataTypes = info.getPostTransformedDataTypes();
+
         BinaryRecordDataGenerator postGenerator = info.getPostTransformedRecordDataGenerator();
 
         Object[] preRow = new Object[preFieldGetters.length];
         for (int i = 0; i < preFieldGetters.length; i++) {
             preRow[i] =
                     DataTypeConverter.convertToOriginal(
-                            preFieldGetters[i].getFieldOrNull(recordData),
-                            preSchema.getColumnDataTypes().get(i));
+                            preFieldGetters[i].getFieldOrNull(recordData), preDataTypes.get(i));
         }
 
         Object[] postRow =
@@ -383,10 +385,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         boolean filterPassed =
                 filterProcessor == null || filterProcessor.test(preRow, postRow, context);
 
-        Object[] postRowBinary = new Object[postSchema.getColumnCount()];
+        Object[] postRowBinary = new Object[postDataTypes.size()];
         for (int i = 0; i < postRow.length; i++) {
-            postRowBinary[i] =
-                    DataTypeConverter.convert(postRow[i], postSchema.getColumnDataTypes().get(i));
+            postRowBinary[i] = DataTypeConverter.convert(postRow[i], postDataTypes.get(i));
         }
         return Tuple2.of(postGenerator.generate(postRowBinary), filterPassed);
     }

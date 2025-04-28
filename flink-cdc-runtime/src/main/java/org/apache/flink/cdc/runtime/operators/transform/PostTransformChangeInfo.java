@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
@@ -40,6 +41,10 @@ public class PostTransformChangeInfo {
 
     private final Schema preTransformedSchema;
     private final Schema postTransformedSchema;
+
+    private final List<DataType> preTransformedDataTypes;
+    private final List<DataType> postTransformedDataTypes;
+
     private final Map<String, Integer> preTransformedSchemaFieldNameToIndexMap;
 
     private final RecordData.FieldGetter[] preTransformedFieldGetters;
@@ -86,6 +91,7 @@ public class PostTransformChangeInfo {
             preTransformedSchemaFieldNameToIndexMap.put(
                     preTransformedSchema.getColumns().get(i).getName(), i);
         }
+        this.preTransformedDataTypes = preTransformedSchema.getColumnDataTypes();
 
         this.postTransformedSchema = postTransformedSchema;
         this.postTransformedFieldGetters = postTransformedFieldGetters;
@@ -96,6 +102,7 @@ public class PostTransformChangeInfo {
             postTransformedSchemaFieldNameToIndexMap.put(
                     postTransformedSchema.getColumns().get(i).getName(), i);
         }
+        this.postTransformedDataTypes = postTransformedSchema.getColumnDataTypes();
     }
 
     public String getName() {
@@ -140,5 +147,13 @@ public class PostTransformChangeInfo {
 
     public BinaryRecordDataGenerator getPostTransformedRecordDataGenerator() {
         return postTransformedRecordDataGenerator;
+    }
+
+    public List<DataType> getPreTransformedDataTypes() {
+        return preTransformedDataTypes;
+    }
+
+    public List<DataType> getPostTransformedDataTypes() {
+        return postTransformedDataTypes;
     }
 }
