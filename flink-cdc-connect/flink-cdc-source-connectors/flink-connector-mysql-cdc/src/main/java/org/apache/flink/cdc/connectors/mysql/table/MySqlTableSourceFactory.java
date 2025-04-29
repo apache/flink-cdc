@@ -26,7 +26,6 @@ import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
 import org.apache.flink.cdc.debezium.table.DebeziumOptions;
 import org.apache.flink.cdc.debezium.utils.JdbcUrlUtils;
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.TableConfigOptions;
@@ -125,7 +124,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                     MySqlSourceOptions.CONNECT_TIMEOUT, connectTimeout, Duration.ofMillis(250));
         }
 
-        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+        OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
         return new MySqlTableSource(
                 physicalSchema,
