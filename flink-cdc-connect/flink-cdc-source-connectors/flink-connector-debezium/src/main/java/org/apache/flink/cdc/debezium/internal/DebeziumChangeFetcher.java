@@ -230,11 +230,10 @@ public class DebeziumChangeFetcher<T> {
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
             SourceRecord record = event.value();
             updateMessageTimestamp(record);
-            if (messageTimestamp == 0L) {
-
-            } else {
-                fetchDelay = isInDbSnapshotPhase ? -1L : processTime - messageTimestamp;
-            }
+            fetchDelay =
+                    (isInDbSnapshotPhase || messageTimestamp == 0L)
+                            ? -1L
+                            : processTime - messageTimestamp;
             if (isHeartbeatEvent(record)) {
                 // keep offset update
                 synchronized (checkpointLock) {
@@ -271,14 +270,10 @@ public class DebeziumChangeFetcher<T> {
             T record;
             while ((record = records.poll()) != null) {
                 // If the snapshot does not end or no latest data is entered, -1 is reported
-                if (messageTimestamp == 0L) {
-
-                } else {
-                    emitDelay =
-                            isInDbSnapshotPhase
-                                    ? -1L
-                                    : System.currentTimeMillis() - messageTimestamp;
-                }
+                emitDelay =
+                        (isInDbSnapshotPhase || messageTimestamp == 0L)
+                                ? -1L
+                                : System.currentTimeMillis() - messageTimestamp;
                 sourceContext.collect(record);
             }
             // update offset to state
