@@ -332,6 +332,18 @@ pipeline:
         可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
       </td>
     </tr>
+    <tr>
+      <td>source.table-name.is-case-sensitive</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        lower_case_table_names参数作用‌</br>
+0‌：表名和数据库名区分大小写（Linux默认值）</br>
+1‌：表名和数据库名不区分大小写，存储时自动转为小写（Windows默认值）</br>
+2‌：表名按原始大小写存储，但查询时转为小写比较（macOS默认值）‌
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>

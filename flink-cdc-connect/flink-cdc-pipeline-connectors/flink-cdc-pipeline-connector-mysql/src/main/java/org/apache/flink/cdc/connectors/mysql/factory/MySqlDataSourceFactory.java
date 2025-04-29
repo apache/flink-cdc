@@ -93,6 +93,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_ID;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SERVER_TIME_ZONE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SOURCE_TABLENAME_IS_CASE_SENSITIVE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TREAT_TINYINT1_AS_BOOLEAN_ENABLED;
@@ -175,6 +176,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         validateDistributionFactorUpper(distributionFactorUpper);
         validateDistributionFactorLower(distributionFactorLower);
 
+        boolean isSourceTableNameCaseSensitive = config.get(SOURCE_TABLENAME_IS_CASE_SENSITIVE);
+
         Map<String, String> configMap = config.toMap();
         OptionUtils.printOptions(IDENTIFIER, config.toMap());
         if (includeComments) {
@@ -218,7 +221,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .parseOnLineSchemaChanges(isParsingOnLineSchemaChanges)
                         .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
                         .useLegacyJsonFormat(useLegacyJsonFormat)
-                        .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst);
+                        .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
+                        .isSourceTableNameCaseSensitive(isSourceTableNameCaseSensitive);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
