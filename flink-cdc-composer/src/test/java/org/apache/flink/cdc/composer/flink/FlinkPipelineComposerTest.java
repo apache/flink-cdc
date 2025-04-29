@@ -24,11 +24,20 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.composer.utils.factory.DataSinkFactory1;
+import org.apache.flink.configuration.PipelineOptions;
+import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTING_INTERVAL;
 
 /** A test for the {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerTest {
@@ -58,5 +67,22 @@ class FlinkPipelineComposerTest {
         Assertions.assertThat(dataSink).isExactlyInstanceOf(DataSinkFactory1.TestDataSink.class);
         Assertions.assertThat(((DataSinkFactory1.TestDataSink) dataSink).getHost())
                 .isEqualTo("0.0.0.0");
+    }
+
+    @Test
+    void testOfMiniCluster() {
+        org.apache.flink.configuration.Configuration flinkConfig =
+                new org.apache.flink.configuration.Configuration();
+        flinkConfig.set(CHECKPOINTING_INTERVAL, Duration.ofSeconds(30));
+        List<Path> additionalJars = new ArrayList<>();
+        additionalJars.add(new Path("/path/to/additionalJars.jar"));
+        FlinkPipelineComposer flinkPipelineComposer =
+                FlinkPipelineComposer.ofMiniCluster(flinkConfig, additionalJars);
+        ReadableConfig configuration = flinkPipelineComposer.getEnv().getConfiguration();
+
+        Assertions.assertThat(configuration.get(CHECKPOINTING_INTERVAL))
+                .isEqualTo(Duration.ofSeconds(30));
+        Assertions.assertThat(configuration.get(PipelineOptions.JARS))
+                .contains("file:/path/to/additionalJars.jar");
     }
 }
