@@ -37,6 +37,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.runners.Parameterized;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -59,8 +60,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -88,7 +89,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
     protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
 
-    protected String flinkVersion = getFlinkVersion();
+    @Parameterized.Parameter public String flinkVersion;
 
     public static final Network NETWORK = Network.newNetwork();
 
@@ -117,13 +118,14 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     private GenericContainer<?> jobManager;
     private GenericContainer<?> taskManager;
 
-    public static String getFlinkVersion() {
+    @Parameterized.Parameters(name = "flinkVersion: {0}")
+    public static List<String> getFlinkVersion() {
         String flinkVersion = System.getProperty("specifiedFlinkVersion");
-        if (Objects.isNull(flinkVersion)) {
-            throw new IllegalArgumentException(
-                    "No Flink version specified to run this test. Please use -DspecifiedFlinkVersion to pass one.");
+        if (flinkVersion != null) {
+            return Collections.singletonList(flinkVersion);
+        } else {
+            return Arrays.asList("1.19.2", "1.20.1");
         }
-        return flinkVersion;
     }
 
     @BeforeEach
