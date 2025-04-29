@@ -51,19 +51,21 @@ public class TransformTranslator {
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
             SupportedMetadataColumn[] supportedMetadataColumns,
-            boolean shouldStoreSchemasInState) {
+            boolean shouldStoreSchemasInState,
+            OperatorUidGenerator operatorUidGenerator) {
         if (transforms.isEmpty()) {
             return input;
         }
         return input.transform(
-                "Transform:Schema",
-                new EventTypeInfo(),
-                generatePreTransform(
-                        transforms,
-                        udfFunctions,
-                        models,
-                        supportedMetadataColumns,
-                        shouldStoreSchemasInState));
+                        "Transform:Schema",
+                        new EventTypeInfo(),
+                        generatePreTransform(
+                                transforms,
+                                udfFunctions,
+                                models,
+                                supportedMetadataColumns,
+                                shouldStoreSchemasInState))
+                .uid(operatorUidGenerator.generateUid("pre-transform"));
     }
 
     private PreTransformOperator generatePreTransform(
@@ -104,7 +106,8 @@ public class TransformTranslator {
             String timezone,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
-            SupportedMetadataColumn[] supportedMetadataColumns) {
+            SupportedMetadataColumn[] supportedMetadataColumns,
+            OperatorUidGenerator operatorUidGenerator) {
         if (transforms.isEmpty()) {
             return input;
         }
@@ -130,7 +133,8 @@ public class TransformTranslator {
         postTransformFunctionBuilder.addUdfFunctions(
                 models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
         return input.transform(
-                "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build());
+                        "Transform:Data", new EventTypeInfo(), postTransformFunctionBuilder.build())
+                .uid(operatorUidGenerator.generateUid("post-transform"));
     }
 
     private Tuple3<String, String, Map<String, String>> modelToUDFTuple(ModelDef model) {
