@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.mongodb.source;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.InMemoryReporter;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 
@@ -39,8 +38,6 @@ import java.util.stream.Stream;
 
 /** MongoDBSourceTestBase for MongoDB >= 5.0.3. */
 public class MongoDBSourceTestBase {
-    protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
-
     public MongoDBSourceTestBase(String mongoVersion) {
         this.mongoContainer =
                 new MongoDBContainer("mongo:" + mongoVersion)
@@ -71,8 +68,6 @@ public class MongoDBSourceTestBase {
                             .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
                             .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
                             .withHaLeadershipControl()
-                            .setConfiguration(
-                                    metricReporter.addToConfiguration(new Configuration()))
                             .build());
 
     @Before
