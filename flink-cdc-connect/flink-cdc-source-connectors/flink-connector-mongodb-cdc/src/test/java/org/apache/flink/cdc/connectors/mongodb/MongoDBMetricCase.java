@@ -1,14 +1,23 @@
 package org.apache.flink.cdc.connectors.mongodb;
 
+import com.mongodb.ConnectionString;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.connectors.mongodb.source.MongoDBSourceTestBase;
+import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
+import org.apache.flink.runtime.minicluster.RpcServiceSharing;
+import org.apache.flink.runtime.testutils.InMemoryReporter;
+import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -22,10 +31,17 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.bson.Document;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.lifecycle.Startables;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -43,12 +59,61 @@ import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MongoDBSource}. */
 @RunWith(Parameterized.class)
-public class MongoDBMetricCase extends MongoDBSourceTestBase {
-    public static final Duration TIMEOUT = Duration.ofSeconds(300);
+public class MongoDBMetricCase {
+    protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
+    private static final Logger LOG = LoggerFactory.getLogger(MongoDBMetricCase.class);
 
     public MongoDBMetricCase(String mongoVersion) {
-        super(mongoVersion);
+        this.mongoContainer =
+                new MongoDBContainer("mongo:" + mongoVersion)
+                        .withSharding()
+                        .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
+
+    public static String[] getMongoVersions() {
+        String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
+        if (specifiedMongoVersion != null) {
+            return new String[] {specifiedMongoVersion};
+        } else {
+            return new String[] {"6.0.16", "7.0.12"};
+        }
+    }
+
+    protected static final int DEFAULT_PARALLELISM = 4;
+
+    @Rule
+    public final MongoDBContainer mongoContainer;
+
+    protected MongoClient mongodbClient;
+
+    @Rule
+    public final MiniClusterWithClientResource miniClusterResource =
+            new MiniClusterWithClientResource(
+                    new MiniClusterResourceConfiguration.Builder()
+                            .setNumberTaskManagers(1)
+                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                            .withHaLeadershipControl()
+                            .setConfiguration(
+                                    metricReporter.addToConfiguration(new Configuration()))
+                            .build());
+
+    @Before
+    public void startContainers() {
+        LOG.info("Starting containers...");
+        Startables.deepStart(Stream.of(mongoContainer)).join();
+
+        MongoClientSettings settings =
+                MongoClientSettings.builder()
+                        .applyConnectionString(
+                                new ConnectionString(mongoContainer.getConnectionString()))
+                        .build();
+        mongodbClient = MongoClients.create(settings);
+
+        LOG.info("Containers are started.");
+    }
+
+    public static final Duration TIMEOUT = Duration.ofSeconds(300);
 
     @Parameterized.Parameters(name = "mongoVersion: {0}")
     public static Object[] parameters() {
