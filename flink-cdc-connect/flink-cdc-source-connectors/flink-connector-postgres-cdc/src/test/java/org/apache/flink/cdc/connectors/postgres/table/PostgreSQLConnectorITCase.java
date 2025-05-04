@@ -318,6 +318,10 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "INSERT INTO inventory_partitioned.products VALUES (default,'jacket','water resistent white wind breaker',0.2, 'us');"); // 110
             statement.execute(
                     "INSERT INTO inventory_partitioned.products VALUES (default,'scooter','Big 2-wheel scooter ',5.18, 'uk');");
+            statement.execute(
+                    "CREATE TABLE inventory_partitioned.products_china PARTITION OF inventory_partitioned.products FOR VALUES IN ('china');");
+            statement.execute(
+                    "INSERT INTO inventory_partitioned.products VALUES (default,'bike','Big 2-wheel bycicle ',6.18, 'china');");
         }
 
         waitForSinkSize("sink", 11);
@@ -335,7 +339,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                     "108,jacket,water resistent black wind breaker,0.100,uk",
                     "109,spare tire,24 inch spare tire,22.200,uk",
                     "110,jacket,water resistent white wind breaker,0.200,us",
-                    "111,scooter,Big 2-wheel scooter ,5.180,uk"
+                    "111,scooter,Big 2-wheel scooter ,5.180,uk",
+                    "112,bike,Big 2-wheel bycicle ,6.180,china"
                 };
 
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
