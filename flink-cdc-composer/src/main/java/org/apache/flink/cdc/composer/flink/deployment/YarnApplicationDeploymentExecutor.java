@@ -101,7 +101,7 @@ public class YarnApplicationDeploymentExecutor extends AbstractDeploymentExecuto
             if (client != null) {
                 client.shutDownCluster();
             }
-            throw new RuntimeException("Failed to deploy Flink CDC job", e);
+            throw new RuntimeException("Failed to yarn application deploy Flink CDC job", e);
         } finally {
             descriptor.close();
             if (client != null) {
