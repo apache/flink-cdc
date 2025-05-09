@@ -187,7 +187,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         out.writeBoolean(hasTableIsSplitting);
         if (hasTableIsSplitting) {
             ChunkSplitterState chunkSplitterState = state.getChunkSplitterState();
-            out.writeUTF(chunkSplitterState.getCurrentSplittingTableId().toString());
+            out.writeUTF(chunkSplitterState.getCurrentSplittingTableId().toDoubleQuotedString());
             out.writeUTF(
                     SerializerUtils.rowToSerializedString(
                             new Object[] {chunkSplitterState.getNextChunkStart().getValue()}));
