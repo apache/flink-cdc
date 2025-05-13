@@ -470,8 +470,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                         schemaChangeEvent);
             } else {
                 LOG.info(
-                        "Skip apply schema change event {} to external system.",
-                        schemaChangeEvent);
+                        "Skip apply schema change event {} to external system.", schemaChangeEvent);
             }
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
             return true;
