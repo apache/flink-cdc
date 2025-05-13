@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventWithPreSchema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
@@ -171,7 +172,9 @@ public class SchemaDerivator {
 
         List<SchemaChangeEvent> finalSchemaChangeEvents = new ArrayList<>();
         for (SchemaChangeEvent schemaChangeEvent : rewrittenSchemaChangeEvents) {
-            if (metadataApplier.acceptsSchemaEvolutionType(schemaChangeEvent.getType())) {
+            // always accept create.table event
+            if (metadataApplier.acceptsSchemaEvolutionType(schemaChangeEvent.getType())
+                    || schemaChangeEvent.getType().equals(SchemaChangeEventType.CREATE_TABLE)) {
                 finalSchemaChangeEvents.add(schemaChangeEvent);
             } else {
                 LOG.info("Ignored schema change {}.", schemaChangeEvent);

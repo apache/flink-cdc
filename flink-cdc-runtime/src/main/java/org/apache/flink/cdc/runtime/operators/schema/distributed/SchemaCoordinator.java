@@ -462,11 +462,18 @@ public class SchemaCoordinator extends SchemaRegistry {
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
         try {
-            metadataApplier.applySchemaChange(schemaChangeEvent);
+            // filter create.table schema change event
+            if (metadataApplier.acceptsSchemaEvolutionType(schemaChangeEvent.getType())) {
+                metadataApplier.applySchemaChange(schemaChangeEvent);
+                LOG.info(
+                        "Successfully applied schema change event {} to external system.",
+                        schemaChangeEvent);
+            } else {
+                LOG.info(
+                        "Skip apply schema change event {} to external system.",
+                        schemaChangeEvent);
+            }
             schemaManager.applyEvolvedSchemaChange(schemaChangeEvent);
-            LOG.info(
-                    "Successfully applied schema change event {} to external system.",
-                    schemaChangeEvent);
             return true;
         } catch (Throwable t) {
             handleUnrecoverableError(

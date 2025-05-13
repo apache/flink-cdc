@@ -168,6 +168,22 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
     }
 
     public static <OP extends AbstractStreamOperator<E>, E extends Event>
+            RegularEventOperatorTestHarness<OP, E> withDurationAndExcludeCreateTableBehavior(
+                    OP operator,
+                    int numOutputs,
+                    Duration evolveDuration,
+                    SchemaChangeBehavior behavior) {
+        return new RegularEventOperatorTestHarness<>(
+                operator,
+                numOutputs,
+                evolveDuration,
+                DEFAULT_RPC_TIMEOUT,
+                behavior,
+                Arrays.stream(SchemaChangeEventTypeFamily.COLUMN).collect(Collectors.toSet()),
+                Arrays.stream(SchemaChangeEventTypeFamily.TABLE).collect(Collectors.toSet()));
+    }
+
+    public static <OP extends AbstractStreamOperator<E>, E extends Event>
             RegularEventOperatorTestHarness<OP, E> withDurationAndFineGrainedBehavior(
                     OP operator,
                     int numOutputs,

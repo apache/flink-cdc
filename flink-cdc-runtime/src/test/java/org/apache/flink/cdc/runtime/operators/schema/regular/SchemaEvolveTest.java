@@ -2561,6 +2561,66 @@ class SchemaEvolveTest {
         }
     }
 
+    /** Tests lenient schema change behavior exclude create.table event. */
+    @Test
+    void testLenientSchemaEvolvesExcludeCreate() throws Exception {
+        TableId tableId = CUSTOMERS_TABLE_ID;
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", INT)
+                        .physicalColumn("name", STRING.notNull())
+                        .physicalColumn("age", SMALLINT)
+                        .primaryKey("id")
+                        .build();
+
+        SchemaChangeBehavior behavior = SchemaChangeBehavior.LENIENT;
+
+        SchemaOperator schemaOperator =
+                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30), behavior);
+        RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
+                RegularEventOperatorTestHarness.withDurationAndExcludeCreateTableBehavior(
+                        schemaOperator, 5, Duration.ofSeconds(3), behavior);
+        harness.open();
+
+        // Test CreateTableEvent
+        {
+            List<Event> createAndInsertDataEvents =
+                    Arrays.asList(
+                            new CreateTableEvent(tableId, schemaV1),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 1, STRING, "Alice", SMALLINT, (short) 17)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 2, STRING, "Bob", SMALLINT, (short) 18)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 3, STRING, "Carol", SMALLINT, (short) 19)));
+
+            processEvent(schemaOperator, createAndInsertDataEvents);
+
+            FlushEvent result;
+            result =
+                    new FlushEvent(
+                            0,
+                            Collections.singletonList(tableId),
+                            SchemaChangeEventType.CREATE_TABLE);
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(result), createAndInsertDataEvents));
+
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV1);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV1);
+
+            harness.clearOutputRecords();
+        }
+    }
+
     private RecordData buildRecord(final Object... args) {
         List<DataType> dataTypes = new ArrayList<>();
         List<Object> objects = new ArrayList<>();
