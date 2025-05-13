@@ -413,6 +413,17 @@ Flink SQL> SELECT * FROM orders;
           <li>false（默认）：所有类型的消息都保持原样下发。</li>
       </td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在快照读取阶段跳过 backfill 。<br>
+        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
+    </tr>
     </tbody>
 </table>
 </div>
