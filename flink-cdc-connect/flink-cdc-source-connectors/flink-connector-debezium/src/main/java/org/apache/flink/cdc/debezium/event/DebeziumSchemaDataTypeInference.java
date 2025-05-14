@@ -188,6 +188,10 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     protected DataType inferStruct(Object value, Schema schema) {
         Struct struct = (Struct) value;
         if (VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
+            if (struct == null) {
+                // set the default value
+                return DataTypes.DECIMAL(10, 0);
+            }
             SpecialValueDecimal decimal = VariableScaleDecimal.toLogical(struct);
             BigDecimal bigDecimal = decimal.getDecimalValue().orElse(BigDecimal.ZERO);
             return DataTypes.DECIMAL(bigDecimal.precision(), bigDecimal.scale());
