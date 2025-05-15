@@ -669,6 +669,10 @@ Notice:
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
     </tr>
     <tr>
+      <td>TIMESTAMP [ (p) ] WITH TIME ZONE</td>
+      <td>TIMESTAMP_LTZ(p)</td>
+    </tr>
+    <tr>
       <td>
         CHAR(n)<br>
         CHARACTER(n)<br>
