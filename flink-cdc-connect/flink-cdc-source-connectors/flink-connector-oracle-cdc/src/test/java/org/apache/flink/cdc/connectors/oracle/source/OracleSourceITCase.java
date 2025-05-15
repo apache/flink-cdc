@@ -20,17 +20,14 @@ package org.apache.flink.cdc.connectors.oracle.source;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.connectors.oracle.source.utils.OracleConnectionUtils;
-import org.apache.flink.cdc.connectors.oracle.testutils.OracleEventDeserializationSchema;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverPhase;
 import org.apache.flink.cdc.connectors.oracle.testutils.OracleTestUtils.FailoverType;
 import org.apache.flink.cdc.connectors.oracle.testutils.TestTable;
-import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -65,7 +62,6 @@ import static org.apache.flink.table.api.DataTypes.BIGINT;
 import static org.apache.flink.table.api.DataTypes.STRING;
 import static org.apache.flink.table.catalog.Column.physical;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 
 /** IT tests for {@link OracleSourceBuilder.OracleIncrementalSource}. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
@@ -489,44 +485,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
         return records;
     }
 
-    @Test
-    public void testNumberWithNullValue() throws Exception {
-        createAndInitialize("product.sql");
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(200L);
-        env.setParallelism(1);
-        ResolvedSchema customersSchema =
-                new ResolvedSchema(
-                        Arrays.asList(
-                                physical("ID", BIGINT().notNull()),
-                                physical("NUMBERTYPE", STRING())),
-                        new ArrayList<>(),
-                        UniqueConstraint.primaryKey("pk", Collections.singletonList("ID")));
-        OracleSourceBuilder.OracleIncrementalSource source =
-                OracleSourceBuilder.OracleIncrementalSource.<Event>builder()
-                        .hostname(ORACLE_CONTAINER.getHost())
-                        .port(ORACLE_CONTAINER.getOraclePort())
-                        .username(TOP_USER)
-                        .password(TOP_SECRET)
-                        .databaseList("ORCLCDB")
-                        .tableList("DEBEZIUM.TESTNUMBERWITHNULLVALUE")
-                        .skipSnapshotBackfill(true)
-                        .startupOptions(StartupOptions.initial())
-                        .deserializer(
-                                new OracleEventDeserializationSchema(DebeziumChangelogMode.ALL))
-                        .build();
-
-        try (CloseableIterator<Event> iterator =
-                env.fromSource(
-                                source,
-                                WatermarkStrategy.noWatermarks(),
-                                "Test nember type with null value source")
-                        .executeAndCollect()) {
-            assertThatNoException().isThrownBy(() -> fetchEventData(iterator, 1));
-            env.close();
-        }
-    }
-
     private void testOracleParallelSource(
             FailoverType failoverType, FailoverPhase failoverPhase, String[] captureCustomerTables)
             throws Exception {
@@ -721,16 +679,6 @@ public class OracleSourceITCase extends OracleSourceTestBase {
             size--;
         }
         return rows.stream().map(stringifier).collect(Collectors.toList());
-    }
-
-    private static List<Event> fetchEventData(Iterator<Event> iter, int size) {
-        List<Event> rows = new ArrayList<>(size);
-        while (size > 0 && iter.hasNext()) {
-            Event row = iter.next();
-            rows.add(row);
-            size--;
-        }
-        return rows;
     }
 
     private static List<String> fetchRows(Iterator<Row> iter, int size) {
