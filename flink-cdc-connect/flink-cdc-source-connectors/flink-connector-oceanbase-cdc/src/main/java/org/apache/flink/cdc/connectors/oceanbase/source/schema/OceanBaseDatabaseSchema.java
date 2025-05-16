@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.oceanbase.source.schema;
 
 import org.apache.flink.cdc.connectors.oceanbase.source.config.OceanBaseConnectorConfig;
+import org.apache.flink.cdc.connectors.oceanbase.source.converter.OceanBaseDefaultValueConverter;
 import org.apache.flink.cdc.connectors.oceanbase.source.converter.OceanBaseValueConverters;
 
 import io.debezium.relational.RelationalDatabaseSchema;
@@ -30,6 +31,7 @@ public class OceanBaseDatabaseSchema extends RelationalDatabaseSchema {
 
     public OceanBaseDatabaseSchema(
             OceanBaseConnectorConfig connectorConfig,
+            OceanBaseValueConverters valueConverters,
             Tables.TableFilter tableFilter,
             boolean tableIdCaseInsensitive) {
         super(
@@ -41,7 +43,8 @@ public class OceanBaseDatabaseSchema extends RelationalDatabaseSchema {
                 tableFilter,
                 connectorConfig.getColumnFilter(),
                 new TableSchemaBuilder(
-                        new OceanBaseValueConverters(connectorConfig),
+                        valueConverters,
+                        new OceanBaseDefaultValueConverter(valueConverters),
                         connectorConfig.schemaNameAdjustmentMode().createAdjuster(),
                         connectorConfig.customConverterRegistry(),
                         connectorConfig.getSourceInfoStructMaker().schema(),
