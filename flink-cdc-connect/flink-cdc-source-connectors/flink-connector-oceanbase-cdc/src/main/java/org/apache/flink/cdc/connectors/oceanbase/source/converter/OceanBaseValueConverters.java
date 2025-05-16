@@ -438,6 +438,10 @@ public class OceanBaseValueConverters extends JdbcValueConverters {
     protected Object convertTimestamp(Column column, Field fieldDefn, Object data) {
         if (data instanceof String) {
             if ("mysql".equalsIgnoreCase(compatibleMode)) {
+                if ("CURRENT_TIMESTAMP".equalsIgnoreCase((String) data)
+                        || "NEW".equalsIgnoreCase((String) data)) {
+                    data = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
+                }
                 data = Timestamp.valueOf(((String) data).trim());
             } else {
                 data = resolveTimestampStringAsInstant((String) data);
