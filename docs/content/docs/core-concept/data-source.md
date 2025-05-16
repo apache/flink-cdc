@@ -35,6 +35,7 @@ To describe a data source, the follows are required:
 |-------------------------------|-----------------------------------------------------------------------------------------------------|-------------------|
 | type                          | The type of the source, such as mysql.                                                              | required          |
 | name                          | The name of the source, which is user-defined (a default value provided).                           | optional          |
+| parallelism                   | The parallelism of the source (or will use `pipeline.parallelism`).                                 | optional          |
 | configurations of Data Source | Configurations to build the Data Source e.g. connection configurations and source table properties. | optional          |
 
 # Example
