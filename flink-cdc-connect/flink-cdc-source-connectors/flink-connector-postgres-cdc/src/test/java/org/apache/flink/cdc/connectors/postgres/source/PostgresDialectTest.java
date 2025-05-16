@@ -46,6 +46,14 @@ class PostgresDialectTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getUsername(),
                     POSTGRES_CONTAINER.getPassword());
 
+    private final UniqueDatabase inventoryPartitionedDatabase =
+            new UniqueDatabase(
+                    POSTGRES_CONTAINER,
+                    "postgres3",
+                    "inventory_partitioned",
+                    POSTGRES_CONTAINER.getUsername(),
+                    POSTGRES_CONTAINER.getPassword());
+
     @Test
     void testDiscoverDataCollectionsInMultiDatabases() {
 
@@ -87,5 +95,23 @@ class PostgresDialectTest extends PostgresTestBase {
                 dialectOfInventoryDatabase2.discoverDataCollections(
                         configFactoryOfInventoryDatabase2.create(0));
         Assertions.assertThat(tableIdsOfInventoryDatabase2).isEmpty();
+    }
+
+    @Test
+    void testDiscoverDataCollectionsForPartitionedTable() {
+        // initial database with partitioned table
+        inventoryPartitionedDatabase.createAndInitialize();
+
+        // get table named 'inventory_partitioned.products' from inventoryPartitionedDatabase
+        PostgresSourceConfigFactory configFactoryOfInventoryPartitionedDatabase =
+                getMockPostgresSourceConfigFactory(
+                        inventoryPartitionedDatabase, "inventory_partitioned", "products", 10);
+        PostgresDialect dialectOfInventoryPartitionedDatabase =
+                new PostgresDialect(configFactoryOfInventoryPartitionedDatabase.create(0));
+        List<TableId> tableIdsOfInventoryPartitionedDatabase =
+                dialectOfInventoryPartitionedDatabase.discoverDataCollections(
+                        configFactoryOfInventoryPartitionedDatabase.create(0));
+        Assertions.assertThat(tableIdsOfInventoryPartitionedDatabase.get(0))
+                .hasToString("inventory_partitioned.products");
     }
 }

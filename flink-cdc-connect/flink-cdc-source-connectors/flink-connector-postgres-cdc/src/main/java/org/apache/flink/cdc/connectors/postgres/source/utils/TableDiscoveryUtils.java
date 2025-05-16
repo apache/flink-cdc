@@ -38,7 +38,8 @@ public class TableDiscoveryUtils {
             throws SQLException {
 
         Set<TableId> allTableIds =
-                jdbc.readTableNames(database, null, null, new String[] {"TABLE"});
+                jdbc.readTableNames(
+                        database, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
 
         Set<TableId> capturedTables =
                 allTableIds.stream()
