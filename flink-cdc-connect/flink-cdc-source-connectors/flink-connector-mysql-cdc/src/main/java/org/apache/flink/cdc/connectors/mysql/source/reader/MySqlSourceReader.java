@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.reader;
 
 import org.apache.flink.api.connector.source.SourceEvent;
+import org.apache.flink.api.connector.source.SourceSplit;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -44,10 +45,8 @@ import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -86,15 +85,13 @@ public class MySqlSourceReader<T>
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
 
     public MySqlSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
             RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter,
             Configuration config,
             MySqlSourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
         super(
-                elementQueue,
-                new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
+                new ReuseSingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
                 config,
                 context.getSourceReaderContext());
@@ -546,5 +543,25 @@ public class MySqlSourceReader<T>
     @VisibleForTesting
     public Map<String, MySqlSnapshotSplit> getFinishedUnackedSplits() {
         return finishedUnackedSplits;
+    }
+
+    /**
+     * A fetcher manager that reuse fetcher thread when fetcher thread is idle.
+     *
+     * @param <E>
+     * @param <SplitT>
+     */
+    public static class ReuseSingleThreadFetcherManager<E, SplitT extends SourceSplit>
+            extends SingleThreadFetcherManager<E, SplitT> {
+        public ReuseSingleThreadFetcherManager(Supplier supplier) {
+            super(supplier);
+        }
+
+        @Override
+        public boolean maybeShutdownFinishedFetchers() {
+            LOG.info(
+                    "Ignore the idle thread shutdown and recycled, reduce fetchers reconstruction.");
+            return fetchers.isEmpty();
+        }
     }
 }
