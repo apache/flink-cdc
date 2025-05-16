@@ -63,6 +63,8 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
     public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     public static final String DEFAULT_DB = "postgres";
+    public static final String TEST_USER = "postgres";
+    public static final String TEST_PASSWORD = "postgres";
 
     // use official postgresql image to support pgoutput plugin
     protected static final DockerImageName PG_IMAGE =
@@ -71,8 +73,8 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
                     .withDatabaseName(DEFAULT_DB)
-                    .withUsername("postgres")
-                    .withPassword("postgres")
+                    .withUsername(TEST_USER)
+                    .withPassword(TEST_PASSWORD)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
                     .withCommand(
                             "postgres",
