@@ -29,6 +29,7 @@ import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
 import org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment;
 import org.apache.flink.cdc.composer.flink.deployment.K8SApplicationDeploymentExecutor;
 import org.apache.flink.cdc.composer.flink.deployment.YarnApplicationDeploymentExecutor;
+import org.apache.flink.cdc.composer.flink.deployment.YarnSessionDeploymentExecutor;
 import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -75,10 +76,11 @@ public class CliExecutor {
                 return deployWithApplicationComposer(new K8SApplicationDeploymentExecutor());
             case YARN_APPLICATION:
                 return deployWithApplicationComposer(new YarnApplicationDeploymentExecutor());
+            case YARN_SESSION:
+                return deployWithApplicationComposer(new YarnSessionDeploymentExecutor());
             case LOCAL:
                 return deployWithComposer(FlinkPipelineComposer.ofMiniCluster());
             case REMOTE:
-            case YARN_SESSION:
                 return deployWithComposer(
                         FlinkPipelineComposer.ofRemoteCluster(flinkConfig, additionalJars));
             default:

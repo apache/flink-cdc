@@ -51,7 +51,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc pipeline job. */
-public class MysqlE2eWithYarnApplicationITCase extends PipelineTestOnYarnEnvironment {
+public class MysqlE2eWithYarnSessionITCase extends PipelineTestOnYarnEnvironment {
     private static final Logger LOG =
             LoggerFactory.getLogger(MysqlE2eWithYarnApplicationITCase.class);
 
@@ -131,7 +131,8 @@ public class MysqlE2eWithYarnApplicationITCase extends PipelineTestOnYarnEnviron
         String applicationId =
                 submitPipelineJob(
                         pipelineJob,
-                        ComposeDeployment.YARN_APPLICATION,
+                        ComposeDeployment.YARN_SESSION,
+                        mysqlCdcJar,
                         valuesCdcJar,
                         mysqlDriverJar);
         LOG.info("Pipeline job is running");
