@@ -37,8 +37,6 @@ import org.apache.commons.cli.CommandLine;
 
 import java.util.List;
 
-import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.REMOTE;
-
 /** Executor for doing the composing and submitting logic for {@link CliFrontend}. */
 public class CliExecutor {
 
