@@ -26,15 +26,15 @@ under the License.
 
 # Iceberg Pipeline Connector
 
-The Iceberg Pipeline Connector functions as a *Data Sink* for data pipelines, enabling data writes to Apache Iceberg tables[Iceberg](https://iceberg.apache.org). This document explains how to configure the connector.
+The Iceberg Pipeline Connector functions as a *Data Sink* for data pipelines, enabling data writes to [Apache Iceberg](https://iceberg.apache.org) tables. This document explains how to configure the connector.
 
 ## Key Capabilities
-* Automatic Table Creation
-Creates Iceberg tables dynamically when they do not exist
-* Schema Synchronization
-Propagates schema changes (e.g., column additions) from source systems to Iceberg
-* Data Replication
-Supports both batch and streaming data synchronization
+* **Automatic Table Creation:**
+creates Iceberg tables dynamically when they do not exist
+* **Schema Synchronization:**
+propagates schema changes (e.g., column additions) from source systems to Iceberg
+* **Data Replication:**
+supports both batch and streaming data synchronization
 
 How to create Pipeline
 ----------------
@@ -82,7 +82,7 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Specify what connector to use, here should be <code>'iceberg'</code>.</td>
+      <td>Specify what connector to use, here should be <code>iceberg</code>.</td>
     </tr>
     <tr>
       <td>name</td>
@@ -96,7 +96,7 @@ Pipeline Connector Options
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Metastore of iceberg catalog, supports hadoop and hive.</td>
+      <td>Metastore of Iceberg catalog, supports <code>hadoop</code> and <code>hive</code>.</td>
     </tr>
     <tr>
       <td>catalog.properties.warehouse</td>
@@ -117,21 +117,21 @@ Pipeline Connector Options
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Partition keys for each partitioned table, allow setting multiple primary keys for multiTables. Each table are separated by ';', and each partition key are separated by ','. For example, we can set partition.key of two tables by 'testdb.table1:id1,id2;testdb.table2:name'.</td>
+      <td>Partition keys for each partitioned table. Allow setting multiple primary keys for multiTables. Tables are separated by ';', and partition keys are separated by ','. For example, we can set <code>partition.key</code> of two tables using 'testdb.table1:id1,id2;testdb.table2:name'.</td>
     </tr>
     <tr>
       <td>catalog.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Iceberg catalog to pipeline，See <a href="https://iceberg.apache.org/docs/nightly/flink-configuration/#catalog-configuration">Iceberg catalog options</a>. </td>
+      <td>Pass Iceberg catalog options to the pipeline，See <a href="https://iceberg.apache.org/docs/nightly/flink-configuration/#catalog-configuration">Iceberg catalog options</a>. </td>
     </tr>
     <tr>
       <td>table.properties.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass options of Iceberg table to pipeline，See <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg table options</a>. </td>
+      <td>Pass Iceberg table options to the pipeline，See <a href="https://iceberg.apache.org/docs/nightly/configuration/#write-properties">Iceberg table options</a>. </td>
     </tr>
     </tbody>
 </table>    
@@ -140,9 +140,9 @@ Pipeline Connector Options
 Usage Notes
 --------
 
-* Only support Iceberg primary key table, so the source table must have primary keys.
+* The source table must have a primary key. Tables with no primary key are not supported.
 
-* Not support exactly-once. The connector uses at-least-once + primary key table for idempotent writing.
+* Exactly-once semantics are not supported. The connector uses at-least-once + the table's primary key for idempotent writing.
 
 Data Type Mapping
 ----------------
