@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -46,6 +47,9 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.ArgumentsProvider;
+import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +59,7 @@ import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -157,11 +162,33 @@ class FlinkParallelizedPipelineITCase {
         outCaptor.reset();
     }
 
+    static class CustomArgumentsProvider implements ArgumentsProvider {
+        @Override
+        public Stream<? extends Arguments> provideArguments(
+                org.junit.jupiter.api.extension.ExtensionContext context) {
+            return Stream.of(
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, null, null),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, 1, 1),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, 2, 1),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, 4, 1),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, 1, 4),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, 2, 4),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, 4, 4),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, null, null),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, 1, 1),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, 2, 1),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, 4, 1),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, 1, 4),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, 2, 4),
+                    Arguments.of(ValuesDataSink.SinkApi.SINK_V2, 4, 4));
+        }
+    }
+
     @ParameterizedTest
     @EnumSource
     void testDistributedTablesSourceInSingleParallelismWithLenientBehavior(
             ValuesDataSink.SinkApi sinkApi) throws Exception {
-        runPipelineJob(sinkApi, 1, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.LENIENT);
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -226,11 +253,17 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @EnumSource
+    @ArgumentsSource(CustomArgumentsProvider.class)
     void testDistributedTablesSourceInMultipleParallelismWithLenientBehavior(
-            ValuesDataSink.SinkApi sinkApi) throws Exception {
+            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
+            throws Exception {
         runPipelineJob(
-                sinkApi, MAX_PARALLELISM, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.LENIENT);
+                sinkApi,
+                sourceParallelism,
+                sinkParallelism,
+                MAX_PARALLELISM,
+                SourceTraits.DISTRIBUTED,
+                SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -409,7 +442,7 @@ class FlinkParallelizedPipelineITCase {
     @EnumSource
     void testDistributedTablesSourceInSingleParallelismWithIgnoreBehavior(
             ValuesDataSink.SinkApi sinkApi) throws Exception {
-        runPipelineJob(sinkApi, 1, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.IGNORE);
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.IGNORE);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -432,11 +465,17 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @EnumSource
+    @ArgumentsSource(CustomArgumentsProvider.class)
     void testDistributedTablesSourceInMultipleParallelismWithIgnoreBehavior(
-            ValuesDataSink.SinkApi sinkApi) throws Exception {
+            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
+            throws Exception {
         runPipelineJob(
-                sinkApi, MAX_PARALLELISM, SourceTraits.DISTRIBUTED, SchemaChangeBehavior.IGNORE);
+                sinkApi,
+                sourceParallelism,
+                sinkParallelism,
+                MAX_PARALLELISM,
+                SourceTraits.DISTRIBUTED,
+                SchemaChangeBehavior.IGNORE);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -466,13 +505,15 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @EnumSource
+    @ArgumentsSource(CustomArgumentsProvider.class)
     void testDistributedTablesSourceInSingleParallelismWithExceptionBehavior(
-            ValuesDataSink.SinkApi sinkApi) {
+            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism) {
         Assertions.assertThatThrownBy(
                         () ->
                                 runPipelineJob(
                                         sinkApi,
+                                        sourceParallelism,
+                                        sinkParallelism,
                                         1,
                                         SourceTraits.DISTRIBUTED,
                                         SchemaChangeBehavior.EXCEPTION))
@@ -484,13 +525,15 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @EnumSource
+    @ArgumentsSource(CustomArgumentsProvider.class)
     void testDistributedTablesSourceInMultipleParallelismWithExceptionBehavior(
-            ValuesDataSink.SinkApi sinkApi) {
+            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism) {
         Assertions.assertThatThrownBy(
                         () ->
                                 runPipelineJob(
                                         sinkApi,
+                                        sourceParallelism,
+                                        sinkParallelism,
                                         MAX_PARALLELISM,
                                         SourceTraits.DISTRIBUTED,
                                         SchemaChangeBehavior.EXCEPTION))
@@ -505,7 +548,7 @@ class FlinkParallelizedPipelineITCase {
     @EnumSource
     void testRegularTablesSourceInSingleParallelism(ValuesDataSink.SinkApi sinkApi)
             throws Exception {
-        runPipelineJob(sinkApi, 1, SourceTraits.REGULAR, SchemaChangeBehavior.LENIENT);
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.REGULAR, SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -572,11 +615,17 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @EnumSource
-    void testRegularTablesSourceInMultipleParallelism(ValuesDataSink.SinkApi sinkApi)
+    @ArgumentsSource(CustomArgumentsProvider.class)
+    void testRegularTablesSourceInMultipleParallelism(
+            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
             throws Exception {
         runPipelineJob(
-                sinkApi, MAX_PARALLELISM, SourceTraits.REGULAR, SchemaChangeBehavior.LENIENT);
+                sinkApi,
+                sourceParallelism,
+                sinkParallelism,
+                MAX_PARALLELISM,
+                SourceTraits.REGULAR,
+                SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
 
@@ -708,7 +757,7 @@ class FlinkParallelizedPipelineITCase {
     @EnumSource
     void testRegularTablesSourceMergedInSingleParallelism(ValuesDataSink.SinkApi sinkApi)
             throws Exception {
-        runPipelineJob(sinkApi, 1, SourceTraits.MERGING, SchemaChangeBehavior.LENIENT);
+        runPipelineJob(sinkApi, 1, 1, 1, SourceTraits.MERGING, SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -773,13 +822,19 @@ class FlinkParallelizedPipelineITCase {
     }
 
     @ParameterizedTest
-    @EnumSource
+    @ArgumentsSource(CustomArgumentsProvider.class)
     @Disabled(
             "Currently, it's not safe to merge tables with hetero schema from different partitions.")
-    void testRegularTablesSourceMergedInMultipleParallelism(ValuesDataSink.SinkApi sinkApi)
+    void testRegularTablesSourceMergedInMultipleParallelism(
+            ValuesDataSink.SinkApi sinkApi, Integer sourceParallelism, Integer sinkParallelism)
             throws Exception {
         runPipelineJob(
-                sinkApi, MAX_PARALLELISM, SourceTraits.MERGING, SchemaChangeBehavior.LENIENT);
+                sinkApi,
+                sourceParallelism,
+                sinkParallelism,
+                MAX_PARALLELISM,
+                SourceTraits.MERGING,
+                SchemaChangeBehavior.LENIENT);
 
         // Validate generated downstream schema
         for (int idx = 0; idx < UPSTREAM_TABLE_COUNT; idx++) {
@@ -956,6 +1011,8 @@ class FlinkParallelizedPipelineITCase {
 
     private void runPipelineJob(
             ValuesDataSink.SinkApi sinkApi,
+            Integer sourceParallelism,
+            Integer sinkParallelism,
             int parallelism,
             SourceTraits traits,
             SchemaChangeBehavior exception)
@@ -971,13 +1028,20 @@ class FlinkParallelizedPipelineITCase {
                 new SourceDef(
                         DistributedDataSourceFactory.IDENTIFIER,
                         "Distributed Source",
-                        sourceConfig);
+                        sourceConfig,
+                        sourceParallelism);
 
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
         sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
-        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+        SinkDef sinkDef =
+                new SinkDef(
+                        ValuesDataFactory.IDENTIFIER,
+                        "Value Sink",
+                        sinkConfig,
+                        Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
+                        sinkParallelism);
 
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
