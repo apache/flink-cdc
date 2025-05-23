@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.assigner.state;
 
+import org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
@@ -81,6 +82,29 @@ class PendingSplitsStateSerializerTest {
 
         final byte[] ser2 = serializer.serialize(state);
         assertThat(ser1).isEqualTo(ser2);
+    }
+
+    @Test
+    void testSerializeSnapshotPendingSplitsState() throws Exception {
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
+        PendingSplitsState state =
+                new SnapshotPendingSplitsState(
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyMap(),
+                        constructTableSchema(),
+                        Collections.emptyMap(),
+                        AssignerStatus.INITIAL_ASSIGNING,
+                        Collections.emptyList(),
+                        false,
+                        true,
+                        Collections.emptyMap(),
+                        new ChunkSplitterState(
+                                constructTableId(), ChunkSplitterState.ChunkBound.middleOf(1), 2));
+
+        assertThat(serializer.deserialize(serializer.getVersion(), serializer.serialize(state)))
+                .isEqualTo(state);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {
@@ -148,7 +172,7 @@ class PendingSplitsStateSerializerTest {
     }
 
     private HashMap<TableId, TableChanges.TableChange> constructTableSchema() {
-        TableId tableId = new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`");
+        TableId tableId = constructTableId();
         HashMap<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
         Tables tables = new Tables();
         Table table = tables.editOrCreateTable(tableId).create();
@@ -156,6 +180,10 @@ class PendingSplitsStateSerializerTest {
                 new TableChanges.TableChange(TableChanges.TableChangeType.CREATE, table);
         tableSchema.put(tableId, tableChange);
         return tableSchema;
+    }
+
+    private TableId constructTableId() {
+        return new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`");
     }
 
     /** An implementation for {@link PendingSplitsState} which will cause a serialization error. */
