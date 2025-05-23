@@ -51,9 +51,9 @@ You may need to configure the following dependencies manually, and pass it with 
 </table>
 </div>
 
-## Example
+## single data source Example
 
-An example of the pipeline for reading data from MySQL and sink to Doris can be defined as follows:
+An example of the pipeline for reading data from single MySQL and sink to Doris can be defined as follows:
 
 ```yaml
 source:
@@ -65,6 +65,44 @@ source:
    password: pass
    tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
    server-id: 5401-5404
+
+sink:
+  type: doris
+  name: Doris Sink
+  fenodes: 127.0.0.1:8030
+  username: root
+  password: pass
+
+pipeline:
+   name: MySQL to Doris Pipeline
+   parallelism: 4
+```
+
+## multiple data source Example
+
+An example of the pipeline for reading data from multiple MySQL datasource and sink to Doris can be defined as follows:
+
+```yaml
+sources:
+  - type: mysql
+    name: MySQL multiple Source1
+    hostname: 127.0.0.1
+    port: 3306
+    username: admin
+    password: pass
+    tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+    server-id: 5400-5404
+    server-time-zone: Asia/Shanghai
+
+  - type: mysql
+      name: MySQL multiple Source2
+    hostname: 127.0.0.2
+    port: 3307
+    username: admin
+    password: pass
+    tables: adb.\.*, bdb.user_table_[0-9]+, [app|web].order_\.*
+    server-id: 5405-5409
+    server-time-zone: Asia/Shanghai
 
 sink:
   type: doris
