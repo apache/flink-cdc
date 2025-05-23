@@ -41,7 +41,7 @@ public interface MetadataApplier extends Serializable, AutoCloseable {
         return this;
     }
 
-    /** Checks if this metadata applier should this event type. */
+    /** Checks if this metadata applier should accept this event type. */
     default boolean acceptsSchemaEvolutionType(SchemaChangeEventType schemaChangeEventType) {
         return true;
     }
