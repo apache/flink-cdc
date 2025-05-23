@@ -578,7 +578,6 @@ class PaimonMetadataApplierTest {
         Assertions.assertThat(table.primaryKeys()).isEmpty();
         Assertions.assertThat(table.partitionKeys()).isEmpty();
         Assertions.assertThat(table.options()).containsEntry("bucket", "-1");
-        Assertions.assertThat(table.comment().orElse(""))
-                .isEqualTo("comment of table_with_comment");
+        Assertions.assertThat(table.comment()).contains("comment of table_with_comment");
     }
 }
