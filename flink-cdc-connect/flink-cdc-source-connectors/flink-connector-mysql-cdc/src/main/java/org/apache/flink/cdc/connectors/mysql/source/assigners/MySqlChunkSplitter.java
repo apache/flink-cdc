@@ -114,6 +114,10 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             throws Exception {
         if (!hasNextChunk()) {
             analyzeTable(partition, tableId);
+            // Skip tables without primary key
+            if (splitColumn == null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                return Collections.emptyList();
+            }
             Optional<List<MySqlSnapshotSplit>> evenlySplitChunks =
                     trySplitAllEvenlySizedChunks(partition, tableId);
             if (evenlySplitChunks.isPresent()) {
@@ -133,6 +137,10 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                     "Can not split a new table before the previous table splitting finish.");
             if (currentSplittingTable == null) {
                 analyzeTable(partition, currentSplittingTableId);
+                // Skip tables without primary key
+                if (splitColumn == null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                    return Collections.emptyList();
+                }
             }
             synchronized (lock) {
                 return Collections.singletonList(splitOneUnevenlySizedChunk(partition, tableId));
@@ -145,12 +153,22 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         try {
             currentSplittingTable =
                     mySqlSchema.getTableSchema(partition, jdbcConnection, tableId).getTable();
-            splitColumn =
-                    ChunkUtils.getChunkKeyColumn(
-                            currentSplittingTable, sourceConfig.getChunkKeyColumns());
+            splitColumn = getChunkKeyColumn(currentSplittingTable);
+            if (splitColumn == null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                LOG.warn(
+                        "Table {} doesn't have primary key and ignore-no-primary-key-table is set to true, skipping incremental snapshot.",
+                        tableId);
+                currentSplittingTableId = null;
+                nextChunkStart = null;
+                nextChunkId = null;
+                return;
+            }
             splitType =
                     ChunkUtils.getChunkKeyColumnType(
-                            splitColumn, sourceConfig.isTreatTinyInt1AsBoolean());
+                            currentSplittingTable,
+                            sourceConfig.getChunkKeyColumns(),
+                            sourceConfig.isTreatTinyInt1AsBoolean(),
+                            sourceConfig);
             minMaxOfSplitColumn =
                     StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
@@ -478,5 +496,10 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             jdbcConnection.close();
         }
         mySqlSchema.close();
+    }
+
+    private Column getChunkKeyColumn(Table table) {
+        return ChunkUtils.getChunkKeyColumn(
+                table, sourceConfig.getChunkKeyColumns(), sourceConfig);
     }
 }

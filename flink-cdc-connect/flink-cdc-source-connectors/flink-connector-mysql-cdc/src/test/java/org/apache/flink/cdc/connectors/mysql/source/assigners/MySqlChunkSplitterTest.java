@@ -17,11 +17,19 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.assigners;
 
+import org.apache.flink.cdc.connectors.mysql.schema.MySqlSchema;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
+import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.connector.mysql.MySqlPartition;
+import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.Column;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.relational.history.TableChanges;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -84,5 +92,54 @@ class MySqlChunkSplitterTest {
                         ChunkRange.of(null, 2147483637),
                         ChunkRange.of(2147483637, 2147483647),
                         ChunkRange.of(2147483647, null));
+    }
+
+    @Test
+    void testIgnoreNoPrimaryKeyTable() throws Exception {
+        // 创建配置，设置ignoreNoPrimaryKeyTable为true
+        MySqlSourceConfig sourceConfig =
+                new MySqlSourceConfigFactory()
+                        .startupOptions(StartupOptions.initial())
+                        .databaseList("test_db")
+                        .tableList("test_db.test_table")
+                        .hostname("localhost")
+                        .username("test")
+                        .password("test")
+                        .serverTimeZone(ZoneId.of("UTC").toString())
+                        .ignoreNoPrimaryKeyTable(true)
+                        .createConfig(0);
+
+        // 创建一个简单的MySqlSchema实现
+        MySqlSchema schema =
+                new MySqlSchema(sourceConfig, true) {
+                    @Override
+                    public TableChanges.TableChange getTableSchema(
+                            MySqlPartition partition, JdbcConnection jdbc, TableId tableId) {
+                        // 创建一个没有主键的表
+                        Table noPkTable =
+                                Table.editor()
+                                        .tableId(tableId)
+                                        .addColumn(
+                                                Column.editor()
+                                                        .name("id")
+                                                        .type("BIGINT")
+                                                        .jdbcType(-5)
+                                                        .optional(false)
+                                                        .create())
+                                        .create();
+                        return new TableChanges.TableChange(
+                                TableChanges.TableChangeType.CREATE, noPkTable);
+                    }
+                };
+
+        MySqlChunkSplitter splitter = new MySqlChunkSplitter(schema, sourceConfig);
+        MySqlPartition partition = new MySqlPartition("mysql_binlog_source");
+
+        // 测试无主键表
+        List<MySqlSnapshotSplit> splits =
+                splitter.splitChunks(partition, new TableId("test_db", null, "test_table"));
+
+        // 验证对于没有主键的表，返回空的分片列表
+        Assertions.assertThat(splits).isEmpty();
     }
 }

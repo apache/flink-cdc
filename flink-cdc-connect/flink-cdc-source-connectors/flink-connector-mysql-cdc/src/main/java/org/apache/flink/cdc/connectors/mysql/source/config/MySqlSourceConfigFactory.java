@@ -74,6 +74,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private boolean ignoreNoPrimaryKeyTable = false;
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -281,6 +282,15 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /**
+     * Whether to ignore tables without primary key. When enabled, the connector will skip tables
+     * that don't have a primary key.
+     */
+    public MySqlSourceConfigFactory ignoreNoPrimaryKeyTable(boolean ignoreNoPrimaryKeyTable) {
+        this.ignoreNoPrimaryKeyTable = ignoreNoPrimaryKeyTable;
+        return this;
+    }
+
+    /**
      * Whether to use legacy json format. The default value is true, which means there is no
      * whitespace before value and after comma in json format.
      */
@@ -421,6 +431,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                ignoreNoPrimaryKeyTable);
     }
 }
