@@ -48,6 +48,10 @@ fi
 
 if [ "$(uname)" == "Darwin" ]; then
     SHASUM="shasum -a 512"
+    # turn off xattr headers in the generated archive file on macOS
+    TAR_OPTIONS="--no-xattrs"
+    # Disable the creation of ._* files on macOS.
+    export COPYFILE_DISABLE=1
 else
     SHASUM="sha512sum"
 fi
@@ -77,7 +81,7 @@ rsync -a \
   --exclude ".travis.yml" \
   . flink-cdc-${RELEASE_VERSION}
 
-tar czf ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz flink-cdc-${RELEASE_VERSION}
+tar $TAR_OPTIONS -czf ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz flink-cdc-${RELEASE_VERSION}
 gpg --armor --detach-sig ${RELEASE_DIR}/flink-cdc-${RELEASE_VERSION}-src.tgz
 cd ${RELEASE_DIR}
 ${SHASUM} flink-cdc-${RELEASE_VERSION}-src.tgz > flink-cdc-${RELEASE_VERSION}-src.tgz.sha512
