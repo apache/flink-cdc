@@ -437,7 +437,7 @@ public class SqlServerIncrementalSourceExample {
 
 ### Tables Without primary keys
 
-Starting from version 3.4-SNAPSHOT, SQLServer CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+Starting from version 3.4.0, SQLServer CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
 
 There are two places that need to be taken care of.
 
