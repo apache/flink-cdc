@@ -289,6 +289,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the connector should read from partitioned table or not */
+    public PostgresSourceBuilder<T> includePartitionedTable(boolean includePartitionedTable) {
+        this.configFactory.setIncludePartitionedTable(includePartitionedTable);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *

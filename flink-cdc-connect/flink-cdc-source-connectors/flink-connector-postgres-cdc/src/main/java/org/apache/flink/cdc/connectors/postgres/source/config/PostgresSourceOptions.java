@@ -88,4 +88,14 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "By setting this to higher value, the offset that is consumed by global slot will be "
                                     + "committed after multiple checkpoint delays instead of after each checkpoint completion.\n"
                                     + "This allows continuous recycle of log files in stream phase.");
+
+    public static final ConfigOption<Boolean> INCLUDE_PARTITIONED_TABLE =
+            ConfigOptions.key("include-partitioned-table")
+                    .booleanType()
+                    .defaultValue(Boolean.FALSE)
+                    .withDescription(
+                            "Enable reading from partitioned table.\n"
+                                    + "If enabled:\n"
+                                    + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
+                                    + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");
 }

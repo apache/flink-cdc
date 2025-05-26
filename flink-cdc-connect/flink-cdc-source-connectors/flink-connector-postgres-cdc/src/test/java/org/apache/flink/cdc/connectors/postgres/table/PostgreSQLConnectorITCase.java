@@ -271,6 +271,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 + " 'schema-name' = '%s',"
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'include-partitioned-table' = 'true',"
                                 + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'debezium.publication.name'  = '%s',"
                                 + " 'slot.name' = '%s'"
