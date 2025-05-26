@@ -52,8 +52,8 @@ import static org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSp
 class PendingSplitsStateSerializerTest {
 
     private static final TableId tableId0 = TableId.parse("test_db.test_table");
-    private static final TableId tableId1 = TableId.parse("test_db.test_table1");
-    private static final TableId tableId2 = TableId.parse("test_db.test_table2");
+    private static final TableId tableId1 = TableId.parse("test_db.\"test_table 1\"");
+    private static final TableId tableId2 = TableId.parse("test_db.\"test_table 2\"");
 
     public static Stream<Arguments> params() {
         return Stream.of(

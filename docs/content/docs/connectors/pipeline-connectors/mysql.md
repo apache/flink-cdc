@@ -344,14 +344,15 @@ pipeline:
       </td>
     </tr>
     <tr>
-      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
-        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
-        Experimental option, defaults to false.
+        Whether to skip backfill in snapshot reading phase.<br> 
+        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
+        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
+        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
     <tr>

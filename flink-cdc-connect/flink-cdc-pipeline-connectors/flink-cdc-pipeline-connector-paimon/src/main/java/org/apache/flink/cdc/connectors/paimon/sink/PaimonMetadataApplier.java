@@ -175,7 +175,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                             column.getName(),
                                             LogicalTypeConversion.toDataType(
                                                     DataTypeUtils.toFlinkDataType(column.getType())
-                                                            .getLogicalType())));
+                                                            .getLogicalType()),
+                                            column.getComment()));
             List<String> partitionKeys = new ArrayList<>();
             List<String> primaryKeys = schema.primaryKeys();
             if (partitionMaps.containsKey(event.tableId())) {
