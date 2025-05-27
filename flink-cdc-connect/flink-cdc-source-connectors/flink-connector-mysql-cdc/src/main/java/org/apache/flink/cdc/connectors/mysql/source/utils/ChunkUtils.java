@@ -23,6 +23,9 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
@@ -41,12 +44,13 @@ import static org.apache.flink.table.api.DataTypes.ROW;
 
 /** Utilities to split chunks of table. */
 public class ChunkUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(ChunkUtils.class);
 
     private ChunkUtils() {}
 
     public static RowType getChunkKeyColumnType(
-            Table table, Map<ObjectPath, String> chunkKeyColumns, boolean tinyInt1isBit) {
-        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumns), tinyInt1isBit);
+            Table table, Map<ObjectPath, String> chunkKeyColumns, boolean tinyInt1isBit, MySqlSourceConfig sourceConfig) {
+        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumns, sourceConfig), tinyInt1isBit);
     }
 
     public static RowType getChunkKeyColumnType(Column chunkKeyColumn, boolean tinyInt1isBit) {
@@ -62,12 +66,25 @@ public class ChunkUtils {
      * have primary keys, `chunkKeyColumn` must be set. When the parameter `chunkKeyColumn` is not
      * set and the table has primary keys, return the first column of primary keys.
      */
-    public static Column getChunkKeyColumn(Table table, Map<ObjectPath, String> chunkKeyColumns) {
+    public static Column getChunkKeyColumn(
+            Table table, Map<ObjectPath, String> chunkKeyColumns, MySqlSourceConfig sourceConfig) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         String chunkKeyColumn = findChunkKeyColumn(table.id(), chunkKeyColumns);
         if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
-            throw new ValidationException(
-                    "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
+            if (sourceConfig != null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                LOG.warn(
+                        "Table {} has no primary key and no chunk key column specified. This table will be skipped.",
+                        table.id());
+                return null;
+            } else {
+                throw new ValidationException(
+                        String.format(
+                                "Table %s has no primary key and no chunk key column specified. "
+                                        + "To use incremental snapshot, either: "
+                                        + "1. Set 'scan.incremental.snapshot.chunk.key-column' for this table, or "
+                                        + "2. Set 'scan.incremental.snapshot.ignore-no-primary-key-table' to true to skip tables without primary keys.",
+                                table.id()));
+            }
         }
 
         List<Column> searchColumns = table.columns();
