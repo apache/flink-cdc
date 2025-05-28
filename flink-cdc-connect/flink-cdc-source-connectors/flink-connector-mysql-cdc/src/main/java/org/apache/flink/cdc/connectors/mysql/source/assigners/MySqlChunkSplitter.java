@@ -116,6 +116,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             analyzeTable(partition, tableId);
             // Skip tables without primary key
             if (splitColumn == null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                LOG.warn(
+                        "Table {} doesn't have primary key and ignore-no-primary-key-table is set to true, skipping incremental snapshot.",
+                        tableId);
                 return Collections.emptyList();
             }
             Optional<List<MySqlSnapshotSplit>> evenlySplitChunks =
@@ -139,6 +142,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 analyzeTable(partition, currentSplittingTableId);
                 // Skip tables without primary key
                 if (splitColumn == null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                    LOG.warn(
+                            "Table {} doesn't have primary key and ignore-no-primary-key-table is set to true, skipping incremental snapshot.",
+                            currentSplittingTableId);
                     return Collections.emptyList();
                 }
             }
@@ -168,7 +174,7 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                             currentSplittingTable,
                             sourceConfig.getChunkKeyColumns(),
                             sourceConfig.isTreatTinyInt1AsBoolean(),
-                            sourceConfig);
+                            sourceConfig.isIgnoreNoPrimaryKeyTable());
             minMaxOfSplitColumn =
                     StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
             approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
@@ -500,6 +506,6 @@ public class MySqlChunkSplitter implements ChunkSplitter {
 
     private Column getChunkKeyColumn(Table table) {
         return ChunkUtils.getChunkKeyColumn(
-                table, sourceConfig.getChunkKeyColumns(), sourceConfig);
+                table, sourceConfig.getChunkKeyColumns(), sourceConfig.isIgnoreNoPrimaryKeyTable());
     }
 }

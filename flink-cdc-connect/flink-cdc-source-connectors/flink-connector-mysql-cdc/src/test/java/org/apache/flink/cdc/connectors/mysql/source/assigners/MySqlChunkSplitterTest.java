@@ -22,7 +22,6 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.connector.mysql.MySqlPartition;
 import io.debezium.jdbc.JdbcConnection;
@@ -96,7 +95,6 @@ class MySqlChunkSplitterTest {
 
     @Test
     void testIgnoreNoPrimaryKeyTable() throws Exception {
-        // 创建配置，设置ignoreNoPrimaryKeyTable为true
         MySqlSourceConfig sourceConfig =
                 new MySqlSourceConfigFactory()
                         .startupOptions(StartupOptions.initial())
@@ -109,7 +107,6 @@ class MySqlChunkSplitterTest {
                         .ignoreNoPrimaryKeyTable(true)
                         .createConfig(0);
 
-        // 创建一个简单的MySqlSchema实现
         MySqlSchema schema =
                 new MySqlSchema(sourceConfig, true) {
                     @Override
@@ -135,11 +132,9 @@ class MySqlChunkSplitterTest {
         MySqlChunkSplitter splitter = new MySqlChunkSplitter(schema, sourceConfig);
         MySqlPartition partition = new MySqlPartition("mysql_binlog_source");
 
-        // 测试无主键表
         List<MySqlSnapshotSplit> splits =
                 splitter.splitChunks(partition, new TableId("test_db", null, "test_table"));
 
-        // 验证对于没有主键的表，返回空的分片列表
         Assertions.assertThat(splits).isEmpty();
     }
 }

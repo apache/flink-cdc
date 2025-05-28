@@ -300,8 +300,5 @@ public class MySqlSourceOptions {
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(
-                            "Whether to ignore tables without primary key. When enabled, the connector will skip tables "
-                                    + "that don't have a primary key. By default these tables will be processed, but for some "
-                                    + "scenarios it may be desirable to ignore them since tables without primary keys "
-                                    + "might cause performance issues during incremental snapshot.");
+                            "Whether to ignore tables without primary key in MySQL. When enabled, the connector will skip tables.");
 }

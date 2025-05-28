@@ -336,5 +336,6 @@ public class MySqlDataSourceOptions {
             ConfigOptions.key("ignore-no-primary-key-table")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Whether to ignore tables without primary key in MySQL.");
+                    .withDescription(
+                            "Whether to ignore tables without primary key in MySQL. When enabled, the connector will skip tables.");
 }

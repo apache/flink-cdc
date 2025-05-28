@@ -424,6 +424,13 @@ Flink SQL> SELECT * FROM orders;
         警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
         例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
     </tr>
+    <tr>
+      <td>ignore-no-primary-key-table</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否跳过没有主键的表。如果设置为true，连接器将跳过没有主键的表。</td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -621,8 +628,8 @@ Flink 定期为 Source 执行 checkpoint，在故障转移的情况下，作业�
 
 在执行增量快照读取时，MySQL CDC source 需要一个用于分片的的算法。
 MySQL CDC Source 使用主键列将表划分为多个分片（chunk）。 默认情况下，MySQL CDC source 会识别表的主键列，并使用主键中的第一列作为用作分片列。
-如果表中没有主键，用户必须指定 `scan.incremental.snapshot.chunk.key-column`、
-否则增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 恢复到旧的快照读取机制。
+如果表中没有主键，用户必须指定 `scan.incremental.snapshot.chunk.key-column`作为分块键,或者
+设置 `ignore-no-primary-key-table` 参数为 true 以跳过没有主键的表。否则增量快照读取将失败，你可以禁用 `scan.incremental.snapshot.enabled` 恢复到旧的快照读取机制。
 请注意，使用不在主键中的列作为分块键可能会降低表的查询性能。
 
 对于数值和自动增量拆分列，MySQL CDC Source 按固定步长高效地拆分块。
@@ -820,6 +827,8 @@ $ ./bin/flink run \
 * 如果指定的列不存在更新操作，此时可以保证 Exactly once 语义。
 * 如果指定的列存在更新操作，此时只能保证 At least once 语义。但可以结合下游，通过指定下游主键，结合幂等性操作来保证数据的正确性。
 
+从 3.5.0 版本开始，MySQL 变更数据捕获（CDC）提供了一个忽略无主键表的选项。
+当 “ignore-no-primary-key-table”（忽略无主键表）设置为 “true”（真）时，连接器将跳过没有主键的表。
 ### 可用的指标
 
 指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):

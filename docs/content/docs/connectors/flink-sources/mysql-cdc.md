@@ -451,6 +451,13 @@ During a snapshot operation, the connector will query each included table to pro
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>ignore-no-primary-key-table</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to skip tables without primary keys. If set to true, the connector will skip tables that don't have a primary key.</td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -656,7 +663,7 @@ Flink performs checkpoints for the source periodically, in case of failover, the
 
 When performing incremental snapshot reading, MySQL CDC source need a criterion which used to split the table.
 MySQL CDC Source use a splitting column to split the table to multiple splits (chunks). By default, MySQL CDC source will identify the primary key column of the table and use the first column in primary key as the splitting column.
-If there is no primary key in the table, user must specify `scan.incremental.snapshot.chunk.key-column`, 
+If there is no primary key in the table, users must specify scan.incremental.snapshot.chunk.key-column as the chunk key, or set ignore-no-primary-key-table to true to skip tables without primary keys,
 otherwise incremental snapshot reading will fail and you can disable `scan.incremental.snapshot.enabled` to fallback to old snapshot reading mechanism.
 Please note that using a column not in primary key as a chunk key can result in slower table query performance.
 
@@ -857,6 +864,9 @@ There are two places that need to be taken care of.
 2. The processing semantics of a MySQL CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
   * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
   * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+Starting from version 3.5.0, MySQL CDC provides an option to ignore tables without primary keys. 
+When `ignore-no-primary-key-table` is set to `true`, the connector will skip tables that don't have a primary key.
 
 ### About converting binary type data to base64 encoded data
 

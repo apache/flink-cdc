@@ -268,7 +268,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
                                 statefulTaskContext.getSourceConfig().getChunkKeyColumns(),
                                 statefulTaskContext.getSourceConfig().isTreatTinyInt1AsBoolean(),
-                                statefulTaskContext.getSourceConfig());
+                                statefulTaskContext.getSourceConfig().isIgnoreNoPrimaryKeyTable());
 
                 Struct target = RecordUtils.getStructContainsChunkKey(sourceRecord);
                 Object[] chunkKey =

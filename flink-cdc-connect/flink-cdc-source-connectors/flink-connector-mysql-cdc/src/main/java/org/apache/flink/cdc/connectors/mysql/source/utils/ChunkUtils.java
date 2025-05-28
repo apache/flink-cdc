@@ -23,14 +23,13 @@ import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Preconditions;
-import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -49,8 +48,12 @@ public class ChunkUtils {
     private ChunkUtils() {}
 
     public static RowType getChunkKeyColumnType(
-            Table table, Map<ObjectPath, String> chunkKeyColumns, boolean tinyInt1isBit, MySqlSourceConfig sourceConfig) {
-        return getChunkKeyColumnType(getChunkKeyColumn(table, chunkKeyColumns, sourceConfig), tinyInt1isBit);
+            Table table,
+            Map<ObjectPath, String> chunkKeyColumns,
+            boolean tinyInt1isBit,
+            boolean ignoreNoPrimaryKeyTable) {
+        return getChunkKeyColumnType(
+                getChunkKeyColumn(table, chunkKeyColumns, ignoreNoPrimaryKeyTable), tinyInt1isBit);
     }
 
     public static RowType getChunkKeyColumnType(Column chunkKeyColumn, boolean tinyInt1isBit) {
@@ -67,11 +70,11 @@ public class ChunkUtils {
      * set and the table has primary keys, return the first column of primary keys.
      */
     public static Column getChunkKeyColumn(
-            Table table, Map<ObjectPath, String> chunkKeyColumns, MySqlSourceConfig sourceConfig) {
+            Table table, Map<ObjectPath, String> chunkKeyColumns, boolean ignoreNoPrimaryKeyTable) {
         List<Column> primaryKeys = table.primaryKeyColumns();
         String chunkKeyColumn = findChunkKeyColumn(table.id(), chunkKeyColumns);
         if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
-            if (sourceConfig != null && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+            if (ignoreNoPrimaryKeyTable) {
                 LOG.warn(
                         "Table {} has no primary key and no chunk key column specified. This table will be skipped.",
                         table.id());
