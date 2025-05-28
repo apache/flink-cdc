@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
+import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
@@ -69,15 +70,24 @@ public class PreCommitOperator
     }
 
     @Override
-    public void processElement(StreamRecord<CommittableMessage<MultiTableCommittable>> element) {
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
         if (catalog == null) {
             this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
             this.storeMultiCommitter =
                     new StoreMultiCommitter(
                             () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
                             Committer.createContext(
-                                    commitUser, getMetricGroup(), true, false, null));
+                                    commitUser,
+                                    getMetricGroup(),
+                                    true,
+                                    context.isRestored(),
+                                    context.getOperatorStateStore()));
         }
+    }
+
+    @Override
+    public void processElement(StreamRecord<CommittableMessage<MultiTableCommittable>> element) {
         if (element.getValue() instanceof CommittableWithLineage) {
             multiTableCommittables.add(
                     ((CommittableWithLineage<MultiTableCommittable>) element.getValue())
