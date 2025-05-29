@@ -53,6 +53,7 @@ public class PostgresDataSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Password to use when connecting to the PostgreSQL database server.");
+
     public static final ConfigOption<String> TABLES =
             ConfigOptions.key("tables")
                     .stringType()
@@ -82,26 +83,6 @@ public class PostgresDataSourceOptions {
                                     + "from a particular plug-in for a particular database/schema. The server uses this slot "
                                     + "to stream events to the connector that you are configuring.");
 
-    public static final ConfigOption<DebeziumChangelogMode> CHANGELOG_MODE =
-            ConfigOptions.key("changelog-mode")
-                    .enumType(DebeziumChangelogMode.class)
-                    .defaultValue(DebeziumChangelogMode.ALL)
-                    .withDescription(
-                            "The changelog mode used for encoding streaming changes.\n"
-                                    + "\"all\": Encodes changes as retract stream using all RowKinds. This is the default mode.\n"
-                                    + "\"upsert\": Encodes changes as upsert stream that describes idempotent updates on a key. It can be used for tables with primary keys when replica identity FULL is not an option.");
-
-    public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_ENABLED =
-            ConfigOptions.key("scan.incremental.snapshot.enabled")
-                    .booleanType()
-                    .defaultValue(false)
-                    .withDescription(
-                            "Incremental snapshot is a new mechanism to read snapshot of a table. "
-                                    + "Compared to the old snapshot mechanism, the incremental snapshot has many advantages, including:\n"
-                                    + "(1) source can be parallel during snapshot reading, \n"
-                                    + "(2) source can perform checkpoints in the chunk granularity during snapshot reading, \n"
-                                    + "(3) source doesn't need to acquire global read lock before snapshot reading.");
-
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
             ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
                     .stringType()
@@ -110,14 +91,6 @@ public class PostgresDataSourceOptions {
                             "The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table."
                                     + "By default, the chunk key is the first column of the primary key and the chunk key is the RowId in oracle."
                                     + "This column must be a column of the primary key.");
-
-    public static final ConfigOption<String> SERVER_TIME_ZONE =
-            ConfigOptions.key("server-time-zone")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "The session time zone in database server. If not set, then "
-                                    + "ZoneId.systemDefault() is used to determine the server time zone.");
 
     public static final ConfigOption<Integer> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE =
             ConfigOptions.key("scan.incremental.snapshot.chunk.size")
@@ -176,26 +149,6 @@ public class PostgresDataSourceOptions {
                     .withDescription(
                             "Optional binlog file position used in case of \"specific-offset\" startup mode");
 
-    public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET =
-            ConfigOptions.key("scan.startup.specific-offset.gtid-set")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional GTID set used in case of \"specific-offset\" startup mode");
-
-    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_EVENTS =
-            ConfigOptions.key("scan.startup.specific-offset.skip-events")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional number of events to skip after the specific starting offset");
-
-    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_SKIP_ROWS =
-            ConfigOptions.key("scan.startup.specific-offset.skip-rows")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription("Optional number of rows to skip after the specific offset");
-
     public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
             ConfigOptions.key("scan.startup.timestamp-millis")
                     .longType()
@@ -210,9 +163,9 @@ public class PostgresDataSourceOptions {
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
 
-    public static final org.apache.flink.configuration.ConfigOption<Double>
+    public static final ConfigOption<Double>
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
-                    org.apache.flink.configuration.ConfigOptions.key(
+                    ConfigOptions.key(
                                     "chunk-key.even-distribution.factor.upper-bound")
                             .doubleType()
                             .defaultValue(1000.0d)
@@ -224,9 +177,9 @@ public class PostgresDataSourceOptions {
                                             + " and the query for splitting would happen when it is uneven."
                                             + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
-    public static final org.apache.flink.configuration.ConfigOption<Double>
+    public static final ConfigOption<Double>
             SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
-                    org.apache.flink.configuration.ConfigOptions.key(
+                    ConfigOptions.key(
                                     "chunk-key.even-distribution.factor.lower-bound")
                             .doubleType()
                             .defaultValue(0.05d)

@@ -42,7 +42,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private static final String JDBC_DRIVER = "org.postgresql.Driver";
 
-    private String pluginName = "decoderbufs";
+    private String pluginName = "pgoutput";
 
     private String slotName = "flink";
 
