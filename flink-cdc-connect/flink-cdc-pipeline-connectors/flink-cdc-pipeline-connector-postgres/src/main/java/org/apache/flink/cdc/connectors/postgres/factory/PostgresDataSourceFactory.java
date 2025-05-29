@@ -294,14 +294,14 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
     }
 
     /**
-     * Get the database name
+     * Get the database name.
      *
      * @param tables Table name list, format is "db.schema.table,db.schema.table,..." Each table
      *     name consists of three parts separated by ".", which are database name, schema name, and
      *     table name.
      * @return Database name if found, otherwise returns Optional.empty()
      * @throws IllegalArgumentException If the input parameter is null or does not match the
-     *     expected format, or if database names are inconsistent
+     *     expected format, or if database names are inconsistent.
      */
     private Optional<String> getValidateDatabaseName(String tables) {
         // Input validation
@@ -353,12 +353,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         return Optional.ofNullable(dbName);
     }
 
-    /**
-     * Validate if the database name conforms to PostgreSQL naming conventions
-     *
-     * @param dbName Database name
-     * @return true if valid, otherwise false
-     */
+    /** Validate if the database name conforms to PostgreSQL naming conventions. */
     private boolean isValidPostgresDbName(String dbName) {
         // PostgreSQL database name conventions:
         // 1. Length does not exceed 63 characters

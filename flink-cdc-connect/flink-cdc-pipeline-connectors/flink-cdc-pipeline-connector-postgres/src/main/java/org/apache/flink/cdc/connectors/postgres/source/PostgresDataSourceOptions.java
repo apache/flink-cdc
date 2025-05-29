@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
-import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 import java.time.Duration;
 
@@ -163,33 +162,29 @@ public class PostgresDataSourceOptions {
                     .withDescription(
                             "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
 
-    public static final ConfigOption<Double>
-            SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
-                    ConfigOptions.key(
-                                    "chunk-key.even-distribution.factor.upper-bound")
-                            .doubleType()
-                            .defaultValue(1000.0d)
-                            .withFallbackKeys("split-key.even-distribution.factor.upper-bound")
-                            .withDescription(
-                                    "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
-                                            + " table is evenly distribution or not."
-                                            + " The table chunks would use evenly calculation optimization when the data distribution is even,"
-                                            + " and the query for splitting would happen when it is uneven."
-                                            + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+    public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
+            ConfigOptions.key("chunk-key.even-distribution.factor.upper-bound")
+                    .doubleType()
+                    .defaultValue(1000.0d)
+                    .withFallbackKeys("split-key.even-distribution.factor.upper-bound")
+                    .withDescription(
+                            "The upper bound of chunk key distribution factor. The distribution factor is used to determine whether the"
+                                    + " table is evenly distribution or not."
+                                    + " The table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the query for splitting would happen when it is uneven."
+                                    + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
 
-    public static final ConfigOption<Double>
-            SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
-                    ConfigOptions.key(
-                                    "chunk-key.even-distribution.factor.lower-bound")
-                            .doubleType()
-                            .defaultValue(0.05d)
-                            .withFallbackKeys("split-key.even-distribution.factor.lower-bound")
-                            .withDescription(
-                                    "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
-                                            + " table is evenly distribution or not."
-                                            + " The table chunks would use evenly calculation optimization when the data distribution is even,"
-                                            + " and the query for splitting would happen when it is uneven."
-                                            + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+    public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND =
+            ConfigOptions.key("chunk-key.even-distribution.factor.lower-bound")
+                    .doubleType()
+                    .defaultValue(0.05d)
+                    .withFallbackKeys("split-key.even-distribution.factor.lower-bound")
+                    .withDescription(
+                            "The lower bound of chunk key distribution factor. The distribution factor is used to determine whether the"
+                                    + " table is evenly distribution or not."
+                                    + " The table chunks would use evenly calculation optimization when the data distribution is even,"
+                                    + " and the query for splitting would happen when it is uneven."
+                                    + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP =
             ConfigOptions.key("scan.incremental.snapshot.backfill.skip")
                     .booleanType()
