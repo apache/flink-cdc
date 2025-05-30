@@ -330,4 +330,12 @@ public class MySqlDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SOURCE_TABLENAME_IS_CASE_SENSITIVE =
+            ConfigOptions.key("source.table-name.is-case-sensitive")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "When the source library supports case-sensitive table names, it is set to true. The purpose is to analyze that the case of table names is consistent with the actual table names when ddl changes.");
 }
