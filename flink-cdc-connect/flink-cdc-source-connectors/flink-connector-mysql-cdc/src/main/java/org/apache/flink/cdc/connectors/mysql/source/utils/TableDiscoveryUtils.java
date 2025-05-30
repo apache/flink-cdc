@@ -29,6 +29,9 @@ import io.debezium.relational.history.TableChanges.TableChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,6 +43,7 @@ import java.util.stream.Collectors;
 /** Utilities to discovery matched tables. */
 public class TableDiscoveryUtils {
 
+    private static final String[] TABLE_QUERY = {"TABLE"};
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
     public static List<TableId> listTables(
@@ -50,54 +54,26 @@ public class TableDiscoveryUtils {
         // READ DATABASE NAMES
         // -------------------
         // Get the list of databases ...
-        LOG.info("Read list of available databases");
-        final List<String> databaseNames = new ArrayList<>();
-
-        jdbc.query(
-                "SHOW DATABASES",
-                rs -> {
-                    while (rs.next()) {
-                        String databaseName = rs.getString(1);
-                        if (databaseFilter.test(databaseName)) {
-                            databaseNames.add(databaseName);
-                        }
+        try (Connection connection = jdbc.connection()) {
+            DatabaseMetaData databaseMetaData = connection.getMetaData();
+            try (ResultSet tableResult = databaseMetaData.getTables(null, null, "%", TABLE_QUERY)) {
+                while (tableResult.next()) {
+                    String dbName = tableResult.getString("TABLE_CAT");
+                    if (!databaseFilter.test(dbName)) {
+                        continue;
                     }
-                });
-        LOG.info("\t list of available databases is: {}", databaseNames);
+                    String tableName = tableResult.getString("TABLE_NAME");
+                    TableId tableId = new TableId(dbName, null, tableName);
+                    if (tableFilter.test(tableId)) {
+                        capturedTableIds.add(tableId);
+                        LOG.info("\t including table '{}' for further processing", tableId);
+                    } else {
+                        LOG.info("\t '{}' is filtered out of table capturing", tableId);
+                    }
+                }
 
-        // ----------------
-        // READ TABLE NAMES
-        // ----------------
-        // Get the list of table IDs for each database. We can't use a prepared statement with
-        // MySQL, so we have to build the SQL statement each time. Although in other cases this
-        // might lead to SQL injection, in our case we are reading the database names from the
-        // database and not taking them from the user ...
-        LOG.info("Read list of available tables in each database");
-        for (String dbName : databaseNames) {
-            try {
-                jdbc.query(
-                        "SHOW FULL TABLES IN "
-                                + StatementUtils.quote(dbName)
-                                + " where Table_Type = 'BASE TABLE'",
-                        rs -> {
-                            while (rs.next()) {
-                                TableId tableId = new TableId(dbName, null, rs.getString(1));
-                                if (tableFilter.test(tableId)) {
-                                    capturedTableIds.add(tableId);
-                                    LOG.info(
-                                            "\t including table '{}' for further processing",
-                                            tableId);
-                                } else {
-                                    LOG.info("\t '{}' is filtered out of table capturing", tableId);
-                                }
-                            }
-                        });
-            } catch (SQLException e) {
-                // We were unable to execute the query or process the results, so skip this ...
-                LOG.warn(
-                        "\t skipping database '{}' due to error reading tables: {}",
-                        dbName,
-                        e.getMessage());
+            } catch (Exception e) {
+                LOG.warn("Failed to get list of tables: {}", e.getMessage());
             }
         }
         return capturedTableIds;
