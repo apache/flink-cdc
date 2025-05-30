@@ -133,6 +133,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
     }
 
+    @Test
+    public void testAllEventTypes() throws Exception {}
+
     private static <T> List<T> fetchResultsExcept(Iterator<T> iter, int size, T sideEvent) {
         List<T> result = new ArrayList<>(size);
         List<T> sideResults = new ArrayList<>();
