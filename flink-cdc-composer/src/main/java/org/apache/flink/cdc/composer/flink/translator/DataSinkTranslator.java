@@ -83,8 +83,9 @@ public class DataSinkTranslator {
             SinkDef sinkDef,
             DataStream<Event> input,
             DataSink dataSink,
-            OperatorID schemaOperatorID) {
-        translate(sinkDef, input, dataSink, false, schemaOperatorID);
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
+        translate(sinkDef, input, dataSink, false, schemaOperatorID, operatorUidGenerator);
     }
 
     public void translate(
@@ -92,7 +93,8 @@ public class DataSinkTranslator {
             DataStream<Event> input,
             DataSink dataSink,
             boolean isBatchMode,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         // Get sink provider
         EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
         String sinkName = generateSinkName(sinkDef);
@@ -100,13 +102,19 @@ public class DataSinkTranslator {
             // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
-            sinkTo(input, sink, sinkName, isBatchMode, schemaOperatorID);
+            sinkTo(input, sink, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
         } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
             // SinkFunction
             FlinkSinkFunctionProvider sinkFunctionProvider =
                     (FlinkSinkFunctionProvider) eventSinkProvider;
             SinkFunction<Event> sinkFunction = sinkFunctionProvider.getSinkFunction();
-            sinkTo(input, sinkFunction, sinkName, isBatchMode, schemaOperatorID);
+            sinkTo(
+                    input,
+                    sinkFunction,
+                    sinkName,
+                    isBatchMode,
+                    schemaOperatorID,
+                    operatorUidGenerator);
         }
     }
 
@@ -116,7 +124,8 @@ public class DataSinkTranslator {
             Sink<Event> sink,
             String sinkName,
             boolean isBatchMode,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         DataStream<Event> stream = input;
         // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
@@ -124,12 +133,15 @@ public class DataSinkTranslator {
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
-            addCommittingTopology(sink, stream, sinkName, isBatchMode, schemaOperatorID);
+            addCommittingTopology(
+                    sink, stream, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
         } else {
             stream.transform(
-                    SINK_WRITER_PREFIX + sinkName,
-                    CommittableMessageTypeInfo.noOutput(),
-                    new DataSinkWriterOperatorFactory<>(sink, isBatchMode, schemaOperatorID));
+                            SINK_WRITER_PREFIX + sinkName,
+                            CommittableMessageTypeInfo.noOutput(),
+                            new DataSinkWriterOperatorFactory<>(
+                                    sink, isBatchMode, schemaOperatorID))
+                    .uid(operatorUidGenerator.generateUid("sink-writer"));
         }
     }
 
@@ -138,7 +150,8 @@ public class DataSinkTranslator {
             SinkFunction<Event> sinkFunction,
             String sinkName,
             boolean isBatchMode,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         StreamSink<Event> sinkOperator;
         if (isBatchMode) {
             sinkOperator = new BatchDataSinkFunctionOperator(sinkFunction);
@@ -153,6 +166,7 @@ public class DataSinkTranslator {
                         sinkOperator,
                         executionEnvironment.getParallelism(),
                         false);
+        transformation.setUid(operatorUidGenerator.generateUid("sink-writer"));
         executionEnvironment.addOperator(transformation);
     }
 
@@ -161,14 +175,18 @@ public class DataSinkTranslator {
             DataStream<Event> inputStream,
             String sinkName,
             boolean isBatchMode,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         TypeInformation<CommittableMessage<CommT>> typeInformation =
                 CommittableMessageTypeInfo.of(() -> getCommittableSerializer(sink));
         DataStream<CommittableMessage<CommT>> written =
-                inputStream.transform(
-                        SINK_WRITER_PREFIX + sinkName,
-                        typeInformation,
-                        new DataSinkWriterOperatorFactory<>(sink, isBatchMode, schemaOperatorID));
+                inputStream
+                        .transform(
+                                SINK_WRITER_PREFIX + sinkName,
+                                typeInformation,
+                                new DataSinkWriterOperatorFactory<>(
+                                        sink, isBatchMode, schemaOperatorID))
+                        .uid(operatorUidGenerator.generateUid("sink-writer"));
 
         DataStream<CommittableMessage<CommT>> preCommitted = written;
         if (sink instanceof WithPreCommitTopology) {
@@ -179,10 +197,13 @@ public class DataSinkTranslator {
         // TODO: Hard coding checkpoint
         boolean isCheckpointingEnabled = true;
         DataStream<CommittableMessage<CommT>> committed =
-                preCommitted.transform(
-                        SINK_COMMITTER_PREFIX + sinkName,
-                        typeInformation,
-                        getCommitterOperatorFactory(sink, isBatchMode, isCheckpointingEnabled));
+                preCommitted
+                        .transform(
+                                SINK_COMMITTER_PREFIX + sinkName,
+                                typeInformation,
+                                getCommitterOperatorFactory(
+                                        sink, isBatchMode, isCheckpointingEnabled))
+                        .uid(operatorUidGenerator.generateUid("sink-committer"));
 
         if (sink instanceof WithPostCommitTopology) {
             ((WithPostCommitTopology<Event, CommT>) sink).addPostCommitTopology(committed);
