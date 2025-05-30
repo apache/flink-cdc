@@ -71,7 +71,6 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 
 /**
  * IT case for Evolving MySQL schema with gh-ost/pt-osc utility. See <a

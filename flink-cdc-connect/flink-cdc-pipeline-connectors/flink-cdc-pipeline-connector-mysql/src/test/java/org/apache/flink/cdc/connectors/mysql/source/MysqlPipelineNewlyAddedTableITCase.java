@@ -97,7 +97,6 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests to cover various newly added tables during capture process in pipeline mode. */
