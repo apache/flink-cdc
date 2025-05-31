@@ -266,12 +266,12 @@ SELECT * FROM shipments;
       </td>
     </tr>
     <tr>
-      <td>include-partitioned-table</td>
+      <td>scan.publish-via-partition-root.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-        Whether to enable reading partitioned table.<br>
+        Whether to enable reading partitioned tables via partition root.<br>
         If enabled:
           (1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true
           (2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.

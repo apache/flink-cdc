@@ -89,12 +89,12 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "committed after multiple checkpoint delays instead of after each checkpoint completion.\n"
                                     + "This allows continuous recycle of log files in stream phase.");
 
-    public static final ConfigOption<Boolean> INCLUDE_PARTITIONED_TABLE =
-            ConfigOptions.key("include-partitioned-table")
+    public static final ConfigOption<Boolean> SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED =
+            ConfigOptions.key("scan.publish-via-partition-root.enabled")
                     .booleanType()
                     .defaultValue(Boolean.FALSE)
                     .withDescription(
-                            "Enable reading from partitioned table.\n"
+                            "Enable reading from partitioned table via partition root.\n"
                                     + "If enabled:\n"
                                     + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
                                     + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");

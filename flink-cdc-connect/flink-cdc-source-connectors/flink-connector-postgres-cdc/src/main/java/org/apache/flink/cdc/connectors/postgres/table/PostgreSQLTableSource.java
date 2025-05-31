@@ -86,7 +86,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean scanNewlyAddedTableEnabled;
     private final int lsnCommitCheckpointsDelay;
     private final boolean assignUnboundedChunkFirst;
-    private final boolean includePartitionedTable;
+    private final boolean publishViaPartitionRoot;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -128,7 +128,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
-            boolean includePartitionedTable) {
+            boolean publishViaPartitionRoot) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -161,7 +161,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
-        this.includePartitionedTable = includePartitionedTable;
+        this.publishViaPartitionRoot = publishViaPartitionRoot;
     }
 
     @Override
@@ -225,7 +225,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
-                            .includePartitionedTable(includePartitionedTable)
+                            .publishViaPartitionRoot(publishViaPartitionRoot)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -296,7 +296,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         scanNewlyAddedTableEnabled,
                         lsnCommitCheckpointsDelay,
                         assignUnboundedChunkFirst,
-                        includePartitionedTable);
+                        publishViaPartitionRoot);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
