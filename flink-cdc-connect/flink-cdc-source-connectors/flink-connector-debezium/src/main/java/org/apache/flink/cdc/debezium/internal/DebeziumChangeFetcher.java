@@ -94,13 +94,13 @@ public class DebeziumChangeFetcher<T> {
      * currentFetchEventTimeLag = FetchTime - messageTimestamp, where the FetchTime is the time the
      * record fetched into the source operator.
      */
-    private volatile long fetchDelay = 0L;
+    private volatile long fetchDelay = -1L;
 
     /**
      * emitDelay = EmitTime - messageTimestamp, where the EmitTime is the time the record leaves the
      * source operator.
      */
-    private volatile long emitDelay = 0L;
+    private volatile long emitDelay = -1L;
 
     /** The number of records that failed to parse or deserialize. */
     private volatile AtomicLong numRecordInErrors = new AtomicLong(0);
@@ -230,7 +230,10 @@ public class DebeziumChangeFetcher<T> {
         for (ChangeEvent<SourceRecord, SourceRecord> event : changeEvents) {
             SourceRecord record = event.value();
             updateMessageTimestamp(record);
-            fetchDelay = isInDbSnapshotPhase ? 0L : processTime - messageTimestamp;
+            fetchDelay =
+                    (isInDbSnapshotPhase || messageTimestamp == 0L)
+                            ? -1L
+                            : processTime - messageTimestamp;
 
             if (isHeartbeatEvent(record)) {
                 // keep offset update
@@ -269,7 +272,9 @@ public class DebeziumChangeFetcher<T> {
             T record;
             while ((record = records.poll()) != null) {
                 emitDelay =
-                        isInDbSnapshotPhase ? 0L : System.currentTimeMillis() - messageTimestamp;
+                        (isInDbSnapshotPhase || messageTimestamp == 0L)
+                                ? -1L
+                                : System.currentTimeMillis() - messageTimestamp;
                 sourceContext.collect(record);
             }
             // update offset to state
