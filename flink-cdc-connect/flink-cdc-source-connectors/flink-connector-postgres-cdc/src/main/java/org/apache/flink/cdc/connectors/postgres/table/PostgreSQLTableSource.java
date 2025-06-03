@@ -86,6 +86,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean scanNewlyAddedTableEnabled;
     private final int lsnCommitCheckpointsDelay;
     private final boolean assignUnboundedChunkFirst;
+    private final boolean publishViaPartitionRoot;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -126,7 +127,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean publishViaPartitionRoot) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -159,6 +161,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.publishViaPartitionRoot = publishViaPartitionRoot;
     }
 
     @Override
@@ -222,6 +225,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                            .publishViaPartitionRoot(publishViaPartitionRoot)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -291,7 +295,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
                         lsnCommitCheckpointsDelay,
-                        assignUnboundedChunkFirst);
+                        assignUnboundedChunkFirst,
+                        publishViaPartitionRoot);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
