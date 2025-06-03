@@ -186,7 +186,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
     }
 
-    /** Enable include partitioned table */
+    /** Enable include partitioned table. */
     public void setPublishViaPartitionRoot(boolean publishViaPartitionRoot) {
         this.publishViaPartitionRoot = publishViaPartitionRoot;
     }
