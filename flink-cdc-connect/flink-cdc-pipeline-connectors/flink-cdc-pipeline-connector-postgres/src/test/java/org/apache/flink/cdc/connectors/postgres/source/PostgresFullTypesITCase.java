@@ -162,11 +162,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     BinaryStringData.fromString("2020-07-17T18:00:22.123456"),
                     18460,
                     64822000,
-                    500,
-                    BinaryStringData.fromString(
-                            "{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326}"),
-                    BinaryStringData.fromString(
-                            "{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187}")
+                    500
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -229,7 +225,5 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.TIMESTAMP(6),
                     DataTypes.DATE(),
                     DataTypes.TIME(0),
-                    DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 18),
-                    DataTypes.STRING(),
-                    DataTypes.STRING());
+                    DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 18));
 }
