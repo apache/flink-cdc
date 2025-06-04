@@ -255,6 +255,17 @@ Connector Options
           <td>The maximum fetch size for per poll when read table snapshot.</td>
     </tr>
     <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
+            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+            <br>
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          </td>
+    </tr>
+    <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
@@ -316,8 +327,7 @@ Connector Options
       </td>
     </tr>
     <tr>
-      <td>debezium.min.row.
-      count.to.stream.result</td>
+      <td>debezium.min.row.count.to.stream.result</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
       <td>Integer</td>
@@ -864,6 +874,30 @@ There are two places that need to be taken care of.
 2. The processing semantics of a MySQL CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
   * If no update operation is performed on the specified column, the exactly-once semantics is ensured.
   * If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+#### Warning
+
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a MySQL table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+
+#### Problem Scenario
+
+- **Table Structure:**
+    - **Primary Key:** `id`
+    - **Chunk Key Column:** `pid` (Not a primary key)
+
+- **Snapshot Splits:**
+    - **Split 0:** `1 < pid <= 3`
+    - **Split 1:** `3 < pid <= 5`
+
+- **Operation:**
+    - Two different subtasks are reading Split 0 and Split 1 concurrently.
+    - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+
+- **Result:**
+    - **Split 0:** Contains the record `[id=0, pid=2]`
+    - **Split 1:** Contains the record `[id=0, pid=4]`
+
+Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
 
 Starting from version 3.5.0, MySQL CDC provides an option to ignore tables without primary keys. 
 When `ignore-no-primary-key-table` is set to `true`, the connector will skip tables that don't have a primary key.
