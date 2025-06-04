@@ -102,8 +102,18 @@ class YamlPipelineDefinitionParserTest {
         URL resource =
                 Resources.getResource("definitions/pipeline-definition-with-base64-encoded.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(decryptedDefWithBase64Encode);
+    }
+
+    @Test
+    void testParsingBase64EncodedDefinitionWhereValuesContainKeywords() throws Exception {
+        URL resource =
+                Resources.getResource(
+                        "definitions/pipeline-definition-with-sensitive-keyword-configured-values.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(decryptedDefWithValuesContainKeywords);
     }
 
     @Test
@@ -422,6 +432,43 @@ class YamlPipelineDefinitionParserTest {
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
+                                    .put("parallelism", "4")
+                                    .put("schema.change.behavior", "evolve")
+                                    .put("schema-operator.rpc-timeout", "1 h")
+                                    .put("shade.identifier", "base64")
+                                    .put("shade.sensitive.keywords", "password;username")
+                                    .build()));
+
+    private final PipelineDef decryptedDefWithValuesContainKeywords =
+            new PipelineDef(
+                    new SourceDef(
+                            "mysql",
+                            "password",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("host", "localhost")
+                                            .put("port", "3306")
+                                            .put("username", "admin")
+                                            .put("password", "password1")
+                                            .put("tables", "replication.cluster")
+                                            .build())),
+                    new SinkDef(
+                            "doris",
+                            "username",
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("fenodes", "localhost:8035")
+                                            .put("username", "root")
+                                            .put("password", "password2")
+                                            .build())),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put(
+                                            "name",
+                                            "test configured values containing sensitive words password and username")
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
