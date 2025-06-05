@@ -19,14 +19,17 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobInfo;
+import org.apache.flink.api.common.RuntimeExecutionMode;
 import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -35,26 +38,43 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.composer.definition.SinkDef;
+import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
+import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
+import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
+import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
+import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkFactory;
+import org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions;
 import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 import org.apache.flink.metrics.groups.UnregisteredMetricsGroup;
 import org.apache.flink.runtime.metrics.groups.InternalSinkCommitterMetricGroup;
+import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequestImpl;
-import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.UserCodeClassLoader;
+
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.apache.paimon.catalog.Catalog;
@@ -81,7 +101,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.common.types.DataTypes.STRING;
+import static org.apache.flink.configuration.ConfigConstants.DEFAULT_PARALLELISM;
 
 /** An ITCase for {@link PaimonWriter} and {@link PaimonCommitter}. */
 public class PaimonSinkITCase {
@@ -91,6 +113,8 @@ public class PaimonSinkITCase {
     private Options catalogOptions;
 
     private TableEnvironment tEnv;
+
+    private StreamExecutionEnvironment env;
 
     private String warehouse;
 
@@ -116,7 +140,11 @@ public class PaimonSinkITCase {
 
     private void initialize(String metastore)
             throws Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException {
-        tEnv = TableEnvironment.create(EnvironmentSettings.newInstance().inBatchMode().build());
+        env =
+                StreamExecutionEnvironment.getExecutionEnvironment()
+                        .setRuntimeMode(RuntimeExecutionMode.BATCH)
+                        .setParallelism(DEFAULT_PARALLELISM);
+        tEnv = StreamTableEnvironment.create(env);
         warehouse = new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
         catalogOptions = new Options();
         catalogOptions.setString("metastore", metastore);
@@ -578,6 +606,108 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "6", "6"),
                         Row.ofKind(RowKind.INSERT, "7", "7"),
                         Row.ofKind(RowKind.INSERT, "8", "8"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"hive"})
+    public void testSinkWithHiveMetastorePartitionedTable(String metastore) throws Exception {
+        initialize(metastore);
+        List<Event> testEvents = new ArrayList<>();
+        Schema.Builder builder = Schema.newBuilder();
+        builder.option("metastore.partitioned-table", "true");
+        // create table
+        Schema schema =
+                builder.physicalColumn("pt", STRING())
+                        .physicalColumn("pk", STRING())
+                        .physicalColumn("name", STRING())
+                        .primaryKey("pk")
+                        .partitionKey("pt")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
+        testEvents.add(createTableEvent);
+        testEvents.add(
+                generateInsert(
+                        table1,
+                        Arrays.asList(
+                                Tuple2.of(STRING(), "20250604"),
+                                Tuple2.of(STRING(), "1"),
+                                Tuple2.of(STRING(), "Alice"))));
+        testEvents.add(
+                generateInsert(
+                        table1,
+                        Arrays.asList(
+                                Tuple2.of(STRING(), "20250604"),
+                                Tuple2.of(STRING(), "2"),
+                                Tuple2.of(STRING(), "Bob"))));
+
+        runJobWithEvents(testEvents, true);
+
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "20250604", "1", "Alice"),
+                        Row.ofKind(RowKind.INSERT, "20250604", "2", "Bob"));
+    }
+
+    private void runJobWithEvents(List<Event> events, boolean isBatchMode) throws Exception {
+        DataStream<Event> stream = env.fromCollection(events, TypeInformation.of(Event.class));
+
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("paimon", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(PaimonDataSinkFactory.class);
+
+        Configuration conf =
+                Configuration.fromMap(
+                        ImmutableMap.<String, String>builder()
+                                .put(PaimonDataSinkOptions.METASTORE.key(), "hive")
+                                .put(PaimonDataSinkOptions.WAREHOUSE.key(), warehouse)
+                                .put("catalog.properties.cache-enabled", "false")
+                                .build());
+
+        DataSink paimonSink =
+                sinkFactory.createDataSink(
+                        new FactoryHelper.DefaultContext(
+                                conf, conf, Thread.currentThread().getContextClassLoader()));
+
+        PartitioningTranslator partitioningTranslator = new PartitioningTranslator();
+
+        SchemaOperatorTranslator schemaOperatorTranslator =
+                new SchemaOperatorTranslator(
+                        SchemaChangeBehavior.EVOLVE,
+                        "$$_schema_operator_$$",
+                        DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
+                        "UTC");
+
+        stream =
+                schemaOperatorTranslator.translateRegular(
+                        stream,
+                        DEFAULT_PARALLELISM,
+                        isBatchMode,
+                        paimonSink
+                                .getMetadataApplier()
+                                .setAcceptedSchemaEvolutionTypes(
+                                        Arrays.stream(SchemaChangeEventTypeFamily.ALL)
+                                                .collect(Collectors.toSet())),
+                        new ArrayList<>());
+        OperatorIDGenerator schemaOperatorIDGenerator =
+                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+
+        stream =
+                partitioningTranslator.translateRegular(
+                        stream,
+                        DEFAULT_PARALLELISM,
+                        DEFAULT_PARALLELISM,
+                        isBatchMode,
+                        schemaOperatorIDGenerator.generate(),
+                        paimonSink.getDataChangeEventHashFunctionProvider(DEFAULT_PARALLELISM));
+
+        DataSinkTranslator sinkTranslator = new DataSinkTranslator();
+        sinkTranslator.translate(
+                new SinkDef("paimon", "Paimon Sink", conf),
+                stream,
+                paimonSink,
+                isBatchMode,
+                schemaOperatorIDGenerator.generate());
+        env.execute("runJobWithEvents").getJobExecutionResult();
     }
 
     private static MultiTableCommittable correctCheckpointId(MultiTableCommittable committable) {
