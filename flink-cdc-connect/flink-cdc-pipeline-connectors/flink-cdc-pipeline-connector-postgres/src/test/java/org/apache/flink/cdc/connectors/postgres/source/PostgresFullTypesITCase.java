@@ -22,6 +22,7 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -53,6 +54,7 @@ import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -150,25 +152,27 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DecimalData.fromBigDecimal(new BigDecimal("5.5"), 2, 1)
                             .toBigDecimal()
                             .floatValue(),
-                    DecimalData.fromBigDecimal(new BigDecimal("6.6"), 2, 1),
-                    DecimalData.fromBigDecimal(new BigDecimal("123.12345"), 8, 5),
+                    DecimalData.fromBigDecimal(new BigDecimal("6.6"), 2, 1)
+                            .toBigDecimal()
+                            .doubleValue(),
+                    DecimalData.fromBigDecimal(new BigDecimal("123.12345"), 10, 5),
                     DecimalData.fromBigDecimal(new BigDecimal("404.4"), 5, 1),
                     true,
                     BinaryStringData.fromString("Hello World"),
                     BinaryStringData.fromString("a"),
                     BinaryStringData.fromString("abc"),
                     BinaryStringData.fromString("abcd..xyz"),
-                    BinaryStringData.fromString("2020-07-17T18:00:22.123"),
-                    BinaryStringData.fromString("2020-07-17T18:00:22.123456"),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
+                    TimestampData.fromLocalDateTime(
+                            LocalDateTime.parse("2020-07-17T18:00:22.123456")),
                     18460,
                     64822000,
-                    500
+                    DecimalData.fromBigDecimal(new BigDecimal("500"), 10, 0)
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
 
-        Object[] result = recordFields(snapshotRecord, PG_TYPES);
         Assertions.assertThat(recordFields(snapshotRecord, PG_TYPES)).isEqualTo(expectedSnapshot);
     }
 
@@ -225,5 +229,5 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.TIMESTAMP(6),
                     DataTypes.DATE(),
                     DataTypes.TIME(0),
-                    DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 18));
+                    DataTypes.DECIMAL(DecimalType.DEFAULT_PRECISION, DecimalType.DEFAULT_SCALE));
 }
