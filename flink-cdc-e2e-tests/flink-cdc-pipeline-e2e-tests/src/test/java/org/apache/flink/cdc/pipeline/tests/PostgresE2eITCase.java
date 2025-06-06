@@ -31,6 +31,9 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.function.Function;
 
@@ -130,5 +133,25 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.products, before=[], after=[102, car battery, 12V car battery, 8.1, white, {\"key2\": \"value2\"}, {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}");
 
         LOG.info("Begin incremental reading stage.");
+
+        String JdbcUrl =
+                String.format(
+                        "jdbc:postgres://%s:%s/%s",
+                        postgresInventoryDatabase.getHost(),
+                        postgresInventoryDatabase.getDatabasePort(),
+                        postgresInventoryDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                JdbcUrl, POSTGRES_TEST_USER, POSTGRES_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            stat.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+
+            // Perform DDL changes after the binlog is generated
+            waitUntilSpecificEvent(
+                    String.format(
+                            "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
+                            postgresInventoryDatabase.getDatabaseName()));
+        }
     }
 }
