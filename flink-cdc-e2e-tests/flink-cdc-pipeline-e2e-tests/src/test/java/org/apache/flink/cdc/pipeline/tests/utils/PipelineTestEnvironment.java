@@ -51,6 +51,7 @@ import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.lifecycle.Startables;
+import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.MountableFile;
 
 import javax.annotation.Nullable;
@@ -115,6 +116,17 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                             .withNetwork(NETWORK)
                             .withNetworkAliases("mysql")
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
+
+    // ------------------------------------------------------------------------------------------
+    // Postgres Variables (we always use Postgres as the data source for easier verifying)
+    // ------------------------------------------------------------------------------------------
+    protected static final String POSTGRES_TEST_USER = "postgres";
+    protected static final String POSTGRES_TEST_PASSWORD = "postgres";
+    protected static final String INTER_CONTAINER_POSTGRES_ALIAS = "postgres";
+
+    // use official postgresql image to support pgoutput plugin
+    protected static final DockerImageName PG_IMAGE =
+            DockerImageName.parse("postgres:14").asCompatibleSubstituteFor("postgres");
 
     // ------------------------------------------------------------------------------------------
     // Flink Variables

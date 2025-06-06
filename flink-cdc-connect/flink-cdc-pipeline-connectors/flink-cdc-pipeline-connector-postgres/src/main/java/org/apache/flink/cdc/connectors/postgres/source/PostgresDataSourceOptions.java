@@ -67,7 +67,7 @@ public class PostgresDataSourceOptions {
     public static final ConfigOption<String> DECODING_PLUGIN_NAME =
             ConfigOptions.key("decoding.plugin.name")
                     .stringType()
-                    .defaultValue("decoderbufs")
+                    .defaultValue("pgoutput")
                     .withDescription(
                             "The name of the Postgres logical decoding plug-in installed on the server.\n"
                                     + "Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming,\n"
