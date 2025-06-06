@@ -41,7 +41,9 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
     @Container
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
-                    .withDatabaseName(INTER_CONTAINER_POSTGRES_ALIAS)
+                    .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
+                    .withNetwork(NETWORK)
+                    .withDatabaseName("flink-test")
                     .withUsername(POSTGRES_TEST_USER)
                     .withPassword(POSTGRES_TEST_PASSWORD)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
@@ -88,17 +90,18 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "  port: %d\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.*.\\.*\n"
-                                + "  slot.name: flink-test\n"
+                                + "  tables: %s.\\.*.\\.*\n"
+                                + "  slot.name: flinktest\n"
                                 //                                + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
                                 + "\n"
                                 + "pipeline:\n"
-                                + "  parallelism: %d",
-                        INTER_CONTAINER_POSTGRES_ALIAS,
-                        postgresInventoryDatabase.getDatabasePort(),
+                                + "  parallelism: %d\n"
+                                + "schema.change.behavior: ignore",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        5432,
                         POSTGRES_TEST_USER,
                         POSTGRES_TEST_PASSWORD,
                         postgresInventoryDatabase.getDatabaseName(),

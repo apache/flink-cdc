@@ -122,7 +122,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     // ------------------------------------------------------------------------------------------
     protected static final String POSTGRES_TEST_USER = "postgres";
     protected static final String POSTGRES_TEST_PASSWORD = "postgres";
-    protected static final String INTER_CONTAINER_POSTGRES_ALIAS = "postgres";
 
     // use official postgresql image to support pgoutput plugin
     protected static final DockerImageName PG_IMAGE =
