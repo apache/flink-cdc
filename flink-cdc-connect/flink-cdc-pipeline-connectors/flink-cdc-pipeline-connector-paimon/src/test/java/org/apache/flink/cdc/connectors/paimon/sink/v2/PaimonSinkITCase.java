@@ -54,6 +54,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
@@ -698,7 +699,8 @@ public class PaimonSinkITCase {
                         DEFAULT_PARALLELISM,
                         isBatchMode,
                         schemaOperatorIDGenerator.generate(),
-                        paimonSink.getDataChangeEventHashFunctionProvider(DEFAULT_PARALLELISM));
+                        paimonSink.getDataChangeEventHashFunctionProvider(DEFAULT_PARALLELISM),
+                        new OperatorUidGenerator());
 
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
         sinkTranslator.translate(
@@ -706,7 +708,8 @@ public class PaimonSinkITCase {
                 stream,
                 paimonSink,
                 isBatchMode,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                new OperatorUidGenerator());
         env.execute("runJobWithEvents").getJobExecutionResult();
     }
 
