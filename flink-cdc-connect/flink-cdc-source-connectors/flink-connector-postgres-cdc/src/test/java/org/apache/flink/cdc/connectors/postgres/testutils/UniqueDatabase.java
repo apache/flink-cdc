@@ -48,6 +48,8 @@ import java.util.stream.Collectors;
 public class UniqueDatabase {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
+    private static final String DROP_DATABASE_DDL = "DROP SCHEMA IF EXISTS $DBNAME$;";
+
     private final PostgreSQLContainer container;
     private final String databaseName;
 
@@ -149,6 +151,20 @@ public class UniqueDatabase {
                 // run an analyze to collect the statics about tables, used in estimating
                 // row count in chunk splitter (for auto-vacuum tables, we don't need to do it)
                 statement.execute("analyze");
+            }
+        } catch (final Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Drop the database if it is existing. */
+    public void dropDatabase() {
+        try {
+            try (Connection connection =
+                            PostgresTestBase.getJdbcConnection(container, databaseName);
+                    Statement statement = connection.createStatement()) {
+                final String dropDatabaseStatement = convertSQL(DROP_DATABASE_DDL);
+                statement.execute(dropDatabaseStatement);
             }
         } catch (final Exception e) {
             throw new IllegalStateException(e);
