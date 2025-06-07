@@ -2725,6 +2725,109 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2.5, ], after=[2.5, x], op=UPDATE, meta=({op_ts=5})}");
     }
 
+    private static final String[] UNICODE_STRINGS = {
+        "ascii test!?",
+        "大五",
+        "测试数据",
+        "ひびぴ",
+        "죠주쥬",
+        "ÀÆÉ",
+        "ÓÔŐÖ",
+        "αβγδε",
+        "בבקשה",
+        "твой",
+        "ภาษาไทย",
+        "piedzimst brīvi"
+    };
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformProjectionWithUnicodeCharacters(ValuesDataSink.SinkApi sinkApi)
+            throws Exception {
+        for (String unicodeString : UNICODE_STRINGS) {
+            List<String> expected =
+                    Stream.of(
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`prefix` STRING,`id` INT NOT NULL,`name` STRING,`age` INT,`suffix` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[{UNICODE_STRING} -> 1, 1, Alice, 18, 1 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[{UNICODE_STRING} -> 2, 2, Bob, 20, 2 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[{UNICODE_STRING} -> 2, 2, Bob, 20, 2 <- {UNICODE_STRING}], after=[{UNICODE_STRING} -> 2, 2, Bob, 30, 2 <- {UNICODE_STRING}], op=UPDATE, meta=()}",
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`prefix` STRING,`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`suffix` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[{UNICODE_STRING} -> 3, 3, Carol, 15, student, 3 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[{UNICODE_STRING} -> 4, 4, Derrida, 25, student, 4 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[{UNICODE_STRING} -> 4, 4, Derrida, 25, student, 4 <- {UNICODE_STRING}], after=[], op=DELETE, meta=()}")
+                            .map(tpl -> tpl.replace("{UNICODE_STRING}", unicodeString))
+                            .collect(Collectors.toList());
+
+            runGenericTransformTest(
+                    sinkApi,
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "\\.*.\\.*.\\.*",
+                                    String.format(
+                                            "'%s' || ' -> ' || id AS prefix, *, id || ' <- ' || '%s' AS suffix",
+                                            unicodeString, unicodeString),
+                                    null,
+                                    null,
+                                    "id",
+                                    null,
+                                    null,
+                                    null)),
+                    expected);
+            outCaptor.reset();
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformFilterWithUnicodeCharacters(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        for (String unicodeString : UNICODE_STRINGS) {
+            List<String> expected =
+                    Stream.of(
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, {UNICODE_STRING}], after=[2, Bob, 30, {UNICODE_STRING}], op=UPDATE, meta=()}",
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, {UNICODE_STRING}], after=[], op=DELETE, meta=()}")
+                            .map(tpl -> tpl.replace("{UNICODE_STRING}", unicodeString))
+                            .collect(Collectors.toList());
+
+            runGenericTransformTest(
+                    sinkApi,
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "\\.*.\\.*.\\.*",
+                                    String.format("*, '%s' AS extras", unicodeString),
+                                    String.format("extras = '%s'", unicodeString),
+                                    null,
+                                    "id",
+                                    null,
+                                    null,
+                                    null)),
+                    expected);
+            outCaptor.reset();
+
+            runGenericTransformTest(
+                    sinkApi,
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "\\.*.\\.*.\\.*",
+                                    String.format("*, '%s' AS extras", unicodeString),
+                                    String.format("extras <> '%s'", unicodeString),
+                                    null,
+                                    "id",
+                                    null,
+                                    null,
+                                    null)),
+                    Arrays.asList(
+                            "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                            "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}"));
+            outCaptor.reset();
+        }
+    }
+
     private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {
         List<Event> events = new ArrayList<>();
         Schema schema =
