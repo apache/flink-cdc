@@ -132,6 +132,11 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private void sendCreateTableEvent(
             JdbcConnection jdbc, TableId tableId, SourceOutput<Event> output) {
         Schema schema = getSchema(jdbc, tableId);
+        // Check if table has primary key and ignore-no-primary-key-table is enabled
+        if (schema.primaryKeys().isEmpty() && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+            LOG.warn("Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping table creation.", tableId);
+            return;
+        }
         output.collect(
                 new CreateTableEvent(
                         org.apache.flink.cdc.common.event.TableId.tableId(
@@ -263,6 +268,11 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                             jdbc, sourceConfig.getDatabaseFilter(), sourceConfig.getTableFilter());
             for (TableId tableId : capturedTableIds) {
                 Schema schema = getSchema(jdbc, tableId);
+                // Skip tables without primary keys if ignore-no-primary-key-table is enabled
+                if (schema.primaryKeys().isEmpty() && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
+                    LOG.warn("Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping table creation.", tableId);
+                    continue;
+                }
                 createTableEventCache.put(
                         tableId,
                         new CreateTableEvent(

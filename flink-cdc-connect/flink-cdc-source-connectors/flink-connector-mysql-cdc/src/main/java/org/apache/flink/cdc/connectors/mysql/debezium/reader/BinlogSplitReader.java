@@ -249,6 +249,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private boolean shouldEmit(SourceRecord sourceRecord) {
         if (RecordUtils.isDataChangeRecord(sourceRecord)) {
             TableId tableId = RecordUtils.getTableId(sourceRecord);
+            // Skip events for tables without primary keys if ignore-no-primary-key-table is enabled
+            if (statefulTaskContext.getSourceConfig().isIgnoreNoPrimaryKeyTable() 
+                    && statefulTaskContext.getDatabaseSchema().tableFor(tableId).primaryKeyColumns().isEmpty()) {
+                LOG.warn("Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping binlog event.", tableId);
+                return false;
+            }
             if (pureBinlogPhaseTables.contains(tableId)) {
                 return true;
             }
@@ -267,7 +273,8 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         ChunkUtils.getChunkKeyColumnType(
                                 statefulTaskContext.getDatabaseSchema().tableFor(tableId),
                                 statefulTaskContext.getSourceConfig().getChunkKeyColumns(),
-                                statefulTaskContext.getSourceConfig().isTreatTinyInt1AsBoolean());
+                                statefulTaskContext.getSourceConfig().isTreatTinyInt1AsBoolean(),
+                                statefulTaskContext.getSourceConfig().isIgnoreNoPrimaryKeyTable());
 
                 Struct target = RecordUtils.getStructContainsChunkKey(sourceRecord);
                 Object[] chunkKey =
