@@ -114,7 +114,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")
                             .withNetwork(NETWORK)
-                            .withNetworkAliases("mysql")
+                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     // ------------------------------------------------------------------------------------------
@@ -122,6 +122,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     // ------------------------------------------------------------------------------------------
     protected static final String POSTGRES_TEST_USER = "postgres";
     protected static final String POSTGRES_TEST_PASSWORD = "postgres";
+    protected static final String INTER_CONTAINER_POSTGRES_ALIAS = "postgres";
 
     // use official postgresql image to support pgoutput plugin
     protected static final DockerImageName PG_IMAGE =

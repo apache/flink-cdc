@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 
 import java.nio.file.Path;
@@ -44,7 +45,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
     @Container
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
-                    .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
+                    .withNetworkAliases(INTER_CONTAINER_POSTGRES_ALIAS)
                     .withNetwork(NETWORK)
                     .withDatabaseName("flink-test")
                     .withUsername(POSTGRES_TEST_USER)
@@ -58,7 +59,9 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                             "-c",
                             "max_replication_slots=20",
                             "-c",
-                            "wal_level=logical");
+                            "wal_level=logical")
+                    .waitingFor(Wait.forListeningPort())
+                    .withStartupTimeout(Duration.ofSeconds(30L));
 
     private final UniqueDatabase postgresInventoryDatabase =
             new UniqueDatabase(
@@ -103,7 +106,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
                                 + "schema.change.behavior: ignore",
-                        INTER_CONTAINER_MYSQL_ALIAS,
+                        INTER_CONTAINER_POSTGRES_ALIAS,
                         5432,
                         POSTGRES_TEST_USER,
                         POSTGRES_TEST_PASSWORD,

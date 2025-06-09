@@ -47,7 +47,7 @@ CREATE TABLE customers (
                            email VARCHAR(255) NOT NULL UNIQUE
 );
 
-ALTER SEQUENCE customers_id_seq RESTART WITH 1001;
+ALTER SEQUENCE customers_id_seq RESTART WITH 101;
 ALTER TABLE customers REPLICA IDENTITY FULL;
 
 -- Insert data into customers table
