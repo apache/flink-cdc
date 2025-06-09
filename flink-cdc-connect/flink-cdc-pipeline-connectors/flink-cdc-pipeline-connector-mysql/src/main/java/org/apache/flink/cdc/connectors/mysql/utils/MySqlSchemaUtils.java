@@ -39,7 +39,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
@@ -49,8 +51,9 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils.
 public class MySqlSchemaUtils {
 
     private static final String[] TABLE_QUERY = {"TABLE"};
-    private static final List<String> DB_LIST =
-            Arrays.asList("information_schema", "mysql", "sys", "performance_schema");
+    private static final Set<String> SYSTEM_DB_SET =
+            new HashSet<>(
+                    Arrays.asList("information_schema", "mysql", "sys", "performance_schema"));
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSchemaUtils.class);
 
     public static List<String> listDatabases(MySqlSourceConfig sourceConfig) {
@@ -70,7 +73,7 @@ public class MySqlSchemaUtils {
                 try (ResultSet resultSet = metaData.getTables(dbName, null, "%", TABLE_QUERY)) {
                     while (resultSet.next()) {
                         String database = resultSet.getString("TABLE_CAT");
-                        if (dbName == null && DB_LIST.contains(database)) {
+                        if (SYSTEM_DB_SET.contains(database)) {
                             continue;
                         }
                         String tableName = resultSet.getString("TABLE_NAME");
@@ -80,7 +83,7 @@ public class MySqlSchemaUtils {
             }
             return tableIds;
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list tables: " + e.getMessage(), e);
+            throw new RuntimeException("Error to list tables: " + dbName, e);
         }
     }
 
@@ -105,7 +108,7 @@ public class MySqlSchemaUtils {
                 List<String> databaseNames = new ArrayList<>();
                 while (resultSet.next()) {
                     String dbName = resultSet.getString("TABLE_CAT");
-                    if (DB_LIST.contains(dbName)) {
+                    if (SYSTEM_DB_SET.contains(dbName)) {
                         continue;
                     }
                     databaseNames.add(dbName);
