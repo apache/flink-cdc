@@ -134,7 +134,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
 
         LOG.info("Begin incremental reading stage.");
 
-        String JdbcUrl =
+        String jdbcUrl =
                 String.format(
                         "jdbc:postgres://%s:%s/%s",
                         postgresInventoryDatabase.getHost(),
@@ -142,7 +142,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                         postgresInventoryDatabase.getDatabaseName());
         try (Connection conn =
                         DriverManager.getConnection(
-                                JdbcUrl, POSTGRES_TEST_USER, POSTGRES_TEST_PASSWORD);
+                                jdbcUrl, POSTGRES_TEST_USER, POSTGRES_TEST_PASSWORD);
                 Statement stat = conn.createStatement()) {
             stat.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
             stat.execute("UPDATE products SET weight='5.1' WHERE id=107;");
