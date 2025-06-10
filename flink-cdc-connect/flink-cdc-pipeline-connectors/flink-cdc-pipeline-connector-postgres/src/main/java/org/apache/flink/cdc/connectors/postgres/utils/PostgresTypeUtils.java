@@ -61,6 +61,7 @@ public class PostgresTypeUtils {
     private static final String PG_CHARACTER_ARRAY = "_character";
     private static final String PG_CHARACTER_VARYING = "varchar";
     private static final String PG_CHARACTER_VARYING_ARRAY = "_varchar";
+    private static final String PG_UUID = "uuid";
     //    private static final String PG_GEOMETRY = "geometry";
     //    private static final String PG_GEOGRAPHY = "geography";
 
@@ -139,6 +140,7 @@ public class PostgresTypeUtils {
             case PG_CHARACTER_VARYING_ARRAY:
                 return DataTypes.ARRAY(DataTypes.VARCHAR(precision));
             case PG_TEXT:
+            case PG_UUID:
                 return DataTypes.STRING();
             case PG_TEXT_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
