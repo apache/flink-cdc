@@ -98,7 +98,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "  tables: %s.\\.*.\\.*\n"
                                 + "  slot.name: flinktest\n"
                                 + "  scan.startup.mode: initial\n"
-                                //                                + "  server-time-zone: UTC\n"
+                                + "  server-time-zone: UTC\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
