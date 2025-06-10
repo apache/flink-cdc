@@ -52,6 +52,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private int lsnCommitCheckpointsDelay;
 
+    private boolean publishViaPartitionRoot;
+
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -133,7 +135,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                publishViaPartitionRoot);
     }
 
     /**
@@ -181,5 +184,10 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The lsn commit checkpoints delay for Postgres. */
     public void setLsnCommitCheckpointsDelay(int lsnCommitCheckpointsDelay) {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+    }
+
+    /** Enable include partitioned table. */
+    public void setPublishViaPartitionRoot(boolean publishViaPartitionRoot) {
+        this.publishViaPartitionRoot = publishViaPartitionRoot;
     }
 }

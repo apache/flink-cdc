@@ -38,6 +38,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     private final int subtaskId;
     private final int lsnCommitCheckpointsDelay;
+    private final boolean publishViaPartitionRoot;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -67,7 +68,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean publishViaPartitionRoot) {
         super(
                 startupOptions,
                 databaseList,
@@ -97,6 +99,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 assignUnboundedChunkFirst);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+        this.publishViaPartitionRoot = publishViaPartitionRoot;
     }
 
     /**
@@ -115,6 +118,15 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
      */
     public int getLsnCommitCheckpointsDelay() {
         return this.lsnCommitCheckpointsDelay;
+    }
+
+    /**
+     * Returns {@code publishViaPartitionRoot} value.
+     *
+     * @return include partitioned table
+     */
+    public boolean getPublishViaPartitionRoot() {
+        return publishViaPartitionRoot;
     }
 
     /**
