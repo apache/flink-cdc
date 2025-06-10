@@ -139,7 +139,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
 
         String jdbcUrl =
                 String.format(
-                        "jdbc:postgres://%s:%s/%s",
+                        "jdbc:postgresql://%s:%s/%s",
                         postgresInventoryDatabase.getHost(),
                         postgresInventoryDatabase.getDatabasePort(),
                         postgresInventoryDatabase.getDatabaseName());
@@ -147,14 +147,15 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                         DriverManager.getConnection(
                                 jdbcUrl, POSTGRES_TEST_USER, POSTGRES_TEST_PASSWORD);
                 Statement stat = conn.createStatement()) {
-            stat.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
-            stat.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+            stat.execute(
+                    "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");
+            stat.execute("UPDATE inventory.products SET weight='5.1' WHERE id=107;");
 
             // Perform DDL changes after the binlog is generated
             waitUntilSpecificEvent(
-                    String.format(
-                            "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0], after=[106, hammer, 18oz carpenter hammer, 1.0], op=UPDATE, meta=()}",
-                            postgresInventoryDatabase.getDatabaseName()));
+                    "DataChangeEvent{tableId=inventory.products, before=[106, hammer, 16oz carpenter's hammer, 1.0], after=[106, hammer, 18oz carpenter hammer, 1.0], op=UPDATE, meta=()}");
+            waitUntilSpecificEvent(
+                    "DataChangeEvent{tableId=inventory.products, before=[107, rocks, box of assorted rocks, 5.3], after=[107, rocks, box of assorted rocks, 5.1], op=UPDATE, meta=()}");
         }
     }
 }
