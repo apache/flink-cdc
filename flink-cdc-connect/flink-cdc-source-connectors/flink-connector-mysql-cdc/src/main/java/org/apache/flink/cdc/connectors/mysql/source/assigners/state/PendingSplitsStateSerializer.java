@@ -161,7 +161,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
         writeFinishedOffsets(state.getSplitFinishedOffsets(), out);
         out.writeInt(state.getSnapshotAssignerStatus().getStatusCode());
         writeTableIds(state.getRemainingTables(), out);
-        out.writeBoolean(state.isTableIdCaseSensitive());
+        out.writeBoolean(state.isTableIdCaseInsensitive());
         MySqlSplitSerializer.writeTableSchemas(state.getTableSchemas(), out);
 
         boolean hasTableIsSplitting =
@@ -265,7 +265,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
             }
         }
         List<TableId> remainingTableIds = readTableIds(in);
-        boolean isTableIdCaseSensitive = in.readBoolean();
+        boolean isTableIdCaseInsensitive = in.readBoolean();
         final List<MySqlSchemalessSnapshotSplit> remainingSchemalessSplits = new ArrayList<>();
         final Map<String, MySqlSchemalessSnapshotSplit> assignedSchemalessSnapshotSplits =
                 new HashMap<>();
@@ -306,7 +306,7 @@ public class PendingSplitsStateSerializer implements SimpleVersionedSerializer<P
                 finishedOffsets,
                 assignerStatus,
                 remainingTableIds,
-                isTableIdCaseSensitive,
+                isTableIdCaseInsensitive,
                 true,
                 splittingTableId == null
                         ? ChunkSplitterState.NO_SPLITTING_TABLE_STATE

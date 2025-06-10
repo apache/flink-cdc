@@ -48,10 +48,10 @@ public class MySqlSchema implements AutoCloseable {
     private final MySqlDatabaseSchema databaseSchema;
     private final Map<TableId, TableChange> schemasByTableId;
 
-    public MySqlSchema(MySqlSourceConfig sourceConfig, boolean isTableIdCaseSensitive) {
+    public MySqlSchema(MySqlSourceConfig sourceConfig, boolean isTableIdCaseInsensitive) {
         this.connectorConfig = sourceConfig.getMySqlConnectorConfig();
         this.databaseSchema =
-                DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, isTableIdCaseSensitive);
+                DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, isTableIdCaseInsensitive);
         this.schemasByTableId = new HashMap<>();
     }
 

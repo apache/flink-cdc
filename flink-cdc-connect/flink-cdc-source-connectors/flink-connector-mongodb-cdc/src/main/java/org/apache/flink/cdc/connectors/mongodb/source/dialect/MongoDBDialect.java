@@ -165,7 +165,7 @@ public class MongoDBDialect implements DataSourceDialect<MongoDBSourceConfig> {
     }
 
     @Override
-    public boolean isDataCollectionIdCaseSensitive(MongoDBSourceConfig sourceConfig) {
+    public boolean isDataCollectionIdCaseInsensitive(MongoDBSourceConfig sourceConfig) {
         // MongoDB's database names and collection names are case-sensitive.
         return true;
     }

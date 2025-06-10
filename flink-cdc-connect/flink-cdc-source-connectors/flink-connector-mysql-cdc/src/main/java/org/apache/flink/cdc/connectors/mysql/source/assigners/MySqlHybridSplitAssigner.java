@@ -60,7 +60,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this(
                 sourceConfig,
@@ -68,7 +68,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
                         sourceConfig,
                         currentParallelism,
                         remainingTables,
-                        isTableIdCaseSensitive,
+                        isTableIdCaseInsensitive,
                         enumeratorContext),
                 false,
                 sourceConfig.getSplitMetaGroupSize());

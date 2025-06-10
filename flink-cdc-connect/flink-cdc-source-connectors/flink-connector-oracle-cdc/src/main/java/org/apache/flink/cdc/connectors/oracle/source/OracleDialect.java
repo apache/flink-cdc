@@ -73,7 +73,7 @@ public class OracleDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
+    public boolean isDataCollectionIdCaseInsensitive(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbcConnection = openJdbcConnection(sourceConfig)) {
             OracleConnection oracleConnection = (OracleConnection) jdbcConnection;
             return oracleConnection.getOracleVersion().getMajor() == 11;
