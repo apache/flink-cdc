@@ -60,7 +60,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Test cases for {@link PostgresTestBase} with full types. */
@@ -125,8 +124,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                                 .databaseList(POSTGRES_CONTAINER.getDatabaseName())
                                 .tableList("inventory.full_types")
                                 .startupOptions(StartupOptions.initial())
-                                .serverTimeZone("UTC")
-                                .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+                                .serverTimeZone("UTC");
         configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
         configFactory.slotName(getSlotName());
 

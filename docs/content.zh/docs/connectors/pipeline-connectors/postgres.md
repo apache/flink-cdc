@@ -1,9 +1,9 @@
 ---
-title: "MySQL"
+title: "Postgres"
 weight: 2
 type: docs
 aliases:
-- /connectors/pipeline-connectors/mysql
+- /connectors/pipeline-connectors/Postgres
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -123,12 +123,16 @@ pipeline:
       <td>需要排除的 Postgres 数据库的表名，参数会在tables参数后发生排除作用。表名支持正则表达式，以排除满足正则表达式的多个表。<br>
           用法和tables参数相同</td>
     </tr>
-    <tr>
-      <td>schema-change.enabled</td>
+     <tr>
+      <td>server-time-zone</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>是否发送模式更改事件，下游 sink 可以响应模式变更事件实现表结构同步，默认为true。</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>数据库服务器中的会话时区， 例如： "Asia/Shanghai". 
+          它控制 Postgres 中的时间戳类型如何转换为字符串。
+          更多请参考 <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-data-types"> 这里</a>.
+          如果没有设置，则使用ZoneId.systemDefault()来确定服务器时区。
+      </td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.chunk.size</td>
@@ -153,18 +157,24 @@ pipeline:
          合法的模式为 "initial"，"latest-offset"，"committed-offset"和 ""snapshot"。</td>
     </tr>
     <tr>
-      <td>scan.startup.specific-offset.skip-events</td>
+      <td>scan.incremental.snapshot.backfill.skip</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
-      <td>在指定的启动位点后需要跳过的事件数量。</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在快照读取阶段跳过 backfill 。<br>
+        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
     </tr>
     <tr>
-      <td>scan.startup.specific-offset.skip-rows</td>
+      <td>scan.lsn-commit.checkpoints-num-delay</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
-      <td>在指定的启动位点后需要跳过的数据行数量。</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>在开始提交LSN偏移量之前，允许的检查点延迟次数。 <br>
+          检查点的 LSN 偏移量将以滚动方式提交，最早的那个检查点标识符将首先从延迟的检查点中提交。
+      </td>
     </tr>
     <tr>
       <td>connect.timeout</td>
@@ -199,16 +209,16 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">30s</td>
       <td>Duration</td>
-      <td>用于跟踪最新可用 binlog 偏移的发送心跳事件的间隔。</td>
+      <td>用于跟踪最新可用wal commited offset 偏移的发送心跳事件的间隔。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
+      <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 Postgres 服务器捕获数据更改。
           例如: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html"> Debezium 的  Postgres 连接器属性</a></td> 
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>
@@ -219,78 +229,12 @@ pipeline:
           若 flink 版本大于等于 1.15，'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 默认值变更为 true，可以不用显式配置 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = true。</td>
     </tr>
     <tr>
-      <td>scan.newly-added-table.enabled</td>
+      <td>chunk-meta.group.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>是否启用动态加表特性，默认关闭。 此配置项只有作业从savepoint/checkpoint启动时才生效。</td>
-    </tr>
-    <tr>
-      <td>scan.binlog.newly-added-table.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>在 binlog 读取阶段，是否读取新增表的表结构变更和数据变更，默认值是 false。 <br>
-          scan.newly-added-table.enabled 和 scan.binlog.newly-added-table.enabled 参数的不同在于: <br>
-          scan.newly-added-table.enabled: 在作业重启后，对新增表的全量和增量数据进行读取; <br>
-          scan.binlog.newly-added-table.enabled: 只在 binlog 读取阶段读取新增表的增量数据。
-      </td>
-    </tr>
-    <tr>
-      <td>scan.parse.online.schema.changes.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>
-        是否尝试解析由 <a href="https://github.com/github/gh-ost">gh-ost</a> 或 <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a> 工具生成的表结构变更事件。
-        这些工具会在变更表结构时，将变更语句应用到“影子表”之上，并稍后将其与主表进行交换，以达到表结构变更的目的。
-        <br>
-        这是一项实验性功能。
-      </td>
-    </tr>
-    <tr>
-      <td>include-comments.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>是否启用同步表、字段注释特性，默认关闭。注意：开启此特性将会对内存使用产生影响。</td>
-    </tr>
-    <tr>
-      <td>treat-tinyint1-as-boolean.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>是否将TINYINT(1)类型当做Boolean类型处理，默认true。</td>
-    </tr>
-    <tr>
-      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>
-        快照读取阶段是否先分配 UnboundedChunk。<br>
-        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
-        这是一项实验特性，默认为 false。
-      </td>
-    </tr>
-    <tr>
-      <td>scan.incremental.snapshot.backfill.skip</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>
-        是否在快照读取阶段跳过 backfill 。<br>
-        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
-        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
-        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
-    </tr>
-    <tr>
-      <td>metadata.list</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">1000</td>
       <td>String</td>
       <td>
-        可额外读取的SourceRecord中元数据的列表，后续可直接使用在transform模块，英文逗号 `,` 分割。目前可用值包含：op_ts。
+        分块元数据的组大小，如果元数据大小超过该组大小，则元数据将被划分为多个组。
       </td>
     </tr>
     </tbody>

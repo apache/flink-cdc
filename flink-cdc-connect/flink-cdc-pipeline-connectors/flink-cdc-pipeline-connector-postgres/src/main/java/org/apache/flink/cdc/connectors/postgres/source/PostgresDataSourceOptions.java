@@ -82,6 +82,14 @@ public class PostgresDataSourceOptions {
                                     + "from a particular plug-in for a particular database/schema. The server uses this slot "
                                     + "to stream events to the connector that you are configuring.");
 
+    public static final ConfigOption<String> SERVER_TIME_ZONE =
+            ConfigOptions.key("server-time-zone")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The session time zone in database server. If not set, then "
+                                    + "ZoneId.systemDefault() is used to determine the server time zone.");
+
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
             ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
                     .stringType()
@@ -131,36 +139,14 @@ public class PostgresDataSourceOptions {
                     .defaultValue("initial")
                     .withDescription(
                             "Optional startup mode for PostgreSQL CDC consumer, valid enumerations are "
-                                    + "\"initial\", \"earliest-offset\", \"latest-offset\", \"timestamp\"\n"
-                                    + "or \"specific-offset\"");
-
-    public static final ConfigOption<String> SCAN_STARTUP_SPECIFIC_OFFSET_FILE =
-            ConfigOptions.key("scan.startup.specific-offset.file")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional binlog file name used in case of \"specific-offset\" startup mode");
-
-    public static final ConfigOption<Long> SCAN_STARTUP_SPECIFIC_OFFSET_POS =
-            ConfigOptions.key("scan.startup.specific-offset.pos")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional binlog file position used in case of \"specific-offset\" startup mode");
-
-    public static final ConfigOption<Long> SCAN_STARTUP_TIMESTAMP_MILLIS =
-            ConfigOptions.key("scan.startup.timestamp-millis")
-                    .longType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "Optional timestamp used in case of \"timestamp\" startup mode");
+                                    + "\"initial\", \"latest-offset\",\"snapshot\" or \"committed-offset\"");
 
     public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
             ConfigOptions.key("heartbeat.interval")
                     .durationType()
                     .defaultValue(Duration.ofSeconds(30))
                     .withDescription(
-                            "Optional interval of sending heartbeat event for tracing the latest available binlog offsets");
+                            "Optional interval of sending heartbeat event for tracing the latest available wal offsets");
 
     public static final ConfigOption<Double> SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND =
             ConfigOptions.key("chunk-key.even-distribution.factor.upper-bound")
@@ -185,6 +171,7 @@ public class PostgresDataSourceOptions {
                                     + " The table chunks would use evenly calculation optimization when the data distribution is even,"
                                     + " and the query for splitting would happen when it is uneven."
                                     + " The distribution factor could be calculated by (MAX(id) - MIN(id) + 1) / rowCount.");
+
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP =
             ConfigOptions.key("scan.incremental.snapshot.backfill.skip")
                     .booleanType()
@@ -240,14 +227,6 @@ public class PostgresDataSourceOptions {
                                     + "greater than or equal to 1.14 when enabling this feature.");
 
     @Experimental
-    public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
-            ConfigOptions.key("schema-change.enabled")
-                    .booleanType()
-                    .defaultValue(true)
-                    .withDescription(
-                            "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
-
-    @Experimental
     public static final ConfigOption<String> TABLES_EXCLUDE =
             ConfigOptions.key("tables.exclude")
                     .stringType()
@@ -258,4 +237,14 @@ public class PostgresDataSourceOptions {
                                     + "If there is a need to use a dot (.) in a regular expression to match any character, "
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    public static final ConfigOption<Integer> SCAN_LSN_COMMIT_CHECKPOINTS_DELAY =
+            ConfigOptions.key("scan.lsn-commit.checkpoints-num-delay")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "The number of checkpoint delays before starting to commit the LSN offsets.\n"
+                                    + "By setting this to higher value, the offset that is consumed by global slot will be "
+                                    + "committed after multiple checkpoint delays instead of after each checkpoint completion.\n"
+                                    + "This allows continuous recycle of log files in stream phase.");
 }

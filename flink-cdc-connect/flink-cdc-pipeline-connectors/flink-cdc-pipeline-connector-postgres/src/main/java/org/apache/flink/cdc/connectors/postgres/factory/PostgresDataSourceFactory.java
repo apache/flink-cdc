@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.time.Duration;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,11 +65,10 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_MODE;
-import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
-import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_POS;
-import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_TIMESTAMP_MILLIS;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SLOT_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
@@ -102,6 +102,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         String password = config.get(PASSWORD);
         String chunkKeyColumn = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         String tables = config.get(TABLES);
+        ZoneId serverTimeZone = getServerTimeZone(config);
         String tablesExclude = config.get(TABLES_EXCLUDE);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         StartupOptions startupOptions = getStartupOptions(config);
@@ -119,6 +120,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         int connectMaxRetries = config.get(CONNECT_MAX_RETRIES);
         int connectionPoolSize = config.get(CONNECTION_POOL_SIZE);
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
+        int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
 
         validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
         validateIntegerOption(CHUNK_META_GROUP_SIZE, splitMetaGroupSize, 1);
@@ -142,6 +144,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .password(password)
                         .decodingPluginName(pluginName)
                         .slotName(slotName)
+                        .serverTimeZone(serverTimeZone.getId())
                         .debeziumProperties(getDebeziumProperties(configMap))
                         .splitSize(splitSize)
                         .splitMetaGroupSize(splitMetaGroupSize)
@@ -156,6 +159,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .heartbeatInterval(heartbeatInterval)
                         .closeIdleReaders(closeIdleReaders)
                         .skipSnapshotBackfill(skipSnapshotBackfill)
+                        .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                         .getConfigFactory();
 
         List<TableId> tableIds = PostgresSchemaUtils.listTables(configFactory.create(0), null);
@@ -204,9 +208,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
         options.add(SCAN_STARTUP_MODE);
-        options.add(SCAN_STARTUP_TIMESTAMP_MILLIS);
-        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_FILE);
-        options.add(SCAN_STARTUP_SPECIFIC_OFFSET_POS);
+        options.add(SERVER_TIME_ZONE);
         options.add(CONNECT_TIMEOUT);
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
@@ -215,6 +217,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_META_GROUP_SIZE);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
+        options.add(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
         return options;
     }
 
@@ -366,5 +369,18 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
             return false;
         }
         return true;
+    }
+
+    /** Replaces the default timezone placeholder with session timezone, if applicable. */
+    private static ZoneId getServerTimeZone(Configuration config) {
+        final String serverTimeZone = config.get(SERVER_TIME_ZONE);
+        if (serverTimeZone != null) {
+            return ZoneId.of(serverTimeZone);
+        } else {
+            LOG.warn(
+                    "{} is not set, which might cause data inconsistencies for time-related fields.",
+                    SERVER_TIME_ZONE.key());
+            return ZoneId.systemDefault();
+        }
     }
 }

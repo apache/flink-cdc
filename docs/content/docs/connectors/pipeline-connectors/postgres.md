@@ -1,9 +1,9 @@
 ---
-title: "MySQL"
+title: "Postgres"
 weight: 2
 type: docs
 aliases:
-- /connectors/pipeline-connectors/mysql
+- /connectors/pipeline-connectors/Postgres
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -124,15 +124,16 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the MySQL database to exclude, parameter will have an exclusion effect after the tables parameter. The table-name also supports regular expressions to exclude multiple tables that satisfy the regular expressions. <br>
+      <td>Table name of the Postgres database to exclude, parameter will have an exclusion effect after the tables parameter. The table-name also supports regular expressions to exclude multiple tables that satisfy the regular expressions. <br>
           The usage is the same as the tables parameter</td>
     </tr>
-    <tr>
-      <td>schema-change.enabled</td>
+   <tr>
+      <td>server-time-zone</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether to send schema change events, so that downstream sinks can respond to schema changes and achieve table structure synchronization.</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>The session time zone in the database server, for example: "Asia/Shanghai".It controls how TIMESTAMP values in Postgres are converted to strings.For more information, please refer to <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-data-types"> here</a>.If not set, the system default time zone (ZoneId.systemDefault()) will be used to determine the server time zone.
+      </td>
     </tr>
     <tr>
       <td>scan.incremental.snapshot.chunk.size</td>
@@ -153,28 +154,34 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"，"latest-offset"，"committed-offset"和 ""snapshot"。</td>
+      <td> Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"，"latest-offset"，"committed-offset"or"snapshot"。</td>
     </tr>
-    <tr>
-      <td>scan.startup.specific-offset.skip-events</td>
+  <tr>
+      <td>scan.incremental.close-idle-reader.enabled</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
-      <td>Optional number of events to skip after the specific starting offset.</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to close idle readers at the end of the snapshot phase. <br>
+          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
+          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
+          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
+      </td>
     </tr>
-    <tr>
-      <td>scan.startup.specific-offset.skip-rows</td>
+   <tr>
+      <td>scan.lsn-commit.checkpoints-num-delay</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">(none)</td>
-      <td>Long</td>
-      <td>Optional number of rows to skip after the specific starting offset.</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>The number of checkpoint delays before starting to commit the LSN offsets. <br>
+          The checkpoint LSN offsets will be committed in rolling fashion, the earliest checkpoint identifier will be committed first from the delayed checkpoints.
+      </td>
     </tr>
     <tr>
       <td>connect.timeout</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30s</td>
       <td>Duration</td>
-      <td>The maximum time that the connector should wait after trying to connect to the MySQL database server before timing out. 
+      <td>The maximum time that the connector should wait after trying to connect to the Postgres database server before timing out. 
               This value cannot be less than 250ms.</td>
     </tr>    
     <tr>
@@ -182,7 +189,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">3</td>
       <td>Integer</td>
-      <td>The max retry times that the connector should retry to build MySQL database server connection.</td>
+      <td>The max retry times that the connector should retry to build Postgres database server connection.</td>
     </tr>
     <tr>
       <td>connection.pool.size</td>
@@ -210,103 +217,24 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from MySQL server.
+      <td>Pass-through Debezium's properties to Debezium Embedded Engine which is used to capture data changes from postgres server.
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties">Debezium's MySQL Connector properties</a></td> 
+          See more about the <a href="https://debezium.io/documentation/reference/1.9/connectors/postgresql.html">Debezium's Postgres Connector properties</a></td> 
     </tr>
     <tr>
-      <td>scan.incremental.close-idle-reader.enabled</td>
+      <td>chunk-meta.group.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Whether to close idle readers at the end of the snapshot phase. <br>
-          The flink version is required to be greater than or equal to 1.14 when 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' is set to true.<br>
-          If the flink version is greater than or equal to 1.15, the default value of 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' has been changed to true,
-          so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
-      </td>
-    </tr>
-    <tr>
-      <td>scan.newly-added-table.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Whether to enable scan the newly added tables feature or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.</td>
-    </tr>
-     <tr>
-      <td>scan.binlog.newly-added-table.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>In binlog reading stage, whether to scan the ddl and dml statements of newly added tables or not, by default is false. <br>
-          The difference between scan.newly-added-table.enabled and scan.binlog.newly-added-table.enabled options is: <br>
-          scan.newly-added-table.enabled: do re-snapshot & binlog-reading for newly added table when restored; <br>
-          scan.binlog.newly-added-table.enabled: only do binlog-reading for newly added table during binlog reading phase.
-      </td>
-    </tr>
-    <tr>
-      <td>scan.parse.online.schema.changes.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>
-        Whether to parse "online" schema changes generated by <a href="https://github.com/github/gh-ost">gh-ost</a> or <a href="https://docs.percona.com/percona-toolkit/pt-online-schema-change.html">pt-osc</a>.
-        Schema change events are applied to a "shadow" table and then swapped with the original table later.
-        <br>
-        This is an experimental feature, and subject to change in the future.
-      </td> 
-    </tr>
-    <tr>
-      <td>include-comments.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Whether enable include table and column comments, by default is false, if set to true, the table and column comments will be sent.<br>
-          Note: Enable this option will bring the implications on memory usage.</td>
-    </tr>
-    <tr>
-      <td>treat-tinyint1-as-boolean.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether treat TINYINT(1) as boolean, by default is true.</td>
-    </tr>
-    <tr>
-      <td>use.legacy.json.format</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>Whether to use legacy JSON format to cast JSON type data in binlog. <br>
-          It determines whether to use the legacy JSON format when retrieving JSON type data in binlog. 
-          If the user configures 'use.legacy.json.format' = 'true', whitespace before values and after commas in the JSON type data is removed. For example,
-          JSON type data {"key1": "value1", "key2": "value2"} in binlog would be converted to {"key1":"value1","key2":"value2"}.
-          When 'use.legacy.json.format' = 'false', the data would be converted to {"key1": "value1", "key2": "value2"}, with whitespace before values and after commas preserved.
-      </td>
-    </tr>
-   <tr>
-      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>
-        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
-        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
-        Experimental option, defaults to false.
-      </td>
-    </tr>
-    <tr>
-      <td>metadata.list</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">1000</td>
       <td>String</td>
       <td>
-        List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
+        The group size of chunk meta, if the meta size exceeds the group size, the meta will be divided into multiple groups.
       </td>
     </tr>
     </tbody>
 </table>
 </div>
 
-## 启动模式
+## Startup Reading Position
 
 The config option `scan.startup.mode` specifies the startup mode for PostgreSQL CDC consumer. The valid enumerations are:
 

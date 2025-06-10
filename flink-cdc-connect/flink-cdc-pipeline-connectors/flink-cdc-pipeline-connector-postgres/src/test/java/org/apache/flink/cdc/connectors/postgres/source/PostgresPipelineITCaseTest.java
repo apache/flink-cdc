@@ -54,7 +54,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
@@ -103,8 +102,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                                 .databaseList(inventoryDatabase.getDatabaseName())
                                 .tableList("inventory.products")
                                 .startupOptions(StartupOptions.initial())
-                                .serverTimeZone("UTC")
-                                .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+                                .serverTimeZone("UTC");
         configFactory.database(inventoryDatabase.getDatabaseName());
         configFactory.slotName(getSlotName());
 
