@@ -250,9 +250,15 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         if (RecordUtils.isDataChangeRecord(sourceRecord)) {
             TableId tableId = RecordUtils.getTableId(sourceRecord);
             // Skip events for tables without primary keys if ignore-no-primary-key-table is enabled
-            if (statefulTaskContext.getSourceConfig().isIgnoreNoPrimaryKeyTable() 
-                    && statefulTaskContext.getDatabaseSchema().tableFor(tableId).primaryKeyColumns().isEmpty()) {
-                LOG.warn("Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping binlog event.", tableId);
+            if (statefulTaskContext.getSourceConfig().isIgnoreNoPrimaryKeyTable()
+                    && statefulTaskContext
+                            .getDatabaseSchema()
+                            .tableFor(tableId)
+                            .primaryKeyColumns()
+                            .isEmpty()) {
+                LOG.warn(
+                        "Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping binlog event.",
+                        tableId);
                 return false;
             }
             if (pureBinlogPhaseTables.contains(tableId)) {

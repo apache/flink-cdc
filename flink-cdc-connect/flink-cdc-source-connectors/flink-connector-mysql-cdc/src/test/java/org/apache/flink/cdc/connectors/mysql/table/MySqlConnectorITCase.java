@@ -2451,6 +2451,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
     void testNoPKTableWithIgnoreNoPrimaryKeyTable(boolean incrementalSnapshot) throws Exception {
         setup(incrementalSnapshot);
         runConsumingForNoPKTableTest(
-                ", 'scan.incremental.snapshot.ignore-no-primary-key-table'='true'", incrementalSnapshot);
+                ", 'scan.incremental.snapshot.ignore-no-primary-key-table'='true'",
+                incrementalSnapshot);
     }
 }

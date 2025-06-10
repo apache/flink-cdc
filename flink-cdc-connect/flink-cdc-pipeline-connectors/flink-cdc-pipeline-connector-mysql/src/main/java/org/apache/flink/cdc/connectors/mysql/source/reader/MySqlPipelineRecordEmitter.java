@@ -134,7 +134,9 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         Schema schema = getSchema(jdbc, tableId);
         // Check if table has primary key and ignore-no-primary-key-table is enabled
         if (schema.primaryKeys().isEmpty() && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
-            LOG.warn("Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping table creation.", tableId);
+            LOG.warn(
+                    "Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping table creation.",
+                    tableId);
             return;
         }
         output.collect(
@@ -270,7 +272,9 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 Schema schema = getSchema(jdbc, tableId);
                 // Skip tables without primary keys if ignore-no-primary-key-table is enabled
                 if (schema.primaryKeys().isEmpty() && sourceConfig.isIgnoreNoPrimaryKeyTable()) {
-                    LOG.warn("Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping table creation.", tableId);
+                    LOG.warn(
+                            "Table {} has no primary key and ignore-no-primary-key-table is set to true, skipping table creation.",
+                            tableId);
                     continue;
                 }
                 createTableEventCache.put(
