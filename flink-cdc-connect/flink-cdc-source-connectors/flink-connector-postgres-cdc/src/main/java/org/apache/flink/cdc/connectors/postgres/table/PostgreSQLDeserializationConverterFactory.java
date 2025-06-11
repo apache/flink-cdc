@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.postgres.table;
 
 import java.util.List;
+import java.util.Objects;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverter;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverterFactory;
 import org.apache.flink.table.data.GenericArrayData;
@@ -109,7 +110,10 @@ public class PostgreSQLDeserializationConverterFactory {
 
                 @Override
                 public Object convert(Object dbzObj, Schema schema) throws Exception {
-                    if (Schema.Type.ARRAY.equals(schema.type()) && dbzObj instanceof List) {
+                    if (dbzObj == null) {
+                        return null;
+                    }
+                    if (Schema.Type.ARRAY.equals(schema.type()) && dbzObj instanceof List && schema.valueSchema() != null) {
                         switch (schema.valueSchema().type()) {
                             case STRING: return new GenericArrayData(
                                 ((List<?>) dbzObj).stream().map(i -> StringData.fromString(i.toString())).toArray());
@@ -119,11 +123,13 @@ public class PostgreSQLDeserializationConverterFactory {
                                 ((List<?>) dbzObj).stream().mapToInt(i -> ((Integer) i)).toArray());
                             case INT64: return new GenericArrayData(
                                 ((List<?>) dbzObj).stream().mapToLong(i -> ((Long) i)).toArray());
-                            default: return new GenericArrayData(((List<?>) dbzObj).toArray());
                         }
-                    }else {
-                        return new GenericArrayData(new StringData[]{StringData.fromString(dbzObj.toString())});
+                    } else if (dbzObj instanceof List) {
+                        return new GenericArrayData(((List<?>) dbzObj).stream().filter(Objects::nonNull)
+                            .map(i -> StringData.fromString(i.toString()))
+                            .toArray());
                     }
+                    return new GenericArrayData(new StringData[]{StringData.fromString(dbzObj.toString())});
                 }
             });
     }
