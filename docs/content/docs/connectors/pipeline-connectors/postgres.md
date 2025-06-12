@@ -359,6 +359,31 @@ Notice:
 </div>
 
 ### Postgres Spatial Data Types Mapping
-Currently not supported
+PostgreSQL supports spatial data types through the PostGIS extension:
+```
+    GEOMETRY(POINT, xx): Represents a point in a Cartesian coordinate system, with EPSG:xx defining the coordinate system. It is suitable for local planar calculations. 
+    GEOGRAPHY(MULTILINESTRING): Stores multiple line strings in latitude and longitude, based on a spherical model. It is suitable for global-scale spatial analysis.
+```
+The former is used for small-area planar data, while the latter is used for large-area data requiring consideration of Earth's curvature.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Spatial data in Postgres</th>
+        <th class="text-left">Json String converted in Flink</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>GEOMETRY(POINT, xx)</td>
+        <td>{"hexewkb":"0101000020730c00001c7c613255de6540787aa52c435c42c0","srid":3187}</td>
+      </tr>
+      <tr>
+        <td>GEOGRAPHY(MULTILINESTRING)</td>
+        <td>{"hexewkb":"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0","srid":4326}</td>
+      </tr>
+    </tbody>
+</table>
+</div>
 
 {{< top >}}

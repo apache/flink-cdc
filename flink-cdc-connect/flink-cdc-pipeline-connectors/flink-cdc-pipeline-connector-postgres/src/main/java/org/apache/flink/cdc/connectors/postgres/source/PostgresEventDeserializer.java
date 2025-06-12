@@ -18,32 +18,39 @@
 package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
-import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.data.Envelope;
+import io.debezium.data.geometry.Geography;
+import io.debezium.data.geometry.Geometry;
+import io.debezium.util.HexConverter;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Event deserializer for {@link PostgresDataSource}. */
 @Internal
 public class PostgresEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private static final long serialVersionUID = 1L;
-    private final boolean includeSchemaChanges;
 
-    public PostgresEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
-        super(new DebeziumSchemaDataTypeInference(), changelogMode);
-        this.includeSchemaChanges = includeSchemaChanges;
+    public static final String SRID = "srid";
+    public static final String HEXEWKB = "hexewkb";
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    public PostgresEventDeserializer(DebeziumChangelogMode changelogMode) {
+        super(new PostgresSchemaDataTypeInference(), changelogMode);
     }
 
     @Override
@@ -75,5 +82,28 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
         return Collections.emptyMap();
+    }
+
+    @Override
+    protected Object convertToString(Object dbzObj, Schema schema) {
+        // the Geometry datatype in PostgreSQL will be converted to
+        // a String with Json format
+        if (Geometry.LOGICAL_NAME.equals(schema.name())
+                || Geography.LOGICAL_NAME.equals(schema.name())) {
+            try {
+                Struct geometryStruct = (Struct) dbzObj;
+                byte[] wkb = geometryStruct.getBytes("wkb");
+                Optional<Integer> srid = Optional.ofNullable(geometryStruct.getInt32(SRID));
+                Map<String, Object> geometryInfo = new HashMap<>(2);
+                geometryInfo.put(HEXEWKB, HexConverter.convertToHexString(wkb));
+                geometryInfo.put(SRID, srid.orElse(0));
+                return BinaryStringData.fromString(OBJECT_MAPPER.writeValueAsString(geometryInfo));
+            } catch (Exception e) {
+                throw new IllegalArgumentException(
+                        String.format("Failed to convert %s to geometry JSON.", dbzObj), e);
+            }
+        } else {
+            return BinaryStringData.fromString(dbzObj.toString());
+        }
     }
 }

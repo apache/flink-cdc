@@ -53,8 +53,7 @@ public class PostgresDataSource implements DataSource {
     @Override
     public EventSourceProvider getEventSourceProvider() {
         DebeziumEventDeserializationSchema deserializer =
-                new PostgresEventDeserializer(
-                        DebeziumChangelogMode.ALL, postgresSourceConfig.isIncludeSchemaChanges());
+                new PostgresEventDeserializer(DebeziumChangelogMode.ALL);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);

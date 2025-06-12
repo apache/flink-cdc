@@ -364,6 +364,31 @@ pipeline:
 </div>
 
 ### 空间数据类型映射
-暂不支持
+PostgreSQL通过PostGIS扩展支持空间数据类型：
+
+    GEOMETRY(POINT, xx)：表示使用笛卡尔坐标系的点，EPSG:xxx定义其坐标系统，适用于局部平面计算。
+    GEOGRAPHY(MULTILINESTRING)：以经纬度存储多条线串，基于球面模型，适合全球范围的空间分析。
+
+前者用于小范围平面数据，后者用于大范围、需考虑地球曲率的地理数据。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Spatial data in Postgres</th>
+        <th class="text-left">Json String converted in Flink</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>GEOMETRY(POINT, xx)</td>
+        <td>{"hexewkb":"0101000020730c00001c7c613255de6540787aa52c435c42c0","srid":3187}</td>
+      </tr>
+      <tr>
+        <td>GEOGRAPHY(MULTILINESTRING)</td>
+        <td>{"hexewkb":"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0","srid":4326}</td>
+      </tr>
+    </tbody>
+</table>
+</div>
 
 {{< top >}}
