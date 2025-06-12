@@ -241,6 +241,9 @@ pipeline:
 </table>
 </div>
 
+注意：
+1. 配置选项`tables`指定 Postgres CDC 需要采集的表，格式为`db.schema1.tabe1,db.schema2.table2`,其中所有的db需要为同一个db，这是因为postgres链接url中需要指定dbname，目前cdc只支持链接一个db。
+
 ## 启动模式
 
 配置选项`scan.startup.mode`指定 Postgres CDC 使用者的启动模式。有效枚举包括：

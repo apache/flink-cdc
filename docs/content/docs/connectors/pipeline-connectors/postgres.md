@@ -234,6 +234,9 @@ pipeline:
 </table>
 </div>
 
+Note:
+1. The configuration option tables specifies the tables to be captured by Postgres CDC, in the format db.schema1.table1,db.schema2.table2. All db values must be the same, as the PostgreSQL connection URL requires a single database name. Currently, CDC only supports connecting to one database.
+
 ## Startup Reading Position
 
 The config option `scan.startup.mode` specifies the startup mode for PostgreSQL CDC consumer. The valid enumerations are:
