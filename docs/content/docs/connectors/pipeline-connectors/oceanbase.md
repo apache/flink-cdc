@@ -52,7 +52,7 @@ sink:
   type: oceanbase
   url: jdbc:mysql://oceanbase:2881/test
   username: root@test
-  password:
+  password: password
 
 pipeline:
   name: MySQL to OceanBase Pipeline
@@ -73,6 +73,13 @@ pipeline:
       </tr>
     </thead>
     <tbody>
+    <tr>
+      <td>type</td>
+      <td>Yes</td>
+      <td></td>
+      <td>String</td>
+      <td>Specify what connector to use, here should be <code>'oceanbase'</code>.</td>
+    </tr>
     <tr>
       <td>url</td>
       <td>Yes</td>
@@ -96,14 +103,14 @@ pipeline:
     </tr>
     <tr>
       <td>schema-name</td>
-      <td>Yes</td>
+      <td>No</td>
       <td></td>
       <td>String</td>
       <td>The schema name or database name.</td>
     </tr>
     <tr>
       <td>table-name</td>
-      <td>Yes</td>
+      <td>No</td>
       <td></td>
       <td>String</td>
       <td>The table name.</td>
@@ -177,6 +184,62 @@ pipeline:
       <td>false</td>
       <td>Boolean</td>
       <td>Whether to enable partition calculation and flush records by partitions. Only works when 'sync-write' and 'direct-load.enabled' are 'false'.</td>
+    </tr>
+    <tr>
+      <td>direct-load.enabled</td>
+      <td>No</td>
+      <td>false</td>
+      <td>Boolean</td>
+      <td>Whether to enable direct load. The parallelism of sink should be 1 if enabled.</td>
+    </tr>
+    <tr>
+      <td>direct-load.host</td>
+      <td>No</td>
+      <td></td>
+      <td>String</td>
+      <td>Hostname used in direct load.</td>
+    </tr>
+    <tr>
+      <td>direct-load.port</td>
+      <td>No</td>
+      <td>2882</td>
+      <td>String</td>
+      <td>Rpc port number used in direct load.</td>
+    </tr>
+    <tr>
+      <td>direct-load.parallel</td>
+      <td>No</td>
+      <td>8</td>
+      <td>Integer</td>
+      <td>Parallelism of direct load.</td>
+    </tr>
+    <tr>
+      <td>direct-load.max-error-rows</td>
+      <td>No</td>
+      <td>0</td>
+      <td>Long</td>
+      <td>Maximum tolerable number of error rows.</td>
+    </tr>
+    <tr>
+      <td>direct-load.dup-action</td>
+      <td>No</td>
+      <td>REPLACE</td>
+      <td>STRING</td>
+      <td>Action when there is duplicated record in direct load.</td>
+    </tr>
+    <tr>
+      <td>direct-load.timeout</td>
+      <td>No</td>
+      <td>7d</td>
+      <td>Duration</td>
+      <td>Timeout for direct load task.</td>
+    </tr>
+    <tr>
+      <td>direct-load.heartbeat-timeout</td>
+      <td>No</td>
+      <td>30s</td>
+      <td>Duration</td>
+      <td>Client heartbeat timeout in direct load task.</td>
     </tr>
 </tbody>
 </table>

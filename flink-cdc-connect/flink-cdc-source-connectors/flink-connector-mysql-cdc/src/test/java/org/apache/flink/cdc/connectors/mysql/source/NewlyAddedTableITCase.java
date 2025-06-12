@@ -831,6 +831,8 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
+            // Wait 1s until snapshot phase finished, make sure the binlog data is not lost.
+            Thread.sleep(1000L);
 
             // step 3: make some binlog data for this round
             makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);

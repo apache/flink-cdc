@@ -31,6 +31,7 @@ import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
 import org.apache.flink.cdc.composer.flink.translator.DataSourceTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.PartitioningTranslator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.composer.flink.translator.TransformTranslator;
@@ -40,12 +41,15 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import javax.annotation.Nullable;
+
 import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -53,6 +57,7 @@ import java.util.Set;
 @Internal
 public class FlinkPipelineComposer implements PipelineComposer {
 
+    private static final String SCHEMA_OPERATOR_UID_SUFFIX = "schema-operator";
     private final StreamExecutionEnvironment env;
     private final boolean isBlocking;
 
@@ -121,6 +126,29 @@ public class FlinkPipelineComposer implements PipelineComposer {
             env.setRuntimeMode(org.apache.flink.api.common.RuntimeExecutionMode.STREAMING);
         }
 
+        // Validate configuration
+        String schemaOperatorUid =
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
+        @Nullable
+        String operatorUidPrefix =
+                pipelineDefConfig.get(PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX);
+        if (!Objects.equals(
+                        schemaOperatorUid,
+                        PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID.defaultValue())
+                && operatorUidPrefix != null) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Only one of the %s and %s pipeline options can be set.",
+                            PipelineOptions.PIPELINE_OPERATOR_UID_PREFIX.key(),
+                            PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID.key()));
+        }
+
+        OperatorUidGenerator operatorUidGenerator = new OperatorUidGenerator(operatorUidPrefix);
+
+        if (operatorUidPrefix != null) {
+            schemaOperatorUid = operatorUidGenerator.generateUid(SCHEMA_OPERATOR_UID_SUFFIX);
+        }
+
         // Initialize translators
         DataSourceTranslator sourceTranslator = new DataSourceTranslator();
         TransformTranslator transformTranslator = new TransformTranslator();
@@ -128,14 +156,13 @@ public class FlinkPipelineComposer implements PipelineComposer {
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         schemaChangeBehavior,
-                        pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID),
+                        schemaOperatorUid,
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_RPC_TIMEOUT),
                         pipelineDefConfig.get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         DataSinkTranslator sinkTranslator = new DataSinkTranslator();
 
         // And required constructors
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+        OperatorIDGenerator schemaOperatorIDGenerator = new OperatorIDGenerator(schemaOperatorUid);
         DataSource dataSource =
                 sourceTranslator.createDataSource(pipelineDef.getSource(), pipelineDefConfig, env);
         DataSink dataSink =
@@ -150,7 +177,12 @@ public class FlinkPipelineComposer implements PipelineComposer {
         }
         DataStream<Event> stream =
                 sourceTranslator.translate(
-                        pipelineDef.getSource(), dataSource, env, sourceParallelism);
+                        pipelineDef.getSource(),
+                        dataSource,
+                        env,
+                        parallelism,
+                        operatorUidGenerator,
+                        parallelism);
 
         // Source ---> PreTransform
         stream =
@@ -160,7 +192,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
                         dataSource.supportedMetadataColumns(),
-                        !isParallelMetadataSource && !isBatchMode);
+                        !isParallelMetadataSource && !isBatchMode,
+                        operatorUidGenerator);
 
         // PreTransform ---> PostTransform
         stream =
@@ -170,7 +203,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getConfig().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
                         pipelineDef.getUdfs(),
                         pipelineDef.getModels(),
-                        dataSource.supportedMetadataColumns());
+                        dataSource.supportedMetadataColumns(),
+                        operatorUidGenerator);
 
         if (isParallelMetadataSource) {
             // Translate a distributed topology for sources with distributed tables
@@ -217,7 +251,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                             parallelism,
                             isBatchMode,
                             schemaOperatorIDGenerator.generate(),
-                            dataSink.getDataChangeEventHashFunctionProvider(parallelism));
+                            dataSink.getDataChangeEventHashFunctionProvider(parallelism),
+                            operatorUidGenerator);
         }
 
         // Schema Operator -> Sink -> X
@@ -231,7 +266,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 dataSink,
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),
-                sinkParallelism);
+                operatorUidGenerator,
+                parallelism);
     }
 
     private void addFrameworkJars() {

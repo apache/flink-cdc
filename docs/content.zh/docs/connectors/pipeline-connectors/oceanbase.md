@@ -52,7 +52,7 @@ sink:
   type: oceanbase
   url: jdbc:mysql://oceanbase:2881/test
   username: root@test
-  password:
+  password: password
 
 pipeline:
   name: MySQL to OceanBase Pipeline
@@ -75,8 +75,8 @@ pipeline:
         <tbody>
             <tr>
               <td>type</td>
-              <td>required</td>
-              <td style="word-wrap: break-word;">(none)</td>
+              <td>是</td>
+              <td></td>
               <td>String</td>
               <td>指定要使用的连接器, 这里需要设置成 <code>'oceanbase'</code>.</td>
             </tr>

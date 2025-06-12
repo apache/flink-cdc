@@ -256,6 +256,17 @@ Flink SQL> SELECT * FROM orders;
           <td>读取表快照时每次读取数据的最大条数。</td>
     </tr>
     <tr>
+          <td>scan.incremental.snapshot.chunk.key-column</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">(none)</td>
+          <td>String</td>
+          <td>表快照的分片键，在读取表的快照时，被捕获的表会按分片键拆分为多个分片。  
+              默认情况下，分片键是主键的第一列。可以使用非主键列作为分片键，但这可能会导致查询性能下降。  
+              <br>  
+              <b>警告：</b> 使用非主键列作为分片键可能会导致数据不一致。请参阅 <a href="#警告">警告</a> 了解详细信息。  
+          </td>
+    </tr>
+    <tr>
       <td>scan.startup.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
@@ -411,6 +422,29 @@ Flink SQL> SELECT * FROM orders;
         参数取值如下：<br>
           <li>true：所有类型的消息（包括INSERT、DELETE、UPDATE_BEFORE、UPDATE_AFTER）都会转换成 INSERT 类型的消息。</li>
           <li>false（默认）：所有类型的消息都保持原样下发。</li>
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在快照读取阶段跳过 backfill 。<br>
+        如果跳过 backfill ，快照阶段捕获表的更改将在稍后的 binlog 读取阶段被回放，而不是合并到快照中。<br>
+        警告：跳过 backfill 可能会导致数据不一致，因为快照阶段发生的某些 binlog 事件可能会被重放（仅保证 at-least-once ）。
+        例如，更新快照阶段已更新的值，或删除快照阶段已删除的数据。这些重放的 binlog 事件应进行特殊处理。
+    </tr>
+    <tr>
+      <td>use.legacy.json.format</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。 <br>
+          这代表着是否使用 legacy JSON 格式来转换 Binlog 中的 JSON 类型的数据。
+          如果用户配置 'use.legacy.json.format' = 'true'，则从 Binlog 中转换 JSON 类型的数据时，会移除值之前的空格和逗号之后的空格。例如，
+          Binlog 中 JSON 类型的数据 {"key1": "value1", "key2": "value2"} 会被转换为 {"key1":"value1","key2":"value2"}。
+          如果设置 'use.legacy.json.format' = 'false'， 这条数据会被转换为 {"key1": "value1", "key2": "value2"}， 也就是 key 和 value 前的空格都会被保留。
       </td>
     </tr>
     </tbody>
@@ -808,6 +842,31 @@ $ ./bin/flink run \
 2. 无主键表的处理语义由 `scan.incremental.snapshot.chunk.key-column` 指定的列的行为决定：
 * 如果指定的列不存在更新操作，此时可以保证 Exactly once 语义。
 * 如果指定的列存在更新操作，此时只能保证 At least once 语义。但可以结合下游，通过指定下游主键，结合幂等性操作来保证数据的正确性。
+
+#### 警告
+
+在 MySQL 表中，若使用 **非主键列** 作为有主键表的 `scan.incremental.snapshot.chunk.key-column`，可能导致**数据不一致**。以下为可能出现的问题及其缓解方案。
+
+#### 问题场景
+
+- **表结构：**
+   - **主键：** `id`
+   - **分片键列 ：** `pid`（非主键）
+
+- **快照分片 ：**
+   - **分片 0:** `1 < pid <= 3`
+   - **分片 1:** `3 < pid <= 5`
+
+- **操作 ：**
+   - 两个子任务并行读取 **分片 0** 和 **分片 1**。
+   - 在读取过程中，发生了一次 **更新** 操作，使 `id=0` 的 `pid` 从 `2` 变为 `4`，在两个分片的**高低水位**间都包含此次变更，导致该更新操作在增量阶段不会被处理。
+
+- **结果 ：**
+   - **分片 0:** 记录 `[id=0, pid=2]`
+   - **分片 1:** 记录 `[id=0, pid=4]`
+
+由于**处理顺序**无法保证，最终 `id=0` 的 `pid` 可能为 `2` 或 `4`，从而导致数据不一致。
+
 
 ### 可用的指标
 

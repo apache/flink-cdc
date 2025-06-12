@@ -1419,6 +1419,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Deadline.fromNow(Duration.ofSeconds(10)));
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
+        // Wait 1s until snapshot phase finished, cannot update DDL during snapshot phase.
+        List<String> actualRows = new ArrayList<>(fetchRows(iterator, 2));
+        Thread.sleep(1000L);
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("DELETE FROM default_value_test WHERE id=1;");
@@ -1506,7 +1509,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "     tiny_un_c TINYINT UNSIGNED DEFAULT ' 28 '"
                             + " );");
         }
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        actualRows.addAll(fetchRows(iterator, expected.length - 2));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
         jobClient.cancel().get();
     }
 
@@ -1554,6 +1558,10 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Deadline.fromNow(Duration.ofSeconds(10)));
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
+        // Wait 1s until snapshot phase finished, cannot update DDL during snapshot phase.
+        List<String> actualRows = new ArrayList<>(fetchRows(iterator, 2));
+        Thread.sleep(1000L);
+
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("DELETE FROM default_value_test WHERE id=1;");
@@ -1572,7 +1580,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute(
                     "alter table default_value_test add column `int_test` INT DEFAULT ' 30 ';");
         }
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        actualRows.addAll(fetchRows(iterator, expected.length - 2));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
         jobClient.cancel().get();
     }
 
@@ -2252,7 +2261,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
         while (!iterator.hasNext()) {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         }
     }
 

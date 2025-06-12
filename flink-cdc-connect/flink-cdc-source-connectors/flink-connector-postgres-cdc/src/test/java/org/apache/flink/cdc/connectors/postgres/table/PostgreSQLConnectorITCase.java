@@ -47,6 +47,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Stream;
 
@@ -302,6 +303,98 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
 
+        result.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true})
+    public void testStartupFromCommittedOffset(boolean parallelismSnapshot) throws Exception {
+        setup(parallelismSnapshot);
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'first','first description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'second','second description',0.2);");
+        }
+
+        // newly create slot's confirmed lsn is latest. We will test whether committed mode starts
+        // from here.
+        String slotName = getSlotName();
+        String publicName = "dbz_publication_" + new Random().nextInt(1000);
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            // TODO: Remove it after adding publication to an existing replication slot.
+            statement.execute(
+                    String.format(
+                            "CREATE PUBLICATION %s FOR TABLE inventory.products", publicName));
+            statement.execute(
+                    String.format(
+                            "select pg_create_logical_replication_slot('%s','pgoutput');",
+                            slotName));
+        }
+
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'thirth','thirth description',0.1);");
+            statement.execute(
+                    "INSERT INTO inventory.products VALUES (default,'forth','forth description',0.2);");
+        }
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE debezium_source ("
+                                + " id INT NOT NULL,"
+                                + " name STRING,"
+                                + " description STRING,"
+                                + " weight DECIMAL(10,3),"
+                                + " PRIMARY KEY (id) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = 'true',"
+                                + " 'decoding.plugin.name' = 'pgoutput',"
+                                + " 'slot.name' = '%s',"
+                                + " 'debezium.publication.name'  = '%s',"
+                                + " 'scan.lsn-commit.checkpoints-num-delay' = '0',"
+                                + " 'scan.startup.mode' = 'committed-offset'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "products",
+                        slotName,
+                        publicName);
+        String sinkDDL =
+                "CREATE TABLE sink "
+                        + " WITH ("
+                        + " 'connector' = 'values',"
+                        + " 'sink-insert-only' = 'false'"
+                        + ") LIKE debezium_source (EXCLUDING OPTIONS)";
+        tEnv.executeSql(sourceDDL);
+        tEnv.executeSql(sinkDDL);
+
+        TableResult result = tEnv.executeSql("INSERT INTO sink SELECT * FROM debezium_source");
+        waitForSinkSize("sink", 2);
+
+        String[] expected =
+                new String[] {
+                    "112,thirth,thirth description,0.100", "113,forth,forth description,0.200"
+                };
+
+        List<String> actual = TestValuesTableFactory.getResultsAsStrings("sink");
+        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
         result.getJobClient().get().cancel().get();
     }
 

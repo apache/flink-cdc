@@ -38,6 +38,11 @@ public class DebeziumOptions {
                                 debeziumProperties.put(subKey, value);
                             });
         }
+        if (properties.containsKey("table.include.list")
+                || properties.containsKey("table.exclude.list")) {
+            throw new IllegalArgumentException(
+                    "table.include.list and table.exclude.list are not supported to set manually, please remove these options.");
+        }
         return debeziumProperties;
     }
 

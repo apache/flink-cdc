@@ -209,6 +209,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
             case INITIAL:
             case SNAPSHOT:
             case LATEST_OFFSET:
+            case COMMITTED_OFFSETS:
                 break;
             default:
                 throw new UnsupportedOperationException(

@@ -35,6 +35,7 @@ import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresQueryUtils;
 import org.apache.flink.cdc.connectors.postgres.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.postgres.testutils.TestTableId;
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
@@ -44,14 +45,19 @@ import org.apache.flink.table.types.DataType;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PostgresScanFetchTask}. */
 class PostgresScanFetchTaskTest extends PostgresTestBase {
@@ -237,6 +243,45 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
+    @Test
+    void testSnapshotFetchSize() throws Exception {
+        customDatabase.createAndInitialize();
+        PostgresSourceConfigFactory sourceConfigFactory =
+                getMockPostgresSourceConfigFactory(customDatabase, schemaName, tableName, 10, true);
+        Properties properties = new Properties();
+        properties.setProperty("snapshot.fetch.size", "2");
+        sourceConfigFactory.debeziumProperties(properties);
+        PostgresSourceConfig sourceConfig = sourceConfigFactory.create(0);
+        PostgresDialect postgresDialect = new PostgresDialect(sourceConfigFactory.create(0));
+        SnapshotSplit snapshotSplit = getSnapshotSplits(sourceConfig, postgresDialect).get(0);
+        PostgresSourceFetchTaskContext postgresSourceFetchTaskContext =
+                new PostgresSourceFetchTaskContext(sourceConfig, postgresDialect);
+        final String selectSql =
+                PostgresQueryUtils.buildSplitScanQuery(
+                        snapshotSplit.getTableId(),
+                        snapshotSplit.getSplitKeyType(),
+                        snapshotSplit.getSplitStart() == null,
+                        snapshotSplit.getSplitEnd() == null,
+                        Collections.emptyList());
+
+        try (PostgresConnection jdbcConnection = postgresDialect.openJdbcConnection();
+                PreparedStatement selectStatement =
+                        PostgresQueryUtils.readTableSplitDataStatement(
+                                jdbcConnection,
+                                selectSql,
+                                snapshotSplit.getSplitStart() == null,
+                                snapshotSplit.getSplitEnd() == null,
+                                snapshotSplit.getSplitStart(),
+                                snapshotSplit.getSplitEnd(),
+                                snapshotSplit.getSplitKeyType().getFieldCount(),
+                                postgresSourceFetchTaskContext
+                                        .getDbzConnectorConfig()
+                                        .getSnapshotFetchSize());
+                ResultSet rs = selectStatement.executeQuery()) {
+            assertThat(rs.getFetchSize()).isEqualTo(2);
+        }
+    }
+
     private List<String> getDataInSnapshotScan(
             String[] changingDataSql,
             String schemaName,
@@ -314,8 +359,8 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
 
         sourceScanFetcher.close();
 
-        Assertions.assertThat(sourceScanFetcher.getExecutorService()).isNotNull();
-        Assertions.assertThat(sourceScanFetcher.getExecutorService().isTerminated()).isTrue();
+        assertThat(sourceScanFetcher.getExecutorService()).isNotNull();
+        assertThat(sourceScanFetcher.getExecutorService().isTerminated()).isTrue();
 
         return formatResult(result, dataType);
     }
