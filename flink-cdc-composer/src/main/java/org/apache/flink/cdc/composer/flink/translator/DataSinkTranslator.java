@@ -86,7 +86,14 @@ public class DataSinkTranslator {
             OperatorID schemaOperatorID,
             OperatorUidGenerator operatorUidGenerator,
             Integer parallelism) {
-        translate(sinkDef, input, dataSink, false, schemaOperatorID, operatorUidGenerator, parallelism);
+        translate(
+                sinkDef,
+                input,
+                dataSink,
+                false,
+                schemaOperatorID,
+                operatorUidGenerator,
+                parallelism);
     }
 
     public void translate(
@@ -104,7 +111,14 @@ public class DataSinkTranslator {
             // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
-            sinkTo(input, sink, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator, parallelism);
+            sinkTo(
+                    input,
+                    sink,
+                    sinkName,
+                    isBatchMode,
+                    schemaOperatorID,
+                    operatorUidGenerator,
+                    parallelism);
         } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
             // SinkFunction
             FlinkSinkFunctionProvider sinkFunctionProvider =

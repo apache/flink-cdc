@@ -113,7 +113,10 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: 4",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse);
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        database,
+                        warehouse);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
@@ -224,7 +227,11 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: 4",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, database, warehouse);
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        database,
+                        database,
+                        warehouse);
         Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         String mysqlJdbcUrl =
