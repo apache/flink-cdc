@@ -709,7 +709,8 @@ public class PaimonSinkITCase {
                 paimonSink,
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),
-                new OperatorUidGenerator());
+                new OperatorUidGenerator(),
+                stream.getParallelism());
         env.execute("runJobWithEvents").getJobExecutionResult();
     }
 

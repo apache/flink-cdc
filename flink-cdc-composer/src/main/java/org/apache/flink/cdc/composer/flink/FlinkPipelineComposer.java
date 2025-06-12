@@ -180,9 +180,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                         pipelineDef.getSource(),
                         dataSource,
                         env,
-                        parallelism,
-                        operatorUidGenerator,
-                        parallelism);
+                        sourceParallelism,
+                        operatorUidGenerator);
 
         // Source ---> PreTransform
         stream =
@@ -267,7 +266,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
                 isBatchMode,
                 schemaOperatorIDGenerator.generate(),
                 operatorUidGenerator,
-                parallelism);
+                sinkParallelism);
     }
 
     private void addFrameworkJars() {
