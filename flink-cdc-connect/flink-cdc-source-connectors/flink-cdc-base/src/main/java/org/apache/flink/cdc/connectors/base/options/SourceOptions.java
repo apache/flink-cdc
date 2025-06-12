@@ -146,4 +146,12 @@ public class SourceOptions {
                             .defaultValue(false)
                             .withDescription(
                                     "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED =
+            ConfigOptions.key("scan.read-changelog-as-append-only.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to convert the changelog data stream to an append-only data stream");
 }
