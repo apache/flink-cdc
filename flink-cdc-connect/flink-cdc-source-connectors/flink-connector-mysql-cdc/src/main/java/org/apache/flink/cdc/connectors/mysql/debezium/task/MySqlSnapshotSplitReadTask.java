@@ -242,12 +242,15 @@ public class MySqlSnapshotSplitReadTask
         long exportStart = clock.currentTimeInMillis();
         LOG.info("Exporting data from split '{}' of table {}", snapshotSplit.splitId(), table.id());
 
+        String projection = StatementUtils.buildProjection(table, sourceConfig);
+
         final String selectSql =
                 StatementUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),
                         snapshotSplit.getSplitKeyType(),
                         snapshotSplit.getSplitStart() == null,
-                        snapshotSplit.getSplitEnd() == null);
+                        snapshotSplit.getSplitEnd() == null,
+                        projection);
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 snapshotSplit.splitId(),

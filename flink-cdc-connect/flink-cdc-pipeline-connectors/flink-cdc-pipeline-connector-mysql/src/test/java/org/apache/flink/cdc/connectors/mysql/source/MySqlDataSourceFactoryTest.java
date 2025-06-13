@@ -36,6 +36,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.TABLE_INCLUDE_LIST_ALREADY_SPECIFIED_ERROR_MSG;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PASSWORD;
@@ -157,6 +160,29 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 .hasMessageContaining(
                         "Cannot find any table with by the option 'tables.exclude'  = "
                                 + tableExclude);
+    }
+
+    @Test
+    void testIncludeAndExcludeColumn() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put(
+                "debezium." + COLUMN_INCLUDE_LIST.name(),
+                inventoryDatabase.getDatabaseName() + ".prod\\.name");
+        options.put(
+                "debezium." + COLUMN_EXCLUDE_LIST.name(),
+                inventoryDatabase.getDatabaseName() + ".prod\\.description");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(TABLE_INCLUDE_LIST_ALREADY_SPECIFIED_ERROR_MSG);
     }
 
     @Test
