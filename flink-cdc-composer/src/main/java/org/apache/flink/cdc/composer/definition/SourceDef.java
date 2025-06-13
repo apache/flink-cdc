@@ -33,18 +33,26 @@ import java.util.Optional;
  *   <li>type: connector type of the source, which will be used for discovering source
  *       implementation. Required in the definition.
  *   <li>name: name of the source. Optional in the definition.
+ *   <li>parallelism: parallelism of the source. Optional in the definition.
  *   <li>config: configuration of the source
  * </ul>
  */
 public class SourceDef {
     private final String type;
     @Nullable private final String name;
+    @Nullable private final Integer parallelism;
     private final Configuration config;
 
     public SourceDef(String type, @Nullable String name, Configuration config) {
+        this(type, name, config, null);
+    }
+
+    public SourceDef(
+            String type, @Nullable String name, Configuration config, Integer parallelism) {
         this.type = type;
         this.name = name;
         this.config = config;
+        this.parallelism = parallelism;
     }
 
     public String getType() {
@@ -59,6 +67,10 @@ public class SourceDef {
         return config;
     }
 
+    public Integer getParallelism() {
+        return parallelism;
+    }
+
     @Override
     public String toString() {
         return "SourceDef{"
@@ -70,6 +82,8 @@ public class SourceDef {
                 + '\''
                 + ", config="
                 + config
+                + ", parallelism="
+                + parallelism
                 + '}';
     }
 
@@ -84,11 +98,12 @@ public class SourceDef {
         SourceDef sourceDef = (SourceDef) o;
         return Objects.equals(type, sourceDef.type)
                 && Objects.equals(name, sourceDef.name)
-                && Objects.equals(config, sourceDef.config);
+                && Objects.equals(config, sourceDef.config)
+                && parallelism == sourceDef.parallelism;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, config);
+        return Objects.hash(type, name, config, parallelism);
     }
 }
