@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.connector.mysql.antlr.listener.AlterTableParserListener;
@@ -68,18 +69,24 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private TableEditor tableEditor;
     private boolean isTableIdCaseInsensitive;
     private int parsingColumnIndex = STARTING_INDEX;
+    private final List<String> columnIncludeList;
+    private final List<String> columnExcludeList;
 
     public CustomAlterTableParserListener(
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners,
             LinkedList<SchemaChangeEvent> changes,
             boolean tinyInt1isBit,
-            boolean isTableIdCaseInsensitive) {
+            boolean isTableIdCaseInsensitive,
+            List<String> columnIncludeList,
+            List<String> columnExcludeListe) {
         this.parser = parser;
         this.listeners = listeners;
         this.changes = changes;
         this.tinyInt1isBit = tinyInt1isBit;
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+        this.columnIncludeList = columnIncludeList;
+        this.columnExcludeList = columnExcludeListe;
     }
 
     @Override
@@ -215,32 +222,36 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    if (ctx.FIRST() != null) {
-                        changes.add(
-                                new AddColumnEvent(
-                                        currentTable,
-                                        Collections.singletonList(
-                                                new AddColumnEvent.ColumnWithPosition(
-                                                        toCdcColumn(column),
-                                                        AddColumnEvent.ColumnPosition.FIRST,
-                                                        null))));
-                    } else if (ctx.AFTER() != null) {
-                        String afterColumn = parser.parseName(ctx.uid(1));
-                        changes.add(
-                                new AddColumnEvent(
-                                        currentTable,
-                                        Collections.singletonList(
-                                                new AddColumnEvent.ColumnWithPosition(
-                                                        toCdcColumn(column),
-                                                        AddColumnEvent.ColumnPosition.AFTER,
-                                                        afterColumn))));
-                    } else {
-                        changes.add(
-                                new AddColumnEvent(
-                                        currentTable,
-                                        Collections.singletonList(
-                                                new AddColumnEvent.ColumnWithPosition(
-                                                        toCdcColumn(column)))));
+                    String qualifiedColumnName = currentTable + "." + column.name();
+                    if (MySqlSchemaUtils.matchesColumn(
+                            qualifiedColumnName, columnIncludeList, columnExcludeList)) {
+                        if (ctx.FIRST() != null) {
+                            changes.add(
+                                    new AddColumnEvent(
+                                            currentTable,
+                                            Collections.singletonList(
+                                                    new AddColumnEvent.ColumnWithPosition(
+                                                            toCdcColumn(column),
+                                                            AddColumnEvent.ColumnPosition.FIRST,
+                                                            null))));
+                        } else if (ctx.AFTER() != null) {
+                            String afterColumn = parser.parseName(ctx.uid(1));
+                            changes.add(
+                                    new AddColumnEvent(
+                                            currentTable,
+                                            Collections.singletonList(
+                                                    new AddColumnEvent.ColumnWithPosition(
+                                                            toCdcColumn(column),
+                                                            AddColumnEvent.ColumnPosition.AFTER,
+                                                            afterColumn))));
+                        } else {
+                            changes.add(
+                                    new AddColumnEvent(
+                                            currentTable,
+                                            Collections.singletonList(
+                                                    new AddColumnEvent.ColumnWithPosition(
+                                                            toCdcColumn(column)))));
+                        }
                     }
                     listeners.remove(columnDefinitionListener);
                 },
@@ -289,10 +300,19 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     columnEditors.forEach(
                             columnEditor -> {
                                 Column column = columnEditor.create();
-                                addedColumns.add(
-                                        new AddColumnEvent.ColumnWithPosition(toCdcColumn(column)));
+                                String qualifiedColumnName = currentTable + "." + column.name();
+                                if (MySqlSchemaUtils.matchesColumn(
+                                        qualifiedColumnName,
+                                        columnIncludeList,
+                                        columnExcludeList)) {
+                                    addedColumns.add(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    toCdcColumn(column)));
+                                }
                             });
-                    changes.add(new AddColumnEvent(currentTable, addedColumns));
+                    if (!addedColumns.isEmpty()) {
+                        changes.add(new AddColumnEvent(currentTable, addedColumns));
+                    }
                     listeners.remove(columnDefinitionListener);
                     columnEditors = null;
                     parsingColumnIndex = STARTING_INDEX;
@@ -319,16 +339,21 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    String newColumnName = parser.parseName(ctx.newColumn);
+                    String qualifiedColumnName = currentTable + "." + column.name();
+                    if (MySqlSchemaUtils.matchesColumn(
+                            qualifiedColumnName, columnIncludeList, columnExcludeList)) {
+                        String newColumnName = parser.parseName(ctx.newColumn);
 
-                    Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
-                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                        Map<String, DataType> typeMapping = new HashMap<>();
+                        typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
+                        changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
 
-                    if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
-                        Map<String, String> renameMap = new HashMap<>();
-                        renameMap.put(column.name(), newColumnName);
-                        changes.add(new RenameColumnEvent(currentTable, renameMap));
+                        if (newColumnName != null
+                                && !column.name().equalsIgnoreCase(newColumnName)) {
+                            Map<String, String> renameMap = new HashMap<>();
+                            renameMap.put(column.name(), newColumnName);
+                            changes.add(new RenameColumnEvent(currentTable, renameMap));
+                        }
                     }
                     listeners.remove(columnDefinitionListener);
                 },
@@ -339,8 +364,13 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     @Override
     public void enterAlterByDropColumn(MySqlParser.AlterByDropColumnContext ctx) {
         String removedColName = parser.parseName(ctx.uid());
-        changes.add(new DropColumnEvent(currentTable, Collections.singletonList(removedColName)));
-        super.enterAlterByDropColumn(ctx);
+        String qualifiedColumnName = currentTable + "." + removedColName;
+        if (MySqlSchemaUtils.matchesColumn(
+                qualifiedColumnName, columnIncludeList, columnExcludeList)) {
+            changes.add(
+                    new DropColumnEvent(currentTable, Collections.singletonList(removedColName)));
+            super.enterAlterByDropColumn(ctx);
+        }
     }
 
     @Override
@@ -372,9 +402,13 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
-                    changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    String qualifiedColumnName = currentTable + "." + column.name();
+                    if (MySqlSchemaUtils.matchesColumn(
+                            qualifiedColumnName, columnIncludeList, columnExcludeList)) {
+                        Map<String, DataType> typeMapping = new HashMap<>();
+                        typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
+                        changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+                    }
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);
@@ -387,7 +421,11 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     String newColumnName = parser.parseName(ctx.newColumn);
-                    if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
+                    String qualifiedColumnName = currentTable + "." + column.name();
+                    if (MySqlSchemaUtils.matchesColumn(
+                                    qualifiedColumnName, columnIncludeList, columnExcludeList)
+                            && newColumnName != null
+                            && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
                         renameMap.put(column.name(), newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));

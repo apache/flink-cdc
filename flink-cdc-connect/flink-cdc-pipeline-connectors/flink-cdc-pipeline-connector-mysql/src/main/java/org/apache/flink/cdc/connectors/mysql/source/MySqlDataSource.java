@@ -37,6 +37,9 @@ import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
+
 /** A {@link DataSource} for mysql cdc connector. */
 @Internal
 public class MySqlDataSource implements DataSource {
@@ -74,7 +77,9 @@ public class MySqlDataSource implements DataSource {
                         readableMetadataList,
                         includeComments,
                         sourceConfig.isTreatTinyInt1AsBoolean(),
-                        MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig));
+                        MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig),
+                        sourceConfig.getDbzConfiguration().getStrings(COLUMN_INCLUDE_LIST, ","),
+                        sourceConfig.getDbzConfiguration().getStrings(COLUMN_EXCLUDE_LIST, ","));
 
         MySqlSource<Event> source =
                 new MySqlSource<>(

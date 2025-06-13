@@ -37,13 +37,21 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
     private final LinkedList<SchemaChangeEvent> parsedEvents;
     private final boolean tinyInt1isBit;
     private boolean isTableIdCaseInsensitive;
+    private final List<String> columnIncludeList;
+    private final List<String> columnExcludeList;
 
     public CustomMySqlAntlrDdlParser(
-            boolean includeComments, boolean tinyInt1isBit, boolean isTableIdCaseInsensitive) {
+            boolean includeComments,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive,
+            List<String> columnIncludeList,
+            List<String> columnExcludeListe) {
         super(true, false, includeComments, null, Tables.TableFilter.includeAll());
         this.parsedEvents = new LinkedList<>();
         this.tinyInt1isBit = tinyInt1isBit;
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+        this.columnIncludeList = columnIncludeList;
+        this.columnExcludeList = columnExcludeListe;
     }
 
     // Overriding this method because the BIT type requires default length dimension of 1.
@@ -284,7 +292,12 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
     @Override
     protected AntlrDdlParserListener createParseTreeWalkerListener() {
         return new CustomMySqlAntlrDdlParserListener(
-                this, parsedEvents, tinyInt1isBit, isTableIdCaseInsensitive);
+                this,
+                parsedEvents,
+                tinyInt1isBit,
+                isTableIdCaseInsensitive,
+                columnIncludeList,
+                columnExcludeList);
     }
 
     public List<SchemaChangeEvent> getAndClearParsedEvents() {

@@ -166,5 +166,15 @@ public class MySqlSchemaUtils {
         }
     }
 
+    public static boolean matchesColumn(
+            String fullColumnName, List<String> columnIncludeList, List<String> columnExcludeList) {
+        if (columnIncludeList != null && !columnIncludeList.isEmpty()) {
+            return columnIncludeList.stream().anyMatch(fullColumnName::matches);
+        } else if (columnExcludeList != null && !columnExcludeList.isEmpty()) {
+            return columnExcludeList.stream().noneMatch(fullColumnName::matches);
+        }
+        return true;
+    }
+
     private MySqlSchemaUtils() {}
 }
