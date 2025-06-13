@@ -82,7 +82,7 @@ pipeline:
     <tr>
       <td>port</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">3306</td>
+      <td style="word-wrap: break-word;">5432</td>
       <td>Integer</td>
       <td>Integer port number of the Postgres database server.</td>
     </tr>
@@ -234,6 +234,7 @@ pipeline:
 </table>
 </div>
 
+
 Note:
 1. The configuration option tables specifies the tables to be captured by Postgres CDC, in the format db.schema1.table1,db.schema2.table2. All db values must be the same, as the PostgreSQL connection URL requires a single database name. Currently, CDC only supports connecting to one database.
 
@@ -278,10 +279,6 @@ Notice:
       </tr>
     </thead>
     <tbody>
-    <tr>
-      <td></td>
-      <td>TINYINT</td>
-    </tr>
     <tr>
       <td>
         SMALLINT<br>

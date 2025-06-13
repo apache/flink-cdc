@@ -284,10 +284,6 @@ pipeline:
     </thead>
     <tbody>
     <tr>
-      <td></td>
-      <td>TINYINT</td>
-    </tr>
-    <tr>
       <td>
         SMALLINT<br>
         INT2<br>
