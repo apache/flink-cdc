@@ -59,6 +59,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_IN
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
@@ -153,7 +154,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -166,6 +168,7 @@ class PostgreSQLTableFactoryTest {
         options.put("changelog-mode", "upsert");
         options.put("scan.incremental.snapshot.backfill.skip", "true");
         options.put("scan.newly-added-table.enabled", "true");
+        options.put("scan.read-changelog-as-append-only.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -200,7 +203,8 @@ class PostgreSQLTableFactoryTest {
                         true,
                         true,
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        true);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -245,7 +249,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name");
@@ -300,7 +305,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -345,7 +351,8 @@ class PostgreSQLTableFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue(),
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
-                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
