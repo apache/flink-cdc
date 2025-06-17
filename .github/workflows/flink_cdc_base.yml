@@ -48,22 +48,25 @@ env:
   flink-cdc-common,\
   flink-cdc-composer,\
   flink-cdc-runtime,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base"
+  flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 
   MODULES_PIPELINE_CONNECTORS: "\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-iceberg,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute"
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 
   MODULES_MYSQL: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql"
 
   MODULES_POSTGRES: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
@@ -87,7 +90,8 @@ env:
 
   MODULES_OCEANBASE: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase"
 
   MODULES_DB2: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
@@ -96,6 +100,27 @@ env:
   MODULES_VITESS: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
+
+  MODULES_DORIS: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris"
+
+  MODULES_STARROCKS: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks"
+
+  MODULES_ICEBERG: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-iceberg"
+
+  MODULES_KAFKA: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka"
+
+  MODULES_PAIMON: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon"
+
+  MODULES_ELASTICSEARCH: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch"
+
+  MODULES_MAXCOMPUTE: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute"
 
   MODULES_PIPELINE_E2E: "\
   flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
@@ -160,9 +185,6 @@ jobs:
               ("core")
                modules=${{ env.MODULES_CORE }}
               ;;
-              ("pipeline_connectors")
-               modules=${{ env.MODULES_PIPELINE_CONNECTORS }}
-              ;;
               ("mysql")
                modules=${{ env.MODULES_MYSQL }}
               ;;
@@ -192,6 +214,27 @@ jobs:
               ;;
               ("vitess")
                modules=${{ env.MODULES_VITESS }}
+              ;;
+              ("doris")
+               modules=${{ env.MODULES_DORIS }}
+              ;;
+              ("elasticsearch")
+               modules=${{ env.MODULES_ELASTICSEARCH }}
+              ;;
+              ("iceberg")
+               modules=${{ env.MODULES_ICEBERG }}
+              ;;
+              ("kafka")
+               modules=${{ env.MODULES_KAFKA }}
+              ;;
+              ("maxcompute")
+               modules=${{ env.MODULES_MAXCOMPUTE }}
+              ;;
+              ("paimon")
+               modules=${{ env.MODULES_PAIMON }}
+              ;;
+              ("starrocks")
+               modules=${{ env.MODULES_STARROCKS }}
               ;;
               ("pipeline_e2e")
                compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
