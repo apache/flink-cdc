@@ -47,54 +47,40 @@ jobs:
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
-  ut:
-    if: github.repository == 'apache/flink-cdc'
-    strategy:
-      fail-fast: false
-      matrix:
-        module: [
-          'core',
-          'mysql',
-          'postgres',
-          'oracle',
-          'mongodb6',
-          'mongodb7',
-          'sqlserver',
-          'tidb',
-          'oceanbase',
-          'db2',
-          'vitess',
-          'doris',
-          'elasticsearch',
-          'iceberg',
-          'kafka',
-          'maxcompute',
-          'paimon',
-          'starrocks'
-        ]
-    name: Unit Tests
+  common:
+    name: Common Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
-      module: ${{ matrix.module }}
+      modules: "['core']"
+  pipeline-ut:
+    name: Pipeline Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[11]"
+      modules: "['mysql-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks']"
+  source-ut:
+    name: Source Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[11]"
+      modules: "['mysql-source', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
-    if: github.repository == 'apache/flink-cdc'
     strategy:
       fail-fast: false
       matrix:
         parallelism: [ 1, 4 ]
-    name: Pipeline E2E Tests (${{ matrix.parallelism }} Parallelism)
+    name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
       flink-version: "['1.19.2', '1.20.1']"
-      module: pipeline_e2e
+      modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
-    if: github.repository == 'apache/flink-cdc'
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[11]"
       flink-version: "['1.19.2', '1.20.1']"
-      module: source_e2e
+      modules: "['source_e2e']"

@@ -28,8 +28,8 @@ on:
         required: false
         type: string
         default: "['generic']"
-      module:
-        description: "Flink CDC module to test against."
+      modules:
+        description: "Flink CDC modules to test against."
         required: true
         type: string
       parallelism:
@@ -63,9 +63,11 @@ env:
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 
-  MODULES_MYSQL: "\
+  MODULES_MYSQL_SOURCE: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
+
+  MODULES_MYSQL_PIPELINE: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql"
 
   MODULES_POSTGRES: "\
@@ -88,9 +90,11 @@ env:
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
   flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
 
-  MODULES_OCEANBASE: "\
+  MODULES_OCEANBASE_SOURCE: "\
   flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc,\
+  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
+
+  MODULES_OCEANBASE_PIPELINE: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase"
 
   MODULES_DB2: "\
@@ -129,7 +133,7 @@ env:
   flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 
 jobs:
-  compile_and_test:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -137,6 +141,7 @@ jobs:
       matrix:
         java-version: ${{ fromJSON(inputs.java-version) }}
         flink-version: ${{ fromJSON(inputs.flink-version) }}
+        module: ${{ fromJSON(inputs.modules) }}
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.java-version }}"
       - name: Clean up disk space
@@ -174,19 +179,22 @@ jobs:
           maven-version: 3.8.6
 
       - name: Compile and test
-        timeout-minutes: 60
+        timeout-minutes: 90
         run: |
           . .github/workflows/utils.sh
           jvm_timezone=$(random_timezone)
           echo "JVM timezone is set to $jvm_timezone"
           set -o pipefail
 
-          case ${{ inputs.module }} in
+          case ${{ matrix.module }} in
               ("core")
                modules=${{ env.MODULES_CORE }}
               ;;
-              ("mysql")
-               modules=${{ env.MODULES_MYSQL }}
+              ("mysql-source")
+               modules=${{ env.MODULES_MYSQL_SOURCE }}
+              ;;
+              ("mysql-pipeline")
+               modules=${{ env.MODULES_MYSQL_PIPELINE }}
               ;;
               ("postgres")
                modules=${{ env.MODULES_POSTGRES }}
@@ -206,8 +214,11 @@ jobs:
               ("tidb")
                modules=${{ env.MODULES_TIDB }}
               ;;
-              ("oceanbase")
-               modules=${{ env.MODULES_OCEANBASE }}
+              ("oceanbase-source")
+               modules=${{ env.MODULES_OCEANBASE_SOURCE }}
+              ;;
+              ("oceanbase-pipeline")
+               modules=${{ env.MODULES_OCEANBASE_PIPELINE }}
               ;;
               ("db2")
                modules=${{ env.MODULES_DB2 }}
@@ -237,24 +248,24 @@ jobs:
                modules=${{ env.MODULES_STARROCKS }}
               ;;
               ("pipeline_e2e")
-               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL_SOURCE }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE_SOURCE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
                modules=${{ env.MODULES_PIPELINE_E2E }}
               ;;
               ("source_e2e")
-               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_SOURCE_E2E }}"
+               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL_SOURCE }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE_SOURCE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_SOURCE_E2E }}"
                modules=${{ env.MODULES_SOURCE_E2E }}
               ;;
           esac
           
-          if [ ${{ inputs.module }} != "pipeline_e2e" ] && [ ${{ inputs.module }} != "source_e2e" ]; then
+          if [ ${{ matrix.module }} != "pipeline_e2e" ] && [ ${{ matrix.module }} != "source_e2e" ]; then
             compile_modules=$modules
           fi
           
           build_maven_parameter=""
 
-          if [ ${{ inputs.module }} == "mongodb6" ]; then
+          if [ ${{ matrix.module }} == "mongodb6" ]; then
             build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
-          elif [ ${{ inputs.module }} == "mongodb7" ]; then
+          elif [ ${{ matrix.module }} == "mongodb7" ]; then
             build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
           fi
           

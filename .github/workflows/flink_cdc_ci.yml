@@ -57,35 +57,24 @@ jobs:
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
-  ut:
-    strategy:
-      fail-fast: false
-      matrix:
-        module: [
-          'core',
-          'mysql',
-          'postgres',
-          'oracle',
-          'mongodb6',
-          'mongodb7',
-          'sqlserver',
-          'tidb',
-          'oceanbase',
-          'db2',
-          'vitess',
-          'doris',
-          'elasticsearch',
-          'iceberg',
-          'kafka',
-          'maxcompute',
-          'paimon',
-          'starrocks'
-        ]
+  common:
+    name: Common Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[8]"
+      modules: "['core']"
+  pipeline-ut:
     name: Pipeline Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-version: "[8]"
-      module: ${{ matrix.module }}
+      modules: "['mysql-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks']"
+  source-ut:
+    name: Source Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-version: "[8]"
+      modules: "['mysql-source', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
     strategy:
       fail-fast: false
@@ -96,7 +85,7 @@ jobs:
     with:
       java-version: "[8]"
       flink-version: "['1.19.2', '1.20.1']"
-      module: pipeline_e2e
+      modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
     name: Source E2E Tests
@@ -104,4 +93,4 @@ jobs:
     with:
       java-version: "[8]"
       flink-version: "['1.19.2', '1.20.1']"
-      module: source_e2e
+      modules: "['source_e2e']"
