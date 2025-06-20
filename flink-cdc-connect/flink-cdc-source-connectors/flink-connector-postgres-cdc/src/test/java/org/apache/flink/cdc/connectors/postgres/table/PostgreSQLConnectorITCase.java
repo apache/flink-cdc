@@ -33,6 +33,7 @@ import org.apache.flink.util.CloseableIterator;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -306,10 +307,9 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         result.getJobClient().get().cancel().get();
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {true})
-    public void testStartupFromCommittedOffset(boolean parallelismSnapshot) throws Exception {
-        setup(parallelismSnapshot);
+    @Test
+    public void testStartupFromCommittedOffset() throws Exception {
+        setup(true);
         initializePostgresTable(POSTGRES_CONTAINER, "inventory");
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
@@ -325,7 +325,9 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         String publicName = "dbz_publication_" + new Random().nextInt(1000);
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
-            // TODO: Remove it after adding publication to an existing replication slot.
+            // For pgoutput specifically, the publication must be created before the slot.
+            // postgres community is still working on it:
+            // https://www.postgresql.org/message-id/CALDaNm0-n8FGAorM%2BbTxkzn%2BAOUyx5%3DL_XmnvOP6T24%2B-NcBKg%40mail.gmail.com
             statement.execute(
                     String.format(
                             "CREATE PUBLICATION %s FOR TABLE inventory.products", publicName));

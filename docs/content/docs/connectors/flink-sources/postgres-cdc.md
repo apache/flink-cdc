@@ -265,6 +265,19 @@ SELECT * FROM shipments;
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
       </td>
     </tr>
+    <tr>
+      <td>scan.read-changelog-as-append-only.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否将 changelog 数据流转换为 append-only 数据流。<br>
+        仅在需要保存上游表删除消息等特殊场景下开启使用，比如在逻辑删除场景下，用户不允许物理删除下游消息，此时使用该特性，并配合 row_kind 元数据字段，下游可以先保存所有明细数据，再通过 row_kind 字段判断是否进行逻辑删除。<br>
+        参数取值如下：<br>
+          <li>true：所有类型的消息（包括INSERT、DELETE、UPDATE_BEFORE、UPDATE_AFTER）都会转换成 INSERT 类型的消息。</li>
+          <li>false（默认）：所有类型的消息都保持原样下发。</li>
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
@@ -352,7 +365,10 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+          <br>
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          </td>
     </tr>
     <tr>
           <td>chunk-key.even-distribution.factor.lower-bound</td>
@@ -467,7 +483,7 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) PostgreSQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) PostgreSQL CDC Source doesn't need to acquire global read lock before snapshot reading
 
-During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by primary key of table,
+During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
 and then PostgreSQL CDC Source assigns the chunks to multiple readers to read the data of snapshot chunk.
 
 ### Exactly-Once Processing
@@ -591,6 +607,41 @@ Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
 2. For PostgreSQL, the group name will be like `test_database.test_schema.test_table`.
 
+### Tables Without primary keys
+
+Starting from version 3.4.0, Postgres CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+
+There are two places that need to be taken care of.
+
+1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
+2. The processing semantics of a Postgres CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
+* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+#### Warning
+
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a Postgres table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+
+#### Problem Scenario
+
+- **Table Structure:**
+    - **Primary Key:** `id`
+    - **Chunk Key Column:** `pid` (Not a primary key)
+
+- **Snapshot Splits:**
+    - **Split 0:** `1 < pid <= 3`
+    - **Split 1:** `3 < pid <= 5`
+
+- **Operation:**
+    - Two different subtasks are reading Split 0 and Split 1 concurrently.
+    - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+
+- **Result:**
+    - **Split 0:** Contains the record `[id=0, pid=2]`
+    - **Split 1:** Contains the record `[id=0, pid=4]`
+
+Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+
 ## Data Type Mapping
 
 <div class="wy-table-responsive">
@@ -667,6 +718,10 @@ Notice:
     <tr>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [ (p) ] WITH TIME ZONE</td>
+      <td>TIMESTAMP_LTZ(p)</td>
     </tr>
     <tr>
       <td>
