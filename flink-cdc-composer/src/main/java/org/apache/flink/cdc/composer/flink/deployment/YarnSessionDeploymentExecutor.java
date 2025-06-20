@@ -116,8 +116,9 @@ public class YarnSessionDeploymentExecutor extends AbstractDeploymentExecutor {
                 applicationId = String.valueOf(client.getClusterId());
             }
             LOG.info("Deployment Flink CDC From application ID {}", applicationId);
-            // how to get jobGraph
-            assert client != null;
+            if (client == null) {
+                throw new RuntimeException("Failed to get yarn session cluster client");
+            }
             client.submitJob(getJobGraph(flinkConfig, 1));
 
             return new PipelineExecution.ExecutionInfo(applicationId, "submit job successful");

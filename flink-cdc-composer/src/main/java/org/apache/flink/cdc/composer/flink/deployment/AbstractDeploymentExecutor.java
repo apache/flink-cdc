@@ -40,7 +40,7 @@ public abstract class AbstractDeploymentExecutor implements PipelineDeploymentEx
         Preconditions.checkNotNull(
                 flinkCDCHomeFromEnvVar,
                 "FLINK_CDC_HOME is not correctly set in environment variable, current FLINK_CDC_HOME is: "
-                        + FLINK_CDC_HOME_ENV_VAR);
+                        + flinkCDCHomeFromEnvVar);
         Path flinkCDCLibPath = new Path(flinkCDCHomeFromEnvVar, "lib");
         if (!flinkCDCLibPath.getFileSystem().exists(flinkCDCLibPath)
                 || !flinkCDCLibPath.getFileSystem().getFileStatus(flinkCDCLibPath).isDir()) {
