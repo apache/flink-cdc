@@ -17,14 +17,12 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.utils.StringUtils;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * The projection of transform applies to describe a projection of filtering tables. Projection
@@ -39,8 +37,8 @@ import java.util.stream.Collectors;
  */
 public class TransformProjection implements Serializable {
     private static final long serialVersionUID = 1L;
-    private String projection;
-    private List<ProjectionColumn> projectionColumns;
+    private final String projection;
+    private final List<ProjectionColumn> projectionColumns;
 
     public TransformProjection(String projection, List<ProjectionColumn> projectionColumns) {
         this.projection = projection;
@@ -55,10 +53,6 @@ public class TransformProjection implements Serializable {
         return projectionColumns;
     }
 
-    public void setProjectionColumns(List<ProjectionColumn> projectionColumns) {
-        this.projectionColumns = projectionColumns;
-    }
-
     public boolean isValid() {
         return !StringUtils.isNullOrWhitespaceOnly(projection);
     }
@@ -70,9 +64,14 @@ public class TransformProjection implements Serializable {
         return Optional.of(new TransformProjection(projection, new ArrayList<>()));
     }
 
-    public List<Column> getAllColumnList() {
-        return projectionColumns.stream()
-                .map(ProjectionColumn::getColumn)
-                .collect(Collectors.toList());
+    @Override
+    public String toString() {
+        return "TransformProjection{"
+                + "projection='"
+                + getProjection()
+                + '\''
+                + ", projectionColumns="
+                + getProjectionColumns()
+                + '}';
     }
 }

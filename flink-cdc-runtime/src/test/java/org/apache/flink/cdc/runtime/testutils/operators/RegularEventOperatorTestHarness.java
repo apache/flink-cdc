@@ -19,11 +19,14 @@ package org.apache.flink.cdc.runtime.testutils.operators;
 
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
@@ -31,6 +34,8 @@ import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSch
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetOriginalSchemaResponse;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.SinkWriterRegisterEvent;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaCoordinator;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
+import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
@@ -50,6 +55,9 @@ import org.apache.flink.streaming.util.MockStreamConfig;
 import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.SerializedValue;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -57,6 +65,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
@@ -75,9 +84,14 @@ import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationR
  */
 public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E>, E extends Event>
         implements AutoCloseable {
+    private static final Logger LOG =
+            LoggerFactory.getLogger(RegularEventOperatorTestHarness.class);
     public static final OperatorID SCHEMA_OPERATOR_ID = new OperatorID(15213L, 15513L);
 
     public static final OperatorID SINK_OPERATOR_ID = new OperatorID(15214L, 15514L);
+
+    private static final Duration DEFAULT_RPC_TIMEOUT =
+            PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 
     private final OP operator;
     private final int numOutputs;
@@ -118,7 +132,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 null,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 SchemaChangeBehavior.EVOLVE,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -131,7 +145,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 SchemaChangeBehavior.EVOLVE,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -147,7 +161,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -164,7 +178,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 enabledEventTypes,
                 Collections.emptySet());
@@ -183,7 +197,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 enabledEventTypes,
                 errorOnEventTypes);
@@ -210,6 +224,22 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
     public void registerTableSchema(TableId tableId, Schema schema) {
         schemaRegistry.emplaceOriginalSchema(tableId, schema);
         schemaRegistry.emplaceEvolvedSchema(tableId, schema);
+    }
+
+    public void registerOriginalSchema(TableId tableId, Schema schema) {
+        schemaRegistry.emplaceOriginalSchema(tableId, schema);
+    }
+
+    public void registerEvolvedSchema(TableId tableId, Schema schema) {
+        schemaRegistry.emplaceEvolvedSchema(tableId, schema);
+    }
+
+    public SchemaChangeResponse requestSchemaChangeEvent(TableId tableId, SchemaChangeEvent event)
+            throws ExecutionException, InterruptedException {
+        return CoordinationResponseUtils.unwrap(
+                schemaRegistry
+                        .handleCoordinationRequest(new SchemaChangeRequest(tableId, event, 0))
+                        .get());
     }
 
     public Schema getLatestOriginalSchema(TableId tableId) throws Exception {

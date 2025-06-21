@@ -34,7 +34,7 @@ public class MaxComputeWriteOptions implements Serializable {
         this.maxBufferSize = builder.maxBufferSize;
         this.slotBufferSize = builder.slotBufferSize;
         this.numCommitThread = builder.numCommitThread;
-        this.compressAlgorithm = builder.compressAlgorithm;
+        this.compressAlgorithm = builder.compressAlgorithm.getValue();
     }
 
     public static Builder builder() {
@@ -67,7 +67,7 @@ public class MaxComputeWriteOptions implements Serializable {
         private long maxBufferSize = 64 * 1024 * 1024L;
         private long slotBufferSize = 1024 * 1024L;
         private int numCommitThread = 16;
-        private String compressAlgorithm = "zlib";
+        private CompressAlgorithm compressAlgorithm = CompressAlgorithm.ZLIB;
 
         public Builder withFlushConcurrent(int flushConcurrent) {
             this.flushConcurrent = flushConcurrent;
@@ -89,7 +89,7 @@ public class MaxComputeWriteOptions implements Serializable {
             return this;
         }
 
-        public Builder withCompressAlgorithm(String compressAlgorithm) {
+        public Builder withCompressAlgorithm(CompressAlgorithm compressAlgorithm) {
             this.compressAlgorithm = compressAlgorithm;
             return this;
         }

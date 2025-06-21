@@ -25,8 +25,8 @@ import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,10 +35,10 @@ import java.util.List;
 import java.util.Map;
 
 /** Unit tests for {@link MySqlBinlogSplit}. */
-public class MySqlBinlogSplitTest {
+class MySqlBinlogSplitTest {
 
     @Test
-    public void filterOutdatedSplitInfos() {
+    void filterOutdatedSplitInfos() {
         Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
 
         // mock table1
@@ -67,6 +67,8 @@ public class MySqlBinlogSplitTest {
                         tableSchemas,
                         0,
                         false);
+        String expectedTables = "[catalog1.table1, catalog2.table2]";
+        Assertions.assertThat(binlogSplit.getTables()).isEqualTo(expectedTables);
 
         // case 1: only include table1
         Tables.TableFilter currentTableFilter = tableId -> tableId.table().equals("table1");
@@ -75,8 +77,9 @@ public class MySqlBinlogSplitTest {
                 MySqlBinlogSplit.filterOutdatedSplitInfos(binlogSplit, currentTableFilter);
         Map<TableId, TableChanges.TableChange> filterTableSchemas =
                 mySqlBinlogSplit.getTableSchemas();
-        Assert.assertEquals(1, filterTableSchemas.size());
-        Assert.assertEquals(tableChange1, filterTableSchemas.get(tableId1));
+        Assertions.assertThat(filterTableSchemas).hasSize(1).containsEntry(tableId1, tableChange1);
+        String expectedTables1 = "[catalog1.table1]";
+        Assertions.assertThat(mySqlBinlogSplit.getTables()).isEqualTo(expectedTables1);
 
         // case 2: include all tables
         currentTableFilter = tableId -> tableId.table().startsWith("table");
@@ -84,9 +87,65 @@ public class MySqlBinlogSplitTest {
         mySqlBinlogSplit =
                 MySqlBinlogSplit.filterOutdatedSplitInfos(binlogSplit, currentTableFilter);
         filterTableSchemas = mySqlBinlogSplit.getTableSchemas();
-        Assert.assertEquals(2, filterTableSchemas.size());
-        Assert.assertEquals(tableChange1, filterTableSchemas.get(tableId1));
-        Assert.assertEquals(tableChange2, filterTableSchemas.get(tableId2));
+        Assertions.assertThat(filterTableSchemas)
+                .hasSize(2)
+                .containsEntry(tableId1, tableChange1)
+                .containsEntry(tableId2, tableChange2);
+        String expectedTables2 = "[catalog1.table1, catalog2.table2]";
+        Assertions.assertThat(mySqlBinlogSplit.getTables()).isEqualTo(expectedTables2);
+    }
+
+    @Test
+    void testTruncatedTablesForLog() {
+        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
+
+        // mock table1
+        TableId tableId1 = new TableId("catalog1", null, "table1");
+
+        TableChanges.TableChange tableChange1 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog1.table1")));
+
+        // mock table2
+        TableId tableId2 = new TableId("catalog2", null, "table2");
+
+        TableChanges.TableChange tableChange2 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog2.table2")));
+
+        // mock table3
+        TableId tableId3 = new TableId("catalog3", null, "table3");
+
+        TableChanges.TableChange tableChange3 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog3.table3")));
+
+        // mock table4
+        TableId tableId4 = new TableId("catalog4", null, "table4");
+
+        TableChanges.TableChange tableChange4 =
+                new TableChanges.TableChange(
+                        TableChanges.TableChangeType.CREATE,
+                        new MockTable(TableId.parse("catalog4.table4")));
+
+        tableSchemas.put(tableId1, tableChange1);
+        tableSchemas.put(tableId2, tableChange2);
+        tableSchemas.put(tableId3, tableChange3);
+        tableSchemas.put(tableId4, tableChange4);
+        MySqlBinlogSplit binlogSplit =
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        BinlogOffset.ofLatest(),
+                        null,
+                        new ArrayList<>(),
+                        tableSchemas,
+                        0,
+                        false);
+        String expectedTables = "[catalog1.table1, catalog2.table2, catalog3.table3]";
+        Assertions.assertThat(binlogSplit.getTables()).isEqualTo(expectedTables);
     }
 
     /** A mock implementation for {@link Table} which is used for unit tests. */

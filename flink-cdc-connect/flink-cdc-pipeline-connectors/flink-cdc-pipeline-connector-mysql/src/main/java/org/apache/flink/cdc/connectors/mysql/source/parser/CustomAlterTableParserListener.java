@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -60,20 +61,25 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private final MySqlAntlrDdlParser parser;
     private final List<ParseTreeListener> listeners;
     private final LinkedList<SchemaChangeEvent> changes;
+    private final boolean tinyInt1isBit;
     private org.apache.flink.cdc.common.event.TableId currentTable;
     private List<ColumnEditor> columnEditors;
     private CustomColumnDefinitionParserListener columnDefinitionListener;
     private TableEditor tableEditor;
-
+    private boolean isTableIdCaseInsensitive;
     private int parsingColumnIndex = STARTING_INDEX;
 
     public CustomAlterTableParserListener(
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners,
-            LinkedList<SchemaChangeEvent> changes) {
+            LinkedList<SchemaChangeEvent> changes,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         this.parser = parser;
         this.listeners = listeners;
         this.changes = changes;
+        this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
@@ -119,6 +125,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     if (tableEditor.hasPrimaryKey()) {
                         builder.primaryKey(tableEditor.primaryKeyColumnNames());
                     }
+                    builder.comment(tableEditor.create().comment());
                     changes.add(
                             new CreateTableEvent(
                                     toCdcTableId(tableEditor.tableId()), builder.build()));
@@ -315,7 +322,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     String newColumnName = parser.parseName(ctx.newColumn);
 
                     Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
 
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
@@ -366,7 +373,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column));
+                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
                     listeners.remove(columnDefinitionListener);
                 },
@@ -410,16 +417,37 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         super.exitDropTable(ctx);
     }
 
+    @Override
+    public void enterTableOptionComment(MySqlParser.TableOptionCommentContext ctx) {
+        if (!parser.skipComments()) {
+            parser.runIfNotNull(
+                    () -> {
+                        if (ctx.COMMENT() != null) {
+                            tableEditor.setComment(
+                                    parser.withoutQuotes(ctx.STRING_LITERAL().getText()));
+                        }
+                    },
+                    tableEditor);
+        }
+        super.enterTableOptionComment(ctx);
+    }
+
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
                 dbzColumn.name(),
-                fromDbzColumn(dbzColumn),
+                fromDbzColumn(dbzColumn, tinyInt1isBit),
                 dbzColumn.comment(),
                 dbzColumn.defaultValueExpression().orElse(null));
     }
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
-        return org.apache.flink.cdc.common.event.TableId.tableId(
-                dbzTableId.catalog(), dbzTableId.table());
+        if (isTableIdCaseInsensitive) {
+            return org.apache.flink.cdc.common.event.TableId.tableId(
+                    dbzTableId.catalog().toLowerCase(Locale.ROOT),
+                    dbzTableId.table().toLowerCase(Locale.ROOT));
+        } else {
+            return org.apache.flink.cdc.common.event.TableId.tableId(
+                    dbzTableId.catalog(), dbzTableId.table());
+        }
     }
 }

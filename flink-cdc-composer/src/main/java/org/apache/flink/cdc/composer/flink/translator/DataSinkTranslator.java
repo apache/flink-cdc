@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
+import org.apache.flink.cdc.runtime.operators.sink.BatchDataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkFunctionOperator;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
@@ -46,6 +47,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.api.transformations.LegacySinkTransformation;
 import org.apache.flink.streaming.api.transformations.PhysicalTransformation;
 
@@ -81,7 +83,18 @@ public class DataSinkTranslator {
             SinkDef sinkDef,
             DataStream<Event> input,
             DataSink dataSink,
-            OperatorID schemaOperatorID) {
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
+        translate(sinkDef, input, dataSink, false, schemaOperatorID, operatorUidGenerator);
+    }
+
+    public void translate(
+            SinkDef sinkDef,
+            DataStream<Event> input,
+            DataSink dataSink,
+            boolean isBatchMode,
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         // Get sink provider
         EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
         String sinkName = generateSinkName(sinkDef);
@@ -89,13 +102,19 @@ public class DataSinkTranslator {
             // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
-            sinkTo(input, sink, sinkName, schemaOperatorID);
+            sinkTo(input, sink, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
         } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
             // SinkFunction
             FlinkSinkFunctionProvider sinkFunctionProvider =
                     (FlinkSinkFunctionProvider) eventSinkProvider;
             SinkFunction<Event> sinkFunction = sinkFunctionProvider.getSinkFunction();
-            sinkTo(input, sinkFunction, sinkName, schemaOperatorID);
+            sinkTo(
+                    input,
+                    sinkFunction,
+                    sinkName,
+                    isBatchMode,
+                    schemaOperatorID,
+                    operatorUidGenerator);
         }
     }
 
@@ -104,7 +123,9 @@ public class DataSinkTranslator {
             DataStream<Event> input,
             Sink<Event> sink,
             String sinkName,
-            OperatorID schemaOperatorID) {
+            boolean isBatchMode,
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         DataStream<Event> stream = input;
         // Pre-write topology
         if (sink instanceof WithPreWriteTopology) {
@@ -112,12 +133,15 @@ public class DataSinkTranslator {
         }
 
         if (sink instanceof TwoPhaseCommittingSink) {
-            addCommittingTopology(sink, stream, sinkName, schemaOperatorID);
+            addCommittingTopology(
+                    sink, stream, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
         } else {
             stream.transform(
-                    SINK_WRITER_PREFIX + sinkName,
-                    CommittableMessageTypeInfo.noOutput(),
-                    new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
+                            SINK_WRITER_PREFIX + sinkName,
+                            CommittableMessageTypeInfo.noOutput(),
+                            new DataSinkWriterOperatorFactory<>(
+                                    sink, isBatchMode, schemaOperatorID))
+                    .uid(operatorUidGenerator.generateUid("sink-writer"));
         }
     }
 
@@ -125,9 +149,15 @@ public class DataSinkTranslator {
             DataStream<Event> input,
             SinkFunction<Event> sinkFunction,
             String sinkName,
-            OperatorID schemaOperatorID) {
-        DataSinkFunctionOperator sinkOperator =
-                new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
+            boolean isBatchMode,
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
+        StreamSink<Event> sinkOperator;
+        if (isBatchMode) {
+            sinkOperator = new BatchDataSinkFunctionOperator(sinkFunction);
+        } else {
+            sinkOperator = new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
+        }
         final StreamExecutionEnvironment executionEnvironment = input.getExecutionEnvironment();
         PhysicalTransformation<Event> transformation =
                 new LegacySinkTransformation<>(
@@ -136,6 +166,7 @@ public class DataSinkTranslator {
                         sinkOperator,
                         executionEnvironment.getParallelism(),
                         false);
+        transformation.setUid(operatorUidGenerator.generateUid("sink-writer"));
         executionEnvironment.addOperator(transformation);
     }
 
@@ -143,14 +174,19 @@ public class DataSinkTranslator {
             Sink<Event> sink,
             DataStream<Event> inputStream,
             String sinkName,
-            OperatorID schemaOperatorID) {
+            boolean isBatchMode,
+            OperatorID schemaOperatorID,
+            OperatorUidGenerator operatorUidGenerator) {
         TypeInformation<CommittableMessage<CommT>> typeInformation =
                 CommittableMessageTypeInfo.of(() -> getCommittableSerializer(sink));
         DataStream<CommittableMessage<CommT>> written =
-                inputStream.transform(
-                        SINK_WRITER_PREFIX + sinkName,
-                        typeInformation,
-                        new DataSinkWriterOperatorFactory<>(sink, schemaOperatorID));
+                inputStream
+                        .transform(
+                                SINK_WRITER_PREFIX + sinkName,
+                                typeInformation,
+                                new DataSinkWriterOperatorFactory<>(
+                                        sink, isBatchMode, schemaOperatorID))
+                        .uid(operatorUidGenerator.generateUid("sink-writer"));
 
         DataStream<CommittableMessage<CommT>> preCommitted = written;
         if (sink instanceof WithPreCommitTopology) {
@@ -158,14 +194,16 @@ public class DataSinkTranslator {
                     ((WithPreCommitTopology<Event, CommT>) sink).addPreCommitTopology(written);
         }
 
-        // TODO: Hard coding stream mode and checkpoint
-        boolean isBatchMode = false;
+        // TODO: Hard coding checkpoint
         boolean isCheckpointingEnabled = true;
         DataStream<CommittableMessage<CommT>> committed =
-                preCommitted.transform(
-                        SINK_COMMITTER_PREFIX + sinkName,
-                        typeInformation,
-                        getCommitterOperatorFactory(sink, isBatchMode, isCheckpointingEnabled));
+                preCommitted
+                        .transform(
+                                SINK_COMMITTER_PREFIX + sinkName,
+                                typeInformation,
+                                getCommitterOperatorFactory(
+                                        sink, isBatchMode, isCheckpointingEnabled))
+                        .uid(operatorUidGenerator.generateUid("sink-committer"));
 
         if (sink instanceof WithPostCommitTopology) {
             ((WithPostCommitTopology<Event, CommT>) sink).addPostCommitTopology(committed);

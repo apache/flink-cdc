@@ -120,12 +120,33 @@ pipeline:
       <td> 是否通过FE重定向写入，直连BE写入 </td>
     </tr>
     <tr>
+      <td>charset-encoding</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td> Doris Http客户端字符集编码，默认UTF-8 </td>
+    </tr>
+    <tr>
       <td>sink.enable.batch-mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td> 是否使用攒批方式写入Doris </td>
     </tr>
+    <tr>
+       <td>sink.enable-delete</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>是否启用删除 </td>
+     </tr>
+     <tr>
+       <td>sink.max-retries</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">3</td>
+       <td>Integer</td>
+       <td>写入失败后最大重试次数</td>
+     </tr>
     <tr>
       <td>sink.flush.queue-size</td>
       <td>optional</td>
@@ -156,13 +177,20 @@ pipeline:
       <td>Flush的间隔时长，超过这个时间，将异步Flush数据</td>
     </tr>
     <tr>
+       <td>sink.ignore.update-before</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>在CDC场景中，当上游的主键与下游的主键不一致时，需要将 update-before 数据作为已删除数据传递给下游，否则数据将无法被删除。默认设置为忽略，即执行 upsert 语义 </td>
+     </tr>
+    <tr>
       <td>sink.properties.</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>StreamLoad的参数。
         For example: <code> sink.properties.strict_mode: true</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad 的属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad 的属性</a></td> 
       </td>
     </tr>
     <tr>
@@ -172,8 +200,27 @@ pipeline:
       <td>String</td>
       <td>创建表的Properties配置。
         For example: <code> table.create.properties.replication_num: 1</code>.
-        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table 的属性</a></td> 
+        查看更多关于 <a href="https://doris.apache.org/zh-CN/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table 的属性</a></td> 
       </td>
+    </tr>
+    <tr>
+      <td>table.create.auto-partition.properties.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>创建自动分区表的配置。<br/>
+        当前仅支持DATE/DATETIME类型列的AUTO RANGE PARTITION，分区函数为<code>date_trunc</code>，且Doris版本必须大于2.1.6，查看更多关于 <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris自动分区</a><br/>
+        支持的属性有：<br/>
+        <code> table.create.auto-partition.properties.include</code>包含的经过route后的表集合，用逗号分隔，支持正则表达式；<br/>
+        <code> table.create.auto-partition.properties.exclude</code>排除的经过route后的表集合，用逗号分隔，支持正则表达式；<br/>
+        <code> table.create.auto-partition.properties.default-partition-key</code>默认分区键；<br/>
+        <code> table.create.auto-partition.properties.default-partition-unit</code>默认分区单位；<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-key</code>特定表的分区键，如未配置取默认分区键；<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-unit</code>特定表的分区单位，如未配置取默认分区单位。<br/>
+        注意：<br/>
+        1: 如果分区键不为DATE/DATETIME类型，则不会创建分区表。<br/>
+        2: Doris AUTO RANGE PARTITION不支持NULLABLE列作为分区列，如果您配置的分区键的值为空或者表创建完成后新增了NULLABLE分区列，系统将自动填充默认值（DATE类型为<code>1970-01-01</code>，DATETIME类型为<code>1970-01-01 00:00:00</code>），请选择合适的分区键。
+      </td> 
     </tr>
     </tbody>
 </table>
@@ -271,6 +318,13 @@ pipeline:
       </td>
       <td>STRING</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>
+        TIME
+      </td>
+      <td>STRING</td>
+      <td> Doris 不支持 TIME 数据类型，需转换为 STRING 类型以兼容 </td>
     </tr>
     <tr>
       <td>STRING</td>

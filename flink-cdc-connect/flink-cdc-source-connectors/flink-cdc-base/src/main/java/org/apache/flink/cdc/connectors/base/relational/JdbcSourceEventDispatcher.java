@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.relational;
 
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.relational.handler.SchemaChangeEventHandler;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -61,7 +62,8 @@ import java.util.Map;
  *     this is useful for downstream to deserialize the {@link HistoryRecord} back.
  * </pre>
  */
-public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatcher<P, TableId> {
+public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatcher<P, TableId>
+        implements WatermarkDispatcher {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcSourceEventDispatcher.class);
 
     public static final String HISTORY_RECORD_FIELD = "historyRecord";
@@ -238,6 +240,7 @@ public class JdbcSourceEventDispatcher<P extends Partition> extends EventDispatc
         }
     }
 
+    @Override
     public void dispatchWatermarkEvent(
             Map<String, ?> sourcePartition,
             SourceSplitBase sourceSplit,

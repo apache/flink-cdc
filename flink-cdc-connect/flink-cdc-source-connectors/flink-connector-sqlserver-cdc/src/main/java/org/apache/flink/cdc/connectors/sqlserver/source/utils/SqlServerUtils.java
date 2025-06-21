@@ -361,12 +361,16 @@ public class SqlServerUtils {
         return quoted.toString();
     }
 
-    public static String quote(String dbOrTableName) {
-        return "[" + dbOrTableName + "]";
+    /**
+     * @link <a
+     *     href="https://learn.microsoft.com/en-us/sql/t-sql/functions/quotename-transact-sql">QUOTENAME</a>
+     */
+    public static String quote(String name) {
+        return "[" + name + "]";
     }
 
     public static String quote(TableId tableId) {
-        return "[" + tableId.schema() + "].[" + tableId.table() + "]";
+        return String.format("%s.%s", quote(tableId.schema()), quote(tableId.table()));
     }
 
     private static void addPrimaryKeyColumnsToCondition(

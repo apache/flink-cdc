@@ -70,6 +70,30 @@ There are some hidden columns used to access metadata information. They will onl
 | __table_name__      | String    | Name of the table that contains the row.     |
 | __data_event_type__ | String    | Operation type of data change event.         |
 
+Besides these fields, pipeline connectors could parse more metadata and put them in the meta map of the DataChangeEvent.
+These metadata could be accessed in the transform module.
+For example, MySQL pipeline connector could parse `op_ts` and use it in the transform module.
+
+```yaml
+source:
+  type: mysql
+  hostname: localhost
+  port: 3306
+  username: testuser
+  password: testpwd
+  tables: testdb.customer
+  server-id: 5400-5404
+  server-time-zone: UTC
+  metadata.list: op_ts
+  
+transform:
+  - source-table: testdb.customer
+    projection: \*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts
+  
+sink:
+  type: values
+```
+
 ## Metadata relationship
 
 | Type                 | Namespace | SchemaName | Table |
@@ -88,22 +112,22 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Comparison Functions
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| value1 = value2      | valueEquals(value1, value2) | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <> value2     | !valueEquals(value1, value2) | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 > value2      | value1 > value2             | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 >= value2     | value1 >= value2            | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2      | value1 < value2             | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <= value2     | value1 <= value2            | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value IS NULL        | null == value               | Returns TRUE if value is NULL.                                  |
-| value IS NOT NULL    | null != value               | Returns TRUE if value is not NULL.                              |
-| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
+| Function             | Janino Code                                  | Description                                                     |
+|----------------------|----------------------------------------------|-----------------------------------------------------------------|
+| value1 = value2      | valueEquals(value1, value2)                  | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <> value2     | !valueEquals(value1, value2)                 | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 > value2      | greaterThan(value1, value2)                  | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 >= value2     | greaterThanOrEqual(value1, value2)               | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 < value2      | lessThan(value1, value2)                         | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
+| value1 <= value2     | lessThanOrEqual(value1, value2)                  | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value IS NULL        | null == value                                | Returns TRUE if value is NULL.                                  |
+| value IS NOT NULL    | null != value                                | Returns TRUE if value is not NULL.                              |
+| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
 | value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3. |
-| string1 LIKE string2 | like(string1, string2)      | Returns TRUE if string1 matches pattern string2.                |
-| string1 NOT LIKE string2 | notLike(string1, string2) | Returns TRUE if string1 does not match pattern string2.       |
-| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*) | Returns TRUE if value1 exists in the given list (value2, value3, …). |
-| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*) | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
+| string1 LIKE string2 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                |
+| string1 NOT LIKE string2 | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.       |
+| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …). |
+| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
 
 ## Logical Functions
 
@@ -119,18 +143,18 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 
 ## Arithmetic Functions
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| numeric1 + numeric2  | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
-| numeric1 - numeric2  | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
-| numeric1 * numeric2  | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
-| numeric1 / numeric2  | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
-| numeric1 % numeric2  | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
-| ABS(numeric)         | abs(numeric)                | Returns the absolute value of numeric.                          |
-| CEIL(numeric)        | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
-| FLOOR(numeric)       | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
-| ROUND(numeric, int)  | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
-| UUID()               | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
+| Function                           | Janino Code                 | Description                                                     |
+|------------------------------------|-----------------------------|-----------------------------------------------------------------|
+| numeric1 + numeric2                | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
+| numeric1 - numeric2                | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
+| numeric1 * numeric2                | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
+| numeric1 / numeric2                | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
+| numeric1 % numeric2                | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
+| ABS(numeric)                       | abs(numeric)                | Returns the absolute value of numeric.                          |
+| CEIL(numeric)<br/>CEILING(numeric) | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
+| FLOOR(numeric)                     | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
+| ROUND(numeric, int)                | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
+| UUID()                             | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
 
 ## String Functions
 
@@ -157,9 +181,13 @@ Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [
 | CURRENT_TIMESTAMP | currentTimestamp() | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3). |
 | NOW() | now() | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP. |
 | DATE_FORMAT(timestamp, string) | dateFormat(timestamp, string) | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat. |
+| TIMESTAMPADD(timeintervalunit, interval, timepoint)   | timestampadd(timeintervalunit, interval, timepoint)  | Returns the timestamp of timepoint2 after timepoint added interval. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.     |
 | TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR. |
 | TO_DATE(string1[, string2]) | toDate(string1[, string2]) | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date. |
 | TO_TIMESTAMP(string1[, string2]) | toTimestamp(string1[, string2]) | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone. |
+| FROM_UNIXTIME(numeric[, string]) | fromUnixtime(NUMERIC[, STRING]) | Returns a representation of the numeric argument as a value in string format (default is ‘yyyy-MM-dd HH:mm:ss’). numeric is an internal timestamp value representing seconds since ‘1970-01-01 00:00:00’ UTC, such as produced by the UNIX_TIMESTAMP() function. The return value is expressed in the session time zone (specified in TableConfig). E.g., FROM_UNIXTIME(44) returns ‘1970-01-01 00:00:44’ if in UTC time zone, but returns ‘1970-01-01 09:00:44’ if in ‘Asia/Tokyo’ time zone. |
+| UNIX_TIMESTAMP() | unixTimestamp() | Gets current Unix timestamp in seconds. This function is not deterministic which means the value would be recalculated for each record. |
+| UNIX_TIMESTAMP(string1[, string2]) | unixTimestamp(STRING1[, STRING2]) | Converts a date time string string1 with format string2 (by default: yyyy-MM-dd HH:mm:ss if not specified) to Unix timestamp (in seconds), using the specified timezone in table config.<br/>If a time zone is specified in the date time string and parsed by UTC+X format such as “yyyy-MM-dd HH:mm:ss.SSS X”, this function will use the specified timezone in the date time string instead of the timezone in table config. If the date time string can not be parsed, the default value Long.MIN_VALUE(-9223372036854775808) will be returned.|
 
 ## Conditional Functions
 
@@ -262,6 +290,8 @@ transform:
     primary-keys: order_id, product_name
     description: reassign composite primary keys example
 ```
+
+Notice that primary key columns will be attributed as NOT NULL in the downstream table, so you should ensure that no NULL value will be assigned to these columns.
 
 ## Reassign partition key
 We can reassign the partition key in transform rules. For example, given a table web_order in the database mydb, we may define a transform rule as follows:
@@ -442,9 +472,3 @@ The following built-in models are provided:
 | openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
 | openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
 | openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
-
-
-# Known limitations
-* Currently, transform doesn't work with route rules. It will be supported in future versions.
-* Computed columns cannot reference trimmed columns that do not present in final projection results. This will be fixed in future versions.
-* Regular matching of tables with different schemas is not supported. If necessary, multiple rules need to be written.

@@ -18,17 +18,31 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.TableId;
 
+import java.util.List;
 import java.util.Objects;
 
 /** A wrapper class for {@link FlushEvent} to attach bucket id. */
 public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper {
 
     private final int bucket;
+    private final int bucketAssignTaskId;
 
-    public BucketWrapperFlushEvent(int bucket, int subTaskId) {
-        super(subTaskId);
+    public BucketWrapperFlushEvent(
+            int bucket,
+            int sourceSubTaskId,
+            int bucketAssignTaskId,
+            List<TableId> tableIds,
+            SchemaChangeEventType schemaChangeEventType) {
+        super(sourceSubTaskId, tableIds, schemaChangeEventType);
         this.bucket = bucket;
+        this.bucketAssignTaskId = bucketAssignTaskId;
+    }
+
+    public int getBucketAssignTaskId() {
+        return bucketAssignTaskId;
     }
 
     @Override
@@ -48,18 +62,22 @@ public class BucketWrapperFlushEvent extends FlushEvent implements BucketWrapper
             return false;
         }
         BucketWrapperFlushEvent that = (BucketWrapperFlushEvent) o;
-        return bucket == that.bucket;
+        return bucket == that.bucket
+                && bucketAssignTaskId == that.bucketAssignTaskId
+                && getSourceSubTaskId() == that.getSourceSubTaskId();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), bucket);
+        return Objects.hash(super.hashCode(), bucket, bucketAssignTaskId);
     }
 
     @Override
     public String toString() {
         return "BucketWrapperFlushEvent{subTaskId="
                 + getSourceSubTaskId()
+                + ", bucketAssignTaskId="
+                + bucketAssignTaskId
                 + ", bucket="
                 + bucket
                 + '}';

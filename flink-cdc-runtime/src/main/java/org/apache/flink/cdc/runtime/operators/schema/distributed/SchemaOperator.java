@@ -97,7 +97,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
         tableIdRouter = new TableIdRouter(routingRules);
@@ -150,6 +150,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
             // Then, notify this information to the coordinator
             requestSchemaChange(
+                    tableId,
                     new SchemaChangeRequest(sourcePartition, subTaskId, schemaChangeEvent));
             schemaOperatorMetrics.increaseFinishedSchemaChangeEvents(1);
         } else if (event instanceof DataChangeEvent) {
@@ -188,9 +189,15 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         }
     }
 
-    private void requestSchemaChange(SchemaChangeRequest schemaChangeRequest) {
+    private void requestSchemaChange(
+            TableId sourceTableId, SchemaChangeRequest schemaChangeRequest) {
         LOG.info("{}> Sent FlushEvent to downstream...", subTaskId);
-        output.collect(new StreamRecord<>(new FlushEvent(subTaskId)));
+        output.collect(
+                new StreamRecord<>(
+                        new FlushEvent(
+                                subTaskId,
+                                tableIdRouter.route(sourceTableId),
+                                schemaChangeRequest.getSchemaChangeEvent().getType())));
 
         LOG.info("{}> Sending evolve request...", subTaskId);
         SchemaChangeResponse response = sendRequestToCoordinator(schemaChangeRequest);
@@ -198,17 +205,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         LOG.info("{}> Evolve request response: {}", subTaskId, response);
 
         // Update local evolved schema cache
-        response.getSchemaEvolveResult()
-                .forEach(
-                        schemaChangeEvent ->
-                                evolvedSchemaMap.compute(
-                                        schemaChangeEvent.tableId(),
-                                        (tableId, schema) ->
-                                                SchemaUtils.applySchemaChangeEvent(
-                                                        schema, schemaChangeEvent)));
+        evolvedSchemaMap.putAll(response.getEvolvedSchemas());
 
         // And emit schema change events to downstream
-        response.getSchemaEvolveResult().forEach(evt -> output.collect(new StreamRecord<>(evt)));
+        response.getEvolvedSchemaChangeEvents()
+                .forEach(evt -> output.collect(new StreamRecord<>(evt)));
         LOG.info(
                 "{}> Successfully updated evolved schema cache. Current state: {}",
                 subTaskId,

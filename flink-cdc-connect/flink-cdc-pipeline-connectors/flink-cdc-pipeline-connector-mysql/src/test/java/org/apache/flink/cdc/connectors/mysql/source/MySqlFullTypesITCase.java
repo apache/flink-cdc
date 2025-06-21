@@ -40,10 +40,10 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.math.BigDecimal;
@@ -59,7 +59,7 @@ import java.util.stream.Stream;
 import static javax.xml.bind.DatatypeConverter.parseHexBinary;
 
 /** IT case for MySQL event source. */
-public class MySqlFullTypesITCase extends MySqlSourceTestBase {
+class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
@@ -80,21 +80,21 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -102,17 +102,45 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57CommonDataTypes() throws Throwable {
+    void testMysql57CommonDataTypes() throws Throwable {
         testCommonDataTypes(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMySql8CommonDataTypes() throws Throwable {
+    public void testMysql57JsonDataTypes() throws Throwable {
+        // Set `useLegacyJsonFormat` as false, so the json string will have no whitespace
+        // before value and after comma in json format be formatted with legacy format.
+        testJsonDataType(fullTypesMySql57Database, false);
+    }
+
+    @Test
+    public void testMysql57JsonDataTypesWithUseLegacyJsonFormat() throws Throwable {
+        // Set `useLegacyJsonFormat` as true, so the json string will have whitespace before
+        // value and after comma in json format be formatted with legacy format.
+        testJsonDataType(fullTypesMySql57Database, true);
+    }
+
+    @Test
+    void testMySql8CommonDataTypes() throws Throwable {
         testCommonDataTypes(fullTypesMySql8Database);
     }
 
     @Test
-    public void testMysql57TimeDataTypes() throws Throwable {
+    public void testMySql8JsonDataTypes() throws Throwable {
+        // Set `useLegacyJsonFormat` as false, so the json string will have no whitespace
+        // before value and after comma in json format be formatted with legacy format.
+        testJsonDataType(fullTypesMySql8Database, false);
+    }
+
+    @Test
+    public void testMySql8JsonDataTypesWithUseLegacyJsonFormat() throws Throwable {
+        // Set `useLegacyJsonFormat` as true, so the json string will have whitespace before
+        // value and after comma in json format be formatted with legacy format.
+        testJsonDataType(fullTypesMySql8Database, true);
+    }
+
+    @Test
+    void testMysql57TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -165,7 +193,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8TimeDataTypes() throws Throwable {
+    void testMysql8TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -224,16 +252,16 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57PrecisionTypes() throws Throwable {
+    void testMysql57PrecisionTypes() throws Throwable {
         testMysqlPrecisionTypes(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMysql8PrecisionTypes() throws Throwable {
+    void testMysql8PrecisionTypes() throws Throwable {
         testMysqlPrecisionTypes(fullTypesMySql8Database);
     }
 
-    public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
+    void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -321,9 +349,13 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 };
 
         database.createAndInitialize();
+        Boolean useLegacyJsonFormat = true;
         CloseableIterator<Event> iterator =
                 env.fromSource(
-                                getFlinkSourceProvider(new String[] {"precision_types"}, database)
+                                getFlinkSourceProvider(
+                                                new String[] {"precision_types"},
+                                                database,
+                                                useLegacyJsonFormat)
                                         .getSource(),
                                 WatermarkStrategy.noWatermarks(),
                                 "Event-Source")
@@ -351,9 +383,15 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     private void testCommonDataTypes(UniqueDatabase database) throws Exception {
         database.createAndInitialize();
+        // Set useLegacyJsonFormat option as true, so the json string will have no whitespace before
+        // value and after comma in json format.be formatted with legacy format.
+        Boolean useLegacyJsonFormat = true;
         CloseableIterator<Event> iterator =
                 env.fromSource(
-                                getFlinkSourceProvider(new String[] {"common_types"}, database)
+                                getFlinkSourceProvider(
+                                                new String[] {"common_types"},
+                                                database,
+                                                useLegacyJsonFormat)
                                         .getSource(),
                                 WatermarkStrategy.noWatermarks(),
                                 "Event-Source")
@@ -446,7 +484,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         }
 
         expectedSnapshot[30] = null;
-        // The json string from binlog will remove useless space
+        // Legacy format removes useless space in json string from binlog
         expectedSnapshot[44] = BinaryStringData.fromString("{\"key1\":\"value1\"}");
         Object[] expectedStreamRecord = expectedSnapshot;
 
@@ -455,6 +493,66 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
         RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
         Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, COMMON_TYPES))
                 .isEqualTo(expectedStreamRecord);
+    }
+
+    private void testJsonDataType(UniqueDatabase database, Boolean useLegacyJsonFormat)
+            throws Exception {
+        database.createAndInitialize();
+        CloseableIterator<Event> iterator =
+                env.fromSource(
+                                getFlinkSourceProvider(
+                                                new String[] {"json_types"},
+                                                database,
+                                                useLegacyJsonFormat)
+                                        .getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                "Event-Source")
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
+                    BinaryStringData.fromString("{\"key1\": \"value1\"}"),
+                    BinaryStringData.fromString("{\"key1\": \"value1\", \"key2\": \"value2\"}"),
+                    BinaryStringData.fromString(
+                            "[{\"key1\": \"value1\", \"key2\": {\"key2_1\": \"value2_1\", \"key2_2\": \"value2_2\"}, \"key3\": [\"value3\"], \"key4\": [\"value4_1\", \"value4_2\"]}, {\"key5\": \"value5\"}]"),
+                    1
+                };
+
+        // skip CreateTableEvent
+        List<Event> snapshotResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Assertions.assertThat(RecordDataTestUtils.recordFields(snapshotRecord, JSON_TYPES))
+                .isEqualTo(expectedSnapshot);
+
+        try (Connection connection = database.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE json_types SET int_c = null WHERE id = 1;");
+        }
+
+        Object[] expectedStreamRecord = expectedSnapshot;
+        List<Event> streamResults =
+                MySqSourceTestUtils.fetchResultsAndCreateTableEvent(iterator, 1).f0;
+        RecordData streamRecord = ((DataChangeEvent) streamResults.get(0)).after();
+
+        expectedSnapshot[4] = null;
+
+        if (useLegacyJsonFormat) {
+            // removed whitespace before value and after comma in json format string value
+            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
+                    .containsExactly(
+                            DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
+                            BinaryStringData.fromString("{\"key1\":\"value1\"}"),
+                            BinaryStringData.fromString(
+                                    "{\"key1\":\"value1\",\"key2\":\"value2\"}"),
+                            BinaryStringData.fromString(
+                                    "[{\"key1\":\"value1\",\"key2\":{\"key2_1\":\"value2_1\",\"key2_2\":\"value2_2\"},\"key3\":[\"value3\"],\"key4\":[\"value4_1\",\"value4_2\"]},{\"key5\":\"value5\"}]"),
+                            null);
+        } else {
+            Assertions.assertThat(RecordDataTestUtils.recordFields(streamRecord, JSON_TYPES))
+                    .containsExactly(expectedStreamRecord);
+        }
     }
 
     private Instant toInstant(String ts) {
@@ -468,9 +566,13 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
             Object[] expectedStreamRecord)
             throws Exception {
         database.createAndInitialize();
+        Boolean useLegacyJsonFormat = true;
         CloseableIterator<Event> iterator =
                 env.fromSource(
-                                getFlinkSourceProvider(new String[] {"time_types"}, database)
+                                getFlinkSourceProvider(
+                                                new String[] {"time_types"},
+                                                database,
+                                                useLegacyJsonFormat)
                                         .getSource(),
                                 WatermarkStrategy.noWatermarks(),
                                 "Event-Source")
@@ -498,7 +600,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     private FlinkSourceProvider getFlinkSourceProvider(
-            String[] captureTables, UniqueDatabase database) {
+            String[] captureTables, UniqueDatabase database, Boolean useLegacyJsonFormat) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> database.getDatabaseName() + "." + tableName)
@@ -517,7 +619,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                         .username(database.getUsername())
                         .password(database.getPassword())
                         .serverTimeZone(ZoneId.of("UTC").toString())
-                        .serverId(MySqSourceTestUtils.getServerId(env.getParallelism()));
+                        .serverId(MySqSourceTestUtils.getServerId(env.getParallelism()))
+                        .useLegacyJsonFormat(useLegacyJsonFormat);
         return (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
     }
 
@@ -577,4 +680,12 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING());
+
+    private static final RowType JSON_TYPES =
+            RowType.of(
+                    DataTypes.DECIMAL(20, 0).notNull(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.INT());
 }

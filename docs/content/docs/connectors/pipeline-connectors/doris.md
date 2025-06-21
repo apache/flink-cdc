@@ -120,11 +120,32 @@ pipeline:
        <td> Whether to write through FE redirection and directly connect to BE to write </td>
      </tr>
      <tr>
+       <td>charset-encoding</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">false</td>
+       <td>Boolean</td>
+       <td> Charset encoding for doris http client, default UTF-8 </td>
+     </tr>
+     <tr>
        <td>sink.enable.batch-mode</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">true</td>
        <td>Boolean</td>
        <td> Whether to use the batch method to write to Doris </td>
+     </tr>
+     <tr>
+       <td>sink.enable-delete</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>Whether to enable the delete function </td>
+     </tr>
+     <tr>
+       <td>sink.max-retries</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">3</td>
+       <td>Integer</td>
+       <td>The max retry times if writing records to database failed. </td>
      </tr>
      <tr>
        <td>sink.flush.queue-size</td>
@@ -156,13 +177,21 @@ pipeline:
        <td>Flush interval duration. If this time is exceeded, the data will be flushed asynchronously</td>
      </tr>
      <tr>
+       <td>sink.ignore.update-before</td>
+       <td>optional</td>
+       <td style="word-wrap: break-word;">true</td>
+       <td>Boolean</td>
+       <td>In the CDC scenario, when the primary key of the upstream is inconsistent with that of the downstream, the update-before data needs to be passed to the downstream as deleted data, otherwise the data cannot be deleted.\n"
+                                    + "The default is to ignore, that is, perform upsert semantics.</td>
+     </tr>
+     <tr>
        <td>sink.properties.</td>
        <td>optional</td>
        <td style="word-wrap: break-word;">(none)</td>
        <td>String</td>
        <td> Parameters of StreamLoad.
          For example: <code> sink.properties.strict_mode: true</code>.
-         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Manipulation-Statements/Load/STREAM-LOAD/"> StreamLoad Properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/data-operate/import/import-way/stream-load-manual"> StreamLoad Properties</a></td>
        </td>
      </tr>
      <tr>
@@ -172,9 +201,28 @@ pipeline:
        <td>String</td>
        <td>Create the Properties configuration of the table.
          For example: <code> table.create.properties.replication_num: 1</code>.
-         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/Data-Definition-Statements/Create/CREATE-TABLE/"> Doris Table Properties</a></td>
+         See more about <a href="https://doris.apache.org/docs/dev/sql-manual/sql-statements/table-and-view/table/CREATE-TABLE"> Doris Table Properties</a></td>
        </td>
      </tr>
+    <tr>
+      <td>table.create.auto-partition.properties.*</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Create the auto partition Properties configuration of the table.<br/>
+        Currently the partition function only supports date_trunc, and the partition column supports only DATE or DATETIME types, and the version of Doris must greater than 2.1.6. See more about <a href="https://doris.apache.org/docs/table-design/data-partitioning/auto-partitioning">Doris Auto Partitioning</a><br/>
+        These properties are supported now：<br/>
+        <code> table.create.auto-partition.properties.include</code>A collection of tables after route to include, separated by commas, supports regular expressions;<br/>
+        <code> table.create.auto-partition.properties.exclude</code>A collection of tables after route to exclude, separated by commas, supports regular expressions;<br/>
+        <code> table.create.auto-partition.properties.default-partition-key</code>The default partition key;<br/>
+        <code> table.create.auto-partition.properties.default-partition-unit</code>The default partition unit;<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-key</code>The partition key of a specific table. If not set, the default partition key is used;<br/>
+        <code> table.create.auto-partition.properties.DB.TABLE.partition-unit</code>The partition unit of a specific table. If not set, the default partition unit is used.<br/>
+        Note:<br/>
+        1: If the partition key is not DATE/DATETIME type, auto partition tables won't be created.<br/>
+        2: Doris AUTO RANGE PARTITION does not support NULLABLE columns as partition key, if Flink CDC get a NULL value or a NULLABLE partition key was added after the table was created, will automatically fill it with a default value(DATE:<code>1970-01-01</code>, DATETIME:<code>1970-01-01 00:00:00</code>), chose a suitable partition key is very important.
+      </td> 
+    </tr>
      </tbody>
 </table>
 </div>
@@ -271,6 +319,13 @@ pipeline:
       </td>
       <td>STRING</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>
+        TIME
+      </td>
+      <td>STRING</td>
+      <td>Doris does not support the TIME data type, it needs to be converted to STRING type for compatibility.</td>
     </tr>
     <tr>
       <td>STRING</td>

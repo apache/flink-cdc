@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Unit tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
-public class UnifiedTransformOperatorTest {
+class UnifiedTransformOperatorTest {
 
     /** Defines a unified transform test cases. */
     static class UnifiedTransformTestCase {
@@ -332,7 +332,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testDataChangeEventTransform() throws Exception {
+    void testDataChangeEventTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -350,7 +350,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -377,7 +377,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testSchemaNullabilityTransform() throws Exception {
+    void testSchemaNullabilityTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -396,7 +396,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING().notNull())
                                 .physicalColumn("age", DataTypes.INT().notNull())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -427,7 +427,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testReduceColumnsTransform() throws Exception {
+    void testReduceColumnsTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "reduce_column");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -496,7 +496,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testWildcardTransform() throws Exception {
+    void testWildcardTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "wildcard");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -515,7 +515,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -562,7 +562,7 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -592,7 +592,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testMetadataTransform() throws Exception {
+    void testMetadataTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "metadata");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -611,7 +611,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
@@ -646,7 +646,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testCalculatedMetadataTransform() throws Exception {
+    void testCalculatedMetadataTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "metadata_transform");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -665,7 +665,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("identifier_name", DataTypes.STRING())
@@ -714,7 +714,7 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("identifier_name", DataTypes.STRING())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -746,7 +746,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testMetadataAndCalculatedTransform() throws Exception {
+    void testMetadataAndCalculatedTransform() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "metadata_transform");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -765,7 +765,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("identifier_name", DataTypes.STRING())
@@ -855,7 +855,7 @@ public class UnifiedTransformOperatorTest {
                                 .physicalColumn("__namespace_name__", DataTypes.STRING().notNull())
                                 .physicalColumn("__schema_name__", DataTypes.STRING().notNull())
                                 .physicalColumn("__table_name__", DataTypes.STRING().notNull())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -922,7 +922,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testMetadataTransformIncludeMetaColumnString() throws Exception {
+    void testMetadataTransformIncludeMetaColumnString() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "schema_nullability");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -942,7 +942,7 @@ public class UnifiedTransformOperatorTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING().notNull())
                                 .physicalColumn("age", DataTypes.INT().notNull())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -975,7 +975,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testTransformWithCast() throws Exception {
+    void testTransformWithCast() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "transform_with_cast");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -1041,7 +1041,7 @@ public class UnifiedTransformOperatorTest {
     }
 
     @Test
-    public void testTransformWithCommentsAndExpressions() throws Exception {
+    void testTransformWithCommentsAndExpressions() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         UnifiedTransformTestCase.of(
                         tableId,
@@ -1065,7 +1065,10 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn(
-                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
                                 .physicalColumn(
                                         "name", DataTypes.STRING(), "name column", "John Smith")
                                 .physicalColumn("age", DataTypes.INT(), "age column", "17")
@@ -1098,7 +1101,10 @@ public class UnifiedTransformOperatorTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn(
-                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
                                 .physicalColumn("age", DataTypes.INT(), "age column", "17")
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -1145,13 +1151,50 @@ public class UnifiedTransformOperatorTest {
                                 .physicalColumn(
                                         "name", DataTypes.STRING(), "name column", "John Smith")
                                 .physicalColumn(
-                                        "id", DataTypes.INT(), "id column", "AUTO_INCREMENT()")
+                                        "id",
+                                        DataTypes.INT().notNull(),
+                                        "id column",
+                                        "AUTO_INCREMENT()")
                                 .primaryKey("id")
                                 .build())
                 .initializeHarness()
                 .insertSource(1001, "Alice", 17, "Whatever")
                 .insertPreTransformed(1001, "Alice", 17)
                 .insertPostTransformed("extras", 18, 17, "Alice", 17, "Alice", 1001)
+                .runTests()
+                .destroyHarness();
+    }
+
+    @Test
+    public void testTransformWithColumnNameMap() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "column_name_map");
+        UnifiedTransformTestCase.of(
+                        tableId,
+                        "foo-bar AS f0, `foo-bar`, foo-bar-`foo-bar` AS f1, class",
+                        "foo-bar <> 0",
+                        Schema.newBuilder()
+                                .physicalColumn("foo", DataTypes.INT())
+                                .physicalColumn("bar", DataTypes.INT())
+                                .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("bar-foo", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("foo", DataTypes.INT())
+                                .physicalColumn("bar", DataTypes.INT())
+                                .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("f0", DataTypes.INT())
+                                .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("f1", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
+                                .build())
+                .initializeHarness()
+                .insertSource(1, 2, 3, 4, "class")
+                .insertPreTransformed(1, 2, 3, "class")
+                .insertPostTransformed(-1, 3, -4, "class")
                 .runTests()
                 .destroyHarness();
     }

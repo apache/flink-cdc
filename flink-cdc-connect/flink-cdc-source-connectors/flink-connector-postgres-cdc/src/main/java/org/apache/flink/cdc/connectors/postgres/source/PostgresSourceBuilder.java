@@ -274,6 +274,15 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether the {@link PostgresSourceEnumerator} should assign the unbounded chunks first or not
+     * during snapshot reading phase.
+     */
+    public PostgresSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
     /** Set the {@code LSN} checkpoints delay number for Postgres to commit the offsets. */
     public PostgresSourceBuilder<T> lsnCommitCheckpointsDelay(int lsnCommitDelay) {
         this.configFactory.setLsnCommitCheckpointsDelay(lsnCommitDelay);

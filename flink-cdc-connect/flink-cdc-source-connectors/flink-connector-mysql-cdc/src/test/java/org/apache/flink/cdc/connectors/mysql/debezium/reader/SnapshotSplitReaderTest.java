@@ -30,7 +30,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.RecordsFormatter;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.types.DataType;
-import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
@@ -38,9 +37,10 @@ import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -50,12 +50,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader}. */
-public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
+class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
     private static final UniqueDatabase customerDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
@@ -66,7 +64,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     private static BinaryLogClient binaryLogClient;
     private static MySqlConnection mySqlConnection;
 
-    @BeforeClass
+    @BeforeAll
     public static void init() {
         customerDatabase.createAndInitialize();
         customer3_0Database.createAndInitialize();
@@ -76,7 +74,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() throws Exception {
         if (mySqlConnection != null) {
             mySqlConnection.close();
@@ -88,7 +86,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testReadSingleSnapshotSplit() throws Exception {
+    void testReadSingleSnapshotSplit() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customers_even_dist"}, 4);
         StatefulTaskContext statefulTaskContext =
@@ -114,7 +112,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testReadSingleSnapshotSplitWithDotName() throws Exception {
+    void testReadSingleSnapshotSplitWithDotName() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(customer3_0Database, new String[] {"customers3.0"}, 4);
         BinaryLogClient binaryLogClient =
@@ -152,7 +150,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testReadAllSnapshotSplitsForOneTable() throws Exception {
+    void testReadAllSnapshotSplitsForOneTable() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customers_even_dist"}, 4);
         StatefulTaskContext statefulTaskContext =
@@ -186,7 +184,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testReadAllSplitForTableWithSingleLine() throws Exception {
+    void testReadAllSplitForTableWithSingleLine() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customer_card_single_line"}, 10);
         StatefulTaskContext statefulTaskContext =
@@ -207,7 +205,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testReadAllSnapshotSplitsForTables() throws Exception {
+    void testReadAllSnapshotSplitsForTables() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(
                         customerDatabase,
@@ -254,7 +252,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testThrowRuntimeExceptionInSnapshotScan() throws Exception {
+    void testThrowRuntimeExceptionInSnapshotScan() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customer_card", "customers_1"}, 10);
         StatefulTaskContext statefulTaskContext =
@@ -274,17 +272,19 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         mySqlConnection.commit();
 
         String exceptionMessage = String.format("Snapshotting of table %s failed.", tableToDrop);
-        try {
-            readTableSnapshotSplits(mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType);
-            fail("Should fail.");
-        } catch (Exception e) {
-            assertTrue(e instanceof FlinkRuntimeException);
-            assertTrue(ExceptionUtils.findThrowableWithMessage(e, exceptionMessage).isPresent());
-        }
+        Assertions.assertThatThrownBy(
+                        () ->
+                                readTableSnapshotSplits(
+                                        mySqlSplits,
+                                        statefulTaskContext,
+                                        mySqlSplits.size(),
+                                        dataType))
+                .isExactlyInstanceOf(FlinkRuntimeException.class)
+                .hasMessageContaining(exceptionMessage);
     }
 
     @Test
-    public void testChangingDataInSnapshotScan() throws Exception {
+    void testChangingDataInSnapshotScan() throws Exception {
         String tableName = "customers_even_dist";
         MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 10);
 
@@ -340,7 +340,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testInsertDataInSnapshotScan() throws Exception {
+    void testInsertDataInSnapshotScan() throws Exception {
         String tableName = "customers_even_dist";
         MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 10);
 
@@ -402,7 +402,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testDeleteDataInSnapshotScan() throws Exception {
+    void testDeleteDataInSnapshotScan() throws Exception {
         String tableName = "customers_even_dist";
         MySqlSourceConfig sourceConfig = getConfig(customerDatabase, new String[] {tableName}, 10);
 
@@ -456,7 +456,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
+    void testSnapshotScanSkipBackfillWithPostLowWatermark() throws Exception {
         String tableName = "customers";
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {tableName}, 10, true);
@@ -511,7 +511,7 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
+    void testSnapshotScanSkipBackfillWithPreHighWatermark() throws Exception {
         String tableName = "customers";
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {tableName}, 10, true);
@@ -606,8 +606,8 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         snapshotSplitReader.close();
 
-        assertNotNull(snapshotSplitReader.getExecutorService());
-        assertTrue(snapshotSplitReader.getExecutorService().isTerminated());
+        Assertions.assertThat(snapshotSplitReader.getExecutorService()).isNotNull();
+        Assertions.assertThat(snapshotSplitReader.getExecutorService().isTerminated()).isTrue();
 
         return formatResult(result, dataType);
     }
@@ -629,7 +629,11 @@ public class SnapshotSplitReaderTest extends MySqlSourceTestBase {
             MySqlSourceConfig sourceConfig, List<TableId> remainingTables) {
         final MySqlSnapshotSplitAssigner assigner =
                 new MySqlSnapshotSplitAssigner(
-                        sourceConfig, DEFAULT_PARALLELISM, remainingTables, false);
+                        sourceConfig,
+                        DEFAULT_PARALLELISM,
+                        remainingTables,
+                        false,
+                        getMySqlSplitEnumeratorContext());
         assigner.open();
         List<MySqlSplit> mySqlSplitList = new ArrayList<>();
         while (true) {

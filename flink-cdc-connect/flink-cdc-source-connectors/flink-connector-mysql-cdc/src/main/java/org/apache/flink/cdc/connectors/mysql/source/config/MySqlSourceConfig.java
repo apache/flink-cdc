@@ -26,6 +26,7 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 
 import javax.annotation.Nullable;
 
@@ -66,6 +67,9 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
+    private final boolean parseOnLineSchemaChanges;
+    public static boolean useLegacyJsonFormat = true;
+    private final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -73,6 +77,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties dbzProperties;
     private final Configuration dbzConfiguration;
     private final MySqlConnectorConfig dbzMySqlConfig;
+    private final boolean treatTinyInt1AsBoolean;
 
     MySqlSourceConfig(
             String hostname,
@@ -99,7 +104,11 @@ public class MySqlSourceConfig implements Serializable {
             Properties dbzProperties,
             Properties jdbcProperties,
             Map<ObjectPath, String> chunkKeyColumns,
-            boolean skipSnapshotBackfill) {
+            boolean skipSnapshotBackfill,
+            boolean parseOnLineSchemaChanges,
+            boolean treatTinyInt1AsBoolean,
+            boolean useLegacyJsonFormat,
+            boolean assignUnboundedChunkFirst) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -124,9 +133,25 @@ public class MySqlSourceConfig implements Serializable {
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
+        Selectors excludeTableFilter =
+                (excludeTableList == null
+                        ? null
+                        : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
+        Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
+        dbzMySqlConfig
+                .getTableFilters()
+                .setDataCollectionFilters(
+                        (TableId tableId) ->
+                                tableFilter.isIncluded(tableId)
+                                        && (excludeTableFilter == null
+                                                || !excludeTableFilter.isMatch(tableId)));
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
+        this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     public String getHostname() {
@@ -210,6 +235,14 @@ public class MySqlSourceConfig implements Serializable {
         return closeIdleReaders;
     }
 
+    public boolean isParseOnLineSchemaChanges() {
+        return parseOnLineSchemaChanges;
+    }
+
+    public boolean isAssignUnboundedChunkFirst() {
+        return assignUnboundedChunkFirst;
+    }
+
     public Properties getDbzProperties() {
         return dbzProperties;
     }
@@ -234,13 +267,7 @@ public class MySqlSourceConfig implements Serializable {
 
     public Predicate<TableId> getTableFilter() {
         RelationalTableFilters tableFilters = dbzMySqlConfig.getTableFilters();
-        Selectors excludeTableFilter =
-                (excludeTableList == null
-                        ? null
-                        : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
-        return (TableId tableId) ->
-                tableFilters.dataCollectionFilter().isIncluded(tableId)
-                        && (excludeTableFilter == null || !excludeTableFilter.isMatch(tableId));
+        return tableId -> tableFilters.dataCollectionFilter().isIncluded(tableId);
     }
 
     public Properties getJdbcProperties() {
@@ -253,5 +280,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isSkipSnapshotBackfill() {
         return skipSnapshotBackfill;
+    }
+
+    public boolean isTreatTinyInt1AsBoolean() {
+        return treatTinyInt1AsBoolean;
     }
 }

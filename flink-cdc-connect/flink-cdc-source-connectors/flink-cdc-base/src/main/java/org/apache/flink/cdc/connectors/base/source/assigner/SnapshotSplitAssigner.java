@@ -366,16 +366,20 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                     hasRecordSchema = true;
                     tableSchemas.putAll(splits.iterator().next().getTableSchemas());
                 }
-                final List<SchemalessSnapshotSplit> schemalessSnapshotSplits =
-                        splits.stream()
-                                .map(SnapshotSplit::toSchemalessSnapshotSplit)
-                                .collect(Collectors.toList());
+                List<String> splitIds = new ArrayList<>();
+                for (SnapshotSplit split : splits) {
+                    SchemalessSnapshotSplit schemalessSnapshotSplit =
+                            split.toSchemalessSnapshotSplit();
+                    splitIds.add(schemalessSnapshotSplit.splitId());
+                    if (sourceConfig.isAssignUnboundedChunkFirst() && split.getSplitEnd() == null) {
+                        // assign unbounded split first
+                        remainingSplits.add(0, schemalessSnapshotSplit);
+                    } else {
+                        remainingSplits.add(schemalessSnapshotSplit);
+                    }
+                }
+
                 chunkNum += splits.size();
-                remainingSplits.addAll(schemalessSnapshotSplits);
-                List<String> splitIds =
-                        schemalessSnapshotSplits.stream()
-                                .map(SchemalessSnapshotSplit::splitId)
-                                .collect(Collectors.toList());
                 enumeratorMetrics.getTableMetrics(nextTable).addNewSplits(splitIds);
 
                 if (!chunkSplitter.hasNextChunk()) {

@@ -22,8 +22,10 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -84,34 +86,53 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     public void processElement(StreamRecord<Event> element) throws Exception {
         Event event = element.getValue();
 
-        // FlushEvent triggers flush
-        if (event instanceof FlushEvent) {
-            handleFlushEvent(((FlushEvent) event));
-            return;
-        }
+        try {
+            // FlushEvent triggers flush
+            if (event instanceof FlushEvent) {
+                handleFlushEvent(((FlushEvent) event));
+                return;
+            }
 
-        // CreateTableEvent marks the table as processed directly
-        if (event instanceof CreateTableEvent) {
-            processedTableIds.add(((CreateTableEvent) event).tableId());
-            super.processElement(element);
-            return;
-        }
+            // CreateTableEvent marks the table as processed directly
+            if (event instanceof CreateTableEvent) {
+                processedTableIds.add(((CreateTableEvent) event).tableId());
+                super.processElement(element);
+                return;
+            }
 
-        // Check if the table is processed before emitting all other events, because we have to make
-        // sure that sink have a view of the full schema before processing any change events,
-        // including schema changes.
-        ChangeEvent changeEvent = (ChangeEvent) event;
-        if (!processedTableIds.contains(changeEvent.tableId())) {
-            emitLatestSchema(changeEvent.tableId());
+            // Check if the table is processed before emitting all other events, because we have to
+            // make
+            // sure that sink have a view of the full schema before processing any change events,
+            // including schema changes.
+            ChangeEvent changeEvent = (ChangeEvent) event;
+            if (!processedTableIds.contains(changeEvent.tableId())) {
+                emitLatestSchema(changeEvent.tableId());
+                processedTableIds.add(changeEvent.tableId());
+            }
             processedTableIds.add(changeEvent.tableId());
+            super.processElement(element);
+        } catch (Exception e) {
+            throw new SinkWrapperException(event, e);
         }
-        processedTableIds.add(changeEvent.tableId());
-        super.processElement(element);
     }
 
     // ----------------------------- Helper functions -------------------------------
     private void handleFlushEvent(FlushEvent event) throws Exception {
         userFunction.finish();
+        if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
+            event.getTableIds().stream()
+                    .filter(tableId -> !processedTableIds.contains(tableId))
+                    .forEach(
+                            tableId -> {
+                                LOG.info("Table {} has not been processed", tableId);
+                                try {
+                                    emitLatestSchema(tableId);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                                processedTableIds.add(tableId);
+                            });
+        }
         schemaEvolutionClient.notifyFlushSuccess(
                 getRuntimeContext().getIndexOfThisSubtask(), event.getSourceSubTaskId());
     }

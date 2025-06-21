@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
@@ -29,7 +30,10 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -49,7 +53,7 @@ import java.util.Optional;
  * Unit tests for the {@link PreTransformOperator} and {@link PostTransformOperator} handling schema
  * evolution events.
  */
-public class TransformOperatorWithSchemaEvolveTest {
+class TransformOperatorWithSchemaEvolveTest {
 
     /** Defines a unified transform test cases. */
     static class TransformWithSchemaEvolveTestCase {
@@ -71,6 +75,10 @@ public class TransformOperatorWithSchemaEvolveTest {
 
         private PreTransformOperator preTransformOperator;
         private PostTransformOperator postTransformOperator;
+
+        private BinaryRecordDataGenerator sourceRecordGenerator;
+        private BinaryRecordDataGenerator preTransformedRecordGenerator;
+        private BinaryRecordDataGenerator postTransformedRecordGenerator;
 
         private RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 preTransformOperatorHarness;
@@ -101,6 +109,16 @@ public class TransformOperatorWithSchemaEvolveTest {
 
         public TransformWithSchemaEvolveTestCase evolveFromSource(SchemaChangeEvent event) {
             sourceEvents.add(event);
+            sourceSchema = SchemaUtils.applySchemaChangeEvent(sourceSchema, event);
+            sourceRecordGenerator =
+                    new BinaryRecordDataGenerator((RowType) sourceSchema.toRowDataType());
+            return this;
+        }
+
+        public TransformWithSchemaEvolveTestCase insertSource(Object... record) {
+            sourceEvents.add(
+                    DataChangeEvent.insertEvent(
+                            tableId, sourceRecordGenerator.generate(stringify(record))));
             return this;
         }
 
@@ -111,6 +129,16 @@ public class TransformOperatorWithSchemaEvolveTest {
 
         public TransformWithSchemaEvolveTestCase expectInPreTransformed(SchemaChangeEvent event) {
             preTransformedEvents.add(event);
+            preTransformedSchema = SchemaUtils.applySchemaChangeEvent(preTransformedSchema, event);
+            preTransformedRecordGenerator =
+                    new BinaryRecordDataGenerator((RowType) preTransformedSchema.toRowDataType());
+            return this;
+        }
+
+        public TransformWithSchemaEvolveTestCase expectInPreTransformed(Object... record) {
+            preTransformedEvents.add(
+                    DataChangeEvent.insertEvent(
+                            tableId, preTransformedRecordGenerator.generate(stringify(record))));
             return this;
         }
 
@@ -121,6 +149,17 @@ public class TransformOperatorWithSchemaEvolveTest {
 
         public TransformWithSchemaEvolveTestCase expectInPostTransformed(SchemaChangeEvent event) {
             postTransformedEvents.add(event);
+            postTransformedSchema =
+                    SchemaUtils.applySchemaChangeEvent(postTransformedSchema, event);
+            postTransformedRecordGenerator =
+                    new BinaryRecordDataGenerator((RowType) postTransformedSchema.toRowDataType());
+            return this;
+        }
+
+        public TransformWithSchemaEvolveTestCase expectInPostTransformed(Object... event) {
+            postTransformedEvents.add(
+                    DataChangeEvent.insertEvent(
+                            tableId, postTransformedRecordGenerator.generate(stringify(event))));
             return this;
         }
 
@@ -138,6 +177,13 @@ public class TransformOperatorWithSchemaEvolveTest {
             this.sourceSchema = sourceSchema;
             this.preTransformedSchema = preTransformedSchema;
             this.postTransformedSchema = postTransformedSchema;
+
+            this.sourceRecordGenerator =
+                    new BinaryRecordDataGenerator((RowType) sourceSchema.toRowDataType());
+            this.preTransformedRecordGenerator =
+                    new BinaryRecordDataGenerator((RowType) preTransformedSchema.toRowDataType());
+            this.postTransformedRecordGenerator =
+                    new BinaryRecordDataGenerator((RowType) postTransformedSchema.toRowDataType());
 
             this.sourceEvents = new ArrayList<>();
             this.preTransformedEvents = new ArrayList<>();
@@ -227,7 +273,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with unspecified columns. */
     @Test
-    public void testIrrelevantSchemaChangeInExplicitTransformRules() throws Exception {
+    void testIrrelevantSchemaChangeInExplicitTransformRules() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -245,7 +291,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -283,7 +329,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with referenced-only columns. */
     @Test
-    public void testSemiRelevantSchemaChangeInExplicitTransformRules() throws Exception {
+    void testSemiRelevantSchemaChangeInExplicitTransformRules() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -302,7 +348,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
                                 .primaryKey("id")
@@ -343,7 +389,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with explicitly-written columns. */
     @Test
-    public void testRelevantColumnSchemaInExplicitTransformRules() throws Exception {
+    void testRelevantColumnSchemaInExplicitTransformRules() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -362,7 +408,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -393,7 +439,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with a wildcard character at first. */
     @Test
-    public void testSchemaChangeWithPreWildcard() throws Exception {
+    void testSchemaChangeWithPreWildcard() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -412,7 +458,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .primaryKey("id")
                                 .build(),
                         Schema.newBuilder()
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed", DataTypes.INT())
@@ -527,7 +573,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with a wildcard character in the middle. */
     @Test
-    public void testSchemaChangeWithMidWildcard() throws Exception {
+    void testSchemaChangeWithMidWildcard() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -547,7 +593,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed1", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .physicalColumn("computed2", DataTypes.INT())
@@ -662,7 +708,7 @@ public class TransformOperatorWithSchemaEvolveTest {
 
     /** This case tests when schema evolution happens with a wildcard character at last. */
     @Test
-    public void testSchemaChangeWithPostWildcard() throws Exception {
+    void testSchemaChangeWithPostWildcard() throws Exception {
         TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
         TransformWithSchemaEvolveTestCase.of(
                         tableId,
@@ -682,7 +728,7 @@ public class TransformOperatorWithSchemaEvolveTest {
                                 .build(),
                         Schema.newBuilder()
                                 .physicalColumn("computed", DataTypes.INT())
-                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("id", DataTypes.INT().notNull())
                                 .physicalColumn("name", DataTypes.STRING())
                                 .physicalColumn("age", DataTypes.INT())
                                 .primaryKey("id")
@@ -792,5 +838,88 @@ public class TransformOperatorWithSchemaEvolveTest {
                                                 AddColumnEvent.ColumnPosition.AFTER,
                                                 "name"))))
                 .runTests("inserting columns at last");
+    }
+
+    /** This case tests column name map when schema evolution happens. */
+    @Test
+    public void testSchemaChangeWithColumnNameMap() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
+        TransformWithSchemaEvolveTestCase.of(
+                        tableId,
+                        "*, foo-bar as computed",
+                        "class <> 'class0'",
+                        Schema.newBuilder()
+                                .physicalColumn("foo", DataTypes.INT())
+                                .physicalColumn("bar", DataTypes.INT())
+                                .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("foo", DataTypes.INT())
+                                .physicalColumn("bar", DataTypes.INT())
+                                .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("foo", DataTypes.INT())
+                                .physicalColumn("bar", DataTypes.INT())
+                                .physicalColumn("foo-bar", DataTypes.INT())
+                                .physicalColumn("class", DataTypes.STRING())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .build())
+                .initializeHarness()
+                .runTests("initializing table")
+                .insertSource(0, 0, 0, "class0")
+                .expectInPreTransformed(0, 0, 0, "class0")
+                .expectNothingInPostTransformed()
+                .insertSource(1, 2, 3, "class1")
+                .expectInPreTransformed(1, 2, 3, "class1")
+                .expectInPostTransformed(1, 2, 3, "class1", -1)
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("bar-foo", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.FIRST,
+                                                null))))
+                .expectInPreTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("bar-foo", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.BEFORE,
+                                                "foo"))))
+                .expectInPostTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("bar-foo", DataTypes.INT()),
+                                                AddColumnEvent.ColumnPosition.BEFORE,
+                                                "foo"))))
+                .insertSource(10, 2, 4, 6, "class2")
+                .expectInPreTransformed(10, 2, 4, 6, "class2")
+                .expectInPostTransformed(10, 2, 4, 6, "class2", -2)
+                .insertSource(20, 2, 4, 6, "class0")
+                .expectInPreTransformed(20, 2, 4, 6, "class0")
+                .expectNothingInPostTransformed()
+                .evolveFromSource(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("bar-foo", "package")))
+                .expectInPreTransformed(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("bar-foo", "package")))
+                .expectInPostTransformed(
+                        new RenameColumnEvent(
+                                tableId, Collections.singletonMap("bar-foo", "package")))
+                .insertSource(30, 3, 6, 9, "class3")
+                .expectInPreTransformed(30, 3, 6, 9, "class3")
+                .expectInPostTransformed(30, 3, 6, 9, "class3", -3)
+                .insertSource(40, 3, 6, 9, "class0")
+                .expectInPreTransformed(40, 3, 6, 9, "class0")
+                .expectNothingInPostTransformed()
+                .runTests("schema evolution with mapped column names");
     }
 }

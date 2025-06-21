@@ -63,7 +63,7 @@ public class DistributedPrePartitionOperator extends AbstractStreamOperator<Part
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
         schemaMap = new HashMap<>();
         hashFunctionMap = new HashMap<>();
     }

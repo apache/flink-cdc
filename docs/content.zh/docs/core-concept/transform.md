@@ -24,33 +24,33 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Definition
-**Transform** module helps users delete and expand data columns based on the data columns in the table.      
-What's more, it also helps users filter some unnecessary data during the synchronization process.
+# 定义
+**Transform** 模块允许用户根据数据列对数据列进行删除和扩展。
+更进一步的，这也也可以帮助用户在同步过程中过滤一些不需要的数据。
 
-# Parameters
-To describe a transform rule, the following parameters can be used:
+# 参数
+为了定义一个transform规则，可以使用以下参数：
 
-| Parameter    | Meaning                                            | Optional/Required |
-|--------------|----------------------------------------------------|-------------------|
-| source-table | Source table id, supports regular expressions      | required          |
-| projection   | Projection rule, supports syntax similar to the select clause in SQL      | optional          |
-| filter       | Filter rule, supports syntax similar to the where clause in SQL      | optional          |
-| primary-keys | Sink table primary keys, separated by commas       | optional          |
-| partition-keys | Sink table partition keys, separated by commas       | optional          |
-| table-options | used to the configure table creation statement when automatically creating tables | optional          |
+| 参数                        | 含义                                                                                | Optional/Required |
+|---------------------------|-----------------------------------------------------------------------------------|-------------------|
+| source-table              | Source table id, supports regular expressions                                     | required          |
+| projection                | Projection rule, supports syntax similar to the select clause in SQL              | optional          |
+| filter                    | Filter rule, supports syntax similar to the where clause in SQL                   | optional          |
+| primary-keys              | Sink table primary keys, separated by commas                                      | optional          |
+| partition-keys            | Sink table partition keys, separated by commas                                    | optional          |
+| table-options             | used to the configure table creation statement when automatically creating tables | optional          |
 | converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
-| description  | Transform rule description | optional          |
+| description               | Transform rule description                                                        | optional          |
 
-Multiple rules can be declared in one single pipeline YAML file.
+多个transform规则可以声明在一个pipeline YAML文件中。
 
 ## converter-after-transform
 
-`converter-after-transform` is used to change the DataChangeEvent after other transform. The available values of this options are as follows.
+`converter-after-transform` 用于在其他 transform 处理之后再修改 DataChangeEvent。可用的值如下：
 
-- SOFT_DELETE: The delete event will be converted as an insert event. This converter should be used together with the metadata `__data_event_type__`. Then you can implement the soft delete.
+- SOFT_DELETE: 删除事件会被转换成插入事件。这个转换器应该与元数据 `__data_event_type__` 一起使用，然后你可以实现软删除。
 
-For example, the following transform will not delete data when the delete event happens. Instead it will update the column `op_type` to -D in sink and transform it to an insert record.
+举个例子，下面的 transform 将不会删除数据，而是更新列 `op_type` 为 -D，然后转换成插入记录。
 
 ```yaml
 transform:
@@ -59,9 +59,9 @@ transform:
     converter-after-transform: SOFT_DELETE
 ```
 
-# Metadata Fields
-## Fields definition
-There are some hidden columns used to access metadata information. They will only take effect when explicitly referenced in the transform rules.
+# 元数据字段
+## 字段定义
+有一些隐藏列可以用来访问元数据信息。它们仅在显式引用在 transform 规则中时才会生效。
 
 | Field               | Data Type | Description                                  |
 |---------------------|-----------|----------------------------------------------|
@@ -69,6 +69,29 @@ There are some hidden columns used to access metadata information. They will onl
 | __schema_name__     | String    | Name of the schema that contains the row.    |
 | __table_name__      | String    | Name of the table that contains the row.     |
 | __data_event_type__ | String    | Operation type of data change event.         |
+
+除了以上的元数据字段，连接器也可以解析额外的元数据并放入 DataChangeEvent 的 meta map中，这些元数据也可以在transform使用。
+例如如下的作业，MySQL 连接器可以解析 `op_ts` 元数据并在transform中使用。
+
+```yaml
+source:
+  type: mysql
+  hostname: localhost
+  port: 3306
+  username: testuser
+  password: testpwd
+  tables: testdb.customer
+  server-id: 5400-5404
+  server-time-zone: UTC
+  metadata.list: op_ts
+  
+transform:
+  - source-table: testdb.customer
+    projection: \*, __namespace_name__ || '.' || __schema_name__ || '.' || __table_name__ AS identifier_name, __data_event_type__ AS type, op_ts AS opts
+  
+sink:
+  type: values
+```
 
 ## Metadata relationship
 
@@ -83,94 +106,98 @@ There are some hidden columns used to access metadata information. They will onl
 | StarRocks            | Database  | -          | Table |
 | Doris                | Database  | -          | Table |
 
-# Functions
-Flink CDC uses [Calcite](https://calcite.apache.org/) to parse expressions and [Janino script](https://www.janino.net/) to evaluate expressions with function call.
+# 函数
+Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且使用 [Janino script](https://www.janino.net/) 来执行表达式。
 
-## Comparison Functions
+## 比较函数
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| value1 = value2      | valueEquals(value1, value2) | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <> value2     | !valueEquals(value1, value2) | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 > value2      | value1 > value2             | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 >= value2     | value1 >= value2            | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2      | value1 < value2             | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL. |
-| value1 <= value2     | value1 <= value2            | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value IS NULL        | null == value               | Returns TRUE if value is NULL.                                  |
-| value IS NOT NULL    | null != value               | Returns TRUE if value is not NULL.                              |
-| value1 BETWEEN value2 AND value3 | betweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3. |
-| value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3. |
-| string1 LIKE string2 | like(string1, string2)      | Returns TRUE if string1 matches pattern string2.                |
-| string1 NOT LIKE string2 | notLike(string1, string2) | Returns TRUE if string1 does not match pattern string2.       |
-| value1 IN (value2 [, value3]* ) | in(value1, value2 [, value3]*) | Returns TRUE if value1 exists in the given list (value2, value3, …). |
-| value1 NOT IN (value2 [, value3]* ) | notIn(value1, value2 [, value3]*) | Returns TRUE if value1 does not exist in the given list (value2, value3, …).  |
+| Function                             | Janino Code                                  | Description                                                                                           |
+|--------------------------------------|----------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| value1 = value2                      | valueEquals(value1, value2)                  | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL.                 |
+| value1 <> value2                     | !valueEquals(value1, value2)                 | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL.             |
+| value1 > value2                      | greaterThan(value1, value2)                  | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL.             |
+| value1 >= value2                     | greaterThanOrEqual(value1, value2)           | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
+| value1 < value2                      | lessThan(value1, value2)                     | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL.                |
+| value1 <= value2                     | lessThanOrEqual(value1, value2)              | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL.    |
+| value IS NULL                        | null == value                                | Returns TRUE if value is NULL.                                                                        |
+| value IS NOT NULL                    | null != value                                | Returns TRUE if value is not NULL.                                                                    |
+| value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3.           |
+| value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3.                                    |
+| string1 LIKE string2                 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                                                      |
+| string1 NOT LIKE string2             | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.                                               |
+| value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …).                                  |
+| value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).                          |
 
-## Logical Functions
+## 逻辑函数
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| boolean1 OR boolean2 | boolean1 &#124;&#124; boolean2 | Returns TRUE if BOOLEAN1 is TRUE or BOOLEAN2 is TRUE.        |
-| boolean1 AND boolean2 | boolean1 && boolean2       | Returns TRUE if BOOLEAN1 and BOOLEAN2 are both TRUE.            |
-| NOT boolean          | !boolean                    | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS FALSE     | false == boolean            | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS NOT FALSE | true == boolean             | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS TRUE      | true == boolean             | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS NOT TRUE  | false == boolean            | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
+| Function              | Janino Code                    | Description                                                         |
+|-----------------------|--------------------------------|---------------------------------------------------------------------|
+| boolean1 OR boolean2  | boolean1 &#124;&#124; boolean2 | Returns TRUE if BOOLEAN1 is TRUE or BOOLEAN2 is TRUE.               |
+| boolean1 AND boolean2 | boolean1 && boolean2           | Returns TRUE if BOOLEAN1 and BOOLEAN2 are both TRUE.                |
+| NOT boolean           | !boolean                       | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
+| boolean IS FALSE      | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
+| boolean IS NOT FALSE  | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
+| boolean IS TRUE       | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
+| boolean IS NOT TRUE   | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
 
-## Arithmetic Functions
+## 数学函数
 
-| Function             | Janino Code                 | Description                                                     |
-|----------------------|-----------------------------|-----------------------------------------------------------------|
-| numeric1 + numeric2  | numeric1 + numeric2         | Returns NUMERIC1 plus NUMERIC2.                                 |
-| numeric1 - numeric2  | numeric1 - numeric2         | Returns NUMERIC1 minus NUMERIC2.                                |
-| numeric1 * numeric2  | numeric1 * numeric2         | Returns NUMERIC1 multiplied by NUMERIC2.                        |
-| numeric1 / numeric2  | numeric1 / numeric2         | Returns NUMERIC1 divided by NUMERIC2.                          |
-| numeric1 % numeric2  | numeric1 % numeric2         | Returns the remainder (modulus) of numeric1 divided by numeric2. |
-| ABS(numeric)         | abs(numeric)                | Returns the absolute value of numeric.                          |
-| CEIL(numeric)        | ceil(numeric)               | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric. |
-| FLOOR(numeric)       | floor(numeric)              | Rounds numeric down, and returns the largest number that is less than or equal to numeric. |
-| ROUND(numeric, int)  | round(numeric)              | Returns a number rounded to INT decimal places for NUMERIC.     |
-| UUID()               | uuid()                      | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
+| Function            | Janino Code         | Description                                                                                                                                                          |
+|---------------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| numeric1 + numeric2 | numeric1 + numeric2 | Returns NUMERIC1 plus NUMERIC2.                                                                                                                                      |
+| numeric1 - numeric2 | numeric1 - numeric2 | Returns NUMERIC1 minus NUMERIC2.                                                                                                                                     |
+| numeric1 * numeric2 | numeric1 * numeric2 | Returns NUMERIC1 multiplied by NUMERIC2.                                                                                                                             |
+| numeric1 / numeric2 | numeric1 / numeric2 | Returns NUMERIC1 divided by NUMERIC2.                                                                                                                                |
+| numeric1 % numeric2 | numeric1 % numeric2 | Returns the remainder (modulus) of numeric1 divided by numeric2.                                                                                                     |
+| ABS(numeric)        | abs(numeric)        | Returns the absolute value of numeric.                                                                                                                               |
+| CEIL(numeric)<br/>CEILING(numeric)       | ceil(numeric)       | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric.                                                                         |
+| FLOOR(numeric)      | floor(numeric)      | Rounds numeric down, and returns the largest number that is less than or equal to numeric.                                                                           |
+| ROUND(numeric, int) | round(numeric)      | Returns a number rounded to INT decimal places for NUMERIC.                                                                                                          |
+| UUID()              | uuid()              | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
 
-## String Functions
+## 字符串函数
 
-| Function             | Janino Code              | Description                                       |
-| -------------------- | ------------------------ | ------------------------------------------------- |
-| string1 &#124;&#124; string2 | concat(string1, string2) | Returns the concatenation of STRING1 and STRING2. |
-| CHAR_LENGTH(string)  | charLength(string)       | Returns the number of characters in STRING.       |
-| UPPER(string)        | upper(string)            | Returns string in uppercase.                      |
-| LOWER(string) | lower(string) | Returns string in lowercase. |
-| TRIM(string1) | trim('BOTH',string1) | Returns a string that removes whitespaces at both sides. |
-| REGEXP_REPLACE(string1, string2, string3) | regexpReplace(string1, string2, string3) | Returns a string from STRING1 with all the substrings that match a regular expression STRING2 consecutively being replaced with STRING3. E.g., 'foobar'.regexpReplace('oo\|ar', '') returns "fb". |
-| SUBSTR(string, integer1[, integer2]) | substr(string,integer1,integer2) | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default). |
-| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2) | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default). |
-| CONCAT(string1, string2,…) | concat(string1, string2,…) | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'. |
+| Function                                         | Janino Code                              | Description                                                                                                                                                                                       |
+|--------------------------------------------------|------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| string1 &#124;&#124; string2                     | concat(string1, string2)                 | Returns the concatenation of STRING1 and STRING2.                                                                                                                                                 |
+| CHAR_LENGTH(string)                              | charLength(string)                       | Returns the number of characters in STRING.                                                                                                                                                       |
+| UPPER(string)                                    | upper(string)                            | Returns string in uppercase.                                                                                                                                                                      |
+| LOWER(string)                                    | lower(string)                            | Returns string in lowercase.                                                                                                                                                                      |
+| TRIM(string1)                                    | trim('BOTH',string1)                     | Returns a string that removes whitespaces at both sides.                                                                                                                                          |
+| REGEXP_REPLACE(string1, string2, string3)        | regexpReplace(string1, string2, string3) | Returns a string from STRING1 with all the substrings that match a regular expression STRING2 consecutively being replaced with STRING3. E.g., 'foobar'.regexpReplace('oo\|ar', '') returns "fb". |
+| SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
+| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
+| CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'.                                                                                          |
 
-## Temporal Functions
+## 时间函数
 
-| Function             | Janino Code              | Description                                       |
-| -------------------- | ------------------------ | ------------------------------------------------- |
-| LOCALTIME | localtime() | Returns the current SQL time in the local time zone, the return type is TIME(0). |
-| LOCALTIMESTAMP | localtimestamp() | Returns the current SQL timestamp in local time zone, the return type is TIMESTAMP(3). |
-| CURRENT_TIME | currentTime() | Returns the current SQL time in the local time zone, this is a synonym of LOCAL_TIME. |
-| CURRENT_DATE                                         | currentDate() | Returns the current SQL date in the local time zone. |
-| CURRENT_TIMESTAMP | currentTimestamp() | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3). |
-| NOW() | now() | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP. |
-| DATE_FORMAT(timestamp, string) | dateFormat(timestamp, string) | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat. |
-| TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR. |
-| TO_DATE(string1[, string2]) | toDate(string1[, string2]) | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date. |
-| TO_TIMESTAMP(string1[, string2]) | toTimestamp(string1[, string2]) | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone. |
+| Function                                             | Janino Code                                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+|------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| LOCALTIME                                            | localtime()                                          | Returns the current SQL time in the local time zone, the return type is TIME(0).                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| LOCALTIMESTAMP                                       | localtimestamp()                                     | Returns the current SQL timestamp in local time zone, the return type is TIMESTAMP(3).                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| CURRENT_TIME                                         | currentTime()                                        | Returns the current SQL time in the local time zone, this is a synonym of LOCAL_TIME.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| CURRENT_DATE                                         | currentDate()                                        | Returns the current SQL date in the local time zone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| CURRENT_TIMESTAMP                                    | currentTimestamp()                                   | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3).                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| NOW()                                                | now()                                                | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| DATE_FORMAT(timestamp, string)                       | dateFormat(timestamp, string)                        | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat.                                                                                                                                                                                                                                                                                                                                                                                            |
+| TIMESTAMPADD(timeintervalunit, interval, timepoint)  | timestampadd(timeintervalunit, interval, timepoint)  | Returns the timestamp of timepoint2 after timepoint added interval. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.                                                                                                                                                                                                                                                                                                                               |
+| TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.                                                                                                                                                                                                                                                                                                                   |
+| TO_DATE(string1[, string2])                          | toDate(string1[, string2])                           | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| TO_TIMESTAMP(string1[, string2])                     | toTimestamp(string1[, string2])                      | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| FROM_UNIXTIME(numeric[, string])                     | fromUnixtime(NUMERIC[, STRING])                      | Returns a representation of the numeric argument as a value in string format (default is ‘yyyy-MM-dd HH:mm:ss’). numeric is an internal timestamp value representing seconds since ‘1970-01-01 00:00:00’ UTC, such as produced by the UNIX_TIMESTAMP() function. The return value is expressed in the session time zone (specified in TableConfig). E.g., FROM_UNIXTIME(44) returns ‘1970-01-01 00:00:44’ if in UTC time zone, but returns ‘1970-01-01 09:00:44’ if in ‘Asia/Tokyo’ time zone.                                                      |
+| UNIX_TIMESTAMP()                                     | unixTimestamp()                                      | Gets current Unix timestamp in seconds. This function is not deterministic which means the value would be recalculated for each record.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| UNIX_TIMESTAMP(string1[, string2])                   | unixTimestamp(STRING1[, STRING2])                    | Converts a date time string string1 with format string2 (by default: yyyy-MM-dd HH:mm:ss if not specified) to Unix timestamp (in seconds), using the specified timezone in table config.<br/>If a time zone is specified in the date time string and parsed by UTC+X format such as “yyyy-MM-dd HH:mm:ss.SSS X”, this function will use the specified timezone in the date time string instead of the timezone in table config. If the date time string can not be parsed, the default value Long.MIN_VALUE(-9223372036854775808) will be returned. |
 
-## Conditional Functions
+## 条件函数
 
-| Function             | Janino Code              | Description                                       |
-| -------------------- | ------------------------ | ------------------------------------------------- |
-| CASE value WHEN value1_1 [, value1_2]* THEN RESULT1 (WHEN value2_1 [, value2_2 ]* THEN result_2)* (ELSE result_z) END | Nested ternary expression | Returns resultX when the first time value is contained in (valueX_1, valueX_2, …). When no value matches, returns result_z if it is provided and returns NULL otherwise. |
-| CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END | Nested ternary expression | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise. |
-| COALESCE(value1 [, value2]*) | coalesce(Object... objects) | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
-| IF(condition, true_value, false_value)   | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5. |
+| Function                                                                                                              | Janino Code                          | Description                                                                                                                                                                                                                                       |
+|-----------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| CASE value WHEN value1_1 [, value1_2]* THEN RESULT1 (WHEN value2_1 [, value2_2 ]* THEN result_2)* (ELSE result_z) END | Nested ternary expression            | Returns resultX when the first time value is contained in (valueX_1, valueX_2, …). When no value matches, returns result_z if it is provided and returns NULL otherwise.                                                                          |
+| CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | Nested ternary expression            | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise.                                                                                                        |
+| COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)          | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
+| IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5.                                                                                                                                               |
 
-## Casting Functions
+## 转换函数
 
 You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
 
@@ -187,9 +214,9 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 | NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
 | STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
 
-# Example
-## Add computed columns
-Evaluation expressions can be used to generate new columns. For example, if we want to append two computed columns based on the table `web_order` in the database `mydb`, we may define a transform rule as follows:
+# 示例
+## 添加计算列
+表达式可以用来生成新的列。例如，如果我们想基于表 `web_order` 在数据库 `mydb` 中添加两个计算列，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -198,9 +225,8 @@ transform:
     description: append calculated columns based on source table
 ```
 
-## Reference metadata columns
-We may reference metadata column in projection expressions. For example, given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
-
+## 引用元数据列
+我们可以在投影表达式中引用元数据列。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 ```yaml
 transform:
   - source-table: mydb.web_order
@@ -208,8 +234,8 @@ transform:
     description: access metadata columns from source table
 ```
 
-## Use wildcard character to project all fields
-A wildcard character (`*`) can be used to reference all fields in a table. For example, given two tables `web_order` and `app_order` in the database `mydb`, we may define a transform rule as follows:
+## 使用通配符来包含所有字段
+通配符(`*`)可以用来引用表中的所有字段。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -220,10 +246,10 @@ transform:
     projection: UPPER(product_name) as product_name, *
     description: project fields with wildcard character from source table
 ```
-Notice: When `*` character presents at the beginning of expressions, an escaping backslash is required.
+注意：当 `*` 字符出现在表达式的开头时，需要添加转义反斜杠。
 
-## Add filter rule
-Use reference columns when adding filtering rules to the table `web_order` in the database `mydb`, we may define a transform rule as follows:
+## 添加过滤条件
+使用引用列时，我们可以在添加过滤规则时使用。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -232,7 +258,7 @@ transform:
     description: filtering rows from source table
 ```
 
-Computed columns can be used in filtering conditions, too. For example, given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
+计算列可以在过滤条件中使用。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -242,8 +268,8 @@ transform:
     description: filtering rows based on computed columns
 ```
 
-## Reassign primary key
-We can reassign the primary key in transform rules. For example, given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
+## 重新设置主键
+我们可以在转换规则中重新设置主键。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -253,7 +279,7 @@ transform:
     description: reassign primary key example
 ```
 
-Composite primary keys are also supported:
+复合主键也支持。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -263,9 +289,10 @@ transform:
     description: reassign composite primary keys example
 ```
 
-## Reassign partition key
-We can reassign the partition key in transform rules. For example, given a table web_order in the database mydb, we may define a transform rule as follows:
+注意主键列不能为空。
 
+## 重新设置分区键
+我们可以重新设置分区键。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 ```yaml
 transform:
   - source-table: mydb.web_order
@@ -274,8 +301,8 @@ transform:
     description: reassign partition key example
 ```
 
-## Specify table creation configuration
-Extra options can be defined in a transform rule, and will be applied when creating downstream tables. Given a table `web_order` in the database `mydb`, we may define a transform rule as follows:
+## 定义建表参数
+额外的建表参数可以定义在转换规则中，并在创建下游表时应用。例如，给定表 `web_order` 在数据库 `mydb` 中，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -284,12 +311,12 @@ transform:
     table-options: comment=web order
     description: auto creating table options example
 ```
-Tips: The format of table-options is `key1=value1,key2=value2`.
+小技巧：table-options 的格式是 `key1=value1,key2=value2`。
 
 ## Classification mapping
-Multiple transform rules can be defined to classify input data rows and apply different processing.
-Only the first matched transform rule will apply.
-For example, we may define a transform rule as follows:
+多个转换规则可以定义为分类映射。
+只有第一个匹配的转换规则将应用。
+举个例子，我们可以定义一个转换规则如下：
 
 ```yaml
 transform:
@@ -303,22 +330,20 @@ transform:
     description: classification mapping example
 ```
 
-## User-defined Functions
+## 用户自定义函数
+用户自定义函数（UDF）可以在转换规则中使用。
 
-User-defined functions (UDFs) can be used in transform rules.
+一个满足了下面条件的类可以作为 UDF:
+* 继承了 `org.apache.flink.cdc.common.udf.UserDefinedFunction` 接口
+* 有一个 public 的无参构造函数
+* 有至少一个 public 方法命名为 `eval`
 
-Classes could be used as a UDF if:
+也可以:
 
-* implements `org.apache.flink.cdc.common.udf.UserDefinedFunction` interface
-* has a public constructor with no parameters
-* has at least one public method named `eval`
+* 重载 `getReturnType` 方法来指示它的返回 CDC 类型
+* 重载 `open` 和 `close` 方法来执行一些初始化和清理工作
 
-It may also:
-
-* overrides `getReturnType` method to indicate its return CDC type
-* overrides `open` and `close` method to do some initialization and cleanup work
-
-For example, this is a valid UDF class:
+举个例子，这是一个有效的 UDF 类:
 
 ```java
 public class AddOneFunctionClass implements UserDefinedFunction {
@@ -344,13 +369,13 @@ public class AddOneFunctionClass implements UserDefinedFunction {
 }
 ```
 
-To ease the migration from Flink SQL to Flink CDC, a Flink `ScalarFunction` could also be used as a transform UDF, with some limitations:
+为了兼容 Flink SQL，UDF 类也可以是 Flink `ScalarFunction`，但有一些限制:
 
-* `ScalarFunction` which has a constructor with parameters is not supported.
-* Flink-style type hint in `ScalarFunction` will be ignored.
-* `open` / `close` lifecycle hooks will not be invoked.
+* 包含有参构造方法的 `ScalarFunction` 是不支持的。
+* FLink 的 `DataType` 提示在 `ScalarFunction` 中将被忽略。
+* `open` / `close` 生命周期钩子不会被调用。
 
-UDF classes could be registered by adding a `user-defined-function` block:
+UDF 类可以通过 `user-defined-function` 块进行注册：
 
 ```yaml
 pipeline:
@@ -361,9 +386,9 @@ pipeline:
       classpath: org.apache.flink.cdc.udf.examples.java.FormatFunctionClass
 ```
 
-Notice that given classpath must be fully-qualified, and corresponding `jar` files must be included in Flink `/lib` folder, or be passed with `flink-cdc.sh --jar` option.
+注意这里的 `classpath` 必须是全限定名，并且对应的 `jar` 文件必须包含在 Flink `/lib` 文件夹中，或者通过 `flink-cdc.sh --jar` 选项传递。
 
-After being correctly registered, UDFs could be used in both `projection` and `filter` expressions, just like built-in functions:
+在正确注册后，UDF 可以在 `projection` 和 `filter` 表达式中使用，就像内置函数一样：
 
 ```yaml
 transform:
@@ -372,12 +397,12 @@ transform:
     filter: inc(id) < 100
 ```
 
-## Embedding AI Model
+## 内置 AI 模型
 
-Embedding AI Model can be used in transform rules.
-To use Embedding AI Model, you need to download the jar of build-in model, and then add `--jar {$BUILT_IN_MODEL_PATH}` to your flink-cdc.sh command.
+内置AI模型可以在transform规则中使用。
+为了使用内置AI模型，你需要下载内置模型的jar，然后在flink-cdc.sh命令中添加`--jar {$BUILT_IN_MODEL_PATH}`。
 
-How to define a Embedding AI Model:
+如何定义一个Embedding AI模型：
 
 ```yaml
 pipeline:
@@ -394,12 +419,12 @@ pipeline:
       openai.host: https://xxxx
       openai.apikey: abcd1234
 ```
-Note:
-* `model-name` is a common required parameter for all support models, which represent the function name called in `projection` or `filter`.
-* `class-name` is a common required parameter for all support models, available values can be found in [All Support models](#all-support-models).
-* `openai.model`, `openai.host`, `openai.apiKey` and `openai.chat.prompt` is option parameters that defined in specific model.
+注意：
+* `model-name` 是一个通用的必填参数，用于所有支持的模型，表示在`projection`或`filter`中调用的函数名称。
+* `class-name` 是一个通用的必填参数，用于所有支持的模型，可用值可以在[所有支持的模型](#all-support-models)中找到。
+* `openai.model`，`openai.host`， `openai.apiKey` 和 `openai.chat.prompt` 是在各个模型中特别的可选参数。
 
-How to use a Embedding AI Model:
+如何使用一个内置的 AI 模型：
 
 ```yaml
 transform:
@@ -420,15 +445,15 @@ pipeline:
       openai.host: http://langchain4j.dev/demo/openai/v1
       openai.apikey: demo
 ```
-Here, GET_EMBEDDING is defined though `model-name` in `pipeline`.
+这里，GET_EMBEDDING 是通过`model-name`在`pipeline`中定义的。
 
-### All Support models
+### 所有支持的模型
 
-The following built-in models are provided:
+下面列出了所有支持的模型：
 
 #### OpenAIChatModel
 
-| parameter          | type   | optional/required | meaning                                                                                                                              |
+| 参数                 | 类型     | optional/required | 含义                                                                                                                                   |
 |--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | openai.model       | STRING | required          | Name of model to be called, for example: "gpt-4o-mini", Available options are "gpt-4o-mini", "gpt-4o", "gpt-4-32k", "gpt-3.5-turbo". |
 | openai.host        | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                      |
@@ -437,13 +462,8 @@ The following built-in models are provided:
 
 #### OpenAIEmbeddingModel
 
-| parameter     | type   | optional/required | meaning                                                                                                                                                                |
+| 参数            | 类型     | optional/required | 含义                                                                                                                                                                     |
 |---------------|--------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
 | openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
 | openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
-
-# Known limitations
-* Currently, transform doesn't work with route rules. It will be supported in future versions.
-* Computed columns cannot reference trimmed columns that do not present in final projection results. This will be fixed in future versions.
-* Regular matching of tables with different schemas is not supported. If necessary, multiple rules need to be written.

@@ -31,9 +31,9 @@ import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -49,13 +49,12 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.loopCheck;
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Parallelized Integration test for MySQL connector. */
-public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
+class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
 
     private static final int PARALLELISM = 4;
     private static final int TEST_TABLE_NUMBER = 100;
@@ -79,7 +78,7 @@ public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
             new UniqueDatabase(
                     MYSQL_CONTAINER, "extreme_parallelism_test_database", TEST_USER, TEST_PASSWORD);
 
-    @Before
+    @BeforeEach
     public void init() {
         // Take over STDOUT as we need to check the output of values sink
         System.setOut(new PrintStream(outCaptor));
@@ -87,13 +86,14 @@ public class MySqlParallelizedPipelineITCase extends MySqlSourceTestBase {
         ValuesDatabase.clear();
     }
 
-    @After
+    @AfterEach
     public void cleanup() {
         System.setOut(standardOut);
+        parallelismDatabase.dropDatabase();
     }
 
     @Test
-    public void testExtremeParallelizedSchemaChange() throws Exception {
+    void testExtremeParallelizedSchemaChange() throws Exception {
         final String databaseName = parallelismDatabase.getDatabaseName();
         try (Connection conn =
                         DriverManager.getConnection(

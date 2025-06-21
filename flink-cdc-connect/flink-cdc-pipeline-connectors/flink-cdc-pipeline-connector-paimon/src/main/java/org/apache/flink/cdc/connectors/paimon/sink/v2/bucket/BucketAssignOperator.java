@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.event.ChangeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -53,6 +52,8 @@ import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.sink.RowKeyExtractor;
 import org.apache.paimon.table.sink.RowPartitionKeyExtractor;
 import org.apache.paimon.utils.MathUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -62,6 +63,8 @@ import java.util.Optional;
 /** Assign bucket for every given {@link DataChangeEvent}. */
 public class BucketAssignOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event> {
+
+    protected static final Logger LOGGER = LoggerFactory.getLogger(BucketAssignOperator.class);
 
     public final String commitUser;
 
@@ -99,8 +102,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
         super.open();
         this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         this.bucketAssignerMap = new HashMap<>();
-        this.totalTasksNumber = getRuntimeContext().getNumberOfParallelSubtasks();
-        this.currentTaskNumber = getRuntimeContext().getIndexOfThisSubtask();
+        this.totalTasksNumber = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
+        this.currentTaskNumber = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         this.schemaMaps = new HashMap<>();
     }
 
@@ -121,10 +124,16 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
     public void processElement(StreamRecord<Event> streamRecord) throws Exception {
         Event event = streamRecord.getValue();
         if (event instanceof FlushEvent) {
-            output.collect(
-                    new StreamRecord<>(
-                            new BucketWrapperFlushEvent(
-                                    currentTaskNumber, ((FlushEvent) event).getSourceSubTaskId())));
+            for (int i = 0; i < totalTasksNumber; i++) {
+                output.collect(
+                        new StreamRecord<>(
+                                new BucketWrapperFlushEvent(
+                                        i,
+                                        ((FlushEvent) event).getSourceSubTaskId(),
+                                        currentTaskNumber,
+                                        ((FlushEvent) event).getTableIds(),
+                                        ((FlushEvent) event).getSchemaChangeEventType())));
+            }
             return;
         }
 
@@ -151,7 +160,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                             dataChangeEvent,
                             schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
             switch (tuple4.f0) {
-                case DYNAMIC:
+                case HASH_DYNAMIC:
                     {
                         bucket =
                                 tuple4.f2.assign(
@@ -159,18 +168,18 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                                         tuple4.f3.trimmedPrimaryKey(genericRow).hashCode());
                         break;
                     }
-                case FIXED:
+                case HASH_FIXED:
                     {
                         tuple4.f1.setRecord(genericRow);
                         bucket = tuple4.f1.bucket();
                         break;
                     }
-                case UNAWARE:
+                case BUCKET_UNAWARE:
                     {
                         bucket = 0;
                         break;
                     }
-                case GLOBAL_DYNAMIC:
+                case CROSS_PARTITION:
                 default:
                     {
                         throw new RuntimeException("Unsupported bucket mode: " + tuple4.f0);
@@ -178,24 +187,21 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             }
             output.collect(
                     new StreamRecord<>(new BucketWrapperChangeEvent(bucket, (ChangeEvent) event)));
-        } else if (event instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) event;
-            schemaMaps.put(
-                    createTableEvent.tableId(),
-                    new TableSchemaInfo(createTableEvent.getSchema(), zoneId));
-            output.collect(
-                    new StreamRecord<>(
-                            new BucketWrapperChangeEvent(currentTaskNumber, (ChangeEvent) event)));
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
             Schema schema =
                     SchemaUtils.applySchemaChangeEvent(
-                            schemaMaps.get(schemaChangeEvent.tableId()).getSchema(),
+                            Optional.ofNullable(schemaMaps.get(schemaChangeEvent.tableId()))
+                                    .map(TableSchemaInfo::getSchema)
+                                    .orElse(null),
                             schemaChangeEvent);
             schemaMaps.put(schemaChangeEvent.tableId(), new TableSchemaInfo(schema, zoneId));
-            output.collect(
-                    new StreamRecord<>(
-                            new BucketWrapperChangeEvent(currentTaskNumber, (ChangeEvent) event)));
+            // Broadcast SchemachangeEvent.
+            for (int index = 0; index < totalTasksNumber; index++) {
+                output.collect(
+                        new StreamRecord<>(
+                                new BucketWrapperChangeEvent(index, (ChangeEvent) event)));
+            }
         }
     }
 

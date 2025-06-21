@@ -18,12 +18,11 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.utils.StringUtils;
 
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
-
-import static org.apache.flink.cdc.runtime.parser.TransformParser.normalizeFilter;
 
 /** A rule defining pre-transformations where filtered rows and irrelevant columns are removed. */
 public class TransformRule implements Serializable {
@@ -48,8 +47,8 @@ public class TransformRule implements Serializable {
             @Nullable String postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInclusions = tableInclusions;
-        this.projection = projection;
-        this.filter = normalizeFilter(projection, filter);
+        this.projection = StringUtils.isNullOrWhitespaceOnly(projection) ? "*" : projection;
+        this.filter = filter;
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
         this.tableOption = tableOption;

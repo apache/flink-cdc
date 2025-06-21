@@ -18,14 +18,14 @@
 package org.apache.flink.cdc.cli.utils;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.composer.flink.FlinkPipelineComposer;
-import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
+import org.apache.flink.core.fs.Path;
+
+import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
-import java.util.List;
+import java.io.File;
 
 /** Utilities for handling Flink configuration and environment. */
 public class FlinkEnvironmentUtils {
@@ -36,26 +36,19 @@ public class FlinkEnvironmentUtils {
     private static final String FLINK_CONF_FILENAME = "config.yaml";
 
     public static Configuration loadFlinkConfiguration(Path flinkHome) throws Exception {
-        Path flinkConfPath = flinkHome.resolve(FLINK_CONF_DIR).resolve(FLINK_CONF_FILENAME);
-        if (flinkConfPath.toFile().exists()) {
+        Path flinkConfPath =
+                new Path(
+                        flinkHome,
+                        Joiner.on(File.separator).join(FLINK_CONF_DIR, FLINK_CONF_FILENAME));
+        if (flinkConfPath.getFileSystem().exists(flinkConfPath)) {
             return ConfigurationUtils.loadConfigFile(flinkConfPath);
         } else {
             return ConfigurationUtils.loadConfigFile(
-                    flinkHome.resolve(FLINK_CONF_DIR).resolve(LEGACY_FLINK_CONF_FILENAME), true);
+                    new Path(
+                            flinkHome,
+                            Joiner.on(File.separator)
+                                    .join(FLINK_CONF_DIR, LEGACY_FLINK_CONF_FILENAME)),
+                    true);
         }
-    }
-
-    public static FlinkPipelineComposer createComposer(
-            boolean useMiniCluster,
-            Configuration flinkConfig,
-            List<Path> additionalJars,
-            SavepointRestoreSettings savepointSettings) {
-        if (useMiniCluster) {
-            return FlinkPipelineComposer.ofMiniCluster();
-        }
-        org.apache.flink.configuration.Configuration configuration =
-                org.apache.flink.configuration.Configuration.fromMap(flinkConfig.toMap());
-        SavepointRestoreSettings.toConfiguration(savepointSettings, configuration);
-        return FlinkPipelineComposer.ofRemoteCluster(configuration, additionalJars);
     }
 }

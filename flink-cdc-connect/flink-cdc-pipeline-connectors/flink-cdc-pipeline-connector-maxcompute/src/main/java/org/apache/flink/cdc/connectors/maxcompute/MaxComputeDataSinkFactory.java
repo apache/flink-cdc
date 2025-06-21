@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.connectors.maxcompute.options.CompressAlgorithm;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.configuration.MemorySize;
@@ -69,21 +70,20 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
 
     private MaxComputeWriteOptions extractMaxComputeWriteOptions(
             Configuration factoryConfiguration) {
-        int numCommitThread =
-                factoryConfiguration.get(MaxComputeDataSinkOptions.NUM_COMMIT_THREADS);
-        String compressAlgorithm =
+        int numCommitThread = factoryConfiguration.get(MaxComputeDataSinkOptions.COMMIT_THREAD_NUM);
+        CompressAlgorithm compressAlgorithm =
                 factoryConfiguration.get(MaxComputeDataSinkOptions.COMPRESS_ALGORITHM);
         int flushConcurrent =
-                factoryConfiguration.get(MaxComputeDataSinkOptions.NUM_FLUSH_CONCURRENT);
+                factoryConfiguration.get(MaxComputeDataSinkOptions.FLUSH_CONCURRENT_NUM);
         long maxBufferSize =
                 MemorySize.parse(
                                 factoryConfiguration.get(
-                                        MaxComputeDataSinkOptions.TOTAL_BATCH_SIZE))
+                                        MaxComputeDataSinkOptions.TOTAL_BUFFER_SIZE))
                         .getBytes();
         long maxSlotSize =
                 MemorySize.parse(
                                 factoryConfiguration.get(
-                                        MaxComputeDataSinkOptions.BUCKET_BATCH_SIZE))
+                                        MaxComputeDataSinkOptions.BUCKET_BUFFER_SIZE))
                         .getBytes();
 
         return MaxComputeWriteOptions.builder()
@@ -119,11 +119,11 @@ public class MaxComputeDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MaxComputeDataSinkOptions.STS_TOKEN);
         optionalOptions.add(MaxComputeDataSinkOptions.BUCKETS_NUM);
         // write options
-        optionalOptions.add(MaxComputeDataSinkOptions.NUM_COMMIT_THREADS);
+        optionalOptions.add(MaxComputeDataSinkOptions.COMMIT_THREAD_NUM);
         optionalOptions.add(MaxComputeDataSinkOptions.COMPRESS_ALGORITHM);
-        optionalOptions.add(MaxComputeDataSinkOptions.NUM_FLUSH_CONCURRENT);
-        optionalOptions.add(MaxComputeDataSinkOptions.TOTAL_BATCH_SIZE);
-        optionalOptions.add(MaxComputeDataSinkOptions.BUCKET_BATCH_SIZE);
+        optionalOptions.add(MaxComputeDataSinkOptions.FLUSH_CONCURRENT_NUM);
+        optionalOptions.add(MaxComputeDataSinkOptions.TOTAL_BUFFER_SIZE);
+        optionalOptions.add(MaxComputeDataSinkOptions.BUCKET_BUFFER_SIZE);
 
         return optionalOptions;
     }

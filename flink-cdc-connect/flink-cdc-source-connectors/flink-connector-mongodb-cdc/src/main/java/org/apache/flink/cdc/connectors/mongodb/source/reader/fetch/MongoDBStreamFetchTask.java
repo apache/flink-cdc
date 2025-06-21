@@ -121,6 +121,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                                     "Resume token has expired, fallback to timestamp restart mode");
                         }
                         changeStreamCursor = openChangeStreamCursor(descriptor, resumeTokenExpires);
+                        heartbeatManager = openHeartbeatManagerIfNeeded(changeStreamCursor);
                         next = Optional.ofNullable(changeStreamCursor.tryNext());
                     } else {
                         throw e;

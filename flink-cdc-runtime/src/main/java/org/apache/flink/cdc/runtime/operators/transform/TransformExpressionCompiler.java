@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.common.InvalidProgramException;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
@@ -74,14 +75,17 @@ public class TransformExpressionCompiler {
                             expressionEvaluator.cook(key.getExpression());
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
-                                    "Expression cannot be compiled. This is a bug. Please file an issue.\nExpression: "
-                                            + key.getExpression(),
+                                    String.format(
+                                            "Expression cannot be compiled. This is a bug. Please file an issue.\n\tExpression: %s\n\tColumn name map: {%s}",
+                                            key.getExpression(),
+                                            TransformException.prettyPrintColumnNameMap(
+                                                    key.getColumnNameMap())),
                                     e);
                         }
                         return expressionEvaluator;
                     });
         } catch (Exception e) {
-            throw new FlinkRuntimeException(e.getMessage(), e);
+            throw new FlinkRuntimeException("Failed to compile expression " + key, e);
         }
     }
 }

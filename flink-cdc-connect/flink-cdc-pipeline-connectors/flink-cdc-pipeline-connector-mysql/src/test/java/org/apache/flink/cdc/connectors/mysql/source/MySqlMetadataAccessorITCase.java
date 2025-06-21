@@ -32,10 +32,10 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.time.ZoneId;
@@ -48,7 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** IT cases for {@link MySqlMetadataAccessor}. */
-public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
+class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
 
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
@@ -70,21 +70,21 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -92,32 +92,42 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57AccessDatabaseAndTable() {
+    void testMysql57AccessDatabaseAndTable() {
         testAccessDatabaseAndTable(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMysql8AccessDatabaseAndTable() {
+    void testMysql8AccessDatabaseAndTable() {
         testAccessDatabaseAndTable(fullTypesMySql8Database);
     }
 
     @Test
-    public void testMysql57AccessCommonTypesSchema() {
-        testAccessCommonTypesSchema(fullTypesMySql57Database);
+    void testMysql57AccessCommonTypesSchemaTinyInt1isBit() {
+        testAccessCommonTypesSchema(fullTypesMySql57Database, true);
     }
 
     @Test
-    public void testMysql8AccessCommonTypesSchema() {
-        testAccessCommonTypesSchema(fullTypesMySql8Database);
+    public void testMysql57AccessCommonTypesSchemaTinyInt1isNotBit() {
+        testAccessCommonTypesSchema(fullTypesMySql57Database, false);
     }
 
     @Test
-    public void testMysql57AccessTimeTypesSchema() {
+    void testMysql8AccessCommonTypesSchemaTinyInt1isBit() {
+        testAccessCommonTypesSchema(fullTypesMySql8Database, true);
+    }
+
+    @Test
+    public void testMysql8AccessCommonTypesSchemaTinyInt1isNotBit() {
+        testAccessCommonTypesSchema(fullTypesMySql8Database, false);
+    }
+
+    @Test
+    void testMysql57AccessTimeTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
         String[] tables = new String[] {"time_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
@@ -158,12 +168,12 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8AccessTimeTypesSchema() {
+    void testMysql8AccessTimeTypesSchema() {
         fullTypesMySql8Database.createAndInitialize();
 
         String[] tables = new String[] {"time_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database);
+                getMetadataAccessor(tables, fullTypesMySql8Database, true);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
@@ -208,17 +218,19 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57PrecisionTypesSchema() {
+    void testMysql57PrecisionTypesSchema() {
         fullTypesMySql57Database.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};
+
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql57Database);
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
                         TableId.tableId(
                                 fullTypesMySql57Database.getDatabaseName(), "precision_types"));
+
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
@@ -283,17 +295,18 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8PrecisionTypesSchema() {
+    void testMysql8PrecisionTypesSchema() {
         fullTypesMySql8Database.createAndInitialize();
 
         String[] tables = new String[] {"precision_types"};
         MySqlMetadataAccessor metadataAccessor =
-                getMetadataAccessor(tables, fullTypesMySql8Database);
+                getMetadataAccessor(tables, fullTypesMySql8Database, false);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
                         TableId.tableId(
                                 fullTypesMySql8Database.getDatabaseName(), "precision_types"));
+
         Schema expectedSchema =
                 Schema.newBuilder()
                         .primaryKey("id")
@@ -360,8 +373,9 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
     private void testAccessDatabaseAndTable(UniqueDatabase database) {
         database.createAndInitialize();
 
-        String[] tables = new String[] {"common_types", "time_types", "precision_types"};
-        MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database);
+        String[] tables =
+                new String[] {"common_types", "time_types", "precision_types", "json_types"};
+        MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database, true);
 
         assertThatThrownBy(metadataAccessor::listNamespaces)
                 .isInstanceOf(UnsupportedOperationException.class);
@@ -377,11 +391,12 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
         assertThat(actualTables).containsExactlyInAnyOrderElementsOf(expectedTables);
     }
 
-    private void testAccessCommonTypesSchema(UniqueDatabase database) {
+    private void testAccessCommonTypesSchema(UniqueDatabase database, boolean tinyint1IsBit) {
         database.createAndInitialize();
 
         String[] tables = new String[] {"common_types"};
-        MySqlMetadataAccessor metadataAccessor = getMetadataAccessor(tables, database);
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, database, tinyint1IsBit);
 
         Schema actualSchema =
                 metadataAccessor.getTableSchema(
@@ -427,8 +442,12 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             DataTypes.STRING(),
                                             DataTypes.BOOLEAN(),
                                             DataTypes.BINARY(1),
-                                            DataTypes.BOOLEAN(),
-                                            DataTypes.BOOLEAN(),
+                                            tinyint1IsBit
+                                                    ? DataTypes.BOOLEAN()
+                                                    : DataTypes.TINYINT(),
+                                            tinyint1IsBit
+                                                    ? DataTypes.BOOLEAN()
+                                                    : DataTypes.TINYINT(),
                                             DataTypes.BINARY(16),
                                             DataTypes.BINARY(8),
                                             DataTypes.STRING(),
@@ -507,12 +526,74 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
         assertThat(actualSchema).isEqualTo(expectedSchema);
     }
 
-    private MySqlMetadataAccessor getMetadataAccessor(String[] tables, UniqueDatabase database) {
-        MySqlSourceConfig sourceConfig = getConfig(tables, database);
+    private MySqlMetadataAccessor getMetadataAccessor(
+            String[] tables, UniqueDatabase database, boolean tinyint1IsBit) {
+        MySqlSourceConfig sourceConfig = getConfig(tables, database, tinyint1IsBit);
         return new MySqlMetadataAccessor(sourceConfig);
     }
 
-    private MySqlSourceConfig getConfig(String[] captureTables, UniqueDatabase database) {
+    @Test
+    public void testMysql57AccessJsonTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"json_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
+                                        },
+                                        new String[] {
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
+    @Test
+    public void testMysql8AccessJsonTypesSchema() {
+        fullTypesMySql57Database.createAndInitialize();
+
+        String[] tables = new String[] {"json_types"};
+        MySqlMetadataAccessor metadataAccessor =
+                getMetadataAccessor(tables, fullTypesMySql57Database, true);
+
+        Schema actualSchema =
+                metadataAccessor.getTableSchema(
+                        TableId.tableId(fullTypesMySql57Database.getDatabaseName(), "json_types"));
+        Schema expectedSchema =
+                Schema.newBuilder()
+                        .primaryKey("id")
+                        .fromRowDataType(
+                                RowType.of(
+                                        new DataType[] {
+                                            DataTypes.DECIMAL(20, 0).notNull(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.INT()
+                                        },
+                                        new String[] {
+                                            "id", "json_c0", "json_c1", "json_c2", "int_c",
+                                        }))
+                        .build();
+        assertThat(actualSchema).isEqualTo(expectedSchema);
+    }
+
+    private MySqlSourceConfig getConfig(
+            String[] captureTables, UniqueDatabase database, boolean tinyint1IsBit) {
         String[] captureTableIds =
                 Arrays.stream(captureTables)
                         .map(tableName -> database.getDatabaseName() + "." + tableName)
@@ -530,6 +611,7 @@ public class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                 .username(database.getUsername())
                 .password(database.getPassword())
                 .serverTimeZone(ZoneId.of("UTC").toString())
+                .treatTinyInt1AsBoolean(tinyint1IsBit)
                 .createConfig(0);
     }
 }

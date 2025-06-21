@@ -62,31 +62,52 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean includeSchemaChanges;
+    private final boolean tinyInt1isBit;
+    private final boolean includeComments;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
 
     private List<MySqlReadableMetadata> readableMetadataList;
+    private boolean isTableIdCaseInsensitive;
 
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
-        this(changelogMode, includeSchemaChanges, new ArrayList<>());
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
+        this(
+                changelogMode,
+                includeSchemaChanges,
+                new ArrayList<>(),
+                includeSchemaChanges,
+                tinyInt1isBit,
+                isTableIdCaseInsensitive);
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
-            List<MySqlReadableMetadata> readableMetadataList) {
+            List<MySqlReadableMetadata> readableMetadataList,
+            boolean includeComments,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
+        this.includeComments = includeComments;
+        this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser();
+                customParser =
+                        new CustomMySqlAntlrDdlParser(
+                                includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
                 tables = new Tables();
             }
 

@@ -28,21 +28,21 @@ import java.util.Optional;
 /** Post-Transformation rule used by {@link PostTransformOperator}. */
 public class PostTransformer {
     private final Selectors selectors;
-    private final SupportedMetadataColumn[] supportedMetadataColumns;
 
-    private final Optional<TransformProjection> projection;
-    private final Optional<TransformFilter> filter;
-    private final Optional<PostTransformConverter> postTransformConverter;
+    private final @Nullable TransformProjection projection;
+    private final @Nullable TransformFilter filter;
+    private final @Nullable PostTransformConverter postTransformConverter;
+    private final SupportedMetadataColumn[] supportedMetadataColumns;
 
     public PostTransformer(
             Selectors selectors,
             @Nullable TransformProjection projection,
             @Nullable TransformFilter filter,
-            Optional<PostTransformConverter> postTransformConverter,
+            @Nullable PostTransformConverter postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         this.selectors = selectors;
-        this.projection = projection != null ? Optional.of(projection) : Optional.empty();
-        this.filter = filter != null ? Optional.of(filter) : Optional.empty();
+        this.projection = projection;
+        this.filter = filter;
         this.postTransformConverter = postTransformConverter;
         this.supportedMetadataColumns = supportedMetadataColumns;
     }
@@ -52,15 +52,15 @@ public class PostTransformer {
     }
 
     public Optional<TransformProjection> getProjection() {
-        return projection;
+        return Optional.ofNullable(projection);
     }
 
     public Optional<TransformFilter> getFilter() {
-        return filter;
+        return Optional.ofNullable(filter);
     }
 
     public Optional<PostTransformConverter> getPostTransformConverter() {
-        return postTransformConverter;
+        return Optional.ofNullable(postTransformConverter);
     }
 
     public SupportedMetadataColumn[] getSupportedMetadataColumns() {

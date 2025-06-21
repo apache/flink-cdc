@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DefaultDataChangeEventHashFunctionProvider;
@@ -32,6 +33,8 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -80,7 +83,11 @@ class PrePartitionOperatorTest {
 
             // FlushEvent
             RegularPrePartitionOperator operator = testHarness.getOperator();
-            FlushEvent flushEvent = new FlushEvent(0);
+            FlushEvent flushEvent =
+                    new FlushEvent(
+                            0,
+                            Collections.singletonList(CUSTOMERS),
+                            SchemaChangeEventType.CREATE_TABLE);
             operator.processElement(new StreamRecord<>(flushEvent));
             assertThat(testHarness.getOutputRecords()).hasSize(DOWNSTREAM_PARALLELISM);
             for (int i = 0; i < DOWNSTREAM_PARALLELISM; i++) {
@@ -114,13 +121,16 @@ class PrePartitionOperatorTest {
                                     new Object[] {2, new BinaryStringData("Bob"), 12345689L}));
             operator.processElement(new StreamRecord<>(eventA));
             operator.processElement(new StreamRecord<>(eventB));
-            assertThat(testHarness.getOutputRecords().poll())
+            StreamRecord<?> recordA = testHarness.getOutputRecords().poll();
+            assertThat(recordA)
                     .isEqualTo(
                             new StreamRecord<>(
                                     PartitioningEvent.ofRegular(
                                             eventA,
                                             getPartitioningTarget(CUSTOMERS_SCHEMA, eventA))));
-            assertThat(testHarness.getOutputRecords().poll())
+
+            StreamRecord<?> recordB = testHarness.getOutputRecords().poll();
+            assertThat(recordB)
                     .isEqualTo(
                             new StreamRecord<>(
                                     PartitioningEvent.ofRegular(

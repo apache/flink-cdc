@@ -17,16 +17,18 @@
 
 package org.apache.flink.cdc.connectors.base.source.reader.external;
 
+import org.apache.flink.annotation.Internal;
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.ErrorHandler;
+import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.spi.OffsetContext;
 import io.debezium.pipeline.spi.Partition;
 import io.debezium.relational.RelationalDatabaseSchema;
@@ -43,6 +45,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** The context for fetch task that fetching data of snapshot split from JDBC data source. */
+@Internal
 public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     protected final JdbcSourceConfig sourceConfig;
@@ -171,7 +174,9 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     public abstract ErrorHandler getErrorHandler();
 
-    public abstract JdbcSourceEventDispatcher getDispatcher();
+    public abstract EventDispatcher getEventDispatcher();
+
+    public abstract WatermarkDispatcher getWaterMarkDispatcher();
 
     public abstract OffsetContext getOffsetContext();
 
