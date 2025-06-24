@@ -48,24 +48,28 @@ jobs:
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
   common:
+    if: github.repository == 'apache/flink-cdc'
     name: Common Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
       modules: "['core']"
   pipeline-ut:
+    if: github.repository == 'apache/flink-cdc'
     name: Pipeline Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
       modules: "['mysql-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks']"
   source-ut:
+    if: github.repository == 'apache/flink-cdc'
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
       modules: "['mysql-source', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
+    if: github.repository == 'apache/flink-cdc'
     strategy:
       fail-fast: false
       matrix:
@@ -78,6 +82,7 @@ jobs:
       modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
+    if: github.repository == 'apache/flink-cdc'
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
