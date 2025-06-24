@@ -18,12 +18,12 @@ name: Flink CDC Base Workflow
 on:
   workflow_call:
     inputs:
-      java-version:
+      java-versions:
         description: "Jdk versions to test against."
         required: false
         type: string
         default: "['8']"
-      flink-version:
+      flink-versions:
         description: "Flink versions to test against."
         required: false
         type: string
