@@ -139,8 +139,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java-version: ${{ fromJSON(inputs.java-version) }}
-        flink-version: ${{ fromJSON(inputs.flink-version) }}
+        java-version: ${{ fromJSON(inputs.java-versions) }}
+        flink-version: ${{ fromJSON(inputs.flink-versions) }}
         module: ${{ fromJSON(inputs.modules) }}
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.java-version }}"
