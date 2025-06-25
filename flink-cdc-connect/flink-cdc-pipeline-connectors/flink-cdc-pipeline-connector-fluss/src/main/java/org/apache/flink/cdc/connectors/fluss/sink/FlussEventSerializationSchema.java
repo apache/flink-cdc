@@ -26,7 +26,6 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.common.utils.SchemaUtils;
 
 import com.alibaba.fluss.flink.row.RowWithOp;
 import com.alibaba.fluss.flink.sink.serializer.FlussSerializationSchema;
@@ -74,11 +73,10 @@ public class FlussEventSerializationSchema implements FlussSerializationSchema<E
         if (event instanceof CreateTableEvent) {
             newSchema = ((CreateTableEvent) event).getSchema();
         } else {
-            TableSchemaInfo tableInfo = tableInfoMap.get(tableId);
-            if (tableInfo == null) {
-                throw new RuntimeException("schema of " + tableId + " is not existed.");
-            }
-            newSchema = SchemaUtils.applySchemaChangeEvent(tableInfo.schema, event);
+            // TODO: Logics for altering tables are not supported yet.
+            // This is anticipated to be supported in Fluss version 0.8.0.
+            throw new RuntimeException(
+                    "Schema change type not supported. Only CreateTableEvent is allowed at the moment.");
         }
         tableInfoMap.put(tableId, new TableSchemaInfo(newSchema, zoneId));
     }

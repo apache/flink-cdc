@@ -1,15 +1,29 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.cdc.connectors.fluss.sink;
 
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
-import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DataType;
@@ -18,16 +32,18 @@ import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.FloatType;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
-import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.VarCharType;
-import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import com.alibaba.fluss.flink.row.OperationType;
 import com.alibaba.fluss.flink.row.RowWithOp;
 import com.alibaba.fluss.flink.sink.serializer.FlussSerializationSchema;
+import com.alibaba.fluss.row.BinaryString;
+import com.alibaba.fluss.row.Decimal;
 import com.alibaba.fluss.row.GenericRow;
+import com.alibaba.fluss.row.TimestampLtz;
+import com.alibaba.fluss.row.TimestampNtz;
 import com.alibaba.fluss.types.RowType;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +55,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.Objects;
 
 public class FlussEventSerializationSchemaTest {
@@ -76,12 +91,18 @@ public class FlussEventSerializationSchemaTest {
                                 new Object[] {
                                     1,
                                     true,
-                                    TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 18:00:00"))
+                                    TimestampData.fromMillis(
+                                            Timestamp.valueOf("2023-11-27 18:00:00").getTime())
                                 }));
 
         verifySerializeResult(
-                new RowWithOp(GenericRow.of(1, true, "2023-11-27 18:00:00"), OperationType.UPSERT),
+                new RowWithOp(
+                        GenericRow.of(
+                                1,
+                                true,
+                                TimestampNtz.fromMillis(
+                                        Timestamp.valueOf("2023-11-27 18:00:00").getTime())),
+                        OperationType.UPSERT),
                 serializer.serialize(insertEvent1));
 
         DataChangeEvent deleteEvent1 =
@@ -91,11 +112,17 @@ public class FlussEventSerializationSchemaTest {
                                 new Object[] {
                                     2,
                                     false,
-                                    TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 19:00:00"))
+                                    TimestampData.fromMillis(
+                                            Timestamp.valueOf("2023-11-27 19:00:00").getTime())
                                 }));
         verifySerializeResult(
-                new RowWithOp(GenericRow.of(2, false, "2023-11-27 19:00:00"), OperationType.DELETE),
+                new RowWithOp(
+                        GenericRow.of(
+                                2,
+                                false,
+                                TimestampNtz.fromMillis(
+                                        Timestamp.valueOf("2023-11-27 19:00:00").getTime())),
+                        OperationType.DELETE),
                 serializer.serialize(deleteEvent1));
 
         DataChangeEvent updateEvent1 =
@@ -105,18 +132,24 @@ public class FlussEventSerializationSchemaTest {
                                 new Object[] {
                                     3,
                                     false,
-                                    TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 20:00:00"))
+                                    TimestampData.fromMillis(
+                                            Timestamp.valueOf("2023-11-27 20:00:00").getTime())
                                 }),
                         generator1.generate(
                                 new Object[] {
                                     3,
                                     true,
-                                    TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 21:00:00"))
+                                    TimestampData.fromMillis(
+                                            Timestamp.valueOf("2023-11-27 21:00:00").getTime())
                                 }));
         verifySerializeResult(
-                new RowWithOp(GenericRow.of(3, true, "2023-11-27 21:00:00"), OperationType.UPSERT),
+                new RowWithOp(
+                        GenericRow.of(
+                                3,
+                                true,
+                                TimestampNtz.fromMillis(
+                                        Timestamp.valueOf("2023-11-27 21:00:00").getTime())),
+                        OperationType.UPSERT),
                 serializer.serialize(updateEvent1));
 
         // 2. create table2, and insert data
@@ -126,6 +159,8 @@ public class FlussEventSerializationSchemaTest {
                         .physicalColumn("col1", new DateType())
                         .physicalColumn("col2", new FloatType())
                         .physicalColumn("col3", new VarCharType(20))
+                        .physicalColumn("col4", new DecimalType(20, 5))
+                        .physicalColumn("col5", new LocalZonedTimestampType())
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema2);
@@ -141,42 +176,8 @@ public class FlussEventSerializationSchemaTest {
                                 new Object[] {
                                     (int) LocalDate.of(2023, 11, 27).toEpochDay(),
                                     3.4f,
-                                    BinaryStringData.fromString("insert table2")
-                                }));
-        verifySerializeResult(
-                new RowWithOp(
-                        GenericRow.of("2023-11-27", 3.4f, "insert table2"), OperationType.UPSERT),
-                serializer.serialize(insertEvent2));
-
-        // 3. add columns to table1, and delete data
-        AddColumnEvent addColumnEvent =
-                new AddColumnEvent(
-                        table1,
-                        Arrays.asList(
-                                new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("col4", new DecimalType(20, 5))),
-                                new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("col5", new SmallIntType())),
-                                new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn(
-                                                "col6", new LocalZonedTimestampType()))));
-        Schema newSchema1 = SchemaUtils.applySchemaChangeEvent(schema1, addColumnEvent);
-        BinaryRecordDataGenerator newGenerator1 =
-                new BinaryRecordDataGenerator(
-                        newSchema1.getColumnDataTypes().toArray(new DataType[0]));
-        Assertions.assertThat(serializer.serialize(addColumnEvent)).isNull();
-
-        DataChangeEvent deleteEvent2 =
-                DataChangeEvent.deleteEvent(
-                        table1,
-                        newGenerator1.generate(
-                                new Object[] {
-                                    4,
-                                    true,
-                                    TimestampData.fromTimestamp(
-                                            Timestamp.valueOf("2023-11-27 21:00:00")),
+                                    BinaryStringData.fromString("insert table2"),
                                     DecimalData.fromBigDecimal(new BigDecimal("83.23"), 20, 5),
-                                    (short) 9,
                                     LocalZonedTimestampData.fromInstant(
                                             LocalDateTime.of(2023, 11, 27, 21, 0, 0)
                                                     .toInstant(ZoneOffset.of("+10")))
@@ -184,33 +185,35 @@ public class FlussEventSerializationSchemaTest {
         verifySerializeResult(
                 new RowWithOp(
                         GenericRow.of(
+                                (int) LocalDate.of(2023, 11, 27).toEpochDay(),
+                                3.4f,
+                                BinaryString.fromString("insert table2"),
+                                Decimal.fromBigDecimal(new BigDecimal("83.23"), 20, 5),
+                                TimestampLtz.fromInstant(
+                                        LocalDateTime.of(2023, 11, 27, 21, 0, 0)
+                                                .toInstant(ZoneOffset.of("+10")))),
+                        OperationType.UPSERT),
+                serializer.serialize(insertEvent2));
+
+        DataChangeEvent deleteEvent2 =
+                DataChangeEvent.deleteEvent(
+                        table1,
+                        generator1.generate(
+                                new Object[] {
+                                    4,
+                                    true,
+                                    TimestampData.fromMillis(
+                                            Timestamp.valueOf("2023-11-27 21:00:00").getTime())
+                                }));
+        verifySerializeResult(
+                new RowWithOp(
+                        GenericRow.of(
                                 4,
                                 true,
-                                "2023-11-27 21:00:00",
-                                DecimalData.fromBigDecimal(new BigDecimal("83.23"), 20, 5)
-                                        .toBigDecimal(),
-                                (short) 9,
-                                "2023-11-27 19:00:00"),
+                                TimestampNtz.fromMillis(
+                                        Timestamp.valueOf("2023-11-27 21:00:00").getTime())),
                         OperationType.DELETE),
                 Objects.requireNonNull(serializer.serialize(deleteEvent2)));
-
-        // 4. drop columns from table2, and insert data
-        DropColumnEvent dropColumnEvent =
-                new DropColumnEvent(table2, Arrays.asList("col2", "col3"));
-        Schema newSchema2 = SchemaUtils.applySchemaChangeEvent(schema2, dropColumnEvent);
-        BinaryRecordDataGenerator newGenerator2 =
-                new BinaryRecordDataGenerator(
-                        newSchema2.getColumnDataTypes().toArray(new DataType[0]));
-        Assertions.assertThat(serializer.serialize(dropColumnEvent)).isNull();
-
-        DataChangeEvent insertEvent3 =
-                DataChangeEvent.insertEvent(
-                        table2,
-                        newGenerator2.generate(
-                                new Object[] {(int) LocalDate.of(2023, 11, 28).toEpochDay()}));
-        verifySerializeResult(
-                new RowWithOp(GenericRow.of("2023-11-28"), OperationType.UPSERT),
-                Objects.requireNonNull(serializer.serialize(insertEvent3)));
     }
 
     private void verifySerializeResult(RowWithOp expectRow, RowWithOp flussRowData)

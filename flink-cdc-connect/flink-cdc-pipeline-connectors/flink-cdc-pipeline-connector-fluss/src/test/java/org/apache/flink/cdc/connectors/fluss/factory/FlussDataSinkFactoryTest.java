@@ -40,8 +40,6 @@ public class FlussDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
-                                .put(FlussDataSinkOptions.DATABASE.key(), "mydb")
-                                .put(FlussDataSinkOptions.TABLE.key(), "orders")
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
@@ -69,8 +67,6 @@ public class FlussDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
-                                .put(FlussDataSinkOptions.DATABASE.key(), "mydb")
-                                .put(FlussDataSinkOptions.TABLE.key(), "orders")
                                 .put("fluss.properties.option1", "value1")
                                 .build());
         DataSink dataSink =
@@ -84,8 +80,6 @@ public class FlussDataSinkFactoryTest {
         return Configuration.fromMap(
                 ImmutableMap.<String, String>builder()
                         .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
-                        .put(FlussDataSinkOptions.DATABASE.key(), "mydb")
-                        .put(FlussDataSinkOptions.TABLE.key(), "orders")
                         .build());
     }
 }

@@ -1,9 +1,24 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.cdc.connectors.fluss.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
-
-import static org.apache.flink.cdc.common.configuration.ConfigOptions.key;
 
 public class FlussDataSinkOptions {
 
@@ -14,23 +29,11 @@ public class FlussDataSinkOptions {
             ConfigOptions.key("bootstrap.servers")
                     .stringType()
                     .noDefaultValue()
-                    .withDescription("The bootstrap servers for the Fluss sink connection");
+                    .withDescription("The bootstrap servers for the Fluss sink connection.");
 
-    public static final ConfigOption<String> DATABASE =
-            key("database")
+    public static final ConfigOption<String> CLIENT_ID =
+            ConfigOptions.key("client.id")
                     .stringType()
-                    .noDefaultValue()
-                    .withDescription("The database name for the Fluss sink");
-
-    public static final ConfigOption<String> TABLE =
-            key("table")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription("The table name for the Fluss sink");
-
-    public static final ConfigOption<Boolean> SHUFFLE_BY_BUCKET_ID =
-            key("shuffle-by-bucket-id")
-                    .booleanType()
-                    .defaultValue(true)
-                    .withDescription("Whether to shuffle data by bucket ID");
+                    .defaultValue("")
+                    .withDescription("An id string to pass to the server when making requests.");
 }

@@ -17,33 +17,28 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
-import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.common.sink.EventSinkProvider;
-import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
-import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.connectors.fluss.writer.FlussWriter;
 
 import com.alibaba.fluss.config.Configuration;
 
-import java.time.ZoneId;
+import java.io.IOException;
 
-public class FlussDataSink implements DataSink {
-
-    private final ZoneId zoneId;
+public class FlussEventSink implements Sink<Event> {
+    private final FlussEventSerializationSchema serializer;
     private final Configuration flussConfig;
 
-    public FlussDataSink(Configuration flussConfig, ZoneId zoneId) {
-        this.zoneId = zoneId;
+    public FlussEventSink(Configuration flussConfig, FlussEventSerializationSchema serializer) {
+        this.serializer = serializer;
         this.flussConfig = flussConfig;
     }
 
     @Override
-    public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(
-                new FlussEventSink(flussConfig, new FlussEventSerializationSchema(zoneId)));
-    }
-
-    @Override
-    public MetadataApplier getMetadataApplier() {
-        return new FlussMetaDataApplier();
+    public SinkWriter<Event> createWriter(InitContext context) throws IOException {
+        FlussWriter flussWriter = new FlussWriter(context, flussConfig, serializer);
+        flussWriter.initialize();
+        return flussWriter;
     }
 }

@@ -1,13 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.cdc.connectors.fluss.factory;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
-import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
-import org.apache.flink.cdc.connectors.fluss.config.FlussSinkOptions;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
+
+import com.alibaba.fluss.config.Configuration;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -17,10 +34,8 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BOOTSTRAP_SERVERS;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.DATABASE;
+import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.CLIENT_ID;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.PREFIX_FLUSS_PROPERTIES;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.SHUFFLE_BY_BUCKET_ID;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.TABLE;
 
 public class FlussDataSinkFactory implements DataSinkFactory {
     public static final String IDENTIFIER = "fluss";
@@ -29,19 +44,18 @@ public class FlussDataSinkFactory implements DataSinkFactory {
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context).validateExcept(PREFIX_FLUSS_PROPERTIES);
 
-        Configuration configuration = context.getFactoryConfiguration();
-        String bootstrap = configuration.get(BOOTSTRAP_SERVERS);
-        String database = configuration.get(DATABASE);
-        String table = configuration.get(TABLE);
-
-        Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         Map<String, String> flussOptions = new HashMap<>();
-        allOptions.forEach(
-                (key, value) -> {
-                    if (key.startsWith(PREFIX_FLUSS_PROPERTIES)) {
-                        flussOptions.put(key.substring(PREFIX_FLUSS_PROPERTIES.length()), value);
-                    }
-                });
+        context.getFactoryConfiguration()
+                .toMap()
+                .forEach(
+                        (key, value) -> {
+                            if (key.startsWith(PREFIX_FLUSS_PROPERTIES)) {
+                                flussOptions.put(
+                                        key.substring(PREFIX_FLUSS_PROPERTIES.length()), value);
+                            } else {
+                                flussOptions.put(key, value);
+                            }
+                        });
         ZoneId zoneId = ZoneId.systemDefault();
         if (!Objects.equals(
                 context.getPipelineConfiguration().get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE),
@@ -51,10 +65,8 @@ public class FlussDataSinkFactory implements DataSinkFactory {
                             context.getPipelineConfiguration()
                                     .get(PipelineOptions.PIPELINE_LOCAL_TIME_ZONE));
         }
-        FlussSinkOptions flussSinkOptions =
-                new FlussSinkOptions(bootstrap, database, table, flussOptions);
-
-        return new FlussDataSink(flussSinkOptions, zoneId);
+        Configuration config = Configuration.fromMap(flussOptions);
+        return new FlussDataSink(config, zoneId);
     }
 
     @Override
@@ -66,15 +78,13 @@ public class FlussDataSinkFactory implements DataSinkFactory {
     public Set<ConfigOption<?>> requiredOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(BOOTSTRAP_SERVERS);
-        options.add(DATABASE);
-        options.add(TABLE);
         return options;
     }
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(SHUFFLE_BY_BUCKET_ID);
+        options.add(CLIENT_ID);
         return options;
     }
 }
