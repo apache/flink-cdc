@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.openJdbcConnection;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getTableId;
@@ -203,8 +204,19 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private Schema parseDDL(String ddlStatement, TableId tableId) {
         Table table = parseDdl(ddlStatement, tableId);
-
-        List<Column> columns = table.columns();
+        List<Column> columns =
+                table.columns().stream()
+                        .filter(
+                                column ->
+                                        sourceConfig
+                                                .getMySqlConnectorConfig()
+                                                .getColumnFilter()
+                                                .matches(
+                                                        tableId.catalog(),
+                                                        tableId.schema(),
+                                                        tableId.table(),
+                                                        column.name()))
+                        .collect(Collectors.toList());
         Schema.Builder tableBuilder = Schema.newBuilder();
         for (int i = 0; i < columns.size(); i++) {
             Column column = columns.get(i);
