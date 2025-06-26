@@ -381,7 +381,7 @@ class PostgresScanFetchTaskTest extends PostgresTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         discoverTables,
-                        sourceDialect.isDataCollectionIdCaseSensitive(sourceConfig),
+                        sourceDialect.isDataCollectionIdCaseInsensitive(sourceConfig),
                         sourceDialect,
                         offsetFactory);
         snapshotSplitAssigner.initEnumeratorMetrics(
