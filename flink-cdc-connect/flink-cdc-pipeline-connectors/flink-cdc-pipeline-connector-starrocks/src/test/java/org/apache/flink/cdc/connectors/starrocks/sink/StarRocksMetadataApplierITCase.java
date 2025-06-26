@@ -464,7 +464,8 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 stream,
                 starRocksSink,
                 schemaOperatorIDGenerator.generate(),
-                new OperatorUidGenerator());
+                new OperatorUidGenerator(),
+                stream.getParallelism());
 
         env.execute("StarRocks Schema Evolution Test");
     }

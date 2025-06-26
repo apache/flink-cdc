@@ -574,7 +574,8 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 stream,
                 dorisSink,
                 schemaOperatorIDGenerator.generate(),
-                new OperatorUidGenerator());
+                new OperatorUidGenerator(),
+                stream.getParallelism());
 
         env.execute("Doris Schema Evolution Test");
     }
