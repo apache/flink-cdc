@@ -95,3 +95,5 @@ maxcompute-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute/**/*
 iceberg-pipeline-connector:
   - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-iceberg/**/*
+postgres-pipeline-connector:
+  - flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-postgres/**/*

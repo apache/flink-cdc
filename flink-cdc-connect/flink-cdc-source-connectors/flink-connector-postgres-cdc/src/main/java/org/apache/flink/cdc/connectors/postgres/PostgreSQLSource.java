@@ -44,7 +44,7 @@ public class PostgreSQLSource {
     /** Builder class of {@link PostgreSQLSource}. */
     public static class Builder<T> {
 
-        private String pluginName = "decoderbufs";
+        private String pluginName = "pgoutput";
         private String slotName = "flink";
         private int port = 5432; // default 5432 port
         private String hostname;

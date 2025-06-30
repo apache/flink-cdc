@@ -126,6 +126,12 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         return getDbzProperties().getProperty(SLOT_NAME.name()) + "_" + getSubtaskId();
     }
 
+    /** Returns the JDBC URL for config unique key. */
+    public String getJdbcUrl() {
+        return String.format(
+                "jdbc:postgresql://%s:%d/%s", getHostname(), getPort(), getDatabaseList().get(0));
+    }
+
     @Override
     public PostgresConnectorConfig getDbzConnectorConfig() {
         return new PostgresConnectorConfig(getDbzConfiguration());
