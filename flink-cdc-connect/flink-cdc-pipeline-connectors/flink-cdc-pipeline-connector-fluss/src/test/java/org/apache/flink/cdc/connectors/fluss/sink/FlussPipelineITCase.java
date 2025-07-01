@@ -42,9 +42,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
 import com.alibaba.fluss.flink.utils.FlinkTestBase;
-import com.alibaba.fluss.metadata.DatabaseDescriptor;
-import com.alibaba.fluss.metadata.Schema;
-import com.alibaba.fluss.metadata.TableDescriptor;
 import com.alibaba.fluss.metadata.TablePath;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,21 +70,57 @@ class FlussPipelineITCase extends FlinkTestBase {
     private static final TablePath DEFAULT_SINK_TABLE_2_PATH =
             TablePath.of(DEFAULT_SINK_DB, "flink_cdc_test_table_2");
 
-    private static final TableDescriptor TABLE_DESCRIPTOR =
-            TableDescriptor.builder()
-                    .schema(
-                            Schema.newBuilder()
-                                    .column("id", com.alibaba.fluss.types.DataTypes.INT())
-                                    .column("name", com.alibaba.fluss.types.DataTypes.CHAR(10))
-                                    .build())
-                    .build();
+    @BeforeEach
+    void before() throws Exception {
+        env.setParallelism(1);
+        // crate catalog using sql
+        tEnv.executeSql(
+                String.format(
+                        "create catalog %s with ('type' = 'fluss', '%s' = '%s')",
+                        CATALOG_NAME, BOOTSTRAP_SERVERS.key(), bootstrapServers));
+        tEnv.executeSql("use catalog " + CATALOG_NAME);
+    }
 
     @Test
-    public void testCreateDatabase() throws Exception {
-        admin.createDatabase(
-                DEFAULT_SINK_TABLE_1_PATH.getDatabaseName(), DatabaseDescriptor.EMPTY, true);
-        Assertions.assertThat(DEFAULT_SINK_DB)
-                .isEqualTo(admin.getDatabaseInfo(DEFAULT_SINK_DB).get().getDatabaseName());
+    void testValuesToFlussMultiTable() throws Exception {
+        TableId tableId1 =
+                TableId.tableId(DEFAULT_SINK_DB, DEFAULT_SINK_TABLE_1_PATH.getTableName());
+        TableId tableId2 =
+                TableId.tableId(DEFAULT_SINK_DB, DEFAULT_SINK_TABLE_2_PATH.getTableName());
+        List<Event> events = new ArrayList<>();
+        events.addAll(generateEvents(tableId2));
+        events.addAll(generateEvents(tableId1));
+        DataStream<Event> stream = env.fromCollection(events, TypeInformation.of(Event.class));
+
+        HashMap<String, String> conf = new HashMap<>();
+        conf.put(BOOTSTRAP_SERVERS.key(), clientConf.toMap().get(BOOTSTRAP_SERVERS.key()));
+        Configuration config = Configuration.fromMap(conf);
+
+        Sink<Event> flussSink =
+                ((FlinkSinkProvider) createFlussDataSink(config).getEventSinkProvider()).getSink();
+        stream.sinkTo(flussSink);
+
+        env.execute("Values to Fluss Sink");
+
+        CloseableIterator<Row> iterRows1 =
+                tEnv.executeSql(
+                                String.format(
+                                        "SELECT * FROM %s LIMIT 10", DEFAULT_SINK_TABLE_1_PATH))
+                        .collect();
+        List<String> actual1 = assertAndCollectRecords(iterRows1, 2);
+        List<String> expected =
+                Arrays.asList(
+                        "+I[17, 6.28, StarRocks, 2023-01-02T00:00:00Z]",
+                        "+I[21, 1.732, Disenchanted, 2023-01-01T00:00:00Z]");
+        Assertions.assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected);
+
+        CloseableIterator<Row> iterRows2 =
+                tEnv.executeSql(
+                                String.format(
+                                        "SELECT * FROM %s LIMIT 10", DEFAULT_SINK_TABLE_2_PATH))
+                        .collect();
+        List<String> actual2 = assertAndCollectRecords(iterRows2, 2);
+        Assertions.assertThat(actual2).containsExactlyInAnyOrderElementsOf(expected);
     }
 
     private List<Event> generateEvents(TableId tableId) {
@@ -196,78 +229,5 @@ class FlussPipelineITCase extends FlinkTestBase {
         public ClassLoader getClassLoader() {
             return null;
         }
-    }
-
-    @BeforeEach
-    void before() throws Exception {
-        env.setParallelism(1);
-        // crate catalog using sql
-        tEnv.executeSql(
-                String.format(
-                        "create catalog %s with ('type' = 'fluss', '%s' = '%s')",
-                        CATALOG_NAME, BOOTSTRAP_SERVERS.key(), bootstrapServers));
-        tEnv.executeSql("use catalog " + CATALOG_NAME);
-        admin.createDatabase(
-                DEFAULT_SINK_TABLE_1_PATH.getDatabaseName(), DatabaseDescriptor.EMPTY, true);
-        TableDescriptor tableDescriptor =
-                TableDescriptor.builder()
-                        .schema(
-                                Schema.newBuilder()
-                                        .primaryKey("id")
-                                        .column("id", com.alibaba.fluss.types.DataTypes.INT())
-                                        .column(
-                                                "number",
-                                                com.alibaba.fluss.types.DataTypes.DOUBLE())
-                                        .column("name", com.alibaba.fluss.types.DataTypes.STRING())
-                                        .column(
-                                                "birthday",
-                                                com.alibaba.fluss.types.DataTypes.TIMESTAMP_LTZ(6))
-                                        .build())
-                        .distributedBy(1, "id")
-                        .build();
-        createTable(DEFAULT_SINK_TABLE_1_PATH, tableDescriptor);
-        createTable(DEFAULT_SINK_TABLE_2_PATH, tableDescriptor);
-    }
-
-    @Test
-    void testValuesToFlussMultiTable() throws Exception {
-        TableId tableId1 =
-                TableId.tableId(DEFAULT_SINK_DB, DEFAULT_SINK_TABLE_1_PATH.getTableName());
-        TableId tableId2 =
-                TableId.tableId(DEFAULT_SINK_DB, DEFAULT_SINK_TABLE_2_PATH.getTableName());
-        List<Event> events = new ArrayList<>();
-        events.addAll(generateEvents(tableId2));
-        events.addAll(generateEvents(tableId1));
-        DataStream<Event> stream = env.fromCollection(events, TypeInformation.of(Event.class));
-
-        HashMap<String, String> conf = new HashMap<>();
-        conf.put(BOOTSTRAP_SERVERS.key(), clientConf.toMap().get(BOOTSTRAP_SERVERS.key()));
-        Configuration config = Configuration.fromMap(conf);
-
-        Sink<Event> flussSink =
-                ((FlinkSinkProvider) createFlussDataSink(config).getEventSinkProvider()).getSink();
-        stream.sinkTo(flussSink);
-
-        env.execute("Values to StarRocks Sink");
-
-        CloseableIterator<Row> iterRows1 =
-                tEnv.executeSql(
-                                String.format(
-                                        "SELECT * FROM %s LIMIT 10", DEFAULT_SINK_TABLE_1_PATH))
-                        .collect();
-        List<String> actual1 = assertAndCollectRecords(iterRows1, 2);
-        List<String> expected =
-                Arrays.asList(
-                        "+I[17, 6.28, StarRocks, 2023-01-02T00:00:00Z]",
-                        "+I[21, 1.732, Disenchanted, 2023-01-01T00:00:00Z]");
-        Assertions.assertThat(actual1).containsExactlyInAnyOrderElementsOf(expected);
-
-        CloseableIterator<Row> iterRows2 =
-                tEnv.executeSql(
-                                String.format(
-                                        "SELECT * FROM %s LIMIT 10", DEFAULT_SINK_TABLE_2_PATH))
-                        .collect();
-        List<String> actual2 = assertAndCollectRecords(iterRows2, 2);
-        Assertions.assertThat(actual2).containsExactlyInAnyOrderElementsOf(expected);
     }
 }

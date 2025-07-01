@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.fluss.sink;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 
+/** Options for {@link FlussDataSink}. */
 public class FlussDataSinkOptions {
 
     // prefix for passing properties for fluss options.
@@ -30,6 +31,28 @@ public class FlussDataSinkOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription("The bootstrap servers for the Fluss sink connection.");
+
+    public static final ConfigOption<String> BUCKET_KEY =
+            ConfigOptions.key("bucket.key")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Specific the distribution policy of each Fluss table. "
+                                    + "Tables are separated by ';', and bucket keys are separated by ','. "
+                                    + "Format: database1.table1:key1,key2;database1.table2:key3. \""
+                                    + "Data will be distributed to each bucket according to the hash value of bucket-key (It must be a subset of the primary keys excluding partition keys of the primary key table). "
+                                    + "If the table has a primary key and a bucket key is not specified, the bucket key will be used as primary key(excluding the partition key). "
+                                    + "If the table has no primary key and the bucket key is not specified, "
+                                    + "the data will be distributed to each bucket randomly.");
+
+    public static final ConfigOption<String> BUCKET_NUMBER =
+            ConfigOptions.key("bucket.num")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The number of buckets of each Fluss table."
+                                    + "Tables are separated by ';'. "
+                                    + "Format: database1.table1:4;database1.table2:8.");
 
     public static final ConfigOption<String> CLIENT_ID =
             ConfigOptions.key("client.id")

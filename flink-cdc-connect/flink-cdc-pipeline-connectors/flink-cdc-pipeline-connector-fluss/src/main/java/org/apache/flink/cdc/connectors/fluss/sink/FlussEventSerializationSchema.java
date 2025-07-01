@@ -17,51 +17,52 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRecordSerializer;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.RowWithOp;
 
-import com.alibaba.fluss.flink.row.RowWithOp;
-import com.alibaba.fluss.flink.sink.serializer.FlussSerializationSchema;
-import com.alibaba.fluss.row.GenericRow;
-import com.alibaba.fluss.row.InternalRow;
+import com.alibaba.fluss.metadata.TablePath;
 
-import java.time.ZoneId;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.fluss.flink.row.OperationType.DELETE;
-import static com.alibaba.fluss.flink.row.OperationType.UPSERT;
+import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.APPEND;
+import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.DELETE;
+import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.UPSERT;
 
-public class FlussEventSerializationSchema implements FlussSerializationSchema<Event> {
+/** Serialization schema that converts a CDC data record to a Fluss event. */
+public class FlussEventSerializationSchema implements FlussRecordSerializer<Event> {
     private static final long serialVersionUID = 1L;
 
-    private transient Map<TableId, TableSchemaInfo> tableInfoMap;
-    private final ZoneId zoneId;
-
-    public FlussEventSerializationSchema(ZoneId zoneId) {
-        this.zoneId = zoneId;
-    }
+    private transient Map<TableId, Schema> tableInfoMap;
 
     @Override
-    public void open(InitializationContext initializationContext) throws Exception {
+    public void open() {
         this.tableInfoMap = new HashMap<>();
     }
 
     @Override
-    public RowWithOp serialize(Event record) throws Exception {
+    public FlussEvent serialize(Event record) throws IOException {
         if (record instanceof SchemaChangeEvent) {
             applySchemaChangeEvent((SchemaChangeEvent) record);
-            return null;
+            return new FlussEvent(getTablePath(((SchemaChangeEvent) record).tableId()), null, true);
         } else if (record instanceof DataChangeEvent) {
-            return applyDataChangeEvent((DataChangeEvent) record);
+            RowWithOp rowWithOp = applyDataChangeEvent((DataChangeEvent) record);
+            return new FlussEvent(
+                    getTablePath(((DataChangeEvent) record).tableId()),
+                    Collections.singletonList(rowWithOp),
+                    false);
+
         } else {
             throw new UnsupportedOperationException("Don't support event " + record);
         }
@@ -78,34 +79,28 @@ public class FlussEventSerializationSchema implements FlussSerializationSchema<E
             throw new RuntimeException(
                     "Schema change type not supported. Only CreateTableEvent is allowed at the moment.");
         }
-        tableInfoMap.put(tableId, new TableSchemaInfo(newSchema, zoneId));
+        tableInfoMap.put(tableId, newSchema);
     }
 
     private RowWithOp applyDataChangeEvent(DataChangeEvent record) {
         OperationType op = record.op();
+        Schema schema = tableInfoMap.get(record.tableId());
+        boolean hasPrimaryKey = !schema.primaryKeys().isEmpty();
+        Preconditions.checkNotNull(schema, "Table schema not found for table " + record.tableId());
         switch (op) {
             case INSERT:
             case UPDATE:
             case REPLACE:
                 return new RowWithOp(
-                        serializeRecord(tableInfoMap.get(record.tableId()), record.after()),
-                        UPSERT);
+                        CdcAsFlussRow.replace(record.after()), hasPrimaryKey ? UPSERT : APPEND);
             case DELETE:
-                return new RowWithOp(
-                        serializeRecord(tableInfoMap.get(record.tableId()), record.before()),
-                        DELETE);
+                return new RowWithOp(CdcAsFlussRow.replace(record.before()), DELETE);
             default:
                 throw new IllegalArgumentException("Unsupported row kind: " + op);
         }
     }
 
-    private InternalRow serializeRecord(TableSchemaInfo tableInfo, RecordData record) {
-        List<Column> columns = tableInfo.schema.getColumns();
-        Preconditions.checkArgument(columns.size() == record.getArity());
-        GenericRow row = new GenericRow(columns.size());
-        for (int i = 0; i < columns.size(); i++) {
-            row.setField(i, tableInfo.fieldGetters[i].getFieldOrNull(record));
-        }
-        return row;
+    private TablePath getTablePath(TableId tableId) {
+        return TablePath.of(tableId.getSchemaName(), tableId.getTableName());
     }
 }

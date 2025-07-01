@@ -17,19 +17,55 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.table.api.ValidationException;
+
+import com.alibaba.fluss.client.Connection;
+import com.alibaba.fluss.client.ConnectionFactory;
+import com.alibaba.fluss.client.admin.Admin;
+import com.alibaba.fluss.config.Configuration;
+import com.alibaba.fluss.metadata.DatabaseDescriptor;
+import com.alibaba.fluss.metadata.TableDescriptor;
+import com.alibaba.fluss.metadata.TableInfo;
+import com.alibaba.fluss.metadata.TablePath;
+import com.alibaba.fluss.types.RowType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class FlussMetaDataApplier implements MetadataApplier {
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.toFlussTable;
 
+/** {@link MetadataApplier} for fluss. */
+public class FlussMetaDataApplier implements MetadataApplier {
+    private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
+    private final Configuration flussConfig;
+    private final Map<String, List<String>> bucketKeysMap;
+    private final Map<String, Integer> bucketNumMap;
     private Set<SchemaChangeEventType> enabledEventTypes =
-            Arrays.stream(SchemaChangeEventTypeFamily.TABLE).collect(Collectors.toSet());
+            new HashSet<>(Arrays.asList(CREATE_TABLE, DROP_TABLE));
+
+    public FlussMetaDataApplier(
+            Configuration flussConfig,
+            Map<String, List<String>> bucketKeysMap,
+            Map<String, Integer> bucketNumMap) {
+        this.flussConfig = flussConfig;
+        this.bucketKeysMap = bucketKeysMap;
+        this.bucketNumMap = bucketNumMap;
+    }
 
     @Override
     public MetadataApplier setAcceptedSchemaEvolutionTypes(
@@ -50,6 +86,103 @@ public class FlussMetaDataApplier implements MetadataApplier {
 
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
-        // simply do nothing here because Fluss do not support alter the schemas.
+        LOG.info("fluss metadata applier receive schemaChangeEvent {}", schemaChangeEvent);
+        if (schemaChangeEvent instanceof CreateTableEvent) {
+            CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
+            applyCreateTable(createTableEvent);
+        } else if (schemaChangeEvent instanceof DropTableEvent) {
+            DropTableEvent dropTableEvent = (DropTableEvent) schemaChangeEvent;
+            applyDropTable(dropTableEvent);
+        } else {
+            throw new IllegalArgumentException(
+                    "fluss metadata applier only support CreateTableEvent now but receives "
+                            + schemaChangeEvent);
+        }
+    }
+
+    private void applyCreateTable(CreateTableEvent event) {
+        TableId tableId = event.tableId();
+        TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+        String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
+        List<String> bucketKeys = bucketKeysMap.get(tableIdentifier);
+        Integer bucketNum = bucketNumMap.get(tableIdentifier);
+        try (Connection connection = ConnectionFactory.createConnection(flussConfig);
+                Admin admin = connection.getAdmin()) {
+            TableDescriptor inferredFlussTable =
+                    toFlussTable(event.getSchema(), bucketKeys, bucketNum);
+            admin.createDatabase(tablePath.getDatabaseName(), DatabaseDescriptor.EMPTY, true);
+            if (!admin.tableExists(tablePath).get()) {
+                admin.createTable(tablePath, inferredFlussTable, false).get();
+            } else {
+                TableInfo tableInfo = admin.getTableInfo(tablePath).get();
+                // sanity check to prevent unexpected table schema evolution.
+                sanityCheck(inferredFlussTable, tableInfo);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void applyDropTable(DropTableEvent event) {
+        TableId tableId = event.tableId();
+        TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+        try (Connection connection = ConnectionFactory.createConnection(flussConfig);
+                Admin admin = connection.getAdmin()) {
+            admin.dropTable(tablePath, true).get();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void sanityCheck(TableDescriptor inferredFlussTable, TableInfo currentTableInfo) {
+        RowType currentTableRowType = currentTableInfo.getRowType();
+        RowType inferredRowType = inferredFlussTable.getSchema().getRowType();
+        if (!inferredRowType.copy(false).equals(currentTableRowType.copy(false))) {
+            throw new ValidationException(
+                    "The CDC create table event schema is not matched to current Fluss table schema. "
+                            + "\n New Fluss schema: "
+                            + inferredRowType
+                            + "\n Current Fluss table schema: "
+                            + currentTableRowType);
+        }
+
+        List<String> inferredPrimaryKeyColumnNames =
+                inferredFlussTable.getSchema().getPrimaryKeyColumnNames().stream()
+                        .sorted()
+                        .collect(Collectors.toList());
+        List<String> currentPrimaryKeyColumnNames =
+                currentTableInfo.getSchema().getPrimaryKeyColumnNames().stream()
+                        .sorted()
+                        .collect(Collectors.toList());
+        if (!inferredPrimaryKeyColumnNames.equals(currentPrimaryKeyColumnNames)) {
+            throw new ValidationException(
+                    "The CDC create table event schema is not matched to current Fluss table schema. "
+                            + "\n New Fluss table's primary keys : "
+                            + inferredPrimaryKeyColumnNames
+                            + "\n Current Fluss's primary keys: "
+                            + currentPrimaryKeyColumnNames);
+        }
+
+        List<String> inferredBucketKeys = inferredFlussTable.getBucketKeys();
+        List<String> currentBucketKeys = currentTableInfo.getBucketKeys();
+        if (!inferredBucketKeys.equals(currentBucketKeys)) {
+            throw new ValidationException(
+                    "The CDC create table event schema is not matched to current Fluss table schema. "
+                            + "\n New Fluss table's bucket keys : "
+                            + inferredBucketKeys
+                            + "\n Current Fluss's bucket keys: "
+                            + currentBucketKeys);
+        }
+
+        List<String> inferredPartitionKeys = inferredFlussTable.getPartitionKeys();
+        List<String> currentPartitionKeys = currentTableInfo.getPartitionKeys();
+        if (!inferredPartitionKeys.equals(currentPartitionKeys)) {
+            throw new ValidationException(
+                    "The CDC create table event schema is not matched to current Fluss table schema. "
+                            + "\n New Fluss table's partition keys : "
+                            + inferredPartitionKeys
+                            + "\n Current Fluss's partition keys: "
+                            + currentPartitionKeys);
+        }
     }
 }

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.flink.cdc.connectors.fluss.factory;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
@@ -30,6 +31,9 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/** Test for {@link FlussDataSinkFactory}. */
 public class FlussDataSinkFactoryTest {
     @Test
     void testCreateDataSink() {
@@ -47,7 +51,6 @@ public class FlussDataSinkFactoryTest {
 
     @Test
     void testUnsupportedOption() {
-
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("fluss", DataSinkFactory.class);
         Assertions.assertThat(sinkFactory).isInstanceOf(FlussDataSinkFactory.class);
@@ -92,10 +95,59 @@ public class FlussDataSinkFactoryTest {
         Assertions.assertThat(dataSink).isInstanceOf(FlussDataSink.class);
     }
 
+    @Test
+    void testWrongBucketKeyAndBucketNum() {
+        DataSinkFactory sinkFactory =
+                FactoryDiscoveryUtils.getFactoryByIdentifier("fluss", DataSinkFactory.class);
+        Assertions.assertThat(sinkFactory).isInstanceOf(FlussDataSinkFactory.class);
+        assertThatThrownBy(
+                        () ->
+                                sinkFactory.createDataSink(
+                                        new FactoryHelper.DefaultContext(
+                                                Configuration.fromMap(
+                                                        ImmutableMap.<String, String>builder()
+                                                                .put(
+                                                                        FlussDataSinkOptions
+                                                                                .BOOTSTRAP_SERVERS
+                                                                                .key(),
+                                                                        "localhost:9123")
+                                                                .put(
+                                                                        FlussDataSinkOptions
+                                                                                .BUCKET_KEY
+                                                                                .key(),
+                                                                        "database1.table1;a,b")
+                                                                .build()),
+                                                new Configuration(),
+                                                Thread.currentThread().getContextClassLoader())))
+                .hasMessageContaining("Invalid bucket key configuration: database1.table1;a,b");
+        assertThatThrownBy(
+                        () ->
+                                sinkFactory.createDataSink(
+                                        new FactoryHelper.DefaultContext(
+                                                Configuration.fromMap(
+                                                        ImmutableMap.<String, String>builder()
+                                                                .put(
+                                                                        FlussDataSinkOptions
+                                                                                .BOOTSTRAP_SERVERS
+                                                                                .key(),
+                                                                        "localhost:9123")
+                                                                .put(
+                                                                        FlussDataSinkOptions
+                                                                                .BUCKET_NUMBER
+                                                                                .key(),
+                                                                        "database1.table1: 11a")
+                                                                .build()),
+                                                new Configuration(),
+                                                Thread.currentThread().getContextClassLoader())))
+                .hasMessageContaining("Invalid bucket number configuration: database1.table1: 11a");
+    }
+
     private Configuration createValidConfiguration() {
         return Configuration.fromMap(
                 ImmutableMap.<String, String>builder()
                         .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
+                        .put(FlussDataSinkOptions.BUCKET_KEY.key(), "database1.table1:a,b")
+                        .put(FlussDataSinkOptions.BUCKET_NUMBER.key(), "database1.table1:2")
                         .build());
     }
 }

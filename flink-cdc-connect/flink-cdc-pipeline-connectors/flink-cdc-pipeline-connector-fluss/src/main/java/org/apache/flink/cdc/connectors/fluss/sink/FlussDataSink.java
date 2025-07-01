@@ -21,29 +21,38 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.FlinkSink;
 
 import com.alibaba.fluss.config.Configuration;
 
-import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 
+/** A DataSink implementation for Fluss. */
 public class FlussDataSink implements DataSink {
 
-    private final ZoneId zoneId;
     private final Configuration flussConfig;
+    private final Map<String, List<String>> bucketKeysMap;
+    private final Map<String, Integer> bucketNumMap;
 
-    public FlussDataSink(Configuration flussConfig, ZoneId zoneId) {
-        this.zoneId = zoneId;
+    public FlussDataSink(
+            Configuration flussConfig,
+            Map<String, List<String>> bucketKeysMap,
+            Map<String, Integer> bucketNumMap) {
         this.flussConfig = flussConfig;
+        this.bucketKeysMap = bucketKeysMap;
+        this.bucketNumMap = bucketNumMap;
     }
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
         return FlinkSinkProvider.of(
-                new FlussEventSink(flussConfig, new FlussEventSerializationSchema(zoneId)));
+                new FlinkSink<>(flussConfig, new FlussEventSerializationSchema()));
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new FlussMetaDataApplier();
+
+        return new FlussMetaDataApplier(flussConfig, bucketKeysMap, bucketNumMap);
     }
 }
