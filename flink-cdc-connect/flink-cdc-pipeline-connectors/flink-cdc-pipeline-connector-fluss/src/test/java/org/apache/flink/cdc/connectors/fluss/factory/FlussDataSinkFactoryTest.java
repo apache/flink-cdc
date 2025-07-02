@@ -86,7 +86,8 @@ public class FlussDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put(FlussDataSinkOptions.BOOTSTRAP_SERVERS.key(), "localhost:9123")
-                                .put("fluss.properties.option1", "value1")
+                                .put("properties.table.option1", "value1")
+                                .put("properties.client.option1", "value1")
                                 .build());
         DataSink dataSink =
                 sinkFactory.createDataSink(

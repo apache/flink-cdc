@@ -52,17 +52,20 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.toFlu
 /** {@link MetadataApplier} for fluss. */
 public class FlussMetaDataApplier implements MetadataApplier {
     private static final Logger LOG = LoggerFactory.getLogger(FlussMetaDataApplier.class);
-    private final Configuration flussConfig;
+    private final Configuration flussClientConfig;
+    private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
     private final Map<String, Integer> bucketNumMap;
     private Set<SchemaChangeEventType> enabledEventTypes =
             new HashSet<>(Arrays.asList(CREATE_TABLE, DROP_TABLE));
 
     public FlussMetaDataApplier(
-            Configuration flussConfig,
+            Configuration flussClientConfig,
+            Map<String, String> tableProperties,
             Map<String, List<String>> bucketKeysMap,
             Map<String, Integer> bucketNumMap) {
-        this.flussConfig = flussConfig;
+        this.flussClientConfig = flussClientConfig;
+        this.tableProperties = tableProperties;
         this.bucketKeysMap = bucketKeysMap;
         this.bucketNumMap = bucketNumMap;
     }
@@ -106,10 +109,10 @@ public class FlussMetaDataApplier implements MetadataApplier {
         String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
         List<String> bucketKeys = bucketKeysMap.get(tableIdentifier);
         Integer bucketNum = bucketNumMap.get(tableIdentifier);
-        try (Connection connection = ConnectionFactory.createConnection(flussConfig);
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
                 Admin admin = connection.getAdmin()) {
             TableDescriptor inferredFlussTable =
-                    toFlussTable(event.getSchema(), bucketKeys, bucketNum);
+                    toFlussTable(event.getSchema(), bucketKeys, bucketNum, tableProperties);
             admin.createDatabase(tablePath.getDatabaseName(), DatabaseDescriptor.EMPTY, true);
             if (!admin.tableExists(tablePath).get()) {
                 admin.createTable(tablePath, inferredFlussTable, false).get();
@@ -126,7 +129,7 @@ public class FlussMetaDataApplier implements MetadataApplier {
     private void applyDropTable(DropTableEvent event) {
         TableId tableId = event.tableId();
         TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
-        try (Connection connection = ConnectionFactory.createConnection(flussConfig);
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
                 Admin admin = connection.getAdmin()) {
             admin.dropTable(tablePath, true).get();
         } catch (Exception e) {

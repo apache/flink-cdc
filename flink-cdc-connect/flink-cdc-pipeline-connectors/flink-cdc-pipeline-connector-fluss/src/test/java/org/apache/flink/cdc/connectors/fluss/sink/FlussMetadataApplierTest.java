@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.types.IntType;
 import com.alibaba.fluss.client.Connection;
 import com.alibaba.fluss.client.ConnectionFactory;
 import com.alibaba.fluss.client.admin.Admin;
+import com.alibaba.fluss.exception.InvalidConfigException;
 import com.alibaba.fluss.metadata.TableDescriptor;
 import com.alibaba.fluss.metadata.TableInfo;
 import com.alibaba.fluss.metadata.TablePath;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import static com.alibaba.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -155,6 +157,7 @@ public class FlussMetadataApplierTest {
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         Collections.emptyMap(),
+                        Collections.emptyMap(),
                         Collections.emptyMap())) {
             // apply create-table event
             Schema.Builder builder = Schema.newBuilder();
@@ -201,6 +204,7 @@ public class FlussMetadataApplierTest {
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         Collections.emptyMap(),
+                        Collections.emptyMap(),
                         Collections.emptyMap())) {
             for (int i = 0; i < fieldNames.length; i++) {
                 // apply create-table event
@@ -235,6 +239,7 @@ public class FlussMetadataApplierTest {
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         Collections.emptyMap(),
+                        Collections.emptyMap(),
                         Collections.emptyMap())) {
             assertThat(admin.tableExists(tablePath).get()).isTrue();
             applier.applySchemaChange(
@@ -250,6 +255,7 @@ public class FlussMetadataApplierTest {
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
                         Collections.emptyMap(),
                         Collections.emptyMap())) {
             // apply create-table event
@@ -275,6 +281,7 @@ public class FlussMetadataApplierTest {
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         Collections.emptyMap(),
+                        Collections.emptyMap(),
                         Collections.emptyMap())) {
             // apply create-table event
             Schema schema =
@@ -299,6 +306,7 @@ public class FlussMetadataApplierTest {
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
                         Collections.emptyMap(),
                         Collections.singletonMap(DATABASE_NAME + ".table1", 3))) {
             Schema schema =
@@ -332,6 +340,7 @@ public class FlussMetadataApplierTest {
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
                         Collections.singletonMap(
                                 DATABASE_NAME + ".table1", Collections.singletonList("id")),
                         Collections.emptyMap())) {
@@ -398,6 +407,7 @@ public class FlussMetadataApplierTest {
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
                         bucketKeys,
                         Collections.emptyMap())) {
             if (partitionTables) {
@@ -484,6 +494,7 @@ public class FlussMetadataApplierTest {
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         Collections.emptyMap(),
+                        Collections.emptyMap(),
                         Collections.emptyMap())) {
             applier.applySchemaChange(new CreateTableEvent(tableId, initialSchema));
         }
@@ -492,6 +503,7 @@ public class FlussMetadataApplierTest {
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
                         Collections.emptyMap(),
                         Collections.emptyMap())) {
             assertThatThrownBy(
@@ -507,8 +519,43 @@ public class FlussMetadataApplierTest {
                 new FlussMetaDataApplier(
                         FLUSS_CLUSTER_EXTENSION.getClientConfig(),
                         Collections.emptyMap(),
+                        Collections.emptyMap(),
                         Collections.emptyMap())) {
             applier.applySchemaChange(new CreateTableEvent(tableId, sameSchema));
+        }
+    }
+
+    @Test
+    void testCreateTableWithTableOptions() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id", "name")
+                        .partitionKey("name")
+                        .build();
+        TableId tableId = TableId.tableId("default_namespace", DATABASE_NAME, "table1");
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.singletonMap("key", "value"),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            assertThatThrownBy(() -> applier.applySchemaChange(createTableEvent))
+                    .rootCause()
+                    .isExactlyInstanceOf(InvalidConfigException.class)
+                    .hasMessageContaining("'key' is not a Fluss table property");
+        }
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.singletonMap(TABLE_REPLICATION_FACTOR.key(), "5"),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            applier.applySchemaChange(createTableEvent);
+            TableInfo tableInfo = admin.getTableInfo(new TablePath(DATABASE_NAME, "table1")).get();
+            assertThat(tableInfo.getProperties().get(TABLE_REPLICATION_FACTOR)).isEqualTo(5);
         }
     }
 }

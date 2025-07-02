@@ -31,15 +31,18 @@ import java.util.Map;
 /** A DataSink implementation for Fluss. */
 public class FlussDataSink implements DataSink {
 
-    private final Configuration flussConfig;
+    private final Configuration flussClientConfig;
+    private final Map<String, String> tableProperties;
     private final Map<String, List<String>> bucketKeysMap;
     private final Map<String, Integer> bucketNumMap;
 
     public FlussDataSink(
-            Configuration flussConfig,
+            Configuration flussClientConfig,
+            Map<String, String> tableProperties,
             Map<String, List<String>> bucketKeysMap,
             Map<String, Integer> bucketNumMap) {
-        this.flussConfig = flussConfig;
+        this.flussClientConfig = flussClientConfig;
+        this.tableProperties = tableProperties;
         this.bucketKeysMap = bucketKeysMap;
         this.bucketNumMap = bucketNumMap;
     }
@@ -47,12 +50,13 @@ public class FlussDataSink implements DataSink {
     @Override
     public EventSinkProvider getEventSinkProvider() {
         return FlinkSinkProvider.of(
-                new FlinkSink<>(flussConfig, new FlussEventSerializationSchema()));
+                new FlinkSink<>(flussClientConfig, new FlussEventSerializationSchema()));
     }
 
     @Override
     public MetadataApplier getMetadataApplier() {
 
-        return new FlussMetaDataApplier(flussConfig, bucketKeysMap, bucketNumMap);
+        return new FlussMetaDataApplier(
+                flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap);
     }
 }

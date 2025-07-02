@@ -51,6 +51,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Converter from Flink's type to Fluss's type. */
@@ -60,7 +61,8 @@ public class FlinkConversions {
     public static TableDescriptor toFlussTable(
             org.apache.flink.cdc.common.schema.Schema cdcSchema,
             List<String> bucketKeys,
-            @Nullable Integer bucketNum) {
+            @Nullable Integer bucketNum,
+            Map<String, String> tableProperties) {
         // now, build Fluss's table
         Schema.Builder schemBuilder = Schema.newBuilder();
         if (!CollectionUtil.isNullOrEmpty(cdcSchema.primaryKeys())) {
@@ -99,7 +101,7 @@ public class FlinkConversions {
                 .partitionedBy(cdcSchema.partitionKeys())
                 .distributedBy(bucketNum, bucketKeys)
                 .comment(cdcSchema.comment())
-                .properties(Collections.emptyMap())
+                .properties(tableProperties)
                 .build();
     }
 

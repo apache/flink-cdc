@@ -24,7 +24,8 @@ import org.apache.flink.cdc.common.configuration.ConfigOptions;
 public class FlussDataSinkOptions {
 
     // prefix for passing properties for fluss options.
-    public static final String PREFIX_FLUSS_PROPERTIES = "fluss.properties.";
+    public static final String TABLE_PROPERTIES_PREFIX = "properties.table.";
+    public static final String CLIENT_PROPERTIES_PREFIX = "properties.client.";
 
     public static final ConfigOption<String> BOOTSTRAP_SERVERS =
             ConfigOptions.key("bootstrap.servers")
@@ -53,10 +54,4 @@ public class FlussDataSinkOptions {
                             "The number of buckets of each Fluss table."
                                     + "Tables are separated by ';'. "
                                     + "Format: database1.table1:4;database1.table2:8.");
-
-    public static final ConfigOption<String> CLIENT_ID =
-            ConfigOptions.key("client.id")
-                    .stringType()
-                    .defaultValue("")
-                    .withDescription("An id string to pass to the server when making requests.");
 }

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
 
+import com.alibaba.fluss.config.ConfigOptions;
 import com.alibaba.fluss.config.Configuration;
 
 import java.util.HashMap;
@@ -36,8 +37,8 @@ import static org.apache.flink.cdc.connectors.fluss.sink.FlussConfigUtils.parseB
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BOOTSTRAP_SERVERS;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_KEY;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_NUMBER;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.CLIENT_ID;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.PREFIX_FLUSS_PROPERTIES;
+import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.CLIENT_PROPERTIES_PREFIX;
+import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.TABLE_PROPERTIES_PREFIX;
 
 /** Factory for creating configured instances of {@link FlussDataSink}. */
 public class FlussDataSinkFactory implements DataSinkFactory {
@@ -45,28 +46,18 @@ public class FlussDataSinkFactory implements DataSinkFactory {
 
     @Override
     public DataSink createDataSink(Context context) {
-        FactoryHelper.createFactoryHelper(this, context).validateExcept(PREFIX_FLUSS_PROPERTIES);
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(CLIENT_PROPERTIES_PREFIX, TABLE_PROPERTIES_PREFIX);
         org.apache.flink.cdc.common.configuration.Configuration factoryConfiguration =
                 context.getFactoryConfiguration();
 
-        Map<String, String> flussOptions = new HashMap<>();
-        factoryConfiguration
-                .toMap()
-                .forEach(
-                        (key, value) -> {
-                            if (key.startsWith(PREFIX_FLUSS_PROPERTIES)) {
-                                flussOptions.put(
-                                        key.substring(PREFIX_FLUSS_PROPERTIES.length()), value);
-                            } else {
-                                flussOptions.put(key, value);
-                            }
-                        });
-        Configuration config = Configuration.fromMap(flussOptions);
+        Configuration flussClientConfig = toFlussClientConfig(factoryConfiguration.toMap());
+        Map<String, String> tableProperties = toFlussTableOptions(factoryConfiguration.toMap());
         Map<String, List<String>> bucketKeysMap =
                 parseBucketKeys(factoryConfiguration.get(BUCKET_KEY));
         Map<String, Integer> bucketNumMap =
                 parseBucketNumber(factoryConfiguration.get(BUCKET_NUMBER));
-        return new FlussDataSink(config, bucketKeysMap, bucketNumMap);
+        return new FlussDataSink(flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap);
     }
 
     @Override
@@ -86,7 +77,33 @@ public class FlussDataSinkFactory implements DataSinkFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(BUCKET_KEY);
         options.add(BUCKET_NUMBER);
-        options.add(CLIENT_ID);
         return options;
+    }
+
+    private static Configuration toFlussClientConfig(Map<String, String> tableOptions) {
+        Configuration flussConfig = new Configuration();
+        flussConfig.setString(
+                ConfigOptions.BOOTSTRAP_SERVERS.key(), tableOptions.get(BOOTSTRAP_SERVERS.key()));
+
+        // forward all client configs
+        tableOptions.forEach(
+                (key, value) -> {
+                    if (key.startsWith(CLIENT_PROPERTIES_PREFIX)) {
+                        flussConfig.setString(key.substring("properties.".length()), value);
+                    }
+                });
+        return flussConfig;
+    }
+
+    private static Map<String, String> toFlussTableOptions(Map<String, String> tableOptions) {
+        Map<String, String> flussTableConfig = new HashMap<>();
+        // forward all client configs
+        tableOptions.forEach(
+                (key, value) -> {
+                    if (key.startsWith(TABLE_PROPERTIES_PREFIX)) {
+                        flussTableConfig.put(key.substring("properties.".length()), value);
+                    }
+                });
+        return flussTableConfig;
     }
 }
