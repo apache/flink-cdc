@@ -104,13 +104,13 @@ public class FlussMetaDataApplier implements MetadataApplier {
     }
 
     private void applyCreateTable(CreateTableEvent event) {
-        TableId tableId = event.tableId();
-        TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
-        String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
-        List<String> bucketKeys = bucketKeysMap.get(tableIdentifier);
-        Integer bucketNum = bucketNumMap.get(tableIdentifier);
         try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
                 Admin admin = connection.getAdmin()) {
+            TableId tableId = event.tableId();
+            TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+            String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
+            List<String> bucketKeys = bucketKeysMap.get(tableIdentifier);
+            Integer bucketNum = bucketNumMap.get(tableIdentifier);
             TableDescriptor inferredFlussTable =
                     toFlussTable(event.getSchema(), bucketKeys, bucketNum, tableProperties);
             admin.createDatabase(tablePath.getDatabaseName(), DatabaseDescriptor.EMPTY, true);
@@ -122,17 +122,19 @@ public class FlussMetaDataApplier implements MetadataApplier {
                 sanityCheck(inferredFlussTable, tableInfo);
             }
         } catch (Exception e) {
+            LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
     }
 
     private void applyDropTable(DropTableEvent event) {
-        TableId tableId = event.tableId();
-        TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
         try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
                 Admin admin = connection.getAdmin()) {
+            TableId tableId = event.tableId();
+            TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             admin.dropTable(tablePath, true).get();
         } catch (Exception e) {
+            LOG.error("Failed to apply schema change {}", event, e);
             throw new RuntimeException(e);
         }
     }
