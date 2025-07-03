@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
+import com.alibaba.fluss.client.Connection;
+
 import java.io.IOException;
 import java.io.Serializable;
 
@@ -26,7 +28,7 @@ import java.io.Serializable;
  * @param <INPUT>
  */
 public interface FlussRecordSerializer<INPUT> extends Serializable {
-    void open() throws IOException;
+    void open(Connection connection) throws IOException;
 
     FlussEvent serialize(INPUT t) throws IOException;
 }

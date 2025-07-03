@@ -23,32 +23,39 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRecordSerializer;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.RowWithOp;
 
+import com.alibaba.fluss.client.Connection;
+import com.alibaba.fluss.client.table.Table;
 import com.alibaba.fluss.metadata.TablePath;
+import com.alibaba.fluss.types.DataType;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.APPEND;
 import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.DELETE;
 import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.UPSERT;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.sameCdcColumnsIgnoreCommentAndDefaultValue;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.toFlussSchema;
 
 /** Serialization schema that converts a CDC data record to a Fluss event. */
 public class FlussEventSerializationSchema implements FlussRecordSerializer<Event> {
     private static final long serialVersionUID = 1L;
 
-    private transient Map<TableId, Schema> tableInfoMap;
+    private transient Map<TableId, TableSchemaInfo> tableInfoMap;
+    private transient Connection connection;
 
     @Override
-    public void open() {
+    public void open(Connection connection) {
         this.tableInfoMap = new HashMap<>();
+        this.connection = connection;
     }
 
     @Override
@@ -70,31 +77,47 @@ public class FlussEventSerializationSchema implements FlussRecordSerializer<Even
 
     private void applySchemaChangeEvent(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
-        org.apache.flink.cdc.common.schema.Schema newSchema;
         if (event instanceof CreateTableEvent) {
-            newSchema = ((CreateTableEvent) event).getSchema();
+            org.apache.flink.cdc.common.schema.Schema newSchema =
+                    ((CreateTableEvent) event).getSchema();
+            // if the table is not exist or the schema is changed, update the table info.
+            if (!tableInfoMap.containsKey(tableId)
+                    || !sameCdcColumnsIgnoreCommentAndDefaultValue(
+                            tableInfoMap.get(tableId).upstreamCdcSchema, newSchema)) {
+                Table table = connection.getTable(getTablePath(tableId));
+                TableSchemaInfo newSchemaInfo =
+                        new TableSchemaInfo(newSchema, table.getTableInfo().getSchema());
+                tableInfoMap.put(tableId, newSchemaInfo);
+            }
         } else {
             // TODO: Logics for altering tables are not supported yet.
             // This is anticipated to be supported in Fluss version 0.8.0.
             throw new RuntimeException(
                     "Schema change type not supported. Only CreateTableEvent is allowed at the moment.");
         }
-        tableInfoMap.put(tableId, newSchema);
     }
 
     private RowWithOp applyDataChangeEvent(DataChangeEvent record) {
         OperationType op = record.op();
-        Schema schema = tableInfoMap.get(record.tableId());
-        boolean hasPrimaryKey = !schema.primaryKeys().isEmpty();
-        Preconditions.checkNotNull(schema, "Table schema not found for table " + record.tableId());
+        TableSchemaInfo tableSchemaInfo = tableInfoMap.get(record.tableId());
+        Preconditions.checkNotNull(
+                tableSchemaInfo, "Table schema not found for table " + record.tableId());
+        int flussFieldCount =
+                tableSchemaInfo.downStreamFlusstreamSchema.getRowType().getFieldCount();
+        boolean hasPrimaryKey = !tableSchemaInfo.upstreamCdcSchema.primaryKeys().isEmpty();
         switch (op) {
             case INSERT:
             case UPDATE:
             case REPLACE:
                 return new RowWithOp(
-                        CdcAsFlussRow.replace(record.after()), hasPrimaryKey ? UPSERT : APPEND);
+                        CdcAsFlussRow.replace(
+                                record.after(), flussFieldCount, tableSchemaInfo.indexMapping),
+                        hasPrimaryKey ? UPSERT : APPEND);
             case DELETE:
-                return new RowWithOp(CdcAsFlussRow.replace(record.before()), DELETE);
+                return new RowWithOp(
+                        CdcAsFlussRow.replace(
+                                record.before(), flussFieldCount, tableSchemaInfo.indexMapping),
+                        DELETE);
             default:
                 throw new IllegalArgumentException("Unsupported row kind: " + op);
         }
@@ -102,5 +125,60 @@ public class FlussEventSerializationSchema implements FlussRecordSerializer<Even
 
     private TablePath getTablePath(TableId tableId) {
         return TablePath.of(tableId.getSchemaName(), tableId.getTableName());
+    }
+
+    private static class TableSchemaInfo {
+        org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema;
+        com.alibaba.fluss.metadata.Schema downStreamFlusstreamSchema;
+        Map<Integer, Integer> indexMapping;
+
+        private TableSchemaInfo(
+                org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema,
+                com.alibaba.fluss.metadata.Schema downStreamFlusstreamSchema) {
+            this.upstreamCdcSchema = upstreamCdcSchema;
+            this.downStreamFlusstreamSchema = downStreamFlusstreamSchema;
+            this.indexMapping =
+                    sanityCheckAndGenerateIndexMapping(
+                            toFlussSchema(upstreamCdcSchema), downStreamFlusstreamSchema);
+        }
+    }
+
+    static Map<Integer, Integer> sanityCheckAndGenerateIndexMapping(
+            com.alibaba.fluss.metadata.Schema inferredFlussSchema,
+            com.alibaba.fluss.metadata.Schema currentFlussnewSchema) {
+        List<String> inferredSchemaColumnNames = inferredFlussSchema.getColumnNames();
+        Map<String, Integer> reverseIndex = new HashMap<>();
+        for (int i = 0; i < inferredSchemaColumnNames.size(); i++) {
+            reverseIndex.put(inferredSchemaColumnNames.get(i), i);
+        }
+
+        List<String> currentSchemaColumnNames = currentFlussnewSchema.getColumnNames();
+        Map<Integer, Integer> indexMapping = new HashMap<>();
+        for (int newSchemaIndex = 0;
+                newSchemaIndex < currentSchemaColumnNames.size();
+                newSchemaIndex++) {
+            String columnName = currentSchemaColumnNames.get(newSchemaIndex);
+            if (reverseIndex.get(columnName) != null) {
+                Integer oldSchemaIndex = reverseIndex.get(columnName);
+                indexMapping.put(newSchemaIndex, oldSchemaIndex);
+
+                // Currently, we only support mismatched column counts between upstream and
+                // downstream, but not mismatched data types, to prevent errors caused by type
+                // changes.
+                // In the future, meta applier will be used to handle column changes.
+                DataType oldDataType = inferredFlussSchema.getRowType().getTypeAt(oldSchemaIndex);
+                DataType newDataType = currentFlussnewSchema.getRowType().getTypeAt(newSchemaIndex);
+                if (!oldDataType.copy(false).equals(newDataType.copy(false))) {
+                    throw new IllegalArgumentException(
+                            "The data type of column "
+                                    + columnName
+                                    + " is changed from "
+                                    + oldDataType
+                                    + " to "
+                                    + newDataType);
+                }
+            }
+        }
+        return indexMapping;
     }
 }

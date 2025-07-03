@@ -379,6 +379,111 @@ public class FlussPipelineITCase {
         checkResult(TABLE_2, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
     }
 
+    @Test
+    void testInsertExistTableWithMoreColumns() throws Exception {
+        // create a fluss table with 2 columns but then cdc read a source table with 3 columns
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s.%s (\n"
+                                        + "    col1 STRING,\n"
+                                        + "    col2 STRING,\n"
+                                        + "   PRIMARY KEY (col1) NOT ENFORCED \n"
+                                        + ");",
+                                TABLE_1.getSchemaName(), TABLE_1.getTableName()))
+                .await();
+
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        split1.add(createTableEvent);
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        RowType.of(DataTypes.STRING(), DataTypes.STRING(), DataTypes.STRING()));
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("a"),
+                                    BinaryStringData.fromString("1")
+                                }));
+        split1.add(insertEvent1);
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
+        split1.add(insertEvent2);
+        eventOfSplits.add(split1);
+
+        composeAndExecute(eventOfSplits);
+        checkResult(TABLE_1, Arrays.asList("+I[1, a]", "+I[2, 2]"));
+    }
+
+    @Test
+    void testInsertExistTableWithLessColumns() throws Exception {
+        // create a fluss table with 2 columns but then cdc read a source table with 3 columns
+        tBatchEnv
+                .executeSql(
+                        String.format(
+                                "CREATE TABLE %s.%s (\n"
+                                        + "    col1 STRING,\n"
+                                        + "    col2 STRING,\n"
+                                        + "    col3 STRING,\n"
+                                        + "   PRIMARY KEY (col1) NOT ENFORCED \n"
+                                        + ");",
+                                TABLE_1.getSchemaName(), TABLE_1.getTableName()))
+                .await();
+
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        split1.add(createTableEvent);
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("1"),
+                                    BinaryStringData.fromString("a")
+                                }));
+        split1.add(insertEvent1);
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        generator.generate(
+                                new Object[] {
+                                    BinaryStringData.fromString("2"),
+                                    BinaryStringData.fromString("2")
+                                }));
+        split1.add(insertEvent2);
+        eventOfSplits.add(split1);
+
+        composeAndExecute(eventOfSplits);
+        checkResult(TABLE_1, Arrays.asList("+I[1, a, null]", "+I[2, 2, null]"));
+    }
+
     private void composeAndExecute(List<List<Event>> customSourceEvents) throws Exception {
         Map<String, String> sinkOption = new HashMap<>();
         sinkOption.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());

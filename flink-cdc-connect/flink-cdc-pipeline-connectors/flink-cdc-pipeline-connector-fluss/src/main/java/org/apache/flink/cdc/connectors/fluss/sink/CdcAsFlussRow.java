@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
@@ -28,79 +30,106 @@ import com.alibaba.fluss.row.InternalRow;
 import com.alibaba.fluss.row.TimestampLtz;
 import com.alibaba.fluss.row.TimestampNtz;
 
-import java.util.Objects;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /** Wraps a CDC {@link RecordData} as a Fluss {@link InternalRow}. */
+@Internal
 public class CdcAsFlussRow implements InternalRow {
 
     private final RecordData cdcRecord;
 
-    private CdcAsFlussRow(RecordData cdcRecord) {
+    /**
+     * Index mapping from Fluss Type to Cdc Type which will be used to convert CDC type to Fluss.
+     */
+    private final Map<Integer, Integer> indexMapping;
+
+    private final Integer rowFieldCount;
+
+    private CdcAsFlussRow(
+            RecordData cdcRecord, Integer rowFieldCount, Map<Integer, Integer> indexMapping) {
         this.cdcRecord = cdcRecord;
+        this.rowFieldCount = rowFieldCount;
+        this.indexMapping = indexMapping;
+    }
+
+    public static CdcAsFlussRow replace(
+            RecordData cdcRecord, Integer rowFieldCount, Map<Integer, Integer> indexMapping) {
+        return new CdcAsFlussRow(cdcRecord, rowFieldCount, indexMapping);
     }
 
     public static CdcAsFlussRow replace(RecordData cdcRecord) {
-        return new CdcAsFlussRow(cdcRecord);
+        return new CdcAsFlussRow(
+                cdcRecord,
+                cdcRecord.getArity(),
+                IntStream.range(0, cdcRecord.getArity())
+                        .boxed()
+                        .collect(Collectors.toMap(i -> i, i -> i)));
     }
 
     @Override
     public int getFieldCount() {
-        return cdcRecord.getArity();
+        return rowFieldCount;
     }
 
     @Override
     public boolean isNullAt(int pos) {
-        return cdcRecord.isNullAt(pos);
+        if (indexMapping.get(pos) == null) {
+            return true;
+        }
+
+        return cdcRecord.isNullAt(indexMapping.get(pos));
     }
 
     @Override
     public boolean getBoolean(int pos) {
-        return cdcRecord.getBoolean(pos);
+        return cdcRecord.getBoolean(indexMapping.get(pos));
     }
 
     @Override
     public byte getByte(int pos) {
-        return cdcRecord.getByte(pos);
+        return cdcRecord.getByte(indexMapping.get(pos));
     }
 
     @Override
     public short getShort(int pos) {
-        return cdcRecord.getShort(pos);
+        return cdcRecord.getShort(indexMapping.get(pos));
     }
 
     @Override
     public int getInt(int pos) {
-        return cdcRecord.getInt(pos);
+        return cdcRecord.getInt(indexMapping.get(pos));
     }
 
     @Override
     public long getLong(int pos) {
-        return cdcRecord.getLong(pos);
+        return cdcRecord.getLong(indexMapping.get(pos));
     }
 
     @Override
     public float getFloat(int pos) {
-        return cdcRecord.getFloat(pos);
+        return cdcRecord.getFloat(indexMapping.get(pos));
     }
 
     @Override
     public double getDouble(int pos) {
-        return cdcRecord.getDouble(pos);
+        return cdcRecord.getDouble(indexMapping.get(pos));
     }
 
     @Override
     public BinaryString getChar(int pos, int length) {
-        return BinaryString.fromBytes(cdcRecord.getString(pos).toBytes());
+        return BinaryString.fromBytes(cdcRecord.getString(indexMapping.get(pos)).toBytes());
     }
 
     @Override
     public BinaryString getString(int pos) {
-        return BinaryString.fromBytes(cdcRecord.getString(pos).toBytes());
+        return BinaryString.fromBytes(cdcRecord.getString(indexMapping.get(pos)).toBytes());
     }
 
     @Override
     public Decimal getDecimal(int pos, int precision, int scale) {
-        return fromFlinkDecimal(cdcRecord.getDecimal(pos, precision, scale));
+        return fromFlinkDecimal(cdcRecord.getDecimal(indexMapping.get(pos), precision, scale));
     }
 
     public static Decimal fromFlinkDecimal(DecimalData decimal) {
@@ -115,7 +144,7 @@ public class CdcAsFlussRow implements InternalRow {
 
     @Override
     public TimestampNtz getTimestampNtz(int pos, int precision) {
-        TimestampData timestamp = cdcRecord.getTimestamp(pos, precision);
+        TimestampData timestamp = cdcRecord.getTimestamp(indexMapping.get(pos), precision);
         return TimestampNtz.fromMillis(
                 timestamp.getMillisecond(), timestamp.getNanoOfMillisecond());
     }
@@ -123,31 +152,28 @@ public class CdcAsFlussRow implements InternalRow {
     @Override
     public TimestampLtz getTimestampLtz(int pos, int precision) {
         // Fluss ltz maybe mapping from CDC ltz or
-        LocalZonedTimestampData timestamp = cdcRecord.getLocalZonedTimestampData(pos, precision);
+        LocalZonedTimestampData timestamp =
+                cdcRecord.getLocalZonedTimestampData(indexMapping.get(pos), precision);
         return TimestampLtz.fromInstant(timestamp.toInstant());
     }
 
     @Override
     public byte[] getBinary(int pos, int length) {
-        return cdcRecord.getBinary(pos);
+        return cdcRecord.getBinary(indexMapping.get(pos));
     }
 
     @Override
     public byte[] getBytes(int pos) {
-        return cdcRecord.getBinary(pos);
+        return cdcRecord.getBinary(indexMapping.get(pos));
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        CdcAsFlussRow that = (CdcAsFlussRow) o;
-        return Objects.equals(cdcRecord, that.cdcRecord);
+    @VisibleForTesting
+    public RecordData getCdcRecord() {
+        return cdcRecord;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(cdcRecord);
+    @VisibleForTesting
+    public Map<Integer, Integer> getIndexMapping() {
+        return indexMapping;
     }
 }

@@ -86,8 +86,7 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
                 new FlinkMetricRegistry(
                         metricGroup, Collections.singleton(MetricNames.WRITER_SEND_LATENCY_MS));
         connection = ConnectionFactory.createConnection(flussConfig, flinkMetricRegistry);
-        // sanityCheck(table.getTableInfo());
-        flussRecordSerializer.open();
+        flussRecordSerializer.open(connection);
 
         initMetrics();
     }
@@ -99,7 +98,7 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
     }
 
     @Override
-    public void write(InputT inputValue, Context context) throws IOException, InterruptedException {
+    public void write(InputT inputValue, Context context) throws IOException {
         checkAsyncException();
 
         try {

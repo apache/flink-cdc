@@ -34,7 +34,6 @@ import com.alibaba.fluss.metadata.DatabaseDescriptor;
 import com.alibaba.fluss.metadata.TableDescriptor;
 import com.alibaba.fluss.metadata.TableInfo;
 import com.alibaba.fluss.metadata.TablePath;
-import com.alibaba.fluss.types.RowType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,9 +116,9 @@ public class FlussMetaDataApplier implements MetadataApplier {
             if (!admin.tableExists(tablePath).get()) {
                 admin.createTable(tablePath, inferredFlussTable, false).get();
             } else {
-                TableInfo tableInfo = admin.getTableInfo(tablePath).get();
+                TableInfo currentTableInfo = admin.getTableInfo(tablePath).get();
                 // sanity check to prevent unexpected table schema evolution.
-                sanityCheck(inferredFlussTable, tableInfo);
+                sanityCheck(inferredFlussTable, currentTableInfo);
             }
         } catch (Exception e) {
             LOG.error("Failed to apply schema change {}", event, e);
@@ -140,17 +139,6 @@ public class FlussMetaDataApplier implements MetadataApplier {
     }
 
     private void sanityCheck(TableDescriptor inferredFlussTable, TableInfo currentTableInfo) {
-        RowType currentTableRowType = currentTableInfo.getRowType();
-        RowType inferredRowType = inferredFlussTable.getSchema().getRowType();
-        if (!inferredRowType.copy(false).equals(currentTableRowType.copy(false))) {
-            throw new ValidationException(
-                    "The CDC create table event schema is not matched to current Fluss table schema. "
-                            + "\n New Fluss schema: "
-                            + inferredRowType
-                            + "\n Current Fluss table schema: "
-                            + currentTableRowType);
-        }
-
         List<String> inferredPrimaryKeyColumnNames =
                 inferredFlussTable.getSchema().getPrimaryKeyColumnNames().stream()
                         .sorted()

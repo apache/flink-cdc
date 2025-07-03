@@ -55,7 +55,6 @@ public class FlussDataSink implements DataSink {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-
         return new FlussMetaDataApplier(
                 flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap);
     }

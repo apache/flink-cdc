@@ -40,9 +40,14 @@ import org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.RowWithOp;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
+import com.alibaba.fluss.client.Connection;
+import com.alibaba.fluss.client.ConnectionFactory;
 import com.alibaba.fluss.metadata.TablePath;
-import org.junit.jupiter.api.BeforeEach;
+import com.alibaba.fluss.server.testutils.FlussClusterExtension;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -57,12 +62,36 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Test for {@link FlussEventSerializationSchema}. */
 public class FlussEventSerializationSchemaTest {
-    private FlussEventSerializationSchema serializer;
+    private static FlussEventSerializationSchema serializer;
 
-    @BeforeEach
-    public void setup() throws Exception {
-        this.serializer = new FlussEventSerializationSchema();
-        serializer.open();
+    @RegisterExtension
+    public static final FlussClusterExtension FLUSS_CLUSTER_EXTENSION =
+            FlussClusterExtension.builder().setNumOfTabletServers(3).build();
+
+    private static Connection conn;
+    private static FlussMetaDataApplier flussMetaDataApplier;
+
+    @BeforeAll
+    static void setup() {
+        conn = ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig());
+        flussMetaDataApplier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap());
+        serializer = new FlussEventSerializationSchema();
+        serializer.open(conn);
+    }
+
+    @AfterAll
+    static void tearDown() throws Exception {
+        if (flussMetaDataApplier != null) {
+            flussMetaDataApplier.close();
+        }
+        if (conn != null) {
+            conn.close();
+        }
     }
 
     @Test
@@ -77,6 +106,7 @@ public class FlussEventSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schema1);
+        flussMetaDataApplier.applySchemaChange(createTableEvent1);
         verifySchemaChangeEvent(table1, serializer.serialize(createTableEvent1));
 
         BinaryRecordDataGenerator generator1 =
@@ -150,6 +180,7 @@ public class FlussEventSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema2);
+        flussMetaDataApplier.applySchemaChange(createTableEvent2);
         verifySchemaChangeEvent(table2, serializer.serialize(createTableEvent2));
 
         BinaryRecordDataGenerator generator2 =
@@ -173,12 +204,15 @@ public class FlussEventSerializationSchemaTest {
                 serializer.serialize(insertEvent2));
 
         record =
-                generator1.generate(
+                generator2.generate(
                         new Object[] {
                             4,
-                            true,
-                            TimestampData.fromMillis(
-                                    Timestamp.valueOf("2023-11-27 21:00:00").getTime())
+                            3.4f,
+                            BinaryStringData.fromString("insert table2"),
+                            DecimalData.fromBigDecimal(new BigDecimal("83.23"), 20, 5),
+                            LocalZonedTimestampData.fromInstant(
+                                    LocalDateTime.of(2023, 11, 27, 21, 0, 0)
+                                            .toInstant(ZoneOffset.of("+10")))
                         });
         DataChangeEvent deleteEvent2 = DataChangeEvent.deleteEvent(table2, record);
         verifyDataChangeEvent(
@@ -221,7 +255,11 @@ public class FlussEventSerializationSchemaTest {
             RowWithOp expectedRowWithOp = expectedRowWithOps.get(i);
             assertThat(actualRowWithOp.getOperationType())
                     .isEqualTo(expectedRowWithOp.getOperationType());
-            assertThat(actualRowWithOp.getRow()).isEqualTo(expectedRowWithOp.getRow());
+            assertThat(actualRowWithOp.getRow()).isInstanceOf(CdcAsFlussRow.class);
+            CdcAsFlussRow actualRow = (CdcAsFlussRow) actualRowWithOp.getRow();
+            CdcAsFlussRow expectedRow = (CdcAsFlussRow) expectedRowWithOp.getRow();
+            assertThat(actualRow.getCdcRecord()).isEqualTo(expectedRow.getCdcRecord());
+            assertThat(actualRow.getIndexMapping()).isEqualTo(expectedRow.getIndexMapping());
         }
     }
 }

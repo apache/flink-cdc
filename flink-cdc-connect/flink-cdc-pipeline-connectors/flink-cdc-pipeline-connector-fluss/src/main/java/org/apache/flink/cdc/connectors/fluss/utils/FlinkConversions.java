@@ -42,9 +42,6 @@ import org.apache.flink.util.CollectionUtil;
 import com.alibaba.fluss.annotation.VisibleForTesting;
 import com.alibaba.fluss.metadata.Schema;
 import com.alibaba.fluss.metadata.TableDescriptor;
-import com.alibaba.fluss.types.BytesType;
-import com.alibaba.fluss.types.DataType;
-import com.alibaba.fluss.types.StringType;
 
 import javax.annotation.Nullable;
 
@@ -56,32 +53,15 @@ import java.util.stream.Collectors;
 
 /** Converter from Flink's type to Fluss's type. */
 public class FlinkConversions {
-    private static final CdcTypeToFlussType INSTANCE = new CdcTypeToFlussType();
+    private static final CdcTypeToFlussType TO_FLUSS_TYPE_INSTANCE = new CdcTypeToFlussType();
 
     public static TableDescriptor toFlussTable(
             org.apache.flink.cdc.common.schema.Schema cdcSchema,
             List<String> bucketKeys,
             @Nullable Integer bucketNum,
             Map<String, String> tableProperties) {
-        // now, build Fluss's table
-        Schema.Builder schemBuilder = Schema.newBuilder();
-        if (!CollectionUtil.isNullOrEmpty(cdcSchema.primaryKeys())) {
-            schemBuilder.primaryKey(cdcSchema.primaryKeys());
-        }
-
         // first build schema with cdc columns
-        Schema schema =
-                schemBuilder
-                        .fromColumns(
-                                cdcSchema.getColumns().stream()
-                                        .map(
-                                                column ->
-                                                        new Schema.Column(
-                                                                column.getName(),
-                                                                toFlussType(column.getType()),
-                                                                column.getComment()))
-                                        .collect(Collectors.toList()))
-                        .build();
+        Schema schema = toFlussSchema(cdcSchema);
 
         if (CollectionUtil.isNullOrEmpty(bucketKeys)) {
             // use primary keys - partition keys
@@ -105,123 +85,169 @@ public class FlinkConversions {
                 .build();
     }
 
+    public static com.alibaba.fluss.metadata.Schema toFlussSchema(
+            org.apache.flink.cdc.common.schema.Schema cdcSchema) {
+        Schema.Builder schemBuilder = Schema.newBuilder();
+        if (!CollectionUtil.isNullOrEmpty(cdcSchema.primaryKeys())) {
+            schemBuilder.primaryKey(cdcSchema.primaryKeys());
+        }
+
+        Schema schema =
+                schemBuilder
+                        .fromColumns(
+                                cdcSchema.getColumns().stream()
+                                        .map(
+                                                column ->
+                                                        new Schema.Column(
+                                                                column.getName(),
+                                                                toFlussType(column.getType()),
+                                                                column.getComment()))
+                                        .collect(Collectors.toList()))
+                        .build();
+        return schema;
+    }
+
     @VisibleForTesting
     private static com.alibaba.fluss.types.DataType toFlussType(
             org.apache.flink.cdc.common.types.DataType flinkDataType) {
-        return flinkDataType.accept(INSTANCE);
+        return flinkDataType.accept(TO_FLUSS_TYPE_INSTANCE);
+    }
+
+    public static Boolean sameCdcColumnsIgnoreCommentAndDefaultValue(
+            org.apache.flink.cdc.common.schema.Schema oldSchema,
+            org.apache.flink.cdc.common.schema.Schema newSchema) {
+        List<org.apache.flink.cdc.common.schema.Column> upstreamColumns = oldSchema.getColumns();
+        List<org.apache.flink.cdc.common.schema.Column> physicalColumns = newSchema.getColumns();
+        if (upstreamColumns.size() != physicalColumns.size()) {
+            return false;
+        }
+        for (int i = 0; i < physicalColumns.size(); i++) {
+            org.apache.flink.cdc.common.schema.Column upstreamColumn = upstreamColumns.get(i);
+            org.apache.flink.cdc.common.schema.Column physicalColumn = physicalColumns.get(i);
+            // Case sensitive.
+            if (!upstreamColumn.getName().equals(physicalColumn.getName())) {
+                return false;
+            }
+            if (!upstreamColumn.getType().equals(physicalColumn.getType())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static class CdcTypeToFlussType
-            implements org.apache.flink.cdc.common.types.DataTypeVisitor<DataType> {
+            implements org.apache.flink.cdc.common.types.DataTypeVisitor<
+                    com.alibaba.fluss.types.DataType> {
 
         @Override
-        public DataType visit(CharType charType) {
+        public com.alibaba.fluss.types.DataType visit(CharType charType) {
             return new com.alibaba.fluss.types.CharType(
                     charType.isNullable(), charType.getLength());
         }
 
         @Override
-        public DataType visit(VarCharType varCharType) {
+        public com.alibaba.fluss.types.DataType visit(VarCharType varCharType) {
             // fluss not support varchar type
-            return new StringType(varCharType.isNullable());
+            return new com.alibaba.fluss.types.StringType(varCharType.isNullable());
         }
 
         @Override
-        public DataType visit(BooleanType booleanType) {
+        public com.alibaba.fluss.types.DataType visit(BooleanType booleanType) {
             return new com.alibaba.fluss.types.BooleanType(booleanType.isNullable());
         }
 
         @Override
-        public DataType visit(BinaryType binaryType) {
+        public com.alibaba.fluss.types.DataType visit(BinaryType binaryType) {
             return new com.alibaba.fluss.types.BinaryType(
                     binaryType.isNullable(), binaryType.getLength());
         }
 
         @Override
-        public DataType visit(VarBinaryType varBinaryType) {
+        public com.alibaba.fluss.types.DataType visit(VarBinaryType varBinaryType) {
             // fluss not support varbinary type
-            return new BytesType(varBinaryType.isNullable());
+            return new com.alibaba.fluss.types.BytesType(varBinaryType.isNullable());
         }
 
         @Override
-        public DataType visit(DecimalType decimalType) {
+        public com.alibaba.fluss.types.DataType visit(DecimalType decimalType) {
             return new com.alibaba.fluss.types.DecimalType(
                     decimalType.isNullable(), decimalType.getPrecision(), decimalType.getScale());
         }
 
         @Override
-        public DataType visit(TinyIntType tinyIntType) {
+        public com.alibaba.fluss.types.DataType visit(TinyIntType tinyIntType) {
             return new com.alibaba.fluss.types.TinyIntType(tinyIntType.isNullable());
         }
 
         @Override
-        public DataType visit(SmallIntType smallIntType) {
+        public com.alibaba.fluss.types.DataType visit(SmallIntType smallIntType) {
             return new com.alibaba.fluss.types.SmallIntType(smallIntType.isNullable());
         }
 
         @Override
-        public DataType visit(IntType intType) {
+        public com.alibaba.fluss.types.DataType visit(IntType intType) {
             return new com.alibaba.fluss.types.IntType(intType.isNullable());
         }
 
         @Override
-        public DataType visit(BigIntType bigIntType) {
+        public com.alibaba.fluss.types.DataType visit(BigIntType bigIntType) {
             return new com.alibaba.fluss.types.BigIntType(bigIntType.isNullable());
         }
 
         @Override
-        public DataType visit(FloatType floatType) {
+        public com.alibaba.fluss.types.DataType visit(FloatType floatType) {
             return new com.alibaba.fluss.types.FloatType(floatType.isNullable());
         }
 
         @Override
-        public DataType visit(DoubleType doubleType) {
+        public com.alibaba.fluss.types.DataType visit(DoubleType doubleType) {
             return new com.alibaba.fluss.types.DoubleType(doubleType.isNullable());
         }
 
         @Override
-        public DataType visit(DateType dateType) {
+        public com.alibaba.fluss.types.DataType visit(DateType dateType) {
             return new com.alibaba.fluss.types.DateType(dateType.isNullable());
         }
 
         @Override
-        public DataType visit(TimeType timeType) {
+        public com.alibaba.fluss.types.DataType visit(TimeType timeType) {
             return new com.alibaba.fluss.types.TimeType(
                     timeType.isNullable(), timeType.getPrecision());
         }
 
         @Override
-        public DataType visit(TimestampType timestampType) {
+        public com.alibaba.fluss.types.DataType visit(TimestampType timestampType) {
             return new com.alibaba.fluss.types.TimestampType(
                     timestampType.isNullable(), timestampType.getPrecision());
         }
 
         @Override
-        public DataType visit(ZonedTimestampType zonedTimestampType) {
+        public com.alibaba.fluss.types.DataType visit(ZonedTimestampType zonedTimestampType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss " + zonedTimestampType);
         }
 
         @Override
-        public DataType visit(LocalZonedTimestampType localZonedTimestampType) {
+        public com.alibaba.fluss.types.DataType visit(
+                LocalZonedTimestampType localZonedTimestampType) {
             return new com.alibaba.fluss.types.LocalZonedTimestampType(
                     localZonedTimestampType.isNullable(), localZonedTimestampType.getPrecision());
         }
 
         @Override
-        public DataType visit(ArrayType arrayType) {
+        public com.alibaba.fluss.types.DataType visit(ArrayType arrayType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss version under 0.7: " + arrayType);
         }
 
         @Override
-        public DataType visit(MapType mapType) {
+        public com.alibaba.fluss.types.DataType visit(MapType mapType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss version under 0.7: " + mapType);
         }
 
         @Override
-        public DataType visit(RowType rowType) {
+        public com.alibaba.fluss.types.DataType visit(RowType rowType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss version under 0.7: " + rowType);
         }
