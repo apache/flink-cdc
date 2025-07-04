@@ -98,7 +98,6 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     static void stopContainers() {
         LOG.info("Stopping containers...");
         POSTGIS_CONTAINER.stop();
-        POSTGIS_CONTAINER.stop();
         LOG.info("Containers are stopped.");
     }
 

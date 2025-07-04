@@ -137,6 +137,16 @@ public class PostgresSourceBuilder<T> {
     }
 
     /**
+     * The session time zone in database server, e.g. "America/Los_Angeles". It controls how the
+     * TIMESTAMP type in MYSQL converted to STRING. See more
+     * https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-temporal-types
+     */
+    public PostgresSourceBuilder<T> serverTimeZone(String timeZone) {
+        this.configFactory.serverTimeZone(timeZone);
+        return this;
+    }
+
+    /**
      * The split size (number of rows) of table snapshot, captured tables are split into multiple
      * splits when read the snapshot of table.
      */
@@ -299,6 +309,10 @@ public class PostgresSourceBuilder<T> {
         PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
         return new PostgresIncrementalSource<>(
                 configFactory, checkNotNull(deserializer), offsetFactory, dialect);
+    }
+
+    public PostgresSourceConfigFactory getConfigFactory() {
+        return configFactory;
     }
 
     /** The Postgres source based on the incremental snapshot framework. */

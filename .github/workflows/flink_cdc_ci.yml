@@ -68,13 +68,13 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[8]"
-      modules: "['mysql-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks']"
+      modules: "['mysql-pipeline', 'postgres-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks']"
   source-ut:
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[8]"
-      modules: "['mysql-source', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
+      modules: "['mysql-source', 'postgres-source', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
     strategy:
       fail-fast: false
