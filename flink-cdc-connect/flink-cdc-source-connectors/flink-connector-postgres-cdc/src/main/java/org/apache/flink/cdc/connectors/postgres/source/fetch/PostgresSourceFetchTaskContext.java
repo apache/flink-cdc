@@ -153,7 +153,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .build());
         }
 
-        LOG.info("PostgresConnectorConfig is ", dbzConfig.getConfig().asProperties().toString());
+        LOG.info("PostgresConnectorConfig is {}", dbzConfig.getConfig().asProperties().toString());
         setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
