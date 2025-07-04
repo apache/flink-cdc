@@ -44,4 +44,20 @@ public class DorisSchemaChangeManager extends SchemaChangeManager {
                 "DROP TABLE " + identifier(databaseName) + "." + identifier(tableName);
         return this.execute(dropTableDDL, databaseName);
     }
+
+    public boolean alterTableComment(String databaseName, String tableName, String comment)
+            throws IOException, IllegalArgumentException {
+        String alterTableCommentDDL =
+                "ALTER TABLE "
+                        + identifier(databaseName)
+                        + "."
+                        + identifier(tableName)
+                        + " MODIFY COMMENT "
+                        + quoted(comment);
+        return this.execute(alterTableCommentDDL, databaseName);
+    }
+
+    private String quoted(String str) {
+        return "\"" + str + "\"";
+    }
 }
