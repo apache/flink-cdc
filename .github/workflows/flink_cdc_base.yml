@@ -61,6 +61,7 @@ env:
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-fluss,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 
   MODULES_MYSQL_SOURCE: "\
@@ -125,6 +126,9 @@ env:
 
   MODULES_MAXCOMPUTE: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute"
+
+  MODULES_FLUSS: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-fluss"
 
   MODULES_PIPELINE_E2E: "\
   flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
@@ -246,6 +250,9 @@ jobs:
               ;;
               ("starrocks")
                modules=${{ env.MODULES_STARROCKS }}
+              ;;
+              ("fluss")
+               modules=${{ env.MODULES_FLUSS }}
               ;;
               ("pipeline_e2e")
                compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL_SOURCE }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE_SOURCE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"

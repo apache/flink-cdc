@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 /** The default {@link HashFunctionProvider} implementation for data change event. */
 public class DefaultDataChangeEventHashFunctionProvider
@@ -63,10 +64,15 @@ public class DefaultDataChangeEventHashFunctionProvider
             objectsToHash.add(tableId.getTableName());
 
             // Primary key
-            RecordData data =
-                    event.op().equals(OperationType.DELETE) ? event.before() : event.after();
-            for (FieldGetter primaryKeyGetter : primaryKeyGetters) {
-                objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
+            if (!primaryKeyGetters.isEmpty()) {
+                RecordData data =
+                        event.op().equals(OperationType.DELETE) ? event.before() : event.after();
+                for (FieldGetter primaryKeyGetter : primaryKeyGetters) {
+                    objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
+                }
+            } else {
+                // Avoid sending all events to the same subtask when table has no primary key.
+                objectsToHash.add(ThreadLocalRandom.current().nextInt());
             }
 
             // Calculate hash
