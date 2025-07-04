@@ -729,6 +729,52 @@ class TransformParserTest {
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
     }
 
+    private static final String[] UNICODE_STRINGS = {
+        "ascii test!?",
+        "大五",
+        "测试数据",
+        "ひびぴ",
+        "죠주쥬",
+        "ÀÆÉ",
+        "ÓÔŐÖ",
+        "αβγδε",
+        "בבקשה",
+        "твой",
+        "ภาษาไทย",
+        "piedzimst brīvi"
+    };
+
+    @Test
+    void testParsingExpressionWithUnicodeLiterals() {
+        List<Column> columns =
+                Arrays.asList(
+                        Column.physicalColumn("a", DataTypes.STRING(), "a"),
+                        Column.physicalColumn("b", DataTypes.INT(), "b"));
+
+        for (String unicodeString : UNICODE_STRINGS) {
+            Assertions.assertThat(
+                            TransformParser.generateProjectionColumns(
+                                    "a, b, a = '{UNICODE_STRING}' AS c1, a <> '{UNICODE_STRING}' AS c2, b = '{UNICODE_STRING}' AS c3, b <> '{UNICODE_STRING}' AS c4"
+                                            .replace("{UNICODE_STRING}", unicodeString),
+                                    columns,
+                                    Collections.emptyList(),
+                                    new SupportedMetadataColumn[] {}))
+                    .map(ProjectionColumn::getScriptExpression)
+                    .containsExactly(
+                            "$0",
+                            "$0",
+                            "valueEquals($0, \"" + unicodeString + "\")",
+                            "!valueEquals($0, \"" + unicodeString + "\")",
+                            "valueEquals($0, castToInteger(\"" + unicodeString + "\"))",
+                            "!valueEquals($0, castToInteger(\"" + unicodeString + "\"))");
+
+            testFilterExpression(
+                    "a = '" + unicodeString + "'", "valueEquals(a, \"" + unicodeString + "\")");
+            testFilterExpression(
+                    "a <> '" + unicodeString + "'", "!valueEquals(a, \"" + unicodeString + "\")");
+        }
+    }
+
     private void testFilterExpression(String expression, String expressionExpect) {
         String janinoExpression =
                 TransformParser.translateFilterExpressionToJaninoExpression(
