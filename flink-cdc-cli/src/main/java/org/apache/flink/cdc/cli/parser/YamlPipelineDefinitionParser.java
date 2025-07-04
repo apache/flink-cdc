@@ -48,6 +48,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_PARALLELISM;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
 import static org.apache.flink.cdc.common.utils.ChangeEventUtils.resolveSchemaEvolutionOptions;
 import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
@@ -145,7 +146,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         checkNotNull(
                                 pipelineDefJsonNode.get(SOURCE_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
-                                SOURCE_KEY));
+                                SOURCE_KEY),
+                        globalPipelineConfig);
 
         // Sink is required
         SinkDef sinkDef =
@@ -154,7 +156,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                                 pipelineDefJsonNode.get(SINK_KEY),
                                 "Missing required field \"%s\" in pipeline definition",
                                 SINK_KEY),
-                        schemaChangeBehavior);
+                        schemaChangeBehavior,
+                        globalPipelineConfig);
 
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
@@ -178,7 +181,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
     }
 
-    private SourceDef toSourceDef(JsonNode sourceNode) {
+    private SourceDef toSourceDef(JsonNode sourceNode, Configuration globalPipelineConfig) {
         Map<String, String> sourceMap =
                 mapper.convertValue(sourceNode, new TypeReference<Map<String, String>>() {});
 
@@ -192,10 +195,18 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sourceMap.remove(NAME_KEY);
 
-        return new SourceDef(type, name, Configuration.fromMap(sourceMap));
+        int parallelism = globalPipelineConfig.get(PIPELINE_PARALLELISM);
+        if (sourceMap.containsKey(PIPELINE_PARALLELISM.key())) {
+            parallelism = Integer.parseInt(sourceMap.remove(PIPELINE_PARALLELISM.key()));
+        }
+
+        return new SourceDef(type, name, Configuration.fromMap(sourceMap), parallelism);
     }
 
-    private SinkDef toSinkDef(JsonNode sinkNode, SchemaChangeBehavior schemaChangeBehavior) {
+    private SinkDef toSinkDef(
+            JsonNode sinkNode,
+            SchemaChangeBehavior schemaChangeBehavior,
+            Configuration globalPipelineConfig) {
         List<String> includedSETypes = new ArrayList<>();
         List<String> excludedSETypes = new ArrayList<>();
         boolean excludedFieldNotPresent = sinkNode.get(EXCLUDE_SCHEMA_EVOLUTION_TYPES) == null;
@@ -243,7 +254,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // "name" field is optional
         String name = sinkMap.remove(NAME_KEY);
 
-        return new SinkDef(type, name, Configuration.fromMap(sinkMap), declaredSETypes);
+        int parallelism = globalPipelineConfig.get(PIPELINE_PARALLELISM);
+        if (sinkMap.containsKey(PIPELINE_PARALLELISM.key())) {
+            parallelism = Integer.parseInt(sinkMap.remove(PIPELINE_PARALLELISM.key()));
+        }
+
+        return new SinkDef(
+                type, name, Configuration.fromMap(sinkMap), declaredSETypes, parallelism);
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {
