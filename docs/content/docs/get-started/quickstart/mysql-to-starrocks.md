@@ -35,11 +35,11 @@ without a single line of Java/Scala code or IDE installation.
 Prepare a Linux or MacOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.19.1](https://archive.apache.org/dist/flink/flink-1.19.1/flink-1.19.1-bin-scala_2.12.tgz) ，unzip and get flink-1.19.1 directory.   
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.19.1 is located.
+1. Download [Flink 1.20.1](https://archive.apache.org/dist/flink/flink-1.20.1/flink-1.20.1-bin-scala_2.12.tgz) ，unzip and get flink-1.20.1 directory.   
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.1 is located.
 
    ```shell
-   cd flink-1.19.1
+   cd flink-1.20.1
    ```
 
 2. Enable checkpointing by appending the following parameters to the conf/flink-conf.yaml configuration file to perform a checkpoint every 3 seconds.
@@ -310,7 +310,7 @@ After finishing the tutorial, run the following command to stop all containers i
    docker-compose down
    ```
 
-Run the following command to stop the Flink cluster in the directory of Flink `flink-1.19.1`:
+Run the following command to stop the Flink cluster in the directory of Flink `flink-1.20.1`:
 
    ```shell
    ./bin/stop-cluster.sh

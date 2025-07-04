@@ -63,8 +63,8 @@ SINKS = {
 FLINK_VERSIONS = %w[
   1.17.2
   1.18.1
-  1.19.1
-  1.20.0
+  1.19.2
+  1.20.1
 ].freeze
 
 FLINK_CDC_VERSIONS = %w[

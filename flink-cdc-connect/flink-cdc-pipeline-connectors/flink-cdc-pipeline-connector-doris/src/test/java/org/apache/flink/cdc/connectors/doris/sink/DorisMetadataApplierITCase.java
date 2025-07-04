@@ -42,6 +42,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
@@ -50,14 +51,12 @@ import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
@@ -73,35 +72,22 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.PA
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_BATCH_MODE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SINK_ENABLE_DELETE;
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
-import static org.junit.Assert.fail;
 
 /** IT tests for {@link DorisMetadataApplier}. */
-@RunWith(Parameterized.class)
-public class DorisMetadataApplierITCase extends DorisSinkTestBase {
+class DorisMetadataApplierITCase extends DorisSinkTestBase {
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
     private static final int DATABASE_OPERATION_TIMEOUT_SECONDS = 5;
 
-    private final boolean batchMode;
-
-    public DorisMetadataApplierITCase(boolean batchMode) {
-        this.batchMode = batchMode;
-    }
-
-    @Parameters(name = "batchMode: {0}")
-    public static Iterable<?> data() {
-        return Arrays.asList(true, false);
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
     }
 
-    @Before
+    @BeforeEach
     public void initializeDatabase() {
         createDatabase(DorisContainer.DORIS_DATABASE_NAME);
 
@@ -114,7 +100,7 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         LOG.info("Database {} created.", DorisContainer.DORIS_DATABASE_NAME);
     }
 
-    @After
+    @AfterEach
     public void destroyDatabase() {
         dropDatabase(DorisContainer.DORIS_DATABASE_NAME);
         // waiting for database to be created
@@ -234,8 +220,9 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         tableId, Collections.singletonMap("number", DataTypes.FLOAT())));
     }
 
-    @Test
-    public void testDorisDataTypes() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisDataTypes(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
@@ -307,7 +294,8 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         .primaryKey("id")
                         .build();
 
-        runJobWithEvents(Collections.singletonList(new CreateTableEvent(tableId, schema)));
+        runJobWithEvents(
+                Collections.singletonList(new CreateTableEvent(tableId, schema)), batchMode);
 
         List<String> actual = inspectTableSchema(tableId);
         List<String> expected =
@@ -341,13 +329,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test
-    public void testDorisAddColumn() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisAddColumn(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
 
-        runJobWithEvents(generateAddColumnEvents(tableId));
+        runJobWithEvents(generateAddColumnEvents(tableId), batchMode);
 
         List<String> actual = inspectTableSchema(tableId);
 
@@ -363,13 +352,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test
-    public void testDorisDropColumn() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisDropColumn(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
 
-        runJobWithEvents(generateDropColumnEvents(tableId));
+        runJobWithEvents(generateDropColumnEvents(tableId), batchMode);
 
         List<String> actual = inspectTableSchema(tableId);
 
@@ -380,13 +370,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test
-    public void testDorisRenameColumn() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisRenameColumn(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
 
-        runJobWithEvents(generateRenameColumnEvents(tableId));
+        runJobWithEvents(generateRenameColumnEvents(tableId), batchMode);
 
         List<String> actual = inspectTableSchema(tableId);
 
@@ -399,13 +390,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test
-    public void testDorisAlterColumnType() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisAlterColumnType(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
 
-        runJobWithEvents(generateAlterColumnTypeEvents(tableId));
+        runJobWithEvents(generateAlterColumnTypeEvents(tableId), batchMode);
 
         List<String> actual = inspectTableSchema(tableId);
 
@@ -418,13 +410,14 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test
-    public void testDorisAlterColumnTypeWithDefaultValue() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisAlterColumnTypeWithDefaultValue(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
 
-        runJobWithEvents(generateAlterColumnTypeWithDefaultValueEvents(tableId));
+        runJobWithEvents(generateAlterColumnTypeWithDefaultValueEvents(tableId), batchMode);
 
         List<String> actual = inspectTableSchema(tableId);
 
@@ -437,17 +430,25 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test(expected = JobExecutionException.class)
-    public void testDorisNarrowingAlterColumnType() throws Exception {
-        TableId tableId =
-                TableId.tableId(
-                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisNarrowingAlterColumnType(boolean batchMode) {
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            TableId tableId =
+                                    TableId.tableId(
+                                            DorisContainer.DORIS_DATABASE_NAME,
+                                            DorisContainer.DORIS_TABLE_NAME);
 
-        runJobWithEvents(generateNarrowingAlterColumnTypeEvents(tableId));
+                            runJobWithEvents(
+                                    generateNarrowingAlterColumnTypeEvents(tableId), batchMode);
+                        })
+                .isExactlyInstanceOf(JobExecutionException.class);
     }
 
-    @Test
-    public void testDorisTruncateTable() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisTruncateTable(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
@@ -465,7 +466,7 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         new CreateTableEvent(tableId, schema),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
-        runJobWithEvents(preparationTestingEvents);
+        runJobWithEvents(preparationTestingEvents, batchMode);
         waitAndVerify(
                 tableId,
                 3,
@@ -478,7 +479,7 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         new TruncateTableEvent(tableId),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 3, 4.5, "Cecily")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 4, 5.6, "Derrida")));
-        runJobWithEvents(truncateTestingEvents);
+        runJobWithEvents(truncateTestingEvents, batchMode);
         waitAndVerify(
                 tableId,
                 3,
@@ -486,8 +487,9 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
     }
 
-    @Test
-    public void testDorisDropTable() throws Exception {
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testDorisDropTable(boolean batchMode) throws Exception {
         TableId tableId =
                 TableId.tableId(
                         DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
@@ -505,7 +507,7 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         new CreateTableEvent(tableId, schema),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 1, 2.3, "Alice")),
                         DataChangeEvent.insertEvent(tableId, generate(schema, 2, 3.4, "Bob")));
-        runJobWithEvents(preparationTestingEvents);
+        runJobWithEvents(preparationTestingEvents, batchMode);
 
         waitAndVerify(
                 tableId,
@@ -514,20 +516,18 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 DATABASE_OPERATION_TIMEOUT_SECONDS * 1000L);
 
         runJobWithEvents(
-                Arrays.asList(new CreateTableEvent(tableId, schema), new DropTableEvent(tableId)));
+                Arrays.asList(new CreateTableEvent(tableId, schema), new DropTableEvent(tableId)),
+                batchMode);
 
-        SQLSyntaxErrorException thrown =
-                Assertions.assertThrows(
-                        SQLSyntaxErrorException.class, () -> fetchTableContent(tableId, 3));
-        Assertions.assertTrue(
-                thrown.getMessage()
-                        .contains(
-                                String.format(
-                                        "errCode = 2, detailMessage = Unknown table '%s'",
-                                        tableId.getTableName())));
+        Assertions.assertThatThrownBy(() -> fetchTableContent(tableId, 3))
+                .isExactlyInstanceOf(SQLSyntaxErrorException.class)
+                .hasMessageContaining(
+                        String.format(
+                                "errCode = 2, detailMessage = Unknown table '%s'",
+                                tableId.getTableName()));
     }
 
-    private void runJobWithEvents(List<Event> events) throws Exception {
+    private void runJobWithEvents(List<Event> events, boolean batchMode) throws Exception {
         DataStream<Event> stream =
                 env.fromCollection(events, TypeInformation.of(Event.class)).setParallelism(1);
 
@@ -546,15 +546,16 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
 
         DataSink dorisSink = createDorisDataSink(config);
 
+        String schemaOperatorUid = "$$_schema_operator_$$";
+
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
-                        "$$_schema_operator_$$",
+                        schemaOperatorUid,
                         DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
                         "UTC");
 
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+        OperatorIDGenerator schemaOperatorIDGenerator = new OperatorIDGenerator(schemaOperatorUid);
 
         stream =
                 schemaOperatorTranslator.translateRegular(
@@ -572,7 +573,8 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                 new SinkDef("doris", "Dummy Doris Sink", config),
                 stream,
                 dorisSink,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                new OperatorUidGenerator());
 
         env.execute("Doris Schema Evolution Test");
     }
@@ -608,6 +610,6 @@ public class DorisMetadataApplierITCase extends DorisSinkTestBase {
                     actual);
             Thread.sleep(1000L);
         }
-        fail(String.format("Failed to verify content of %s.", tableId));
+        Assertions.fail("Failed to verify content of {}.", tableId);
     }
 }

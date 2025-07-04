@@ -64,6 +64,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, Offset> maxSplitHighWatermarkMap;
+    private final boolean isBackfillSkipped;
 
     private static final long READER_CLOSE_TIMEOUT_SECONDS = 30L;
 
@@ -74,6 +75,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureStreamPhaseTables = new HashSet<>();
+        this.isBackfillSkipped = taskContext.getSourceConfig().isSkipSnapshotBackfill();
     }
 
     @Override
@@ -184,6 +186,10 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
             }
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
+                // if backfill skipped, don't need to filter
+                if (isBackfillSkipped) {
+                    return true;
+                }
                 for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
                     if (taskContext.isRecordBetween(
                                     sourceRecord,

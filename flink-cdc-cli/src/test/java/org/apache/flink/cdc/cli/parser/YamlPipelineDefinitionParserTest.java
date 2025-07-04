@@ -27,6 +27,7 @@ import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableSet;
@@ -35,7 +36,6 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 import org.junit.jupiter.api.Test;
 
 import java.net.URL;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Arrays;
@@ -61,7 +61,7 @@ class YamlPipelineDefinitionParserTest {
     void testParsingFullDefinition() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-full.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDef);
     }
 
@@ -69,7 +69,7 @@ class YamlPipelineDefinitionParserTest {
     void testParsingNecessaryOnlyDefinition() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-with-optional.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(defWithOptional);
     }
 
@@ -77,7 +77,7 @@ class YamlPipelineDefinitionParserTest {
     void testMinimizedDefinition() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(minimizedDef);
     }
 
@@ -87,7 +87,7 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef =
                 parser.parse(
-                        Paths.get(resource.toURI()),
+                        new Path(resource.toURI()),
                         Configuration.fromMap(
                                 ImmutableMap.<String, String>builder()
                                         .put("parallelism", "1")
@@ -99,7 +99,7 @@ class YamlPipelineDefinitionParserTest {
     void testEvaluateDefaultLocalTimeZone() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-minimized.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef.getConfig().get(PIPELINE_LOCAL_TIME_ZONE))
                 .isNotEqualTo(PIPELINE_LOCAL_TIME_ZONE.defaultValue());
     }
@@ -110,7 +110,7 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef =
                 parser.parse(
-                        Paths.get(resource.toURI()),
+                        new Path(resource.toURI()),
                         Configuration.fromMap(
                                 ImmutableMap.<String, String>builder()
                                         .put(
@@ -131,7 +131,7 @@ class YamlPipelineDefinitionParserTest {
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
         PipelineDef pipelineDef =
                 parser.parse(
-                        Paths.get(resource.toURI()),
+                        new Path(resource.toURI()),
                         Configuration.fromMap(
                                 ImmutableMap.<String, String>builder()
                                         .put(PIPELINE_LOCAL_TIME_ZONE.key(), "Asia/Shanghai")
@@ -141,7 +141,7 @@ class YamlPipelineDefinitionParserTest {
 
         pipelineDef =
                 parser.parse(
-                        Paths.get(resource.toURI()),
+                        new Path(resource.toURI()),
                         Configuration.fromMap(
                                 ImmutableMap.<String, String>builder()
                                         .put(PIPELINE_LOCAL_TIME_ZONE.key(), "GMT+08:00")
@@ -150,7 +150,7 @@ class YamlPipelineDefinitionParserTest {
 
         pipelineDef =
                 parser.parse(
-                        Paths.get(resource.toURI()),
+                        new Path(resource.toURI()),
                         Configuration.fromMap(
                                 ImmutableMap.<String, String>builder()
                                         .put(PIPELINE_LOCAL_TIME_ZONE.key(), "UTC")
@@ -165,7 +165,7 @@ class YamlPipelineDefinitionParserTest {
         assertThatThrownBy(
                         () ->
                                 parser.parse(
-                                        Paths.get(resource.toURI()),
+                                        new Path(resource.toURI()),
                                         Configuration.fromMap(
                                                 ImmutableMap.<String, String>builder()
                                                         .put(
@@ -185,7 +185,7 @@ class YamlPipelineDefinitionParserTest {
         URL resource =
                 Resources.getResource("definitions/pipeline-definition-full-with-repsym.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(fullDefWithRouteRepSym);
     }
 
@@ -193,7 +193,7 @@ class YamlPipelineDefinitionParserTest {
     void testUdfDefinition() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-with-udf.yaml");
         YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
-        PipelineDef pipelineDef = parser.parse(Paths.get(resource.toURI()), new Configuration());
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
         assertThat(pipelineDef).isEqualTo(pipelineDefWithUdf);
     }
 
@@ -364,6 +364,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "source-database-sync-pipe")
                                     .put("parallelism", "4")
+                                    .put("execution.runtime-mode", "STREAMING")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
                                     .build()));
@@ -415,6 +416,7 @@ class YamlPipelineDefinitionParserTest {
                         + "  parallelism: 4\n"
                         + "  schema.change.behavior: evolve\n"
                         + "  schema-operator.rpc-timeout: 1 h\n"
+                        + "  execution.runtime-mode: STREAMING\n"
                         + "  model:\n"
                         + "    - model-name: GET_EMBEDDING\n"
                         + "      class-name: OpenAIEmbeddingModel\n"
@@ -502,6 +504,7 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .put("schema.change.behavior", "evolve")
                                     .put("schema-operator.rpc-timeout", "1 h")
+                                    .put("execution.runtime-mode", "STREAMING")
                                     .build()));
 
     private final PipelineDef defWithOptional =

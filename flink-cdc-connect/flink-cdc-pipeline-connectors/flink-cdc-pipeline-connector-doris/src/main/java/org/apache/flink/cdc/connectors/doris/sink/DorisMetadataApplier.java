@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.doris.sink;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
@@ -39,6 +40,7 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
 import org.apache.flink.util.CollectionUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
@@ -162,6 +164,13 @@ public class DorisMetadataApplier implements MetadataApplier {
                     DorisDataSinkOptions.getPropertiesByPrefix(
                             config, TABLE_CREATE_PROPERTIES_PREFIX);
             tableSchema.setProperties(tableProperties);
+
+            Tuple2<String, String> partitionInfo =
+                    DorisSchemaUtils.getPartitionInfo(config, schema, tableId);
+            if (partitionInfo != null) {
+                LOG.info("Partition info of {} is: {}.", tableId.identifier(), partitionInfo);
+                tableSchema.setPartitionInfo(partitionInfo);
+            }
             schemaChangeManager.createTable(tableSchema);
         } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);

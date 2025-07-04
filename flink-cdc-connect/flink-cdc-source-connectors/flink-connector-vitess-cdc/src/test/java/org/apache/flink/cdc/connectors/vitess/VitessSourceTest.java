@@ -36,8 +36,8 @@ import org.apache.flink.streaming.util.MockStreamingRuntimeContext;
 import org.apache.flink.util.Collector;
 
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -55,15 +55,15 @@ import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertInsert;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertUpdate;
 
 /** Tests for {@link VitessSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class VitessSourceTest extends VitessTestBase {
+class VitessSourceTest extends VitessTestBase {
 
-    @Before
+    @BeforeEach
     public void before() {
         initializeTable("inventory");
     }
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    void testConsumingAllEvents() throws Exception {
         DebeziumSourceFunction<SourceRecord> source = createVitessSqlSource(0);
         TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
 

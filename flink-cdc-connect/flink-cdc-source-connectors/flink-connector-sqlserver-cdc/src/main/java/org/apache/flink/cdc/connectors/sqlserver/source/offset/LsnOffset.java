@@ -43,7 +43,7 @@ public class LsnOffset extends Offset {
             offsetMap.put(SourceInfo.COMMIT_LSN_KEY, commitScn.toString());
         }
         if (eventSerialNo != null) {
-            offsetMap.put(SourceInfo.EVENT_SERIAL_NO_KEY, String.valueOf(eventSerialNo));
+            offsetMap.put(SourceInfo.EVENT_SERIAL_NO_KEY, eventSerialNo.toString());
         }
 
         this.offset = offsetMap;

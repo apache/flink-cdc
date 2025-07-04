@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
+import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
+import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -34,6 +36,7 @@ import org.apache.paimon.options.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,8 +45,9 @@ import java.util.List;
 public class PreCommitOperator
         extends AbstractStreamOperator<CommittableMessage<MultiTableCommittable>>
         implements OneInputStreamOperator<
-                CommittableMessage<MultiTableCommittable>,
-                CommittableMessage<MultiTableCommittable>> {
+                        CommittableMessage<MultiTableCommittable>,
+                        CommittableMessage<MultiTableCommittable>>,
+                BoundedOneInput {
     protected static final Logger LOGGER = LoggerFactory.getLogger(PreCommitOperator.class);
 
     private final String commitUser;
@@ -69,15 +73,24 @@ public class PreCommitOperator
     }
 
     @Override
-    public void processElement(StreamRecord<CommittableMessage<MultiTableCommittable>> element) {
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
         if (catalog == null) {
             this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
             this.storeMultiCommitter =
                     new StoreMultiCommitter(
                             () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
                             Committer.createContext(
-                                    commitUser, getMetricGroup(), true, false, null));
+                                    commitUser,
+                                    getMetricGroup(),
+                                    true,
+                                    context.isRestored(),
+                                    context.getOperatorStateStore()));
         }
+    }
+
+    @Override
+    public void processElement(StreamRecord<CommittableMessage<MultiTableCommittable>> element) {
         if (element.getValue() instanceof CommittableWithLineage) {
             multiTableCommittables.add(
                     ((CommittableWithLineage<MultiTableCommittable>) element.getValue())
@@ -109,18 +122,20 @@ public class PreCommitOperator
     public void snapshotState(StateSnapshotContext context) throws Exception {
         super.snapshotState(context);
         long checkpointId = context.getCheckpointId();
+        commitUpToCheckpoint(checkpointId);
+    }
+
+    private void commitUpToCheckpoint(long checkpointId) throws IOException, InterruptedException {
         if (!multiTableCommittables.isEmpty()) {
-            multiTableCommittables.forEach(
-                    (multiTableCommittable) ->
-                            LOGGER.debug(
-                                    "Try to commit for {}.{} : {} in checkpoint {}",
-                                    multiTableCommittable.getDatabase(),
-                                    multiTableCommittable.getTable(),
-                                    multiTableCommittables,
-                                    checkpointId));
             WrappedManifestCommittable wrappedManifestCommittable =
                     storeMultiCommitter.combine(checkpointId, checkpointId, multiTableCommittables);
+            long commitStart = System.currentTimeMillis();
             storeMultiCommitter.commit(Collections.singletonList(wrappedManifestCommittable));
+            LOGGER.info(
+                    "Commit for {} in checkpoint {} takes {} ms",
+                    wrappedManifestCommittable,
+                    checkpointId,
+                    System.currentTimeMillis() - commitStart);
             multiTableCommittables.clear();
         }
     }
@@ -131,5 +146,10 @@ public class PreCommitOperator
         if (storeMultiCommitter != null) {
             storeMultiCommitter.close();
         }
+    }
+
+    @Override
+    public void endInput() throws Exception {
+        commitUpToCheckpoint(Long.MAX_VALUE);
     }
 }

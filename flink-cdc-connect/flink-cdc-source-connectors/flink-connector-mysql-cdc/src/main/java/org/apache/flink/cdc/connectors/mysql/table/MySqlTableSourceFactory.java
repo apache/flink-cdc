@@ -26,7 +26,6 @@ import org.apache.flink.cdc.connectors.mysql.utils.OptionUtils;
 import org.apache.flink.cdc.debezium.table.DebeziumOptions;
 import org.apache.flink.cdc.debezium.utils.JdbcUrlUtils;
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.TableConfigOptions;
@@ -105,6 +104,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         boolean parseOnLineSchemaChanges =
                 config.get(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         boolean useLegacyJsonFormat = config.get(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
+        boolean assignUnboundedChunkFirst =
+                config.get(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
+
+        boolean appendOnly =
+                config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -120,7 +124,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                     MySqlSourceOptions.CONNECT_TIMEOUT, connectTimeout, Duration.ofMillis(250));
         }
 
-        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+        OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
         return new MySqlTableSource(
                 physicalSchema,
@@ -150,7 +154,9 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 chunkKeyColumn,
                 skipSnapshotBackFill,
                 parseOnLineSchemaChanges,
-                useLegacyJsonFormat);
+                useLegacyJsonFormat,
+                assignUnboundedChunkFirst,
+                appendOnly);
     }
 
     @Override
@@ -198,6 +204,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(MySqlSourceOptions.PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
+        options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
+        options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         return options;
     }
 

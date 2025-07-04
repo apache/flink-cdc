@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 /** A test for the {@link ColumnSerializer}. */
-public class ColumnSerializerTest extends SerializerTestBase<Column> {
+class ColumnSerializerTest extends SerializerTestBase<Column> {
     @Override
     protected TypeSerializer<Column> createSerializer() {
         return ColumnSerializer.INSTANCE;

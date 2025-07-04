@@ -26,20 +26,20 @@ import org.apache.flink.cdc.connectors.oceanbase.factory.OceanBaseDataSinkFactor
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.oceanbase.catalog.OceanBaseCatalogFactory}. */
-public class OceanBaseDataSinkFactoryTest {
+class OceanBaseDataSinkFactoryTest {
 
     @Test
-    public void testCreateDataSink() {
+    void testCreateDataSink() {
         DataSinkFactory sinkFactory =
                 FactoryDiscoveryUtils.getFactoryByIdentifier("oceanbase", DataSinkFactory.class);
-        assertTrue(sinkFactory instanceof OceanBaseDataSinkFactory);
+        assertThat(sinkFactory).isInstanceOf(OceanBaseDataSinkFactory.class);
 
         Configuration conf =
                 Configuration.fromMap(
@@ -56,6 +56,6 @@ public class OceanBaseDataSinkFactoryTest {
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
                                 conf, conf, Thread.currentThread().getContextClassLoader()));
-        assertTrue(dataSink instanceof OceanBaseDataSink);
+        assertThat(dataSink).isInstanceOf(OceanBaseDataSink.class);
     }
 }

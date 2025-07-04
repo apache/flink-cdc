@@ -248,6 +248,35 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
         <td>起始毫秒数, 仅适用于 <code>'timestamp'</code> 启动模式.</td>
     </tr>
     <tr>
+      <td>initial.snapshotting.queue.size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">16000</td>
+      <td>Integer</td>
+      <td>进行初始快照时的队列大小。仅在 scan.startup.mode 选项设置为 initial 时生效。<br>
+          注意：已弃用的选项名是 copy.existing.queue.size，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
+      </td>
+    </tr>
+    <tr>
+      <td>initial.snapshotting.max.threads</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">Processors Count</td>
+      <td>Integer</td>
+      <td>执行数据复制时使用的线程数。仅在 scan.startup.mode 选项设置为 initial 时生效。<br>
+          注意：已弃用的选项名是 copy.existing.max.threads，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
+      </td>
+    </tr>
+    <tr>
+      <td>initial.snapshotting.pipeline</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>MongoDB 管道操作的 JSON 对象数组，在快照读取阶段，会把该操作下推到 MongoDB，只筛选所需的数据，从而提高读取效率，
+          比如管道操作 [{"$match": {"closed": "false"}}] 表示只复制 closed 字段为 "false" 的文档。<br>
+          该选项仅在 scan.startup.mode 选项设置为 initial 时生效，且仅限于在 Debezium 模式下使用，不能用于增量快照模式，因为会出现语义不一致的问题。<br>
+          注意：已弃用的选项名是 copy.existing.pipeline，为了兼容旧版本的作业，该选项名仍可用，但是推荐升级到新选项名
+      </td>
+    </tr>
+    <tr>
       <td>batch.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1024</td>
@@ -296,6 +325,29 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>Boolean</td>
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        快照读取阶段是否先分配 UnboundedChunk。<br>
+        这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
+        这是一项实验特性，默认为 false。
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to skip backfill in snapshot reading phase.<br> 
+        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
+        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
+        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -332,21 +384,28 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>它指示在数据库中进行更改的时间。 <br>如果记录是从表的快照而不是改变流中读取的，该值将始终为0。</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>当前记录对应的 changelog 类型。注意：当 Source 算子选择为每条记录输出 row_kind 字段后，下游 SQL 算子在处理消息撤回时会因为这个字段不同而比对失败，
+建议只在简单的同步作业中引用该元数据列。<br>'+I' 表示 INSERT 数据，'-D' 表示 DELETE 数据，'-U' 表示 UPDATE_BEFORE 数据，'+U' 表示 UPDATE_AFTER 数据。</td>
+    </tr>
   </tbody>
 </table>
 
 扩展的 CREATE TABLE 示例演示了用于公开这些元数据字段的语法：
 ```sql
 CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    db_name         STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    _id STRING, // 必须声明
-    name STRING,
-    weight DECIMAL(10,3),
-    tags ARRAY<STRING>, -- array
-    price ROW<amount DECIMAL(10,2), currency STRING>, -- 嵌入式文档
-    suppliers ARRAY<ROW<name STRING, address STRING>>, -- 嵌入式文档
+    operation_ts    TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation       STRING METADATA FROM 'row_kind' VIRTUAL,
+    _id             STRING, // 必须声明
+    name            STRING,
+    weight          DECIMAL(10,3),
+    tags            ARRAY<STRING>, -- array
+    price           ROW<amount DECIMAL(10,2), currency STRING>, -- 嵌入式文档
+    suppliers       ARRAY<ROW<name STRING, address STRING>>, -- 嵌入式文档
     PRIMARY KEY(_id) NOT ENFORCED
 ) WITH (
     'connector' = 'mongodb-cdc',
@@ -397,6 +456,17 @@ CREATE TABLE mongodb_source (...) WITH (
 
 **Notes:**
 - 'timestamp' 指定时间戳启动模式，需要开启增量快照读。
+
+### 快照数据筛选器
+
+配置选项 `initial.snapshotting.pipeline` 描述复制现有数据时的筛选器。<br>
+在快照读取阶段，会把该筛选器下推到 MongoDB，只筛选所需的数据，从而提高读取效率。
+
+在下面的示例中，`$match` 聚合运算符确保只复制 closed 字段设置为 "false" 的文档。
+
+```
+'initial.snapshotting.pipeline' = '[ { "$match": { "closed": "false" } } ]'
+```
 
 ### 更改流
 
@@ -487,6 +557,82 @@ public class MongoDBIncrementalSourceExample {
 **注意:**
 - 如果使用数据库正则表达式，则需要 `readAnyDatabase` 角色。
 - 增量快照功能仅支持 MongoDB 4.0 之后的版本。
+
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 MongoDB，这里的 `namespace` 会被设置成默认值 ""，也就是一个空字符串，Group 名称的格式会类似于 `test_database.test_table`。
+
+### 完整的 Changelog
+
+MongoDB 6.0 以及更高的版本支持发送变更流事件，其中包含文档的更新前和更新后的内容（或者说数据的前后镜像）。
+
+- 前镜像是指被替换、更新或删除之前的文档。对于插入操作没有前镜像。
+
+- 后镜像是指被替换、更新或删除之后的文档。对于删除操作没有后镜像。
+
+MongoDB CDC 能够使用前镜像和后镜像来生成完整的变更日志流，包括插入、更新前、更新后和删除的数据行，从而避免了额外的 `ChangelogNormalize` 下游节点。
+
+为了启用此功能，你需要满足以下条件：
+
+- MongoDB 的版本必须为 6.0 或更高版本。
+- 启用 `preAndPostImages` 功能。
+
+```javascript
+db.runCommand({
+  setClusterParameter: {
+    changeStreamOptions: {
+      preAndPostImages: {
+        expireAfterSeconds: 'off' // replace with custom image expiration time
+      }
+    }
+  }
+})
+```
+
+- 为希望监控的 collection 启用 `changeStreamPreAndPostImages` 功能：
+```javascript
+db.runCommand({
+  collMod: "<< collection name >>", 
+  changeStreamPreAndPostImages: {
+    enabled: true 
+  } 
+})
+```
+
+在 DataStream 中开启 MongoDB CDC 的 `scan.full-changelog` 功能：
+
+```java
+MongoDBSource.builder()
+    .scanFullChangelog(true)
+    ...
+    .build()
+```
+
+或者使用 Flink SQL:
+
+```SQL
+CREATE TABLE mongodb_source (...) WITH (
+    'connector' = 'mongodb-cdc',
+    'scan.full-changelog' = 'true',
+    ...
+)
+```
 
 数据类型映射
 ----------------

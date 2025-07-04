@@ -232,7 +232,9 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
             // compared ...
             long timestamp = this.getTimestampSec();
             long targetTimestamp = that.getTimestampSec();
-            return Long.compare(timestamp, targetTimestamp);
+            if (timestamp != 0 && targetTimestamp != 0) {
+                return Long.compare(timestamp, targetTimestamp);
+            }
         }
 
         // First compare the MySQL binlog filenames
@@ -251,12 +253,7 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         }
 
         // The completed events are the same, so compare the row number ...
-        if (this.getRestartSkipRows() != that.getRestartSkipRows()) {
-            return Long.compare(this.getRestartSkipRows(), that.getRestartSkipRows());
-        }
-
-        // The skip rows are the same, so compare the timestamp ...
-        return Long.compare(this.getTimestampSec(), that.getTimestampSec());
+        return Long.compare(this.getRestartSkipRows(), that.getRestartSkipRows());
     }
 
     public boolean isAtOrBefore(BinlogOffset that) {

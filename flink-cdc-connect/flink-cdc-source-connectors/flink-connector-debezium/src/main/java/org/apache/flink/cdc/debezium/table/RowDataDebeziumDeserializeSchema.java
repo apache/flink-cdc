@@ -81,6 +81,8 @@ public final class RowDataDebeziumDeserializeSchema
     /** Whether the deserializer needs to handle metadata columns. */
     private final boolean hasMetadata;
 
+    private final boolean appendOnly;
+
     /**
      * A wrapped output collector which is used to append metadata columns after physical columns.
      */
@@ -104,9 +106,10 @@ public final class RowDataDebeziumDeserializeSchema
             ValueValidator validator,
             ZoneId serverTimeZone,
             DeserializationRuntimeConverterFactory userDefinedConverterFactory,
-            DebeziumChangelogMode changelogMode) {
+            DebeziumChangelogMode changelogMode,
+            boolean appendOnly) {
         this.hasMetadata = checkNotNull(metadataConverters).length > 0;
-        this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters);
+        this.appendMetadataCollector = new AppendMetadataCollector(metadataConverters, appendOnly);
         this.physicalConverter =
                 createConverter(
                         checkNotNull(physicalDataType),
@@ -115,6 +118,7 @@ public final class RowDataDebeziumDeserializeSchema
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
         this.changelogMode = checkNotNull(changelogMode);
+        this.appendOnly = appendOnly;
     }
 
     @Override
@@ -160,7 +164,7 @@ public final class RowDataDebeziumDeserializeSchema
     }
 
     private void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {
-        if (!hasMetadata) {
+        if (!hasMetadata && !appendOnly) {
             collector.collect(physicalRow);
             return;
         }
@@ -189,6 +193,8 @@ public final class RowDataDebeziumDeserializeSchema
         private DeserializationRuntimeConverterFactory userDefinedConverterFactory =
                 DeserializationRuntimeConverterFactory.DEFAULT;
         private DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
+
+        private boolean appendOnly = false;
 
         public Builder setPhysicalRowType(RowType physicalRowType) {
             this.physicalRowType = physicalRowType;
@@ -226,6 +232,11 @@ public final class RowDataDebeziumDeserializeSchema
             return this;
         }
 
+        public Builder setAppendOnly(boolean appendOnly) {
+            this.appendOnly = appendOnly;
+            return this;
+        }
+
         public RowDataDebeziumDeserializeSchema build() {
             return new RowDataDebeziumDeserializeSchema(
                     physicalRowType,
@@ -234,7 +245,8 @@ public final class RowDataDebeziumDeserializeSchema
                     validator,
                     serverTimeZone,
                     userDefinedConverterFactory,
-                    changelogMode);
+                    changelogMode,
+                    appendOnly);
         }
     }
 
@@ -481,12 +493,17 @@ public final class RowDataDebeziumDeserializeSchema
                             return TimestampData.fromEpochMillis((Long) dbzObj);
                         case MicroTimestamp.SCHEMA_NAME:
                             long micro = (long) dbzObj;
+                            // Use Math#floorDiv and Math#floorMod instead of `/` and `%`, because
+                            // timestamp number could be negative if we're handling timestamps prior
+                            // to 1970.
                             return TimestampData.fromEpochMillis(
-                                    micro / 1000, (int) (micro % 1000 * 1000));
+                                    Math.floorDiv(micro, 1000),
+                                    (int) (Math.floorMod(micro, 1000) * 1000));
                         case NanoTimestamp.SCHEMA_NAME:
                             long nano = (long) dbzObj;
                             return TimestampData.fromEpochMillis(
-                                    nano / 1000_000, (int) (nano % 1000_000));
+                                    Math.floorDiv(nano, 1000_000),
+                                    (int) (Math.floorMod(nano, 1000_000)));
                     }
                 }
                 LocalDateTime localDateTime =

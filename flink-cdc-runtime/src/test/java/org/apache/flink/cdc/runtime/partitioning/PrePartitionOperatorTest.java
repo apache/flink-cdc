@@ -121,13 +121,16 @@ class PrePartitionOperatorTest {
                                     new Object[] {2, new BinaryStringData("Bob"), 12345689L}));
             operator.processElement(new StreamRecord<>(eventA));
             operator.processElement(new StreamRecord<>(eventB));
-            assertThat(testHarness.getOutputRecords().poll())
+            StreamRecord<?> recordA = testHarness.getOutputRecords().poll();
+            assertThat(recordA)
                     .isEqualTo(
                             new StreamRecord<>(
                                     PartitioningEvent.ofRegular(
                                             eventA,
                                             getPartitioningTarget(CUSTOMERS_SCHEMA, eventA))));
-            assertThat(testHarness.getOutputRecords().poll())
+
+            StreamRecord<?> recordB = testHarness.getOutputRecords().poll();
+            assertThat(recordB)
                     .isEqualTo(
                             new StreamRecord<>(
                                     PartitioningEvent.ofRegular(

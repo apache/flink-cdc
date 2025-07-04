@@ -284,6 +284,15 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link MySqlSource} should assign the unbounded chunks first or not during
+     * snapshot reading phase.
+     */
+    public MySqlSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link MySqlSource}.
      *
      * @return a MySqlParallelSource with the settings made for this builder.

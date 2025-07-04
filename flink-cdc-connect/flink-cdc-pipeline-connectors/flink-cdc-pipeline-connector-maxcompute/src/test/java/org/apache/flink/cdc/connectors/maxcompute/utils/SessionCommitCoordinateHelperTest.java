@@ -19,96 +19,97 @@ package org.apache.flink.cdc.connectors.maxcompute.utils;
 
 import org.apache.flink.cdc.connectors.maxcompute.common.Constant;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import java.util.concurrent.ExecutionException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** */
-public class SessionCommitCoordinateHelperTest {
+class SessionCommitCoordinateHelperTest {
 
     @Test
-    public void test() throws ExecutionException, InterruptedException {
+    void testSessionCommit() {
         SessionCommitCoordinateHelper sessionCommitCoordinateHelper =
                 new SessionCommitCoordinateHelper(4);
         sessionCommitCoordinateHelper.clear();
         ExecutorService executorService = Executors.newFixedThreadPool(5);
 
-        Future<?> future =
+        List<Future<?>> futures = new ArrayList<>();
+        futures.add(
                 executorService.submit(
                         () -> {
                             int expect = 1;
                             while (sessionCommitCoordinateHelper.isCommitting()) {
-                                try {
-                                    String toCommitSessionId =
-                                            sessionCommitCoordinateHelper.getToCommitSessionId();
-                                    if (toCommitSessionId != null) {
-                                        Assert.assertEquals(
-                                                expect, Integer.parseInt(toCommitSessionId));
-                                        expect++;
-                                    }
-                                    Thread.sleep(1000);
-                                } catch (InterruptedException e) {
-                                    e.printStackTrace();
+                                String toCommitSessionId =
+                                        sessionCommitCoordinateHelper.getToCommitSessionId();
+                                if (toCommitSessionId != null) {
+                                    assertThat(Integer.parseInt(toCommitSessionId))
+                                            .isEqualTo(expect);
+                                    expect++;
                                 }
+                                interruptableSleep(1000);
                             }
-                        });
+                        }));
 
-        executorService.submit(
-                () -> {
-                    try {
-                        Thread.sleep(3000);
-                        sessionCommitCoordinateHelper.commit(0, "1");
-                        Thread.sleep(5000);
-                        sessionCommitCoordinateHelper.commit(0, Constant.END_OF_SESSION);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                });
-        executorService.submit(
-                () -> {
-                    try {
-                        Thread.sleep(2000);
-                        sessionCommitCoordinateHelper.commit(1, "1");
-                        Thread.sleep(5000);
-                        sessionCommitCoordinateHelper.commit(1, "2");
-                        Thread.sleep(1000);
-                        sessionCommitCoordinateHelper.commit(1, Constant.END_OF_SESSION);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                });
-        executorService.submit(
-                () -> {
-                    try {
-                        Thread.sleep(4000);
-                        sessionCommitCoordinateHelper.commit(2, "2");
-                        Thread.sleep(3000);
-                        sessionCommitCoordinateHelper.commit(2, "3");
-                        Thread.sleep(2000);
-                        sessionCommitCoordinateHelper.commit(2, Constant.END_OF_SESSION);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                });
-        executorService.submit(
-                () -> {
-                    try {
-                        Thread.sleep(2000);
-                        sessionCommitCoordinateHelper.commit(3, "1");
-                        Thread.sleep(2000);
-                        sessionCommitCoordinateHelper.commit(3, "2");
-                        Thread.sleep(2000);
-                        sessionCommitCoordinateHelper.commit(3, "3");
-                        sessionCommitCoordinateHelper.commit(3, Constant.END_OF_SESSION);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                });
+        futures.add(
+                executorService.submit(
+                        () -> {
+                            interruptableSleep(3000);
+                            sessionCommitCoordinateHelper.commit(0, "1");
+                            interruptableSleep(5000);
+                            sessionCommitCoordinateHelper.commit(0, Constant.END_OF_SESSION);
+                        }));
 
-        future.get();
+        futures.add(
+                executorService.submit(
+                        () -> {
+                            interruptableSleep(2000);
+                            sessionCommitCoordinateHelper.commit(1, "1");
+                            interruptableSleep(5000);
+                            sessionCommitCoordinateHelper.commit(1, "2");
+                            interruptableSleep(1000);
+                            sessionCommitCoordinateHelper.commit(1, Constant.END_OF_SESSION);
+                        }));
+
+        futures.add(
+                executorService.submit(
+                        () -> {
+                            interruptableSleep(4000);
+                            sessionCommitCoordinateHelper.commit(2, "2");
+                            interruptableSleep(3000);
+                            sessionCommitCoordinateHelper.commit(2, "3");
+                            interruptableSleep(2000);
+                            sessionCommitCoordinateHelper.commit(2, Constant.END_OF_SESSION);
+                        }));
+
+        futures.add(
+                executorService.submit(
+                        () -> {
+                            interruptableSleep(2000);
+                            sessionCommitCoordinateHelper.commit(3, "1");
+                            interruptableSleep(2000);
+                            sessionCommitCoordinateHelper.commit(3, "2");
+                            interruptableSleep(2000);
+                            sessionCommitCoordinateHelper.commit(3, "3");
+                            sessionCommitCoordinateHelper.commit(3, Constant.END_OF_SESSION);
+                        }));
+
+        for (Future<?> future : futures) {
+            Assertions.assertThatCode(future::get).doesNotThrowAnyException();
+        }
+    }
+
+    private static void interruptableSleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Sleep interrupted.", e);
+        }
     }
 }
