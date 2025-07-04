@@ -271,18 +271,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
                 // case 2: there are new tables to add
                 if (!newlyAddedTables.isEmpty()) {
-                    // if job is still in snapshot reading phase, directly add all newly added
-                    // tables
                     LOG.info("Found newly added tables, start capture newly added tables process");
 
-                    // add new tables
                     remainingTables.addAll(newlyAddedTables);
-                    if (AssignerStatus.isAssigningFinished(assignerStatus)) {
-                        // start the newly added tables process under binlog reading phase
-                        LOG.info(
-                                "Found newly added tables, start capture newly added tables process under binlog reading phase");
-                        this.startAssignNewlyAddedTables();
-                    }
+                    this.startAssignNewlyAddedTables();
                 }
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
