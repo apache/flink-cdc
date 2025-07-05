@@ -128,14 +128,14 @@ SELECT * FROM shipments;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Schema name of the PostgreSQL database to monitor.</td>
+      <td>Schema name of the PostgreSQL database to monitor. The Schema name also supports regular expressions to monitor multiple schemas that satisfy the regular expressions.</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the PostgreSQL database to monitor.</td>
+      <td>Table name of the PostgreSQL database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions.</td>
     </tr>
     <tr>
       <td>port</td>
