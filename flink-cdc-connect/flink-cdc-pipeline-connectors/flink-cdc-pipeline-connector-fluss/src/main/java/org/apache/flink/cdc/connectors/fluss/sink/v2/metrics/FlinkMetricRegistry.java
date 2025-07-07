@@ -120,7 +120,7 @@ public class FlinkMetricRegistry implements MetricRegistry {
     private void registerMetric(MetricGroup metricGroup, Metric metric, String metricName) {
         switch (metric.getMetricType()) {
             case COUNTER:
-                metricGroup.counter(metricName, new FlinkCounter((Counter) metric));
+                metricGroup.counter(metricName, new WarppedFlussCounter((Counter) metric));
                 break;
             case METER:
                 metricGroup.meter(metricName, new FlinkMeter((Meter) metric));

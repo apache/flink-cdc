@@ -24,36 +24,36 @@ import org.apache.flink.metrics.Counter;
  * additional information regarding copyright ownership. */
 
 /** An implementation of Flink's {@link Counter} which wraps Fluss's Counter. */
-public class FlinkCounter implements Counter {
+public class WarppedFlussCounter implements Counter {
 
-    private final com.alibaba.fluss.metrics.Counter wrapped;
+    private final com.alibaba.fluss.metrics.Counter flussCounter;
 
-    public FlinkCounter(com.alibaba.fluss.metrics.Counter wrapped) {
-        this.wrapped = wrapped;
+    public WarppedFlussCounter(com.alibaba.fluss.metrics.Counter flussCounter) {
+        this.flussCounter = flussCounter;
     }
 
     @Override
     public void inc() {
-        wrapped.inc();
+        flussCounter.inc();
     }
 
     @Override
     public void inc(long n) {
-        wrapped.inc(n);
+        flussCounter.inc(n);
     }
 
     @Override
     public void dec() {
-        wrapped.dec();
+        flussCounter.dec();
     }
 
     @Override
     public void dec(long n) {
-        wrapped.dec(n);
+        flussCounter.dec(n);
     }
 
     @Override
     public long getCount() {
-        return wrapped.getCount();
+        return flussCounter.getCount();
     }
 }

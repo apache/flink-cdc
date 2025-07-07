@@ -36,10 +36,10 @@ import java.io.IOException;
  * @param <InputT> The type of the input elements.
  */
 public class FlussSink<InputT> implements Sink<InputT> {
-    private final FlussRecordSerializer<InputT> serializer;
+    private final FlussEventSerializer<InputT> serializer;
     private final Configuration flussConfig;
 
-    public FlussSink(Configuration flussConfig, FlussRecordSerializer<InputT> serializer) {
+    public FlussSink(Configuration flussConfig, FlussEventSerializer<InputT> serializer) {
         this.serializer = serializer;
         this.flussConfig = flussConfig;
     }

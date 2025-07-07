@@ -386,8 +386,8 @@ public class FlussPipelineITCase {
                 .executeSql(
                         String.format(
                                 "CREATE TABLE %s.%s (\n"
-                                        + "    col1 STRING,\n"
                                         + "    col2 STRING,\n"
+                                        + "    col1 STRING,\n"
                                         + "   PRIMARY KEY (col1) NOT ENFORCED \n"
                                         + ");",
                                 TABLE_1.getSchemaName(), TABLE_1.getTableName()))
@@ -430,7 +430,7 @@ public class FlussPipelineITCase {
         eventOfSplits.add(split1);
 
         composeAndExecute(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[1, a]", "+I[2, 2]"));
+        checkResult(TABLE_1, Arrays.asList("+I[a, 1]", "+I[2, 2]"));
     }
 
     @Test

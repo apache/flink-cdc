@@ -25,7 +25,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRecordSerializer;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEventSerializer;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRowWithOp;
 
 import com.alibaba.fluss.client.Connection;
@@ -46,7 +46,7 @@ import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.sameC
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussSchema;
 
 /** Serialization schema that converts a CDC data record to a Fluss event. */
-public class FlussEventSerializationSchema implements FlussRecordSerializer<Event> {
+public class FlussEventSerializationSchema implements FlussEventSerializer<Event> {
     private static final long serialVersionUID = 1L;
 
     private transient Map<TableId, TableSchemaInfo> tableInfoMap;
@@ -59,19 +59,19 @@ public class FlussEventSerializationSchema implements FlussRecordSerializer<Even
     }
 
     @Override
-    public FlussEvent serialize(Event record) throws IOException {
-        if (record instanceof SchemaChangeEvent) {
-            applySchemaChangeEvent((SchemaChangeEvent) record);
-            return new FlussEvent(getTablePath(((SchemaChangeEvent) record).tableId()), null, true);
-        } else if (record instanceof DataChangeEvent) {
-            FlussRowWithOp rowWithOp = applyDataChangeEvent((DataChangeEvent) record);
+    public FlussEvent serialize(Event event) throws IOException {
+        if (event instanceof SchemaChangeEvent) {
+            applySchemaChangeEvent((SchemaChangeEvent) event);
+            return new FlussEvent(getTablePath(((SchemaChangeEvent) event).tableId()), null, true);
+        } else if (event instanceof DataChangeEvent) {
+            FlussRowWithOp rowWithOp = applyDataChangeEvent((DataChangeEvent) event);
             return new FlussEvent(
-                    getTablePath(((DataChangeEvent) record).tableId()),
+                    getTablePath(((DataChangeEvent) event).tableId()),
                     Collections.singletonList(rowWithOp),
                     false);
 
         } else {
-            throw new UnsupportedOperationException("Don't support event " + record);
+            throw new UnsupportedOperationException("Don't support event " + event);
         }
     }
 

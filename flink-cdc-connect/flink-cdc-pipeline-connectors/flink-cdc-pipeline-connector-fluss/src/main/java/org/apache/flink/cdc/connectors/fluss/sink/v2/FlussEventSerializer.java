@@ -28,7 +28,7 @@ import java.io.Serializable;
  * @param <InputT> The type of the input record which comes from the upstream and will be
  *     transformed into a FlussEvent here.
  */
-public interface FlussRecordSerializer<InputT> extends Serializable {
+public interface FlussEventSerializer<InputT> extends Serializable {
     void open(Connection connection) throws IOException;
 
     FlussEvent serialize(InputT in) throws IOException;

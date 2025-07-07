@@ -511,7 +511,7 @@ public class FlussMetadataApplierTest {
                                     applier.applySchemaChange(
                                             new CreateTableEvent(tableId, differentSchema)))
                     .hasMessageContaining(
-                            "The CDC create table event schema is not matched to current Fluss table schema");
+                            "The table schema inffered by Flink CDC is not matched with current Fluss table schema");
         }
 
         // recreate table with schema1 again

@@ -78,7 +78,7 @@ limitations under the License.
             <version>${fluss.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- In cdc yaml, we use our own sink. Thus, import fluss-fink just for test -->
+        <!-- In Flink CDC project has Pipeline Sink Connector for Fluss. we import fluss-fink for Fluss Sink Connector just for test purpose -->
         <dependency>
             <groupId>com.alibaba.fluss</groupId>
             <artifactId>fluss-flink-common</artifactId>
@@ -104,9 +104,6 @@ limitations under the License.
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
-
-
-
     </dependencies>
 
     <build>

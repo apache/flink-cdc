@@ -52,7 +52,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
 
     private final Configuration flussConfig;
     private final MailboxExecutor mailboxExecutor;
-    private final FlussRecordSerializer<InputT> flussRecordSerializer;
+    private final FlussEventSerializer<InputT> flussRecordSerializer;
 
     private transient Connection connection;
     protected transient FlinkMetricRegistry flinkMetricRegistry;
@@ -69,7 +69,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
     public FlussSinkWriter(
             Configuration flussConfig,
             MailboxExecutor mailboxExecutor,
-            FlussRecordSerializer<InputT> flussRecordSerializer) {
+            FlussEventSerializer<InputT> flussRecordSerializer) {
         this.flussConfig = flussConfig;
         this.mailboxExecutor = mailboxExecutor;
         this.flussRecordSerializer = flussRecordSerializer;

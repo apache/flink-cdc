@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.sink;
+package org.apache.flink.cdc.connectors.fluss.sink;
 
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.data.RecordData.FieldGetter;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.TableId;
@@ -32,24 +31,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
-/** The default {@link HashFunctionProvider} implementation for data change event. */
-public class DefaultDataChangeEventHashFunctionProvider
-        implements HashFunctionProvider<DataChangeEvent> {
-
-    private static final long serialVersionUID = 1L;
-
+/** {@link HashFunctionProvider} implementation for {@link FlussDataSink}. */
+public class FlussHashFunctionProvider implements HashFunctionProvider<DataChangeEvent> {
     @Override
     public HashFunction<DataChangeEvent> getHashFunction(@Nullable TableId tableId, Schema schema) {
-        return new DefaultDataChangeEventHashFunction(schema);
+        return new FlussHashFunction(schema);
     }
 
-    /** The default {@link HashFunction} implementation for data change event. */
-    static class DefaultDataChangeEventHashFunction implements HashFunction<DataChangeEvent> {
+    static class FlussHashFunction implements HashFunction<DataChangeEvent> {
+        private final List<RecordData.FieldGetter> primaryKeyGetters;
 
-        private final List<FieldGetter> primaryKeyGetters;
-
-        public DefaultDataChangeEventHashFunction(Schema schema) {
+        public FlussHashFunction(Schema schema) {
             primaryKeyGetters = createFieldGetters(schema);
         }
 
@@ -63,18 +57,24 @@ public class DefaultDataChangeEventHashFunctionProvider
             objectsToHash.add(tableId.getTableName());
 
             // Primary key
-            RecordData data =
-                    event.op().equals(OperationType.DELETE) ? event.before() : event.after();
-            for (FieldGetter primaryKeyGetter : primaryKeyGetters) {
-                objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
+            if (!primaryKeyGetters.isEmpty()) {
+                RecordData data =
+                        event.op().equals(OperationType.DELETE) ? event.before() : event.after();
+                for (RecordData.FieldGetter primaryKeyGetter : primaryKeyGetters) {
+                    objectsToHash.add(primaryKeyGetter.getFieldOrNull(data));
+                }
+            } else {
+                // Avoid sending all events to the same subtask when table has no primary key.
+                objectsToHash.add(ThreadLocalRandom.current().nextInt());
             }
 
             // Calculate hash
             return (Objects.hash(objectsToHash.toArray()) * 31) & 0x7FFFFFFF;
         }
 
-        private List<FieldGetter> createFieldGetters(Schema schema) {
-            List<FieldGetter> fieldGetters = new ArrayList<>(schema.primaryKeys().size());
+        private List<RecordData.FieldGetter> createFieldGetters(Schema schema) {
+            List<RecordData.FieldGetter> fieldGetters =
+                    new ArrayList<>(schema.primaryKeys().size());
             schema.primaryKeys().stream()
                     .mapToInt(
                             pk -> {

@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
@@ -57,5 +59,10 @@ public class FlussDataSink implements DataSink {
     public MetadataApplier getMetadataApplier() {
         return new FlussMetaDataApplier(
                 flussClientConfig, tableProperties, bucketKeysMap, bucketNumMap);
+    }
+
+    @Override
+    public HashFunctionProvider<DataChangeEvent> getDataChangeEventHashFunctionProvider() {
+        return new FlussHashFunctionProvider();
     }
 }
