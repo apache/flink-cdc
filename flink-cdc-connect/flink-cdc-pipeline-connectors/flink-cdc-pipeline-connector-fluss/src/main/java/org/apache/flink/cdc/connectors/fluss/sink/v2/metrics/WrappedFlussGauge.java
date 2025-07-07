@@ -24,16 +24,16 @@ import org.apache.flink.metrics.Gauge;
  * additional information regarding copyright ownership. */
 
 /** An implementation of Flink's {@link Gauge} which wraps Fluss's Gauge. */
-public class FlinkGauge<T> implements Gauge<T> {
+public class WrappedFlussGauge<T> implements Gauge<T> {
 
-    private final com.alibaba.fluss.metrics.Gauge<T> wrapped;
+    private final com.alibaba.fluss.metrics.Gauge<T> flussGauge;
 
-    public FlinkGauge(com.alibaba.fluss.metrics.Gauge<T> wrapped) {
-        this.wrapped = wrapped;
+    public WrappedFlussGauge(com.alibaba.fluss.metrics.Gauge<T> flussGauge) {
+        this.flussGauge = flussGauge;
     }
 
     @Override
     public T getValue() {
-        return wrapped.getValue();
+        return flussGauge.getValue();
     }
 }

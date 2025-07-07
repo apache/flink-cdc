@@ -25,73 +25,74 @@ import org.apache.flink.metrics.HistogramStatistics;
  * additional information regarding copyright ownership. */
 
 /** An implementation of Flink's {@link Histogram} which wraps Fluss's Histogram. */
-public class FlinkHistogram implements Histogram {
+public class WrapperFlussHistogram implements Histogram {
 
-    private final com.alibaba.fluss.metrics.Histogram wrapped;
+    private final com.alibaba.fluss.metrics.Histogram flussHistogram;
 
-    public FlinkHistogram(com.alibaba.fluss.metrics.Histogram wrapped) {
-        this.wrapped = wrapped;
+    public WrapperFlussHistogram(com.alibaba.fluss.metrics.Histogram flussHistogram) {
+        this.flussHistogram = flussHistogram;
     }
 
     @Override
     public void update(long n) {
-        wrapped.update(n);
+        flussHistogram.update(n);
     }
 
     @Override
     public long getCount() {
-        return wrapped.getCount();
+        return flussHistogram.getCount();
     }
 
     @Override
     public HistogramStatistics getStatistics() {
 
-        wrapped.getStatistics();
+        flussHistogram.getStatistics();
 
         return null;
     }
 
     private static class FlinkHistogramStatistics extends HistogramStatistics {
 
-        private final com.alibaba.fluss.metrics.HistogramStatistics wrapped;
+        private final com.alibaba.fluss.metrics.HistogramStatistics flussHistogramStatistics;
 
-        public FlinkHistogramStatistics(com.alibaba.fluss.metrics.HistogramStatistics wrapped) {
-            this.wrapped = wrapped;
+        public FlinkHistogramStatistics(
+                com.alibaba.fluss.metrics.HistogramStatistics flussHistogramStatistics) {
+            this.flussHistogramStatistics = flussHistogramStatistics;
         }
 
         @Override
         public double getQuantile(double quantile) {
-            return wrapped.getQuantile(quantile);
+            return flussHistogramStatistics.getQuantile(quantile);
         }
 
         @Override
         public long[] getValues() {
-            return wrapped.getValues();
+            return flussHistogramStatistics.getValues();
         }
 
         @Override
         public int size() {
-            return wrapped.size();
+            return flussHistogramStatistics.size();
         }
 
         @Override
         public double getMean() {
-            return wrapped.getMean();
+            return flussHistogramStatistics.getMean();
         }
 
         @Override
         public double getStdDev() {
-            return wrapped.getStdDev();
+            return flussHistogramStatistics.getStdDev();
         }
 
         @Override
         public long getMax() {
-            return wrapped.getMax();
+            return flussHistogramStatistics.getMax();
         }
 
         @Override
         public long getMin() {
-            return wrapped.getMin();
+            return flussHistogramStatistics.getMin();
         }
     }
 }

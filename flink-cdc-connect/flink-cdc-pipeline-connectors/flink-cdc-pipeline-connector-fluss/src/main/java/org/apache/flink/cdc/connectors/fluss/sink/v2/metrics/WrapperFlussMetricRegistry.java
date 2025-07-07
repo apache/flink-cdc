@@ -49,7 +49,7 @@ import java.util.concurrent.CompletableFuture;
  * <p>For example, the metrics sendLatencyMs will be reported in metric:
  * "{some_parent_groups}.operator.fluss.client_writer.client_id.sendLatencyMs"
  */
-public class FlinkMetricRegistry implements MetricRegistry {
+public class WrapperFlussMetricRegistry implements MetricRegistry {
 
     public static final String FLUSS_GROUP_NAME = "fluss";
     private static final Character FIELD_DELIMITER = '_';
@@ -58,11 +58,7 @@ public class FlinkMetricRegistry implements MetricRegistry {
     private final Map<String, Metric> metrics;
     private final Set<String> exposedMetricNames;
 
-    public FlinkMetricRegistry(MetricGroup flinkOperatorMetricGroup) {
-        this(flinkOperatorMetricGroup, Collections.emptySet());
-    }
-
-    public FlinkMetricRegistry(
+    public WrapperFlussMetricRegistry(
             MetricGroup flinkOperatorMetricGroup, Set<String> exposedMetricNames) {
         this.metricGroupForFluss = flinkOperatorMetricGroup.addGroup(FLUSS_GROUP_NAME);
         this.metrics = new HashMap<>();
@@ -123,13 +119,13 @@ public class FlinkMetricRegistry implements MetricRegistry {
                 metricGroup.counter(metricName, new WarppedFlussCounter((Counter) metric));
                 break;
             case METER:
-                metricGroup.meter(metricName, new FlinkMeter((Meter) metric));
+                metricGroup.meter(metricName, new WrapperFlussMeter((Meter) metric));
                 break;
             case GAUGE:
-                metricGroup.gauge(metricName, new FlinkGauge<>((Gauge<?>) metric));
+                metricGroup.gauge(metricName, new WrappedFlussGauge<>((Gauge<?>) metric));
                 break;
             case HISTOGRAM:
-                metricGroup.histogram(metricName, new FlinkHistogram((Histogram) metric));
+                metricGroup.histogram(metricName, new WrapperFlussHistogram((Histogram) metric));
                 break;
         }
 

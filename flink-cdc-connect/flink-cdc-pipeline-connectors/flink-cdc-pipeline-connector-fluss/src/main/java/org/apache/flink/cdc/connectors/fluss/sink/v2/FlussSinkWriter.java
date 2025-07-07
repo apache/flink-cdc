@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.connector.sink2.SinkWriter;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.FlinkMetricRegistry;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricRegistry;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 
@@ -55,7 +55,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
     private final FlussEventSerializer<InputT> flussRecordSerializer;
 
     private transient Connection connection;
-    protected transient FlinkMetricRegistry flinkMetricRegistry;
+    protected transient WrapperFlussMetricRegistry flinkMetricRegistry;
 
     protected transient SinkWriterMetricGroup metricGroup;
 
@@ -81,7 +81,7 @@ public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
         LOG.info("Opening Fluss with config {}", flussConfig);
         this.metricGroup = metricGroup;
         flinkMetricRegistry =
-                new FlinkMetricRegistry(
+                new WrapperFlussMetricRegistry(
                         metricGroup, Collections.singleton(MetricNames.WRITER_SEND_LATENCY_MS));
         connection = ConnectionFactory.createConnection(flussConfig, flinkMetricRegistry);
         flussRecordSerializer.open(connection);

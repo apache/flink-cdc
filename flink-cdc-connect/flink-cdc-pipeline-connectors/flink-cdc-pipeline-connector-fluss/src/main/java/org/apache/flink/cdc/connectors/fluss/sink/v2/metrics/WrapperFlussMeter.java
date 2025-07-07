@@ -24,31 +24,31 @@ import org.apache.flink.metrics.Meter;
  * additional information regarding copyright ownership. */
 
 /** An implementation of Flink's {@link Meter} which wraps Fluss's Meter. */
-public class FlinkMeter implements Meter {
+public class WrapperFlussMeter implements Meter {
 
-    private final com.alibaba.fluss.metrics.Meter wrapped;
+    private final com.alibaba.fluss.metrics.Meter flussMeter;
 
-    public FlinkMeter(com.alibaba.fluss.metrics.Meter wrapped) {
-        this.wrapped = wrapped;
+    public WrapperFlussMeter(com.alibaba.fluss.metrics.Meter flussMeter) {
+        this.flussMeter = flussMeter;
     }
 
     @Override
     public void markEvent() {
-        wrapped.markEvent();
+        flussMeter.markEvent();
     }
 
     @Override
     public void markEvent(long n) {
-        wrapped.markEvent(n);
+        flussMeter.markEvent(n);
     }
 
     @Override
     public double getRate() {
-        return wrapped.getRate();
+        return flussMeter.getRate();
     }
 
     @Override
     public long getCount() {
-        return wrapped.getCount();
+        return flussMeter.getCount();
     }
 }
