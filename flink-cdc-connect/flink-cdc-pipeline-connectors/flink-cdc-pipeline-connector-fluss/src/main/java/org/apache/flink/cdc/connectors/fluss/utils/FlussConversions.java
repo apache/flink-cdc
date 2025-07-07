@@ -52,7 +52,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Converter from Flink's type to Fluss's type. */
-public class FlinkConversions {
+public class FlussConversions {
     private static final CdcTypeToFlussType TO_FLUSS_TYPE_INSTANCE = new CdcTypeToFlussType();
 
     public static TableDescriptor toFlussTable(

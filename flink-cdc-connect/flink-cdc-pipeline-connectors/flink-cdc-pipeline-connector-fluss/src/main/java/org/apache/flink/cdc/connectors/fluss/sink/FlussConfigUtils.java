@@ -24,7 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Utils for parse fluss yaml sink options. */
+/** Utils for parsing fluss yaml sink options. */
 public class FlussConfigUtils {
     public static Map<String, List<String>> parseBucketKeys(@Nullable String rawValue)
             throws IllegalArgumentException {

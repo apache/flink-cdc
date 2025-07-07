@@ -15,13 +15,11 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink.v2.metrics;
+package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.FlinkSinkWriter;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRecordSerializer;
 import org.apache.flink.runtime.metrics.groups.InternalSinkWriterMetricGroup;
 
 import com.alibaba.fluss.config.Configuration;
@@ -32,28 +30,32 @@ import java.io.IOException;
  * Software Foundation (ASF) under the Apache License, Version 2.0. See the NOTICE file distributed with this work for
  * additional information regarding copyright ownership. */
 
-/** Flink sink for Fluss. */
-public class FlinkSink<INPUT> implements Sink<INPUT> {
-    private final FlussRecordSerializer<INPUT> serializer;
+/**
+ * Flink sink for Fluss.
+ *
+ * @param <InputT> The type of the input elements.
+ */
+public class FlussSink<InputT> implements Sink<InputT> {
+    private final FlussRecordSerializer<InputT> serializer;
     private final Configuration flussConfig;
 
-    public FlinkSink(Configuration flussConfig, FlussRecordSerializer<INPUT> serializer) {
+    public FlussSink(Configuration flussConfig, FlussRecordSerializer<InputT> serializer) {
         this.serializer = serializer;
         this.flussConfig = flussConfig;
     }
 
     @Deprecated
-    public SinkWriter<INPUT> createWriter(InitContext context) throws IOException {
-        FlinkSinkWriter<INPUT> flinkSinkWriter =
-                new FlinkSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);
+    public SinkWriter<InputT> createWriter(InitContext context) throws IOException {
+        FlussSinkWriter<InputT> flinkSinkWriter =
+                new FlussSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);
         flinkSinkWriter.initialize(InternalSinkWriterMetricGroup.wrap(context.metricGroup()));
         return flinkSinkWriter;
     }
 
     @Override
-    public SinkWriter<INPUT> createWriter(WriterInitContext context) throws IOException {
-        FlinkSinkWriter<INPUT> flinkSinkWriter =
-                new FlinkSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);
+    public SinkWriter<InputT> createWriter(WriterInitContext context) throws IOException {
+        FlussSinkWriter<InputT> flinkSinkWriter =
+                new FlussSinkWriter<>(flussConfig, context.getMailboxExecutor(), serializer);
         flinkSinkWriter.initialize(InternalSinkWriterMetricGroup.wrap(context.metricGroup()));
         return flinkSinkWriter;
     }

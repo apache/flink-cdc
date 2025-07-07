@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
-import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.toFlussTable;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussTable;
 
 /** {@link MetadataApplier} for fluss. */
 public class FlussMetaDataApplier implements MetadataApplier {

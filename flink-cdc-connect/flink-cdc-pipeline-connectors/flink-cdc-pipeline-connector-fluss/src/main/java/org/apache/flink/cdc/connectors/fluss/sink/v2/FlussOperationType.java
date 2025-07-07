@@ -35,9 +35,9 @@ package org.apache.flink.cdc.connectors.fluss.sink.v2;
  *   <li>{@link #IGNORE} - Represents an operation that should be ignored.
  * </ul>
  *
- * @see com.alibaba.fluss.flink.row.RowWithOp
+ * @see FlussRowWithOp
  */
-public enum OperationType {
+public enum FlussOperationType {
     /** Represents an append-only (insert) operation. */
     APPEND,
 

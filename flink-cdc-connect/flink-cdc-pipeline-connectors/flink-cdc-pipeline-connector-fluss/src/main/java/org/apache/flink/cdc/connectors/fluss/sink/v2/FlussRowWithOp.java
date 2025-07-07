@@ -30,21 +30,21 @@ import static com.alibaba.fluss.utils.Preconditions.checkNotNull;
  * additional information regarding copyright ownership. */
 
 /**
- * A wrapper class that associates an {@link InternalRow} with an {@link OperationType} for use in
- * Fluss-Flink data processing.
+ * A wrapper class that associates an {@link InternalRow} with an {@link FlussOperationType} for use
+ * in Fluss-Flink data processing.
  *
  * <p>This class is used to represent a row of data along with its corresponding operation type,
- * such as APPEND, UPSERT, or DELETE, as defined by {@link OperationType}.
+ * such as APPEND, UPSERT, or DELETE, as defined by {@link FlussOperationType}.
  *
  * @see InternalRow
- * @see OperationType
+ * @see FlussOperationType
  */
-public class RowWithOp {
+public class FlussRowWithOp {
     /** The internal row data. */
     private final InternalRow row;
 
     /** The type of operation associated with this row (e.g., APPEND, UPSERT, DELETE). */
-    private final OperationType opType;
+    private final FlussOperationType opType;
 
     /**
      * Constructs a {@code RowWithOp} with the specified internal row and operation type.
@@ -53,7 +53,7 @@ public class RowWithOp {
      * @param opType the operation type (must not be null)
      * @throws NullPointerException if {@code row} or {@code opType} is null
      */
-    public RowWithOp(InternalRow row, @Nullable OperationType opType) {
+    public FlussRowWithOp(InternalRow row, @Nullable FlussOperationType opType) {
         this.row = checkNotNull(row, "row cannot be null");
         this.opType = checkNotNull(opType, "opType cannot be null");
     }
@@ -72,7 +72,7 @@ public class RowWithOp {
      *
      * @return the operation type
      */
-    public OperationType getOperationType() {
+    public FlussOperationType getOperationType() {
         return opType;
     }
 
@@ -88,7 +88,7 @@ public class RowWithOp {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        RowWithOp rowWithOp = (RowWithOp) o;
+        FlussRowWithOp rowWithOp = (FlussRowWithOp) o;
         return Objects.equals(row, rowWithOp.row) && opType == rowWithOp.opType;
     }
 

@@ -24,12 +24,12 @@ import java.util.List;
 /** FlussEvent is a wrapper for a list of genericRows. */
 public class FlussEvent {
     private final TablePath tablePath;
-    private final List<RowWithOp> rowWithOps;
+    private final List<FlussRowWithOp> rowWithOps;
     // if true, means that table schema has changed right before this genericRow.
     boolean shouldRefreshSchema;
 
     public FlussEvent(
-            TablePath tablePath, List<RowWithOp> rowWithOps, boolean shouldRefreshSchema) {
+            TablePath tablePath, List<FlussRowWithOp> rowWithOps, boolean shouldRefreshSchema) {
         this.tablePath = tablePath;
         this.rowWithOps = rowWithOps;
         this.shouldRefreshSchema = shouldRefreshSchema;
@@ -39,7 +39,7 @@ public class FlussEvent {
         return tablePath;
     }
 
-    public List<RowWithOp> getRowWithOps() {
+    public List<FlussRowWithOp> getRowWithOps() {
         return rowWithOps;
     }
 

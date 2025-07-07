@@ -30,7 +30,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussEventSerializationSchema;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.FlinkSink;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -556,8 +555,8 @@ public class FlussSinkITCase extends AbstractTestBase {
                 environment.fromData(events, TypeInformation.of(Event.class));
 
         FlussEventSerializationSchema flussRecordSerializer = new FlussEventSerializationSchema();
-        FlinkSink<Event> flussSink =
-                new FlinkSink<>(FLUSS_CLUSTER_EXTENSION.getClientConfig(), flussRecordSerializer);
+        FlussSink<Event> flussSink =
+                new FlussSink<>(FLUSS_CLUSTER_EXTENSION.getClientConfig(), flussRecordSerializer);
         source.sinkTo(flussSink);
         environment.execute();
     }

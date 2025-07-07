@@ -36,8 +36,8 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.RowWithOp;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRowWithOp;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import com.alibaba.fluss.client.Connection;
@@ -125,7 +125,7 @@ public class FlussEventSerializationSchemaTest {
 
         verifyDataChangeEvent(
                 table1,
-                new RowWithOp(CdcAsFlussRow.replace(record), OperationType.UPSERT),
+                new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.UPSERT),
                 serializer.serialize(insertEvent1));
 
         record =
@@ -140,7 +140,7 @@ public class FlussEventSerializationSchemaTest {
         DataChangeEvent deleteEvent1 = DataChangeEvent.deleteEvent(table1, record);
         verifyDataChangeEvent(
                 table1,
-                new RowWithOp(CdcAsFlussRow.replace(record), OperationType.DELETE),
+                new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.DELETE),
                 serializer.serialize(deleteEvent1));
 
         record =
@@ -165,7 +165,7 @@ public class FlussEventSerializationSchemaTest {
 
         verifyDataChangeEvent(
                 table1,
-                new RowWithOp(CdcAsFlussRow.replace(record), OperationType.UPSERT),
+                new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.UPSERT),
                 serializer.serialize(updateEvent1));
 
         // 2. create table2, and insert data
@@ -200,7 +200,7 @@ public class FlussEventSerializationSchemaTest {
         DataChangeEvent insertEvent2 = DataChangeEvent.insertEvent(table2, record);
         verifyDataChangeEvent(
                 table2,
-                new RowWithOp(CdcAsFlussRow.replace(record), OperationType.UPSERT),
+                new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.UPSERT),
                 serializer.serialize(insertEvent2));
 
         record =
@@ -217,7 +217,7 @@ public class FlussEventSerializationSchemaTest {
         DataChangeEvent deleteEvent2 = DataChangeEvent.deleteEvent(table2, record);
         verifyDataChangeEvent(
                 table2,
-                new RowWithOp(CdcAsFlussRow.replace(record), OperationType.DELETE),
+                new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.DELETE),
                 Objects.requireNonNull(serializer.serialize(deleteEvent2)));
     }
 
@@ -228,7 +228,7 @@ public class FlussEventSerializationSchemaTest {
                 flussEvent);
     }
 
-    private void verifyDataChangeEvent(TableId tableId, RowWithOp row, FlussEvent flussEvent)
+    private void verifyDataChangeEvent(TableId tableId, FlussRowWithOp row, FlussEvent flussEvent)
             throws Exception {
         verifySerializeResult(
                 new FlussEvent(
@@ -243,16 +243,16 @@ public class FlussEventSerializationSchemaTest {
         assertThat(actualflussEvent.getTablePath()).isEqualTo(expectedEvent.getTablePath());
         assertThat(actualflussEvent.isShouldRefreshSchema())
                 .isEqualTo(expectedEvent.isShouldRefreshSchema());
-        List<RowWithOp> actualRowWithOps = actualflussEvent.getRowWithOps();
-        List<RowWithOp> expectedRowWithOps = expectedEvent.getRowWithOps();
+        List<FlussRowWithOp> actualRowWithOps = actualflussEvent.getRowWithOps();
+        List<FlussRowWithOp> expectedRowWithOps = expectedEvent.getRowWithOps();
         if (actualRowWithOps == null) {
             assertThat(expectedRowWithOps).isNull();
             return;
         }
         assertThat(actualRowWithOps.size()).isEqualTo(expectedRowWithOps.size());
         for (int i = 0; i < actualRowWithOps.size(); i++) {
-            RowWithOp actualRowWithOp = actualRowWithOps.get(i);
-            RowWithOp expectedRowWithOp = expectedRowWithOps.get(i);
+            FlussRowWithOp actualRowWithOp = actualRowWithOps.get(i);
+            FlussRowWithOp expectedRowWithOp = expectedRowWithOps.get(i);
             assertThat(actualRowWithOp.getOperationType())
                     .isEqualTo(expectedRowWithOp.getOperationType());
             assertThat(actualRowWithOp.getRow()).isInstanceOf(CdcAsFlussRow.class);

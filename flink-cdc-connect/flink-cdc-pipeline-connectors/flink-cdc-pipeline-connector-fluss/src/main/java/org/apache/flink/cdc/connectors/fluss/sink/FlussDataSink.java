@@ -21,7 +21,7 @@ import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.FlinkSink;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussSink;
 
 import com.alibaba.fluss.config.Configuration;
 
@@ -50,7 +50,7 @@ public class FlussDataSink implements DataSink {
     @Override
     public EventSinkProvider getEventSinkProvider() {
         return FlinkSinkProvider.of(
-                new FlinkSink<>(flussClientConfig, new FlussEventSerializationSchema()));
+                new FlussSink<>(flussClientConfig, new FlussEventSerializationSchema()));
     }
 
     @Override

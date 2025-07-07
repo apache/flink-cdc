@@ -26,7 +26,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRecordSerializer;
-import org.apache.flink.cdc.connectors.fluss.sink.v2.RowWithOp;
+import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRowWithOp;
 
 import com.alibaba.fluss.client.Connection;
 import com.alibaba.fluss.client.table.Table;
@@ -39,11 +39,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.APPEND;
-import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.DELETE;
-import static org.apache.flink.cdc.connectors.fluss.sink.v2.OperationType.UPSERT;
-import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.sameCdcColumnsIgnoreCommentAndDefaultValue;
-import static org.apache.flink.cdc.connectors.fluss.utils.FlinkConversions.toFlussSchema;
+import static org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType.APPEND;
+import static org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType.DELETE;
+import static org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType.UPSERT;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussSchema;
 
 /** Serialization schema that converts a CDC data record to a Fluss event. */
 public class FlussEventSerializationSchema implements FlussRecordSerializer<Event> {
@@ -64,7 +64,7 @@ public class FlussEventSerializationSchema implements FlussRecordSerializer<Even
             applySchemaChangeEvent((SchemaChangeEvent) record);
             return new FlussEvent(getTablePath(((SchemaChangeEvent) record).tableId()), null, true);
         } else if (record instanceof DataChangeEvent) {
-            RowWithOp rowWithOp = applyDataChangeEvent((DataChangeEvent) record);
+            FlussRowWithOp rowWithOp = applyDataChangeEvent((DataChangeEvent) record);
             return new FlussEvent(
                     getTablePath(((DataChangeEvent) record).tableId()),
                     Collections.singletonList(rowWithOp),
@@ -97,7 +97,7 @@ public class FlussEventSerializationSchema implements FlussRecordSerializer<Even
         }
     }
 
-    private RowWithOp applyDataChangeEvent(DataChangeEvent record) {
+    private FlussRowWithOp applyDataChangeEvent(DataChangeEvent record) {
         OperationType op = record.op();
         TableSchemaInfo tableSchemaInfo = tableInfoMap.get(record.tableId());
         Preconditions.checkNotNull(
@@ -109,12 +109,12 @@ public class FlussEventSerializationSchema implements FlussRecordSerializer<Even
             case INSERT:
             case UPDATE:
             case REPLACE:
-                return new RowWithOp(
+                return new FlussRowWithOp(
                         CdcAsFlussRow.replace(
                                 record.after(), flussFieldCount, tableSchemaInfo.indexMapping),
                         hasPrimaryKey ? UPSERT : APPEND);
             case DELETE:
-                return new RowWithOp(
+                return new FlussRowWithOp(
                         CdcAsFlussRow.replace(
                                 record.before(), flussFieldCount, tableSchemaInfo.indexMapping),
                         DELETE);

@@ -22,7 +22,6 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.FlinkMetricRegistry;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
-import org.apache.flink.table.api.ValidationException;
 
 import com.alibaba.fluss.client.Connection;
 import com.alibaba.fluss.client.ConnectionFactory;
@@ -31,7 +30,6 @@ import com.alibaba.fluss.client.table.writer.AppendWriter;
 import com.alibaba.fluss.client.table.writer.TableWriter;
 import com.alibaba.fluss.client.table.writer.UpsertWriter;
 import com.alibaba.fluss.config.Configuration;
-import com.alibaba.fluss.metadata.TableInfo;
 import com.alibaba.fluss.metadata.TablePath;
 import com.alibaba.fluss.metrics.Gauge;
 import com.alibaba.fluss.metrics.Metric;
@@ -48,9 +46,9 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 /** Base class for Flink {@link SinkWriter} implementations in Fluss. */
-public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
+public class FlussSinkWriter<InputT> implements SinkWriter<InputT> {
 
-    protected static final Logger LOG = LoggerFactory.getLogger(FlinkSinkWriter.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(FlussSinkWriter.class);
 
     private final Configuration flussConfig;
     private final MailboxExecutor mailboxExecutor;
@@ -68,7 +66,7 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
     private final Map<TablePath, TableWriter> writerMap;
     private final Map<TablePath, Table> tableMap;
 
-    public FlinkSinkWriter(
+    public FlussSinkWriter(
             Configuration flussConfig,
             MailboxExecutor mailboxExecutor,
             FlussRecordSerializer<InputT> flussRecordSerializer) {
@@ -125,14 +123,14 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
                 writerMap.put(tablePath, writer);
             }
 
-            List<RowWithOp> rowWithOps = flussEvent.getRowWithOps();
+            List<FlussRowWithOp> rowWithOps = flussEvent.getRowWithOps();
             if (rowWithOps == null) {
                 return;
             }
-            for (RowWithOp rowWithOp : rowWithOps) {
-                OperationType opType = rowWithOp.getOperationType();
+            for (FlussRowWithOp rowWithOp : rowWithOps) {
+                FlussOperationType opType = rowWithOp.getOperationType();
                 InternalRow row = rowWithOp.getRow();
-                if (opType == OperationType.IGNORE) {
+                if (opType == FlussOperationType.IGNORE) {
                     // skip writing the row
                     return;
                 }
@@ -160,13 +158,13 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
     }
 
     private CompletableFuture<?> write(
-            TableWriter writer, OperationType opType, InternalRow row, TablePath tablePath)
+            TableWriter writer, FlussOperationType opType, InternalRow row, TablePath tablePath)
             throws IOException {
         if (writer instanceof UpsertWriter) {
             UpsertWriter upsertWriter = (UpsertWriter) writer;
-            if (opType == OperationType.UPSERT) {
+            if (opType == FlussOperationType.UPSERT) {
                 return upsertWriter.upsert(row);
-            } else if (opType == OperationType.DELETE) {
+            } else if (opType == FlussOperationType.DELETE) {
                 return upsertWriter.delete(row);
             } else {
                 throw new UnsupportedOperationException(
@@ -176,7 +174,7 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
             }
         } else if (writer instanceof AppendWriter) {
             AppendWriter appendWriter = (AppendWriter) writer;
-            if (opType == OperationType.APPEND) {
+            if (opType == FlussOperationType.APPEND) {
                 return appendWriter.append(row);
             } else {
                 throw new UnsupportedOperationException(
@@ -226,39 +224,6 @@ public class FlinkSinkWriter<InputT> implements SinkWriter<InputT> {
         checkAsyncException();
 
         LOG.info("Finished closing Fluss sink function.");
-    }
-
-    // todo: move sanityCheck to fluss.
-    private void sanityCheck(TableInfo flussTableInfo, boolean hasPrimaryKey) {
-        // when it's UpsertSinkWriter, it means it has primary key got from Flink's metadata
-        if (flussTableInfo.hasPrimaryKey() != hasPrimaryKey) {
-            throw new ValidationException(
-                    String.format(
-                            "Primary key constraint is not matched between metadata in Fluss (%s) and Flink (%s).",
-                            flussTableInfo.hasPrimaryKey(), hasPrimaryKey));
-        }
-        //        RowType currentTableRowType =
-        // FlinkConversions.toFlinkRowType(flussTableInfo.getRowType());
-        //        if (!this.tableRowType.copy(false).equals(currentTableRowType.copy(false))) {
-        //            // The default nullability of Flink row type and Fluss row type might be not
-        // the same,
-        //            // thus we need to compare the row type without nullability here.
-        //
-        //            // Throw exception if the schema is the not same, this should rarely happen
-        // because we
-        //            // only allow fluss tables derived from fluss catalog. But this can happen if
-        // an ALTER
-        //            // TABLE command executed on the fluss table, after the job is submitted but
-        // before the
-        //            // SinkFunction is opened.
-        //            throw new ValidationException(
-        //                    "The Flink query schema is not matched to current Fluss table schema.
-        // "
-        //                            + "\nFlink query schema: "
-        //                            + this.tableRowType
-        //                            + "\nFluss table schema: "
-        //                            + currentTableRowType);
-        //        }
     }
 
     private long computeSendTime() {

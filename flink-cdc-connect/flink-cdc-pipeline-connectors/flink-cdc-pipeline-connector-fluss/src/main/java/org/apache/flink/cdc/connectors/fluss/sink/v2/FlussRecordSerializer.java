@@ -23,12 +23,13 @@ import java.io.IOException;
 import java.io.Serializable;
 
 /**
- * Serializer to serialize the input record to a {@link FlussEvent} for {@link FlinkSinkWriter}.
+ * Serializer to serialize the input record to a {@link FlussEvent} for {@link FlussSinkWriter}.
  *
- * @param <INPUT>
+ * @param <InputT> The type of the input record which comes from the upstream and will be
+ *     transformed into a FlussEvent here.
  */
-public interface FlussRecordSerializer<INPUT> extends Serializable {
+public interface FlussRecordSerializer<InputT> extends Serializable {
     void open(Connection connection) throws IOException;
 
-    FlussEvent serialize(INPUT t) throws IOException;
+    FlussEvent serialize(InputT in) throws IOException;
 }
