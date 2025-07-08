@@ -43,7 +43,6 @@ import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.TableDiscoveryUtils;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.connector.base.source.reader.RecordEmitter;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
 import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
@@ -82,13 +81,14 @@ public class MySqlSourceReader<T>
     private final Map<String, MySqlBinlogSplit> uncompletedBinlogSplits;
     private final int subtaskId;
     private final MySqlSourceReaderContext mySqlSourceReaderContext;
-    private final MySqlPartition partition;
     private volatile MySqlBinlogSplit suspendedBinlogSplit;
+    private final MySqlRecordEmitter<T> recordEmitter;
+    private final MySqlPartition partition;
 
     public MySqlSourceReader(
             FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<MySqlSplitReader> splitReaderSupplier,
-            RecordEmitter<SourceRecords, T, MySqlSplitState> recordEmitter,
+            MySqlRecordEmitter<T> recordEmitter,
             Configuration config,
             MySqlSourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
@@ -98,6 +98,7 @@ public class MySqlSourceReader<T>
                 recordEmitter,
                 config,
                 context.getSourceReaderContext());
+        this.recordEmitter = recordEmitter;
         this.sourceConfig = sourceConfig;
         this.finishedUnackedSplits = new HashMap<>();
         this.uncompletedBinlogSplits = new HashMap<>();
@@ -117,6 +118,7 @@ public class MySqlSourceReader<T>
 
     @Override
     protected MySqlSplitState initializedState(MySqlSplit split) {
+        recordEmitter.applySplit(split);
         if (split.isSnapshotSplit()) {
             return new MySqlSnapshotSplitState(split.asSnapshotSplit());
         } else {
@@ -377,7 +379,7 @@ public class MySqlSourceReader<T>
             FinishedSnapshotSplitsReportEvent reportEvent =
                     new FinishedSnapshotSplitsReportEvent(finishedOffsets);
             context.sendSourceEventToCoordinator(reportEvent);
-            LOG.debug(
+            LOG.info(
                     "Source reader {} reports offsets of finished snapshot splits {}.",
                     subtaskId,
                     finishedOffsets);

@@ -80,7 +80,7 @@ public class ValuesDataSink implements DataSink, Serializable {
         if (errorOnSchemaChange) {
             return new ValuesDatabase.ErrorOnChangeMetadataApplier();
         } else {
-            return new ValuesDatabase.ValuesMetadataApplier();
+            return new ValuesDatabase.ValuesMetadataApplier(materializedInMemory);
         }
     }
 

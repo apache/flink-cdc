@@ -24,6 +24,8 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
@@ -59,6 +61,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,10 +85,13 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     protected final DebeziumChangelogMode changelogMode;
 
+    private final Map<io.debezium.relational.TableId, CreateTableEvent> createTableEventCache;
+
     public DebeziumEventDeserializationSchema(
             SchemaDataTypeInference schemaDataTypeInference, DebeziumChangelogMode changelogMode) {
         this.schemaDataTypeInference = schemaDataTypeInference;
         this.changelogMode = changelogMode;
+        this.createTableEventCache = new HashMap<>();
     }
 
     @Override
@@ -434,5 +440,15 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 return converter.convert(dbzObj, schema);
             }
         };
+    }
+
+    public Map<io.debezium.relational.TableId, CreateTableEvent> getCreateTableEventCache() {
+        return createTableEventCache;
+    }
+
+    public void applyChangeEvent(ChangeEvent changeEvent) {
+        createTableEventCache.put(
+                io.debezium.relational.TableId.parse(changeEvent.tableId().identifier()),
+                (CreateTableEvent) changeEvent);
     }
 }
