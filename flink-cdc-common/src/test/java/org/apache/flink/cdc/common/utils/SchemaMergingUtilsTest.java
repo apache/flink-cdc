@@ -19,8 +19,10 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -49,6 +51,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -743,6 +746,10 @@ class SchemaMergingUtilsTest {
                                 DATE, dateOf(2020, 4, 4), TIMESTAMP_TZ, zTsOf("2020", "04", "04")),
                         Tuple4.of(DATE, dateOf(2021, 5, 5), STRING, binStrOf("2021-05-05")),
 
+                        // From TIME
+                        Tuple4.of(TIME, timeOf(21, 48, 25), TIME, timeOf(21, 48, 25)),
+                        Tuple4.of(TIME, timeOf(21, 48, 25), STRING, binStrOf("21:48:25")),
+
                         // From TIMESTAMP
                         Tuple4.of(
                                 TIMESTAMP,
@@ -1145,8 +1152,12 @@ class SchemaMergingUtilsTest {
         return builder.build();
     }
 
-    private static long dateOf(int year, int month, int dayOfMonth) {
-        return LocalDate.of(year, month, dayOfMonth).toEpochDay();
+    private static DateData dateOf(int year, int month, int dayOfMonth) {
+        return DateData.fromLocalDate(LocalDate.of(year, month, dayOfMonth));
+    }
+
+    private static TimeData timeOf(int hour, int minute, int second) {
+        return TimeData.fromLocalTime(LocalTime.of(hour, minute, second));
     }
 
     private static TimestampData tsOf(String year, String month, String dayOfMonth) {

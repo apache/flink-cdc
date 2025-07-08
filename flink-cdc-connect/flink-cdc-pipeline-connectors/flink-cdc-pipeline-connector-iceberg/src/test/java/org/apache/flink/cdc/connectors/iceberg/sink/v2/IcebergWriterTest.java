@@ -18,9 +18,11 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -152,7 +154,7 @@ public class IcebergWriterTest {
                             1.0f,
                             1.0d,
                             DecimalData.fromBigDecimal(new BigDecimal("1.0"), 10, 2),
-                            9
+                            DateData.fromEpochDay(9)
                         });
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, recordData);
         icebergWriter.write(dataChangeEvent, null);
@@ -167,7 +169,7 @@ public class IcebergWriterTest {
                             1.0f,
                             1.0d,
                             DecimalData.fromBigDecimal(new BigDecimal("1.0"), 10, 2),
-                            9
+                            DateData.fromEpochDay(9)
                         });
         DataChangeEvent dataChangeEvent2 = DataChangeEvent.insertEvent(tableId, recordData2);
         icebergWriter.write(dataChangeEvent2, null);
@@ -194,7 +196,7 @@ public class IcebergWriterTest {
                             1.0f,
                             1.0d,
                             DecimalData.fromBigDecimal(new BigDecimal("1.0"), 10, 2),
-                            9
+                            DateData.fromEpochDay(9)
                         });
         DataChangeEvent dataChangeEvent3 = DataChangeEvent.insertEvent(tableId, recordData3);
         icebergWriter.write(dataChangeEvent3, null);
@@ -209,7 +211,7 @@ public class IcebergWriterTest {
                             1.0f,
                             1.0d,
                             DecimalData.fromBigDecimal(new BigDecimal("1.0"), 10, 2),
-                            9
+                            DateData.fromEpochDay(9)
                         });
         DataChangeEvent dataChangeEvent4 = DataChangeEvent.insertEvent(tableId, recordData4);
         icebergWriter.write(dataChangeEvent4, null);
@@ -243,7 +245,7 @@ public class IcebergWriterTest {
                             1.0f,
                             1.0d,
                             DecimalData.fromBigDecimal(new BigDecimal("1.0"), 10, 2),
-                            9,
+                            DateData.fromEpochDay(9),
                             BinaryStringData.fromString("newStringColumn"),
                         });
         DataChangeEvent dataChangeEvent5 = DataChangeEvent.insertEvent(tableId, recordData5);
@@ -324,8 +326,8 @@ public class IcebergWriterTest {
                             12345L,
                             123.456f,
                             123456.789d,
-                            12345,
-                            12345,
+                            TimeData.fromNanoOfDay(12345_000_000L),
+                            DateData.fromEpochDay(12345),
                             TimestampData.fromTimestamp(Timestamp.valueOf("1970-01-01 00:00:00")),
                             LocalZonedTimestampData.fromInstant(Instant.ofEpochSecond(0)),
                             ZonedTimestampData.fromZonedDateTime(

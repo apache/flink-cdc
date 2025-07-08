@@ -213,7 +213,9 @@ class PreTransformOperatorTest {
                                 "key1=value1,key2=value2",
                                 null,
                                 new SupportedMetadataColumn[0])
+                        .setAllowTrimmingPkColumns(true)
                         .build();
+
         RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
                         RegularEventOperatorTestHarness.with(transform, 1);

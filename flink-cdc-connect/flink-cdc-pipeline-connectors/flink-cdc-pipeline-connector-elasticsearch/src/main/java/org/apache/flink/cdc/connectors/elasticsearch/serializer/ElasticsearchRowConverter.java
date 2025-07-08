@@ -31,7 +31,6 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.elasticsearch6.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -118,7 +117,7 @@ public class ElasticsearchRowConverter {
             case DOUBLE:
                 return (pos, data) -> data.getDouble(pos);
             case DATE:
-                return (pos, data) -> LocalDate.ofEpochDay(data.getInt(pos)).format(DATE_FORMATTER);
+                return (pos, data) -> data.getDate(pos).toLocalDate().format(DATE_FORMATTER);
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return (pos, data) ->
                         data.getTimestamp(pos, DataTypeChecks.getPrecision(columnType))

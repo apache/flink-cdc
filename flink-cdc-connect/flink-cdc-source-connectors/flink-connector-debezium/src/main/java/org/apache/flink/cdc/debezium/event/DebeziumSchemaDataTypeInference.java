@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.types.DecimalType;
 
 import io.debezium.data.SpecialValueDecimal;
 import io.debezium.data.VariableScaleDecimal;
+import io.debezium.time.Date;
 import io.debezium.time.MicroTime;
 import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
@@ -32,7 +33,6 @@ import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Time;
 import io.debezium.time.Timestamp;
 import io.debezium.time.ZonedTimestamp;
-import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
@@ -48,6 +48,7 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
 
     private static final long serialVersionUID = 1L;
 
+    public static final String DEBEZIUM_DATE_SCHEMA_NAME = "io.debezium.time.Date";
     public static final String PRECISION_PARAMETER_KEY = "connect.decimal.precision";
 
     public static final int DEFAULT_DECIMAL_PRECISION = 20;
@@ -104,7 +105,7 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     }
 
     protected DataType inferInt32(Object value, Schema schema) {
-        if (Date.LOGICAL_NAME.equals(schema.name())) {
+        if (Date.SCHEMA_NAME.equals(schema.name())) {
             return DataTypes.DATE();
         }
         if (Time.SCHEMA_NAME.equals(schema.name())) {

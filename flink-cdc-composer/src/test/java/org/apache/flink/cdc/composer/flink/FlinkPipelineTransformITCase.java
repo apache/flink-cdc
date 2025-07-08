@@ -18,8 +18,10 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -56,7 +58,6 @@ import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
-import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.ThrowableAssert;
 import org.codehaus.commons.compiler.CompileException;
@@ -66,7 +67,9 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.ByteArrayOutputStream;
@@ -74,7 +77,9 @@ import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -82,6 +87,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -135,11 +141,21 @@ class FlinkPipelineTransformITCase {
         System.setOut(standardOut);
     }
 
+    private static Stream<Arguments> parameterProvider() {
+        return Stream.of(
+                Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, true),
+                Arguments.of(ValuesDataSink.SinkApi.SINK_FUNCTION, false),
+                Arguments.of(ValuesDataSink.SinkApi.SINK_V2, true),
+                Arguments.of(ValuesDataSink.SinkApi.SINK_V2, false));
+    }
+
     /** This tests if we can append calculated columns based on existing columns. */
-    @ParameterizedTest
-    @EnumSource
-    void testCalculatedColumns(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testCalculatedColumns(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -163,11 +179,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if we can reference a column more than once in projection expressions. */
-    @ParameterizedTest
-    @EnumSource
-    void testMultipleReferencedColumnsInProjection(ValuesDataSink.SinkApi sinkApi)
-            throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultipleReferencedColumnsInProjection(
+            ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -191,10 +208,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if we can reference a column more than once in filtering expressions. */
-    @ParameterizedTest
-    @EnumSource
-    void testMultipleReferencedColumnsInFilter(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultipleReferencedColumnsInFilter(
+            ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -213,10 +232,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if we can filter out source records by rule. */
-    @ParameterizedTest
-    @EnumSource
-    void testFilteringRules(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testFilteringRules(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -241,10 +262,12 @@ class FlinkPipelineTransformITCase {
      * This tests if transform rule could be used to classify source records based on filtering
      * rules.
      */
-    @ParameterizedTest
-    @EnumSource
-    void testMultipleDispatchTransform(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultipleDispatchTransform(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Arrays.asList(
                         new TransformDef(
@@ -276,10 +299,12 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, OLD], after=[], op=DELETE, meta=()}"));
     }
 
-    @ParameterizedTest
-    @EnumSource
-    void testMultipleTransformWithDiffRefColumn(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultipleTransformWithDiffRefColumn(
+            ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Arrays.asList(
                         new TransformDef(
@@ -311,10 +336,12 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, 25, Derrida], after=[], op=DELETE, meta=()}"));
     }
 
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformWithAsterisk(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultiTransformWithAsterisk(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Arrays.asList(
                         new TransformDef(
@@ -346,10 +373,12 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, Derrida], after=[], op=DELETE, meta=()}"));
     }
 
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultiTransformMissingProjection(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Arrays.asList(
                         new TransformDef(
@@ -381,9 +410,8 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, DERRIDA, 25, student], after=[], op=DELETE, meta=()}"));
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "API version: {0}")
     @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
     void testMultiTransformSchemaColumnsCompatibilityWithNullProjection(
             ValuesDataSink.SinkApi sinkApi) {
         TransformDef nullProjection =
@@ -400,6 +428,7 @@ class FlinkPipelineTransformITCase {
         assertThatThrownBy(
                         () ->
                                 runGenericTransformTest(
+                                        false,
                                         sinkApi,
                                         Arrays.asList(
                                                 nullProjection,
@@ -415,15 +444,13 @@ class FlinkPipelineTransformITCase {
                                                         null)),
                                         Collections.emptyList()))
                 .rootCause()
-                .isExactlyInstanceOf(IllegalStateException.class)
+                .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
+                        "Trying to merge transformed schemas [columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=(), columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=()], but got more than one column name views: [[id, name, age, description], [id, name]]");
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "API version: {0}")
     @EnumSource
-    @Disabled("to be fixed in FLINK-37132")
     void testMultiTransformSchemaColumnsCompatibilityWithEmptyProjection(
             ValuesDataSink.SinkApi sinkApi) {
         TransformDef emptyProjection =
@@ -440,6 +467,7 @@ class FlinkPipelineTransformITCase {
         assertThatThrownBy(
                         () ->
                                 runGenericTransformTest(
+                                        false,
                                         sinkApi,
                                         Arrays.asList(
                                                 emptyProjection,
@@ -455,16 +483,15 @@ class FlinkPipelineTransformITCase {
                                                         null)),
                                         Collections.emptyList()))
                 .rootCause()
-                .isExactlyInstanceOf(IllegalStateException.class)
+                .isExactlyInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
-                        "Unable to merge schema columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=() "
-                                + "and columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=() with different column counts.");
+                        "Trying to merge transformed schemas [columns={`id` BIGINT,`name` VARCHAR(255),`age` TINYINT,`description` STRING}, primaryKeys=id, options=(), columns={`id` BIGINT,`name` STRING}, primaryKeys=id, options=()], but got more than one column name views: [[id, name, age, description], [id, name]]");
     }
 
-    @ParameterizedTest
-    @EnumSource
-    void testMultiTransformWithNullEmptyAsteriskProjections(ValuesDataSink.SinkApi sinkApi)
-            throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMultiTransformWithNullEmptyAsteriskProjections(
+            ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         TransformDef nullProjection =
                 new TransformDef(
                         "default_namespace.default_schema.mytable2",
@@ -499,6 +526,7 @@ class FlinkPipelineTransformITCase {
                         null);
 
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Arrays.asList(
                         // Setting projection as null, '', or * should be equivalent
@@ -527,12 +555,13 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if transform generates metadata info correctly. */
-    @ParameterizedTest
-    @EnumSource
-    void testMetadataInfo(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMetadataInfo(ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
-                Collections.singletonList(
+                Arrays.asList(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
                                 "*",
@@ -540,6 +569,15 @@ class FlinkPipelineTransformITCase {
                                 "id,name",
                                 "id",
                                 "replication_num=1,bucket=17",
+                                "Just a Transform Block",
+                                null),
+                        new TransformDef(
+                                "default_namespace.default_schema.\\.*",
+                                "*",
+                                null,
+                                "id,name",
+                                "id",
+                                "replication_num=1,bucket=20",
                                 "Just a Transform Block",
                                 null)),
                 Arrays.asList(
@@ -557,10 +595,12 @@ class FlinkPipelineTransformITCase {
      * This tests if transform generates metadata info correctly without specifying projection /
      * filtering rules.
      */
-    @ParameterizedTest
-    @EnumSource
-    void testMetadataInfoWithoutChangingSchema(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMetadataInfoWithoutChangingSchema(
+            ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -584,10 +624,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if projection rule could reference metadata info correctly. */
-    @ParameterizedTest
-    @EnumSource
-    void testMetadataColumn(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMetadataColumn(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -611,10 +653,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if projection rule could reference metadata info correctly with wildcard (*). */
-    @ParameterizedTest
-    @EnumSource
-    void testMetadataColumnWithWildcard(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testMetadataColumnWithWildcard(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -641,11 +685,12 @@ class FlinkPipelineTransformITCase {
      * This tests if transform operator could distinguish metadata column identifiers and string
      * literals.
      */
-    @ParameterizedTest
-    @EnumSource
-    void testUsingMetadataColumnLiteralWithWildcard(ValuesDataSink.SinkApi sinkApi)
-            throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testUsingMetadataColumnLiteralWithWildcard(
+            ValuesDataSink.SinkApi sinkApi, boolean initializeMode) throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -669,10 +714,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if projection rule could reference metadata info correctly. */
-    @ParameterizedTest
-    @EnumSource
-    void testConvertDeleteAsInsert(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testConvertDeleteAsInsert(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -696,10 +743,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if built-in comparison functions work as expected. */
-    @ParameterizedTest
-    @EnumSource
-    void testBuiltinComparisonFunctions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testBuiltinComparisonFunctions(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -729,10 +778,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if built-in logical functions work as expected. */
-    @ParameterizedTest
-    @EnumSource
-    void testBuiltinLogicalFunctions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testBuiltinLogicalFunctions(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -762,10 +813,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if built-in arithmetic functions work as expected. */
-    @ParameterizedTest
-    @EnumSource
-    void testBuiltinArithmeticFunctions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testBuiltinArithmeticFunctions(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -796,10 +849,12 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if built-in string functions work as expected. */
-    @ParameterizedTest
-    @EnumSource
-    void testBuiltinStringFunctions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testBuiltinStringFunctions(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -832,11 +887,13 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, Dear Derrida, 7, DERRIDA, derrida, Derrida, Derrida, D, e, rrida, Derrida - 4], after=[], op=DELETE, meta=()}"));
     }
 
-    @ParameterizedTest
-    @EnumSource
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
     @Disabled("SUBSTRING ... FROM ... FOR ... isn't available until we close FLINK-35985.")
-    void testSubstringFunctions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    void testSubstringFunctions(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -858,11 +915,13 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if built-in conditional functions work as expected. */
-    @ParameterizedTest
-    @EnumSource
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
     @Disabled("This case will not run until we close FLINK-35986.")
-    void testConditionalFunctions(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    void testConditionalFunctions(ValuesDataSink.SinkApi sinkApi, boolean initializeMode)
+            throws Exception {
         runGenericTransformTest(
+                initializeMode,
                 sinkApi,
                 Collections.singletonList(
                         new TransformDef(
@@ -894,8 +953,10 @@ class FlinkPipelineTransformITCase {
     }
 
     /** This tests if transform temporal functions works as expected. */
-    @Test
-    void testTransformWithTemporalFunction() throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testTransformWithTemporalFunction(
+            ValuesDataSink.SinkApi apiVersion, boolean initializeMode) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -922,7 +983,8 @@ class FlinkPipelineTransformITCase {
                         .primaryKey("id")
                         .build();
 
-        List<Event> events = getTestEvents(table1Schema, table2Schema, myTable1, myTable2);
+        List<Event> events =
+                getTestEvents(initializeMode, table1Schema, table2Schema, myTable1, myTable2);
 
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
 
@@ -932,6 +994,7 @@ class FlinkPipelineTransformITCase {
         // Setup value sink
         Configuration sinkConfig = new Configuration();
         sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, apiVersion);
         SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
 
         // Setup pipeline
@@ -966,8 +1029,8 @@ class FlinkPipelineTransformITCase {
         Arrays.stream(outputEvents).forEach(this::extractDataLines);
     }
 
-    @ParameterizedTest
-    @EnumSource
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
     public void testTransformWithColumnNameMap(ValuesDataSink.SinkApi sinkApi) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
@@ -1134,8 +1197,20 @@ class FlinkPipelineTransformITCase {
     }
 
     void runGenericTransformTest(
+            boolean initializeMode,
             ValuesDataSink.SinkApi sinkApi,
             List<TransformDef> transformDefs,
+            List<String> expectedResults)
+            throws Exception {
+        runGenericTransformTest(
+                initializeMode, sinkApi, transformDefs, conf -> {}, expectedResults);
+    }
+
+    void runGenericTransformTest(
+            boolean initializeMode,
+            ValuesDataSink.SinkApi sinkApi,
+            List<TransformDef> transformDefs,
+            Consumer<Configuration> globalConfModifier,
             List<String> expectedResults)
             throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
@@ -1164,7 +1239,8 @@ class FlinkPipelineTransformITCase {
                         .primaryKey("id")
                         .build();
 
-        List<Event> events = getTestEvents(table1Schema, table2Schema, myTable1, myTable2);
+        List<Event> events =
+                getTestEvents(initializeMode, table1Schema, table2Schema, myTable1, myTable2);
 
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
 
@@ -1180,6 +1256,7 @@ class FlinkPipelineTransformITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        globalConfModifier.accept(pipelineConfig);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -1196,11 +1273,15 @@ class FlinkPipelineTransformITCase {
         // Check the order and content of all received events
         String[] outputEvents = outCaptor.toString().trim().split("\n");
 
-        assertThat(outputEvents).containsExactly(expectedResults.toArray(new String[0]));
+        assertThat(outputEvents).containsExactlyInAnyOrder(expectedResults.toArray(new String[0]));
     }
 
     private static List<Event> getTestEvents(
-            Schema table1Schema, Schema table2Schema, TableId myTable1, TableId myTable2) {
+            boolean initializeMode,
+            Schema table1Schema,
+            Schema table2Schema,
+            TableId myTable1,
+            TableId myTable2) {
         List<Event> events = new ArrayList<>();
         BinaryRecordDataGenerator table1dataGenerator =
                 new BinaryRecordDataGenerator(
@@ -2000,8 +2081,10 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[12th, 15, Oops], after=[], op=DELETE, meta=()}");
     }
 
-    @Test
-    void testTransformWithCommentsAndDefaultExpr() throws Exception {
+    @ParameterizedTest(name = "API version: {0}, initializeMode: {1}")
+    @MethodSource(value = "parameterProvider")
+    void testTransformWithCommentsAndDefaultExpr(
+            ValuesDataSink.SinkApi apiVersion, boolean initializeMode) throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -2036,7 +2119,8 @@ class FlinkPipelineTransformITCase {
                         .partitionKey("id, name")
                         .build();
 
-        List<Event> events = getTestEvents(table1Schema, table2Schema, myTable1, myTable2);
+        List<Event> events =
+                getTestEvents(initializeMode, table1Schema, table2Schema, myTable1, myTable2);
 
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
 
@@ -2077,7 +2161,7 @@ class FlinkPipelineTransformITCase {
         String[] outputEvents = outCaptor.toString().trim().split("\n");
 
         Assertions.assertThat(outputEvents)
-                .containsExactly(
+                .containsExactlyInAnyOrder(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL 'id column' 'AUTO_INCREMENT()',`name` STRING 'name column' 'Jane Doe',`age` INT 'age column' '17',`new_name` STRING 'name column' 'Jane Doe',`new_age` INT,`extras` STRING}, primaryKeys=id, partitionKeys=id, age, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, Alice, 19, extras], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, Bob, 21, extras], op=INSERT, meta=()}",
@@ -2545,7 +2629,6 @@ class FlinkPipelineTransformITCase {
                                 + "to schema\n"
                                 + "\t(Unknown).")
                 .rootCause()
-                .isExactlyInstanceOf(SqlValidatorException.class)
                 .hasMessage("Column 'id1' not found in any table");
 
         // Unexpected column in filter rule
@@ -2641,20 +2724,20 @@ class FlinkPipelineTransformITCase {
                         "Comparison of unsupported data types: java.lang.String and java.lang.Integer");
 
         // Unsupported operations in metadata rule
-        Assertions.assertThatThrownBy(expectTransformError("*", null, "not_even_exist"))
+        Assertions.assertThatThrownBy(expectTransformError("*", null, "id,not_even_exist"))
                 .cause()
                 .cause()
                 .cause()
                 .isExactlyInstanceOf(TransformException.class)
                 .hasMessage(
                         "Failed to post-transform with\n"
-                                + "\tCreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=()}\n"
+                                + "\tCreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id;not_even_exist, options=()}\n"
                                 + "for table\n"
                                 + "\tdefault_namespace.default_schema.mytable1\n"
                                 + "from schema\n"
-                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=()\n"
+                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=id;not_even_exist, options=()\n"
                                 + "to schema\n"
-                                + "\tcolumns={`id` INT,`name` STRING,`age` INT}, primaryKeys=not_even_exist, options=().")
+                                + "\tcolumns={`id` INT NOT NULL,`name` STRING,`age` INT}, primaryKeys=id;not_even_exist, options=().")
                 .rootCause()
                 .isExactlyInstanceOf(IllegalStateException.class)
                 .hasMessage(
@@ -2665,6 +2748,7 @@ class FlinkPipelineTransformITCase {
             String projectionRule, String filterRule, String primaryKeys) {
         return () ->
                 runGenericTransformTest(
+                        false,
                         ValuesDataSink.SinkApi.SINK_V2,
                         Collections.singletonList(
                                 new TransformDef(
@@ -2723,6 +2807,103 @@ class FlinkPipelineTransformITCase {
                         "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
                         "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2.5, ], after=[2.5, x], op=UPDATE, meta=({op_ts=5})}");
+    }
+
+    @Test
+    void testDateAndTimeCastingFunctions() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId tableId = TableId.tableId("default_namespace", "default_schema", "my_table");
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("date_0", DataTypes.DATE())
+                        .physicalColumn("time_0", DataTypes.TIME(0))
+                        .physicalColumn("time_3", DataTypes.TIME(3))
+                        .physicalColumn("time_6", DataTypes.TIME(6))
+                        .physicalColumn("time_9", DataTypes.TIME(9))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        tableSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, tableSchema),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            DateData.fromLocalDate(LocalDate.of(1999, 12, 31)),
+                                            TimeData.fromLocalTime(LocalTime.of(21, 48, 25)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123000000)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123456000)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123456789))
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {2, null, null, null, null, null})));
+
+        TransformDef transformDef =
+                new TransformDef(
+                        tableId.toString(),
+                        "*,"
+                                + "CAST(date_0 AS VARCHAR) AS date_0_str,"
+                                + "CAST(time_0 AS VARCHAR) AS time_0_str,"
+                                + "CAST(time_3 AS VARCHAR) AS time_3_str,"
+                                + "CAST(time_6 AS VARCHAR) AS time_6_str,"
+                                + "CAST(time_9 AS VARCHAR) AS time_9_str",
+                        null,
+                        "id",
+                        null,
+                        null,
+                        null,
+                        null);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, ValuesDataSink.SinkApi.SINK_V2);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(transformDef),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactlyInAnyOrder(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.my_table, schema=columns={`id` INT NOT NULL,`date_0` DATE,`time_0` TIME(0),`time_3` TIME(3),`time_6` TIME(6),`time_9` TIME(9),`date_0_str` STRING,`time_0_str` STRING,`time_3_str` STRING,`time_6_str` STRING,`time_9_str` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[1, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[2, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
     private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {
@@ -3131,14 +3312,16 @@ class FlinkPipelineTransformITCase {
                         .toInstant(ZoneOffset.UTC);
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+        assertThat(TimeData.fromIsoLocalTimeString(localTime))
+                .isEqualTo(
+                        TimeData.fromMillisOfDay(
+                                (int) (instant.toEpochMilli() % milliSecondsInOneDay)));
 
-        assertThat(instant.toEpochMilli() % milliSecondsInOneDay)
-                .isEqualTo(Long.parseLong(localTime));
-
-        String currentDate = tokens.get(5);
-
-        assertThat(instant.toEpochMilli() / milliSecondsInOneDay)
-                .isEqualTo(Long.parseLong(currentDate));
+        String localDate = tokens.get(5);
+        assertThat(DateData.fromIsoLocalDateString(localDate))
+                .isEqualTo(
+                        DateData.fromEpochDay(
+                                (int) (instant.toEpochMilli() / milliSecondsInOneDay)));
     }
 
     BinaryRecordData generate(Schema schema, Object... fields) {

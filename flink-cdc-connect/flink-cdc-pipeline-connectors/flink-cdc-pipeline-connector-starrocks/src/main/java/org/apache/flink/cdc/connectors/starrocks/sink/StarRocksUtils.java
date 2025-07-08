@@ -40,7 +40,6 @@ import org.apache.flink.cdc.common.types.VarCharType;
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
 
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -172,9 +171,7 @@ public class StarRocksUtils {
                 break;
             case DATE:
                 fieldGetter =
-                        record ->
-                                LocalDate.ofEpochDay(record.getInt(fieldPos))
-                                        .format(DATE_FORMATTER);
+                        record -> record.getDate(fieldPos).toLocalDate().format(DATE_FORMATTER);
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =

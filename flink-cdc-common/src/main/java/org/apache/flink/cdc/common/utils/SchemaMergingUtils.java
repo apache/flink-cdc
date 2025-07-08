@@ -20,9 +20,15 @@ package org.apache.flink.cdc.common.utils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -68,10 +74,12 @@ import javax.annotation.Nullable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -85,6 +93,37 @@ import java.util.stream.Collectors;
  */
 @PublicEvolving
 public class SchemaMergingUtils {
+
+    /**
+     * Get a wider schema by joining columns from two schemas. The column names in two schemas
+     * should not conflict.
+     */
+    public static Schema getJoinedColumnsSchema(Schema lschema, Schema rschema) {
+        Schema.Builder builder = Schema.newBuilder();
+        lschema.getColumns().forEach(builder::column);
+        rschema.getColumns().forEach(builder::column);
+
+        List<String> primaryKeys = new ArrayList<>();
+        primaryKeys.addAll(lschema.primaryKeys());
+        primaryKeys.addAll(rschema.primaryKeys());
+        builder.primaryKey(primaryKeys);
+
+        List<String> partitionKeys = new ArrayList<>();
+        partitionKeys.addAll(lschema.partitionKeys());
+        partitionKeys.addAll(rschema.partitionKeys());
+        builder.partitionKey(partitionKeys);
+
+        if (lschema.comment() != null && rschema.comment() != null) {
+            builder.comment(String.format("%s\n%s", lschema.comment(), rschema.comment()));
+        } else if (lschema.comment() != null) {
+            builder.comment(lschema.comment());
+        } else if (rschema.comment() != null) {
+            builder.comment(rschema.comment());
+        }
+
+        return builder.build();
+    }
+
     /**
      * Checking if given {@code upcomingSchema} could be fit into currently known {@code
      * currentSchema}. Current schema could be null (as the cold opening state, and in this case it
@@ -170,11 +209,11 @@ public class SchemaMergingUtils {
     }
 
     /** Merge compatible schemas. */
-    public static Schema getCommonSchema(List<Schema> schemas) {
+    public static Schema getCommonSchema(Collection<Schema> schemas) {
         if (schemas.isEmpty()) {
             return null;
         } else if (schemas.size() == 1) {
-            return schemas.get(0);
+            return schemas.iterator().next();
         } else {
             Schema outputSchema = null;
             for (Schema schema : schemas) {
@@ -182,6 +221,13 @@ public class SchemaMergingUtils {
             }
             return outputSchema;
         }
+    }
+
+    /** Merge {@link DataType}s. */
+    public static DataType getCommonDataTypes(List<DataType> dataTypes) {
+        return dataTypes.stream()
+                .reduce(SchemaMergingUtils::getLeastCommonType)
+                .orElse(DataTypes.STRING());
     }
 
     /**
@@ -250,7 +296,7 @@ public class SchemaMergingUtils {
             String timezone,
             Schema currentSchema,
             Schema upcomingSchema,
-            List<Object> upcomingRow) {
+            Collection<Object> upcomingRow) {
         return coerceRow(timezone, currentSchema, upcomingSchema, upcomingRow, true);
     }
 
@@ -263,7 +309,7 @@ public class SchemaMergingUtils {
             String timezone,
             Schema currentSchema,
             Schema upcomingSchema,
-            List<Object> upcomingRow,
+            Collection<Object> upcomingRow,
             boolean toleranceMode) {
         List<Column> currentColumns = currentSchema.getColumns();
         Map<String, DataType> upcomingColumnTypes =
@@ -454,6 +500,22 @@ public class SchemaMergingUtils {
             return false;
         }
 
+        // For nested types, we check their inner types covariantly.
+        if (currentType instanceof ArrayType && upcomingType instanceof ArrayType) {
+            return isDataTypeCompatible(
+                    ((ArrayType) currentType).getElementType(),
+                    ((ArrayType) upcomingType).getElementType());
+        }
+
+        if (currentType instanceof MapType && upcomingType instanceof MapType) {
+            return isDataTypeCompatible(
+                            ((MapType) currentType).getKeyType(),
+                            ((MapType) upcomingType).getValueType())
+                    && isDataTypeCompatible(
+                            ((MapType) currentType).getValueType(),
+                            ((MapType) upcomingType).getValueType());
+        }
+
         // Or, check if upcomingType is presented in the type merging tree.
         return TYPE_MERGING_TREE.get(upcomingType.getClass()).contains(currentType);
     }
@@ -476,6 +538,23 @@ public class SchemaMergingUtils {
 
         if (currentType instanceof DecimalType || targetType instanceof DecimalType) {
             return mergeDecimalType(currentType, targetType).copy(nullable);
+        }
+
+        if (currentType instanceof ArrayType && targetType instanceof ArrayType) {
+            return DataTypes.ARRAY(
+                    getLeastCommonType(
+                            ((ArrayType) currentType).getElementType(),
+                            ((ArrayType) targetType).getElementType()));
+        }
+
+        if (currentType instanceof MapType && targetType instanceof MapType) {
+            return DataTypes.MAP(
+                    getLeastCommonType(
+                            ((MapType) currentType).getKeyType(),
+                            ((MapType) targetType).getKeyType()),
+                    getLeastCommonType(
+                            ((MapType) currentType).getValueType(),
+                            ((MapType) targetType).getValueType()));
         }
 
         List<DataType> currentTypeTree = TYPE_MERGING_TREE.get(currentType.getClass());
@@ -664,12 +743,11 @@ public class SchemaMergingUtils {
         }
 
         if (destinationType instanceof DateType) {
-            try {
-                return coerceToLong(originalField);
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(
-                        String.format("Cannot fit \"%s\" into a DATE column.", originalField));
-            }
+            return coerceToDate(originalField);
+        }
+
+        if (destinationType instanceof TimeType) {
+            return coerceToTime(originalField);
         }
 
         if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
@@ -702,6 +780,19 @@ public class SchemaMergingUtils {
             return coerceToZonedTimestamp(originalField, timezone);
         }
 
+        if (originalType instanceof ArrayType && destinationType instanceof ArrayType) {
+            return coerceToArray(
+                    timezone,
+                    originalField,
+                    ((ArrayType) originalType),
+                    ((ArrayType) destinationType));
+        }
+
+        if (originalType instanceof MapType && destinationType instanceof MapType) {
+            return coerceToMap(
+                    timezone, originalField, ((MapType) originalType), (MapType) destinationType);
+        }
+
         throw new IllegalArgumentException(
                 String.format(
                         "Column type \"%s\" doesn't support type coercion to \"%s\"",
@@ -713,13 +804,12 @@ public class SchemaMergingUtils {
             return BinaryStringData.fromString("null");
         }
 
-        if (originalType instanceof DateType) {
-            long epochOfDay = coerceToLong(originalField);
-            return BinaryStringData.fromString(LocalDate.ofEpochDay(epochOfDay).toString());
-        }
-
         if (originalField instanceof StringData) {
             return originalField;
+        }
+
+        if (originalType instanceof DateType || originalType instanceof TimeType) {
+            return BinaryStringData.fromString(originalField.toString());
         }
 
         if (originalField instanceof byte[]) {
@@ -864,6 +954,52 @@ public class SchemaMergingUtils {
         }
     }
 
+    private static DateData coerceToDate(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof DateData) {
+            return (DateData) o;
+        }
+        if (o instanceof Number) {
+            return DateData.fromEpochDay(((Number) o).intValue());
+        }
+        if (o instanceof String) {
+            return DateData.fromIsoLocalDateString((String) o);
+        }
+        if (o instanceof LocalDate) {
+            return DateData.fromLocalDate((LocalDate) o);
+        }
+        if (o instanceof LocalDateTime) {
+            return DateData.fromLocalDate(((LocalDateTime) o).toLocalDate());
+        }
+        throw new IllegalArgumentException(
+                String.format("Cannot fit type \"%s\" into a DATE column. ", o.getClass()));
+    }
+
+    private static TimeData coerceToTime(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof TimeData) {
+            return (TimeData) o;
+        }
+        if (o instanceof Number) {
+            return TimeData.fromNanoOfDay(((Number) o).longValue());
+        }
+        if (o instanceof String) {
+            return TimeData.fromIsoLocalTimeString((String) o);
+        }
+        if (o instanceof LocalTime) {
+            return TimeData.fromLocalTime((LocalTime) o);
+        }
+        if (o instanceof LocalDateTime) {
+            return TimeData.fromLocalTime(((LocalDateTime) o).toLocalTime());
+        }
+        throw new IllegalArgumentException(
+                String.format("Cannot fit type \"%s\" into a TIME column. ", o.getClass()));
+    }
+
     private static TimestampData coerceToTimestamp(Object object, String timezone) {
         if (object == null) {
             return null;
@@ -881,6 +1017,9 @@ public class SchemaMergingUtils {
                             ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
         } else if (object instanceof TimestampData) {
             return (TimestampData) object;
+        } else if (object instanceof DateData) {
+            return TimestampData.fromLocalDateTime(
+                    ((DateData) object).toLocalDate().atStartOfDay());
         } else {
             throw new IllegalArgumentException(
                     String.format(
@@ -911,6 +1050,70 @@ public class SchemaMergingUtils {
                         ZoneId.of(timezone)));
     }
 
+    private static GenericArrayData coerceToArray(
+            String timezone, Object object, ArrayType originalType, ArrayType targetType) {
+        DataType originalElementType = originalType.getElementType();
+        DataType targetElementType = targetType.getElementType();
+
+        if (!(object instanceof ArrayData)) {
+            throw new IllegalArgumentException(
+                    "Unable to coerce given object: " + object + " to " + targetType);
+        }
+        ArrayData arrayData = (ArrayData) object;
+        ArrayData.ElementGetter elementGetter = ArrayData.createElementGetter(originalElementType);
+
+        Object[] coerced = new Object[arrayData.size()];
+        for (int i = 0; i < arrayData.size(); i++) {
+            coerced[i] =
+                    coerceObject(
+                            timezone,
+                            elementGetter.getElementOrNull(arrayData, i),
+                            originalElementType,
+                            targetElementType);
+        }
+
+        return new GenericArrayData(coerced);
+    }
+
+    private static GenericMapData coerceToMap(
+            String timezone, Object object, MapType originalType, MapType targetType) {
+        DataType originalKeyType = originalType.getKeyType();
+        DataType originalValueType = originalType.getValueType();
+
+        DataType targetKeyType = targetType.getKeyType();
+        DataType targetValueType = targetType.getValueType();
+
+        if (!(object instanceof MapData)) {
+            throw new IllegalArgumentException(
+                    "Unable to coerce given object: " + object + " to " + targetType);
+        }
+        MapData mapData = (MapData) object;
+
+        Object[] keyArray =
+                coerceToArray(
+                                timezone,
+                                mapData.keyArray(),
+                                DataTypes.ARRAY(originalKeyType),
+                                DataTypes.ARRAY(targetKeyType))
+                        .toObjectArray();
+        Object[] valueArray =
+                coerceToArray(
+                                timezone,
+                                mapData.valueArray(),
+                                DataTypes.ARRAY(originalValueType),
+                                DataTypes.ARRAY(targetValueType))
+                        .toObjectArray();
+
+        Preconditions.checkArgument(keyArray.length == valueArray.length);
+
+        Map<Object, Object> genericMapObjects = new HashMap<>(keyArray.length);
+        for (int i = 0; i < keyArray.length; i++) {
+            genericMapObjects.put(keyArray[i], valueArray[i]);
+        }
+
+        return new GenericMapData(genericMapObjects);
+    }
+
     private static String hexlify(byte[] bytes) {
         return BaseEncoding.base64().encode(bytes);
     }
@@ -932,6 +1135,8 @@ public class SchemaMergingUtils {
         DataType timestampLtzType = DataTypes.TIMESTAMP_LTZ(LocalZonedTimestampType.MAX_PRECISION);
         DataType timestampType = DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
         DataType dateType = DataTypes.DATE();
+        DataType arrayType = DataTypes.ARRAY(stringType);
+        DataType mapType = DataTypes.MAP(stringType, stringType);
 
         Map<Class<? extends DataType>, List<DataType>> mergingTree = new HashMap<>();
 
@@ -988,8 +1193,8 @@ public class SchemaMergingUtils {
 
         // Complex types
         mergingTree.put(RowType.class, ImmutableList.of(stringType));
-        mergingTree.put(ArrayType.class, ImmutableList.of(stringType));
-        mergingTree.put(MapType.class, ImmutableList.of(stringType));
+        mergingTree.put(ArrayType.class, ImmutableList.of(arrayType, stringType));
+        mergingTree.put(MapType.class, ImmutableList.of(mapType, stringType));
         return mergingTree;
     }
 }
