@@ -26,10 +26,13 @@ import org.apache.flink.cdc.connectors.mysql.schema.MySqlFieldDefinition;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
@@ -39,6 +42,7 @@ import io.debezium.relational.RelationalDatabaseConnectorConfig;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
+import io.debezium.relational.history.TableChanges;
 import io.debezium.text.ParsingException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -76,7 +80,9 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private boolean shouldEmitAllCreateTableEventsInSnapshotMode = true;
     private boolean isBounded = false;
 
-    private Map<TableId, CreateTableEvent> createTableEventCache;
+    private final DebeziumDeserializationSchema<Event> debeziumDeserializationSchema;
+
+    private final Map<TableId, CreateTableEvent> createTableEventCache;
 
     public MySqlPipelineRecordEmitter(
             DebeziumDeserializationSchema<Event> debeziumDeserializationSchema,
@@ -86,10 +92,30 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges());
+        this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
-        this.createTableEventCache = generateCreateTableEvent(sourceConfig);
+        this.createTableEventCache =
+                ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
+                        .getCreateTableEventCache();
         this.isBounded = StartupOptions.snapshot().equals(sourceConfig.getStartupOptions());
+    }
+
+    @Override
+    public void applySplit(MySqlSplit split) {
+        if ((isBounded) && createTableEventCache.isEmpty() && split instanceof MySqlSnapshotSplit) {
+            // TableSchemas in MySqlSnapshotSplit only contains one table.
+            createTableEventCache.putAll(generateCreateTableEvent(sourceConfig));
+        } else {
+            for (TableChanges.TableChange tableChange : split.getTableSchemas().values()) {
+                CreateTableEvent createTableEvent =
+                        new CreateTableEvent(
+                                toCdcTableId(tableChange.getId()),
+                                buildSchemaFromTable(tableChange.getTable()));
+                ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
+                        .applyChangeEvent(createTableEvent);
+            }
+        }
     }
 
     @Override
@@ -127,6 +153,11 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
             }
         }
         super.processElement(element, output, splitState);
+    }
+
+    private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
+        return org.apache.flink.cdc.common.event.TableId.tableId(
+                dbzTableId.catalog(), dbzTableId.table());
     }
 
     private void sendCreateTableEvent(
@@ -203,7 +234,10 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private Schema parseDDL(String ddlStatement, TableId tableId) {
         Table table = parseDdl(ddlStatement, tableId);
+        return buildSchemaFromTable(table);
+    }
 
+    private Schema buildSchemaFromTable(Table table) {
         List<Column> columns = table.columns();
         Schema.Builder tableBuilder = Schema.newBuilder();
         for (int i = 0; i < columns.size(); i++) {
