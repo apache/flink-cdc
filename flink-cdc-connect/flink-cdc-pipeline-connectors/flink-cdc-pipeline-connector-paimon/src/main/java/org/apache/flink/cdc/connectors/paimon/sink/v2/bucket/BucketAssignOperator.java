@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
-import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -192,7 +191,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                     }
             }
             output.collect(
-                    new StreamRecord<>(new BucketWrapperChangeEvent(bucket, (ChangeEvent) event)));
+                    new StreamRecord<>(new BucketWrapperChangeEvent(bucket, dataChangeEvent)));
         } else {
             // Broadcast SchemachangeEvent.
             for (int index = 0; index < totalTasksNumber; index++) {
@@ -216,7 +215,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
         Schema upstreamSchema =
                 schemaMaps.containsKey(tableId)
                         ? schemaMaps.get(tableId).getUpstreamSchemaInfo().getSchema()
-                        : null;
+                        : schemaEvolutionClient.getLatestEvolvedSchema(tableId).orElse(null);
         if (!SchemaUtils.isSchemaChangeEventRedundant(upstreamSchema, schemaChangeEvent)) {
             upstreamSchema = SchemaUtils.applySchemaChangeEvent(upstreamSchema, schemaChangeEvent);
         }
@@ -261,6 +260,18 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                             tableId,
                             mixedSchemaInfo.getUpstreamSchemaInfo().getSchema(),
                             mixedSchemaInfo.getPaimonSchemaInfo().getSchema());
+                }
+                // Broadcast the CreateTableEvent with physical schema after job restarted.
+                // This is necessary because the DataSinkOperator would emit the upstream schema.
+                for (int index = 0; index < totalTasksNumber; index++) {
+                    output.collect(
+                            new StreamRecord<>(
+                                    new BucketWrapperChangeEvent(
+                                            index,
+                                            new CreateTableEvent(
+                                                    tableId,
+                                                    mixedSchemaInfo.paimonSchemaInfo
+                                                            .getSchema()))));
                 }
                 schemaMaps.put(tableId, mixedSchemaInfo);
             } else {
