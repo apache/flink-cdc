@@ -577,7 +577,7 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 "id,name",
                                 "id",
-                                "replication_num=1,bucket=20",
+                                "replication_num=1,bucket=17",
                                 "Just a Transform Block",
                                 null)),
                 Arrays.asList(
