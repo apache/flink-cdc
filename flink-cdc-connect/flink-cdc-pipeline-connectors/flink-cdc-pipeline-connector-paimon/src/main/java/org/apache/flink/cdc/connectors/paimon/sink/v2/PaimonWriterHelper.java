@@ -222,7 +222,9 @@ public class PaimonWriterHelper {
 
     /** create full {@link GenericRow}s from a {@link DataChangeEvent} for {@link PaimonWriter}. */
     public static List<GenericRow> convertEventToFullGenericRows(
-            DataChangeEvent dataChangeEvent, List<RecordData.FieldGetter> fieldGetters) {
+            DataChangeEvent dataChangeEvent,
+            List<RecordData.FieldGetter> fieldGetters,
+            boolean hasPrimaryKey) {
         List<GenericRow> fullGenericRows = new ArrayList<>();
         switch (dataChangeEvent.op()) {
             case INSERT:
@@ -235,9 +237,13 @@ public class PaimonWriterHelper {
             case UPDATE:
             case REPLACE:
                 {
-                    fullGenericRows.add(
-                            convertRecordDataToGenericRow(
-                                    dataChangeEvent.before(), fieldGetters, RowKind.UPDATE_BEFORE));
+                    if (hasPrimaryKey) {
+                        fullGenericRows.add(
+                                convertRecordDataToGenericRow(
+                                        dataChangeEvent.before(),
+                                        fieldGetters,
+                                        RowKind.UPDATE_BEFORE));
+                    }
                     fullGenericRows.add(
                             convertRecordDataToGenericRow(
                                     dataChangeEvent.after(), fieldGetters, RowKind.UPDATE_AFTER));
@@ -245,9 +251,11 @@ public class PaimonWriterHelper {
                 }
             case DELETE:
                 {
-                    fullGenericRows.add(
-                            convertRecordDataToGenericRow(
-                                    dataChangeEvent.before(), fieldGetters, RowKind.DELETE));
+                    if (hasPrimaryKey) {
+                        fullGenericRows.add(
+                                convertRecordDataToGenericRow(
+                                        dataChangeEvent.before(), fieldGetters, RowKind.DELETE));
+                    }
                     break;
                 }
             default:
