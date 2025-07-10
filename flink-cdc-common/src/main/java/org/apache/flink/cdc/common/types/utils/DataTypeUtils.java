@@ -18,10 +18,12 @@
 package org.apache.flink.cdc.common.types.utils;
 
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.types.DataField;
@@ -58,9 +60,11 @@ public class DataTypeUtils {
             case SMALLINT:
                 return Short.class;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 return Integer.class;
+            case DATE:
+                return DateData.class;
+            case TIME_WITHOUT_TIME_ZONE:
+                return TimeData.class;
             case BIGINT:
                 return Long.class;
             case FLOAT:
