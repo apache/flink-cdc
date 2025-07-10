@@ -177,7 +177,8 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s'"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.parse.online.schema.changes.enabled' = 'true'"
                                 + ")",
                         MYSQL8_CONTAINER.getHost(),
                         MYSQL8_CONTAINER.getDatabasePort(),
@@ -346,7 +347,8 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s'"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.parse.online.schema.changes.enabled' = 'true'"
                                 + ")",
                         MYSQL8_CONTAINER.getHost(),
                         MYSQL8_CONTAINER.getDatabasePort(),
