@@ -17,12 +17,13 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.runtime.operators.transform.PostTransformOperator;
 import org.apache.flink.cdc.runtime.operators.transform.PreTransformOperator;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** E2e tests for the {@link PreTransformOperator} and {@link PostTransformOperator}. */
 class TransformE2eITCase extends PipelineTestEnvironment {
@@ -1179,20 +1182,19 @@ class TransformE2eITCase extends PipelineTestEnvironment {
     }
 
     void verifyDataRecord(String recordLine) {
-        LOG.info("Verifying data line {}", recordLine);
         List<String> tokens = Arrays.asList(recordLine.split(", "));
-        Assertions.assertThat(tokens).hasSizeGreaterThanOrEqualTo(6);
+        assertThat(tokens).hasSizeGreaterThanOrEqualTo(6);
 
         tokens = tokens.subList(tokens.size() - 6, tokens.size());
 
         String localTime = tokens.get(0);
         String currentTime = tokens.get(1);
-        Assertions.assertThat(currentTime).isEqualTo(localTime);
+        assertThat(localTime).isEqualTo(currentTime);
 
         String currentTimestamp = tokens.get(2);
         String nowTimestamp = tokens.get(3);
         String localTimestamp = tokens.get(4);
-        Assertions.assertThat(currentTimestamp).isEqualTo(nowTimestamp).isEqualTo(localTimestamp);
+        assertThat(currentTimestamp).isEqualTo(nowTimestamp).isEqualTo(localTimestamp);
 
         // If timestamp millisecond part is .000, it will be truncated to yyyy-MM-dd'T'HH:mm:ss
         // format. Manually append this for the following checks.
@@ -1207,13 +1209,15 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                         .toInstant(ZoneOffset.UTC);
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+        assertThat(TimeData.fromIsoLocalTimeString(localTime))
+                .isEqualTo(
+                        TimeData.fromMillisOfDay(
+                                (int) (instant.toEpochMilli() % milliSecondsInOneDay)));
 
-        Assertions.assertThat(Long.parseLong(localTime))
-                .isEqualTo(instant.toEpochMilli() % milliSecondsInOneDay);
-
-        String currentDate = tokens.get(5);
-
-        Assertions.assertThat(Long.parseLong(currentDate))
-                .isEqualTo(instant.toEpochMilli() / milliSecondsInOneDay);
+        String localDate = tokens.get(5);
+        assertThat(DateData.fromIsoLocalDateString(localDate))
+                .isEqualTo(
+                        DateData.fromEpochDay(
+                                (int) (instant.toEpochMilli() / milliSecondsInOneDay)));
     }
 }

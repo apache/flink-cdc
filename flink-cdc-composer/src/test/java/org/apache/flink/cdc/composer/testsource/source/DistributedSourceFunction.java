@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.testsource.source;
 
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -116,7 +117,7 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
         dummyDataTypes.put(DataTypes.VARCHAR(17), BinaryStringData.fromString("Bob"));
         dummyDataTypes.put(DataTypes.BINARY(17), "Cicada".getBytes());
         dummyDataTypes.put(DataTypes.VARBINARY(17), "Derrida".getBytes());
-        dummyDataTypes.put(DataTypes.TIME(9), 64800000);
+        dummyDataTypes.put(DataTypes.TIME(9), TimeData.fromMillisOfDay(64801000));
         dummyDataTypes.put(
                 DataTypes.TIMESTAMP(9),
                 TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:00")));

@@ -17,10 +17,12 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -95,9 +97,9 @@ class PaimonWriterHelperTest {
                     BinaryStringData.fromString("test1"),
                     BinaryStringData.fromString("test2"),
                     BinaryStringData.fromString("test3"),
-                    100,
-                    200,
-                    300,
+                    DateData.fromEpochDay(100),
+                    TimeData.fromNanoOfDay(200_000_000L),
+                    TimeData.fromNanoOfDay(300_000_000L),
                     TimestampData.fromTimestamp(
                             java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
                     TimestampData.fromTimestamp(java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),

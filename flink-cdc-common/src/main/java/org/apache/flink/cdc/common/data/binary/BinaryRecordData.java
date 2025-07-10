@@ -19,11 +19,13 @@ package org.apache.flink.cdc.common.data.binary;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.utils.Preconditions;
@@ -214,6 +216,18 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     public RecordData getRow(int pos, int numFields) {
         assertIndexIsValid(pos);
         return BinarySegmentUtils.readRecordData(segments, numFields, offset, getLong(pos));
+    }
+
+    @Override
+    public DateData getDate(int pos) {
+        assertIndexIsValid(pos);
+        return DateData.fromEpochDay(getInt(pos));
+    }
+
+    @Override
+    public TimeData getTime(int pos) {
+        assertIndexIsValid(pos);
+        return TimeData.fromMillisOfDay(getInt(pos));
     }
 
     /** The bit is 1 when the field is null. Default is 0. */

@@ -387,7 +387,7 @@ class FlinkParallelizedPipelineITCase {
             "Bob",
             "Q2ljYWRh",
             "RGVycmlkYQ==",
-            "64800000",
+            "18:00:01",
             "2019-12-31T18:00",
             "2020-07-17T18:00",
             "1970-01-05T05:20:00.000123456+08:00"
@@ -686,7 +686,7 @@ class FlinkParallelizedPipelineITCase {
             "Bob",
             "Q2ljYWRh",
             "RGVycmlkYQ==",
-            "64800000",
+            "18:00:01",
             "2019-12-31T18:00",
             "2020-07-17T18:00",
             "1970-01-05T05:20:00.000123456+08:00"
@@ -936,7 +936,7 @@ class FlinkParallelizedPipelineITCase {
             "Bob",
             "Q2ljYWRh",
             "RGVycmlkYQ==",
-            "64800000",
+            "18:00:01",
             "2019-12-31T18:00",
             "2020-07-17T18:00",
             "1970-01-05T05:20:00.000123456+08:00"
