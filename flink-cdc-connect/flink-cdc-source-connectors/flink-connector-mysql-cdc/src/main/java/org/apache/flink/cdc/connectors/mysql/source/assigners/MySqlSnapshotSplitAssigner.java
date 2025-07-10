@@ -88,7 +88,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private volatile Throwable uncaughtSplitterException;
     private AssignerStatus assignerStatus;
     private MySqlChunkSplitter chunkSplitter;
-    private boolean isTableIdCaseSensitive;
+    private boolean isTableIdCaseInsensitive;
     private ExecutorService executor;
 
     @Nullable private Long checkpointIdToFinish;
@@ -97,7 +97,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             MySqlSourceConfig sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
         this(
                 sourceConfig,
@@ -109,7 +109,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 new HashMap<>(),
                 AssignerStatus.INITIAL_ASSIGNING,
                 remainingTables,
-                isTableIdCaseSensitive,
+                isTableIdCaseInsensitive,
                 true,
                 ChunkSplitterState.NO_SPLITTING_TABLE_STATE,
                 enumeratorContext);
@@ -130,7 +130,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 checkpoint.getSplitFinishedOffsets(),
                 checkpoint.getSnapshotAssignerStatus(),
                 checkpoint.getRemainingTables(),
-                checkpoint.isTableIdCaseSensitive(),
+                checkpoint.isTableIdCaseInsensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
                 checkpoint.getChunkSplitterState(),
                 enumeratorContext);
@@ -146,7 +146,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState,
             SplitEnumeratorContext<MySqlSplit> enumeratorContext) {
@@ -170,9 +170,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
         this.assignerStatus = assignerStatus;
         this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
-        this.isTableIdCaseSensitive = isTableIdCaseSensitive;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
         this.chunkSplitter =
-                createChunkSplitter(sourceConfig, isTableIdCaseSensitive, chunkSplitterState);
+                createChunkSplitter(sourceConfig, isTableIdCaseInsensitive, chunkSplitterState);
         this.partition =
                 new MySqlPartition(sourceConfig.getMySqlConnectorConfig().getLogicalName());
         this.enumeratorContext = enumeratorContext;
@@ -196,7 +196,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 final List<TableId> discoverTables =
                         DebeziumUtils.discoverCapturedTables(jdbc, sourceConfig);
                 this.remainingTables.addAll(discoverTables);
-                this.isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                this.isTableIdCaseInsensitive = DebeziumUtils.isTableIdCaseInsensitive(jdbc);
             } catch (Exception e) {
                 throw new FlinkRuntimeException("Failed to discovery tables to capture", e);
             }
@@ -213,7 +213,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         DebeziumUtils.discoverCapturedTables(jdbc, sourceConfig);
                 discoverTables.removeAll(alreadyProcessedTables);
                 this.remainingTables.addAll(discoverTables);
-                this.isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                this.isTableIdCaseInsensitive = DebeziumUtils.isTableIdCaseInsensitive(jdbc);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
                         "Failed to discover remaining tables to capture", e);
@@ -454,7 +454,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                         splitFinishedOffsets,
                         assignerStatus,
                         remainingTables,
-                        isTableIdCaseSensitive,
+                        isTableIdCaseInsensitive,
                         true,
                         chunkSplitter.snapshotState(checkpointId));
         // we need a complete checkpoint before mark this assigner to be finished, to wait for
@@ -612,9 +612,9 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
     private static MySqlChunkSplitter createChunkSplitter(
             MySqlSourceConfig sourceConfig,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             ChunkSplitterState chunkSplitterState) {
-        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseSensitive);
+        MySqlSchema mySqlSchema = new MySqlSchema(sourceConfig, isTableIdCaseInsensitive);
         if (!ChunkSplitterState.NO_SPLITTING_TABLE_STATE.equals(chunkSplitterState)) {
             TableId tableId = chunkSplitterState.getCurrentSplittingTableId();
             return new MySqlChunkSplitter(
