@@ -83,7 +83,7 @@ OceanBase CDC 源端读取方案：
             <tr>
                 <td>OceanBase EE (Oracle 模式)</td>
                 <td></td>
-                <td>暂不支持 OceanBase Oracle 兼容模式，Oracle 兼容模式下的增量订阅服务请联系企业技术支持，获取帮助</td>
+                <td>暂不支持 OceanBase Oracle 兼容模式下的增量订阅服务，请联系企业技术支持。</td>
                 <td></td>
             </tr>
         </tbody>
@@ -94,7 +94,7 @@ OceanBase CDC 源端读取方案：
 - 先前基于 OceanBase Log Proxy 服务实现的连接器已被正式移除，当前将仅支持连接到 OceanBase Binlog 服务。
 - 当前版本 oceanbase-cdc 将基于 mysql-cdc 连接器实现，主要改进了对 OceanBase Binlog 服务的兼容性，包含一些 Bug 修复，推荐使用。
 - 由于 OceanBase Binlog 服务兼容 MySQL 复制协议，仍然支持使用 [MySQL CDC](mysql-cdc.md) 连接器连接到 OceanBase Binlog 服务。
-- 暂不支持 OceanBase 企业版 Oracle 兼容模式，Oracle 兼容模式下的增量订阅服务请联系企业技术支持，获取帮助。
+- 暂不支持 OceanBase Oracle 兼容模式下的增量订阅服务，请联系企业技术支持。
 
 
 依赖
