@@ -82,7 +82,7 @@ CDC Source Solutions for OceanBase:
             <tr>
                 <td>OceanBase EE (Oracle Mode)</td>
                 <td></td>
-                <td>OceanBase Oracle Compatibility Mode is currently not supported. For incremental data subscription requirements in Oracle Compatibility Mode, please contact Enterprise Support for assistance.</td>
+                <td>The incremental data subscription service for OceanBase Oracle Compatibility Mode is not currently supported. Please contact Enterprise Support for assistance.</td>
                 <td></td>
             </tr>
         </tbody>
@@ -93,7 +93,7 @@ CDC Source Solutions for OceanBase:
 - The previous connector implementation based on the OceanBase Log Proxy service has been officially removed. The current version now only supports connecting to the OceanBase Binlog Service.
 - The current oceanbase-cdc connector is rebuilt based on the mysql-cdc connector, offering enhanced compatibility with the OceanBase Binlog Service, including critical bug fixes. Upgrading to this version is strongly recommended.
 - Since the OceanBase Binlog Service is compatible with MySQL replication protocols, you may still use the MySQL CDC connector to connect to the OceanBase Binlog Service.
-- Oracle Compatibility Mode for OceanBase Enterprise Edition is not currently supported. For incremental subscription services in Oracle Compatibility Mode, please contact Enterprise Technical Support for assistance.
+- The incremental data subscription service for OceanBase Oracle Compatibility Mode is not currently supported. Please contact Enterprise Support for assistance.
 
 Dependencies
 ------------
