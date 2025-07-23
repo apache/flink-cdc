@@ -36,9 +36,9 @@ Glossary:
 - *OceanBase EE*: OceanBase Enterprise Edition. It supports two compatibility modes: MySQL and Oracle. See https://en.oceanbase.com.
 - *OceanBase Cloud*: OceanBase Enterprise Edition on Cloud. See https://en.oceanbase.com/product/cloud.
 - *Binlog Service CE*: OceanBase Binlog Service Community Edition. It is a solution of OceanBase CE that is compatible with the MySQL replication protocol. See the docs of [OceanBase Binlog Service](https://en.oceanbase.com/docs/common-ocp-10000000002168919) for details.
-- *Binlog Service EE*: OceanBase Binlog Service Enterprise Edition. It is a solution of OceanBase EE MySQL mode that is compatible with the MySQL replication protocol, and it's only available for users of Alibaba Cloud, see [User Guide](https://www.alibabacloud.com/help/en/apsaradb-for-oceanbase/latest/binlog-overview).
-- *MySQL Driver*: `mysql-connector-java` which can be used with OceanBase CE and OceanBase EE MySQL mode.
-- *OceanBase Driver*: The Jdbc driver for OceanBase, which supports both MySQL mode and Oracle mode of all OceanBase versions. It's open sourced at https://github.com/oceanbase/obconnector-j.
+- *Binlog Service EE*: OceanBase Binlog Service Enterprise Edition. It is a solution of OceanBase EE MySQL compatible mode that is compatible with the MySQL replication protocol, and it's only available for users of Alibaba Cloud, see [User Guide](https://www.alibabacloud.com/help/en/apsaradb-for-oceanbase/latest/binlog-overview).
+- *MySQL Driver*: `mysql-connector-java` which can be used with OceanBase CE and OceanBase EE MySQL compatible mode.
+- *OceanBase Driver*: The JDBC driver for OceanBase, which supports both MySQL compatible mode and Oracle compatible mode of all OceanBase versions. It's open sourced at https://github.com/oceanbase/obconnector-j.
 
 CDC Source Solutions for OceanBase:
 
@@ -67,7 +67,7 @@ CDC Source Solutions for OceanBase:
                 <td>Binlog Service CE</td>
             </tr>
             <tr>
-                <td rowspan="2">OceanBase EE (MySQL Mode)</td>
+                <td rowspan="2">OceanBase EE (MySQL Compatible Mode)</td>
                 <td>
                     MySQL Driver: 8.0.x <br>
                 </td>
@@ -80,7 +80,7 @@ CDC Source Solutions for OceanBase:
                 <td>Binlog Service EE</td>
             </tr>
             <tr>
-                <td>OceanBase EE (Oracle Mode)</td>
+                <td>OceanBase EE (Oracle Compatible Mode)</td>
                 <td></td>
                 <td>The incremental data subscription service for OceanBase Oracle Compatibility Mode is not currently supported. Please contact Enterprise Support for assistance.</td>
                 <td></td>
@@ -725,7 +725,7 @@ Data Type Mapping
         where 38 < p <= 65<br>
       </td>
       <td>STRING</td>
-      <td>The precision for DECIMAL data type is up to 65 in OceanBase, but the precision for DECIMAL is limited to 38 in Flink.
+      <td>The precision for DECIMAL data type is up to 65 in OceanBase compatible mode, but the precision for DECIMAL is limited to 38 in Flink.
   So if you define a decimal column whose precision is greater than 38, you should map it to STRING to avoid precision loss.</td>
     </tr>
     <tr>
