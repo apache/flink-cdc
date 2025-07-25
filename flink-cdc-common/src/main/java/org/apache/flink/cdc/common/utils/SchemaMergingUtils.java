@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -212,6 +213,7 @@ public class SchemaMergingUtils {
                     oldTypeMapping.put(columnName, beforeType);
                     newTypeMapping.put(columnName, afterType);
                 }
+                beforeColumns.remove(columnName);
             } else {
                 if (afterWhichColumnPosition == null) {
                     appendedColumns.add(
@@ -238,6 +240,10 @@ public class SchemaMergingUtils {
                     new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
         }
 
+        if (!beforeColumns.isEmpty()) {
+            schemaChangeEvents.add(
+                    new DropColumnEvent(tableId, new ArrayList<>(beforeColumns.keySet())));
+        }
         return schemaChangeEvents;
     }
 

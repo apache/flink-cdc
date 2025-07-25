@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -417,7 +418,29 @@ class SchemaMergingUtilsTest {
                                 TABLE_ID,
                                 Collections.singletonMap("name", STRING),
                                 Collections.singletonMap("name", VARCHAR(17))));
-
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "number", BIGINT),
+                                of("id", BIGINT)))
+                .as("test remove id while add gentle")
+                .containsExactly(
+                        new DropColumnEvent(TABLE_ID, Arrays.asList("number", "name")));
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "number", BIGINT),
+                                of("id", BIGINT, "name", STRING, "gentle", STRING)))
+                .as("test remove id while add gentle")
+                .containsExactly(
+                        new AddColumnEvent(
+                                TABLE_ID,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("gentle", STRING),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "name"))),
+                        new DropColumnEvent(TABLE_ID, Collections.singletonList("number")));
         Stream.of(TINYINT, SMALLINT, INT)
                 .forEach(
                         type ->
