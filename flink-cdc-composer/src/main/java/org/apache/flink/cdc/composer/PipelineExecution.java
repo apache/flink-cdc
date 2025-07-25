@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.composer;
 
+import org.apache.flink.core.execution.JobClient;
+
 /** A pipeline execution that can be executed by a computing engine. */
 public interface PipelineExecution {
 
@@ -27,10 +29,18 @@ public interface PipelineExecution {
     class ExecutionInfo {
         private final String id;
         private final String description;
+        private final JobClient jobClient;
 
         public ExecutionInfo(String id, String description) {
             this.id = id;
             this.description = description;
+            this.jobClient = null;
+        }
+
+        public ExecutionInfo(String id, String description, JobClient jobClient) {
+            this.id = id;
+            this.description = description;
+            this.jobClient = jobClient;
         }
 
         public String getId() {
@@ -39,6 +49,10 @@ public interface PipelineExecution {
 
         public String getDescription() {
             return description;
+        }
+
+        public JobClient getJobClient() {
+            return jobClient;
         }
     }
 }
