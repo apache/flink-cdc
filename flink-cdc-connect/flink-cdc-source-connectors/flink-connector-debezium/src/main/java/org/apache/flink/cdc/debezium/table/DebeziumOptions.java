@@ -20,6 +20,10 @@ package org.apache.flink.cdc.debezium.table;
 import java.util.Map;
 import java.util.Properties;
 
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.TABLE_INCLUDE_LIST_ALREADY_SPECIFIED_ERROR_MSG;
+
 /** Option utils for Debezium options. */
 public class DebeziumOptions {
     public static final String DEBEZIUM_OPTIONS_PREFIX = "debezium.";
@@ -42,6 +46,10 @@ public class DebeziumOptions {
                 || properties.containsKey("table.exclude.list")) {
             throw new IllegalArgumentException(
                     "table.include.list and table.exclude.list are not supported to set manually, please remove these options.");
+        }
+        if (debeziumProperties.containsKey(COLUMN_INCLUDE_LIST.name())
+                && debeziumProperties.containsKey(COLUMN_EXCLUDE_LIST.name())) {
+            throw new IllegalArgumentException(TABLE_INCLUDE_LIST_ALREADY_SPECIFIED_ERROR_MSG);
         }
         return debeziumProperties;
     }
