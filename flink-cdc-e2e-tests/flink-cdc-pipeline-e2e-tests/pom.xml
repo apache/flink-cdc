@@ -35,7 +35,7 @@ limitations under the License.
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
         <starrocks.connector.version>1.2.10_flink-${flink-major-1.19}</starrocks.connector.version>
-        <paimon.version>1.0.1</paimon.version>
+        <paimon.version>1.2.0</paimon.version>
         <flink.release.download.skip>false</flink.release.download.skip>
         <flink.release.name>flink-${flink.version}-bin-scala_${scala.binary.version}.tgz</flink.release.name>
         <flink.release.mirror>https://dlcdn.apache.org/flink/flink-${flink.version}</flink.release.mirror>

@@ -36,7 +36,7 @@ import java.util.Optional;
  * represent different types of schema modifications.
  */
 public class SchemaChangeProvider {
-
+    private static final String DEFAULT_VALUE_SUFFIX = "default-value";
     /**
      * Creates a SchemaChange object for adding a column without specifying its position.
      *
@@ -65,7 +65,7 @@ public class SchemaChangeProvider {
                                             "%s.%s.%s",
                                             CoreOptions.FIELDS_PREFIX,
                                             column.getName(),
-                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
+                                            SchemaChangeProvider.DEFAULT_VALUE_SUFFIX);
                             result.add(SchemaChangeProvider.setOption(key, value));
                         });
         return result;
@@ -103,7 +103,7 @@ public class SchemaChangeProvider {
                                             "%s.%s.%s",
                                             CoreOptions.FIELDS_PREFIX,
                                             column.getName(),
-                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
+                                            SchemaChangeProvider.DEFAULT_VALUE_SUFFIX);
                             result.add(SchemaChangeProvider.setOption(key, value));
                         });
         return result;
@@ -158,7 +158,7 @@ public class SchemaChangeProvider {
     public static String defaultValueOptionKey(String columnName) {
         return String.format(
                 "%s.%s.%s",
-                CoreOptions.FIELDS_PREFIX, columnName, CoreOptions.DEFAULT_VALUE_SUFFIX);
+                CoreOptions.FIELDS_PREFIX, columnName, SchemaChangeProvider.DEFAULT_VALUE_SUFFIX);
     }
 
     /**
