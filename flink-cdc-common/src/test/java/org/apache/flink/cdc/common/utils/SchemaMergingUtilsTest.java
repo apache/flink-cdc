@@ -424,8 +424,7 @@ class SchemaMergingUtilsTest {
                                 of("id", BIGINT, "name", STRING, "number", BIGINT),
                                 of("id", BIGINT)))
                 .as("test remove id while add gentle")
-                .containsExactly(
-                        new DropColumnEvent(TABLE_ID, Arrays.asList("number", "name")));
+                .containsExactly(new DropColumnEvent(TABLE_ID, Arrays.asList("number", "name")));
         Assertions.assertThat(
                         getSchemaDifference(
                                 TABLE_ID,
