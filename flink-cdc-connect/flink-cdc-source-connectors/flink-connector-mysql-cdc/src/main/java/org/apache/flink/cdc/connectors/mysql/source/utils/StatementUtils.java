@@ -225,7 +225,7 @@ public class StatementUtils {
     }
 
     public static String quote(String dbOrTableName) {
-        return "`" + dbOrTableName + "`";
+        return "`" + dbOrTableName.replace("`", "``") + "`";
     }
 
     public static String quote(TableId tableId) {
