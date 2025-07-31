@@ -136,7 +136,7 @@ public class IcebergMetadataApplierTest {
                                         3,
                                         true,
                                         "tinyIntCol",
-                                        Types.BooleanType.get(),
+                                        Types.IntegerType.get(),
                                         "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         4,
@@ -200,7 +200,7 @@ public class IcebergMetadataApplierTest {
                                         3,
                                         true,
                                         "tinyIntCol",
-                                        Types.BooleanType.get(),
+                                        Types.IntegerType.get(),
                                         "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         4,
@@ -262,7 +262,7 @@ public class IcebergMetadataApplierTest {
                                         3,
                                         true,
                                         "tinyIntCol",
-                                        Types.BooleanType.get(),
+                                        Types.IntegerType.get(),
                                         "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         5,
@@ -318,7 +318,7 @@ public class IcebergMetadataApplierTest {
                                         3,
                                         true,
                                         "tinyIntCol",
-                                        Types.BooleanType.get(),
+                                        Types.IntegerType.get(),
                                         "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         5,
@@ -375,7 +375,7 @@ public class IcebergMetadataApplierTest {
                                         3,
                                         true,
                                         "tinyIntCol",
-                                        Types.BooleanType.get(),
+                                        Types.IntegerType.get(),
                                         "column for tinyIntCol"),
                                 Types.NestedField.of(
                                         5,
