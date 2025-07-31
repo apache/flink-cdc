@@ -118,7 +118,7 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
                 "memoryPool and memoryPoolFactory cannot be set at the same time.");
 
         TableWriteImpl<?> tableWrite =
-                table.newWrite(commitUser, (part, bucket) -> true)
+                table.newWrite(commitUser, (part, bucket) -> true, null)
                         .withIOManager(paimonIOManager)
                         .withIgnorePreviousFiles(ignorePreviousFiles);
 
@@ -141,9 +141,6 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
     public void withCompactExecutor(ExecutorService compactExecutor) {
         write.withCompactExecutor(compactExecutor);
     }
-
-    @Override
-    public void withInsertOnly(boolean b) {}
 
     @Override
     public SinkRecord write(InternalRow internalRow) throws Exception {

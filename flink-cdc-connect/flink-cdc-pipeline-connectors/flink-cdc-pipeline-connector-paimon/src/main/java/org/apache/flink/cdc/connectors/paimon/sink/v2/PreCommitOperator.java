@@ -85,7 +85,9 @@ public class PreCommitOperator
                                     getMetricGroup(),
                                     true,
                                     context.isRestored(),
-                                    context.getOperatorStateStore()));
+                                    context.getOperatorStateStore(),
+                                    getRuntimeContext().getNumberOfParallelSubtasks(),
+                                    getRuntimeContext().getIndexOfThisSubtask()));
         }
     }
 
