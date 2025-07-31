@@ -104,9 +104,13 @@ public class PaimonWriterHelper {
                 fieldGetter = row -> row.getDouble(fieldPos);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = row -> row.getInt(fieldPos);
+                break;
+            case DATE:
+                fieldGetter = row -> (int) row.getDate(fieldPos).toEpochDay();
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = row -> (int) row.getTime(fieldPos).toMillisOfDay();
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =

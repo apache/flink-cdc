@@ -139,9 +139,13 @@ public class TableSchemaInfo {
                 fieldGetter = record -> record.getShort(fieldPos);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = record -> record.getInt(fieldPos);
+                break;
+            case DATE:
+                fieldGetter = record -> (int) record.getDate(fieldPos).toEpochDay();
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = record -> (int) record.getTime(fieldPos).toMillisOfDay();
                 break;
             case BIGINT:
                 fieldGetter = record -> record.getLong(fieldPos);

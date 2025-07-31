@@ -18,11 +18,13 @@
 package org.apache.flink.cdc.runtime.typeutils;
 
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -94,9 +96,9 @@ public class DataTypeConverter {
             case BIGINT:
                 return Long.class;
             case DATE:
-                return Integer.class;
+                return DateData.class;
             case TIME_WITHOUT_TIME_ZONE:
-                return Integer.class;
+                return TimeData.class;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return TimestampData.class;
             case TIMESTAMP_WITH_TIME_ZONE:
@@ -170,10 +172,7 @@ public class DataTypeConverter {
                 case TIME_WITHOUT_TIME_ZONE:
                     TimeType timeType = (TimeType) column.getType();
                     fieldInfoBuilder
-                            .add(
-                                    column.getName(),
-                                    SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE,
-                                    timeType.getPrecision())
+                            .add(column.getName(), SqlTypeName.TIME, timeType.getPrecision())
                             .nullable(timeType.isNullable());
                     break;
                 case TIMESTAMP_WITHOUT_TIME_ZONE:
@@ -309,8 +308,7 @@ public class DataTypeConverter {
                 return typeFactory.createSqlType(SqlTypeName.DATE);
             case TIME_WITHOUT_TIME_ZONE:
                 TimeType timeType = (TimeType) dataType;
-                return typeFactory.createSqlType(
-                        SqlTypeName.TIME_WITH_LOCAL_TIME_ZONE, timeType.getPrecision());
+                return typeFactory.createSqlType(SqlTypeName.TIME, timeType.getPrecision());
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 TimestampType timestampType = (TimestampType) dataType;
                 return typeFactory.createSqlType(
@@ -382,7 +380,6 @@ public class DataTypeConverter {
             case DATE:
                 return DataTypes.DATE();
             case TIME:
-            case TIME_WITH_LOCAL_TIME_ZONE:
                 return DataTypes.TIME(relDataType.getPrecision());
             case TIMESTAMP:
                 return DataTypes.TIMESTAMP(relDataType.getPrecision());
@@ -573,8 +570,11 @@ public class DataTypeConverter {
         }
     }
 
-    private static Object convertToDate(Object obj) {
-        return (int) toLocalDate(obj).toEpochDay();
+    private static DateData convertToDate(Object obj) {
+        if (obj instanceof DateData) {
+            return (DateData) obj;
+        }
+        return DateData.fromLocalDate(toLocalDate(obj));
     }
 
     private static LocalDate toLocalDate(Object obj) {
@@ -613,12 +613,11 @@ public class DataTypeConverter {
                         + obj.getClass().getName());
     }
 
-    private static Object convertToTime(Object obj) {
-        if (obj instanceof Integer) {
-            return obj;
+    private static TimeData convertToTime(Object obj) {
+        if (obj instanceof TimeData) {
+            return (TimeData) obj;
         }
-        // get number of milliseconds of the day
-        return toLocalTime(obj).toSecondOfDay() * 1000;
+        return TimeData.fromLocalTime(toLocalTime(obj));
     }
 
     private static Object convertToArray(Object obj, ArrayType arrayType) {

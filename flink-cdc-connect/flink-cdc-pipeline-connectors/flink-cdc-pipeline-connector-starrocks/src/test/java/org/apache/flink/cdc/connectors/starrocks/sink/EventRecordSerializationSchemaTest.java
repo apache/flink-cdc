@@ -25,6 +25,7 @@ import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -192,7 +193,7 @@ class EventRecordSerializationSchemaTest {
                         table2,
                         generator2.generate(
                                 new Object[] {
-                                    (int) LocalDate.of(2023, 11, 27).toEpochDay(),
+                                    DateData.fromLocalDate(LocalDate.of(2023, 11, 27)),
                                     3.4f,
                                     BinaryStringData.fromString("insert table2")
                                 }));
@@ -252,7 +253,7 @@ class EventRecordSerializationSchemaTest {
                 DataChangeEvent.insertEvent(
                         table2,
                         newGenerator2.generate(
-                                new Object[] {(int) LocalDate.of(2023, 11, 28).toEpochDay()}));
+                                new Object[] {DateData.fromLocalDate(LocalDate.of(2023, 11, 28))}));
         verifySerializeResult(
                 table2,
                 "{\"col1\":\"2023-11-28\",\"__op\":0}",

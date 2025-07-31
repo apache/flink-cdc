@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.functions;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.utils.DateTimeUtils;
@@ -65,16 +67,16 @@ public class SystemFunctionUtils {
                 Instant.ofEpochMilli(epochTime).atZone(ZoneId.of(timezone)).toLocalDateTime());
     }
 
-    public static int localtime(long epochTime, String timezone) {
+    public static TimeData localtime(long epochTime, String timezone) {
         return timestampMillisToTime(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
-    public static int currentTime(long epochTime, String timezone) {
+    public static TimeData currentTime(long epochTime, String timezone) {
         // the time value of currentTimestamp under given session time zone
         return timestampMillisToTime(localtimestamp(epochTime, timezone).getMillisecond());
     }
 
-    public static int currentDate(long epochTime, String timezone) {
+    public static DateData currentDate(long epochTime, String timezone) {
         // the date value of currentTimestamp under given session time zone
         return timestampMillisToDate(localtimestamp(epochTime, timezone).getMillisecond());
     }
@@ -118,11 +120,11 @@ public class SystemFunctionUtils {
                 timestamp.getEpochMillisecond(), format, TimeZone.getTimeZone(timezone));
     }
 
-    public static int toDate(String str, String timezone) {
+    public static DateData toDate(String str, String timezone) {
         return toDate(str, "yyyy-MM-dd", timezone);
     }
 
-    public static int toDate(String str, String format, String timezone) {
+    public static DateData toDate(String str, String format, String timezone) {
         return DateTimeUtils.parseDate(str, format, timezone);
     }
 
