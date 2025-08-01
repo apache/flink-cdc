@@ -335,14 +335,14 @@ public class PostgresSourceBuilder<T> {
                 try {
                     final List<TableId> remainingTables =
                             dataSourceDialect.discoverDataCollections(sourceConfig);
-                    boolean isTableIdCaseSensitive =
-                            dataSourceDialect.isDataCollectionIdCaseSensitive(sourceConfig);
+                    boolean isTableIdCaseInsensitive =
+                            dataSourceDialect.isDataCollectionIdCaseInsensitive(sourceConfig);
                     splitAssigner =
                             new HybridSplitAssigner<>(
                                     sourceConfig,
                                     enumContext.currentParallelism(),
                                     remainingTables,
-                                    isTableIdCaseSensitive,
+                                    isTableIdCaseInsensitive,
                                     dataSourceDialect,
                                     offsetFactory,
                                     enumContext);
