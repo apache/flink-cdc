@@ -20,9 +20,12 @@ package org.apache.flink.cdc.connectors.oracle.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import javax.annotation.Nullable;
 
@@ -44,6 +47,7 @@ public class OracleSourceBuilder<T> {
     private RedoLogOffsetFactory offsetFactory;
     private OracleDialect dialect;
     private DebeziumDeserializationSchema<T> deserializer;
+    private static RecordEmitter recordEmitter;
 
     public OracleSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);
@@ -258,6 +262,13 @@ public class OracleSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link OracleIncrementalSource} should assign the recordEmitter object. */
+    public OracleSourceBuilder<T> recordEmitter(
+            RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter) {
+        this.recordEmitter = recordEmitter;
+        return this;
+    }
+
     /**
      * Build the {@link OracleIncrementalSource}.
      *
@@ -279,6 +290,7 @@ public class OracleSourceBuilder<T> {
                 RedoLogOffsetFactory offsetFactory,
                 OracleDialect dataSourceDialect) {
             super(configFactory, deserializationSchema, offsetFactory, dataSourceDialect);
+            super.setRecordEmitter(recordEmitter);
         }
 
         public static <T> OracleSourceBuilder<T> builder() {
