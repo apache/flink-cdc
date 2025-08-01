@@ -366,7 +366,7 @@ public class SqlServerUtils {
      *     href="https://learn.microsoft.com/en-us/sql/t-sql/functions/quotename-transact-sql">QUOTENAME</a>
      */
     public static String quote(String name) {
-        return "[" + name + "]";
+        return "[" + name.replace("]", "]]") + "]";
     }
 
     public static String quote(TableId tableId) {
