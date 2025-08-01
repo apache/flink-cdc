@@ -33,6 +33,12 @@ limitations under the License.
             <artifactId>flink-connector-oceanbase-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-sql-connector-mysql-cdc</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -52,70 +58,10 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>io.debezium:debezium-api</include>
-                                    <include>io.debezium:debezium-embedded</include>
-                                    <include>io.debezium:debezium-core</include>
-                                    <include>org.apache.flink:flink-cdc-base</include>
-                                    <include>org.apache.flink:flink-cdc-common</include>
-                                    <include>org.apache.flink:flink-connector-debezium</include>
+                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc</include>
                                     <include>org.apache.flink:flink-connector-oceanbase-cdc</include>
-                                    <include>com.oceanbase:*</include>
-                                    <include>io.netty:*</include>
-                                    <include>com.google.protobuf:protobuf-java</include>
-                                    <include>commons-codec:commons-codec</include>
-                                    <include>org.lz4:lz4-java</include>
-                                    <include>org.apache.avro:avro</include>
-                                    <include>org.apache.commons:commons-lang3</include>
-                                    <include>org.apache.kafka:*</include>
-                                    <include>com.fasterxml.*:*</include>
                                 </includes>
                             </artifactSet>
-                            <filters>
-                                <filter>
-                                    <artifact>org.apache.kafka:*</artifact>
-                                    <excludes>
-                                        <exclude>kafka/kafka-version.properties</exclude>
-                                        <exclude>LICENSE</exclude>
-                                        <!-- Does not contain anything relevant.
-                                            Cites a binary dependency on jersey, but this is neither reflected in the
-                                            dependency graph, nor are any jersey files bundled. -->
-                                        <exclude>NOTICE</exclude>
-                                        <exclude>common/**</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
-                            <relocations>
-                                <relocation>
-                                    <pattern>org.apache.commons</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.commons
-                                    </shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>org.apache.kafka</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
-                                    </shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>org.apache.avro</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.avro
-                                    </shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.fasterxml</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
-                                    </shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.google</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.com.google
-                                    </shadedPattern>
-                                </relocation>
-                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
