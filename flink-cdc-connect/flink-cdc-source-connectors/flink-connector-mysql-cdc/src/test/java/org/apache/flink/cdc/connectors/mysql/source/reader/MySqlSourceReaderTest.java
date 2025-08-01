@@ -563,16 +563,16 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
         final Method metricGroupMethod = readerContext.getClass().getMethod("metricGroup");
         metricGroupMethod.setAccessible(true);
         final MetricGroup metricGroup = (MetricGroup) metricGroupMethod.invoke(readerContext);
-        final RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> recordEmitter =
+        final MySqlRecordEmitter<SourceRecord> recordEmitter =
                 limit > 0
                         ? new MysqlLimitedRecordEmitter(
                                 new ForwardDeserializeSchema(),
-                                new MySqlSourceReaderMetrics(metricGroup),
+                                new MySqlSourceReaderMetrics(readerContext.metricGroup()),
                                 configuration.isIncludeSchemaChanges(),
                                 limit)
                         : new MySqlRecordEmitter<>(
                                 new ForwardDeserializeSchema(),
-                                new MySqlSourceReaderMetrics(metricGroup),
+                                new MySqlSourceReaderMetrics(readerContext.metricGroup()),
                                 configuration.isIncludeSchemaChanges());
         final MySqlSourceReaderContext mySqlSourceReaderContext =
                 new MySqlSourceReaderContext(readerContext);
@@ -723,8 +723,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
      * A implementation of {@link RecordEmitter} which only emit records in given limit number, this
      * class is used for test purpose.
      */
-    private static class MysqlLimitedRecordEmitter
-            implements RecordEmitter<SourceRecords, SourceRecord, MySqlSplitState> {
+    private static class MysqlLimitedRecordEmitter extends MySqlRecordEmitter<SourceRecord> {
 
         private static final Logger LOG = LoggerFactory.getLogger(MySqlRecordEmitter.class);
         private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
@@ -741,6 +740,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 MySqlSourceReaderMetrics sourceReaderMetrics,
                 boolean includeSchemaChanges,
                 int limit) {
+            super(debeziumDeserializationSchema, sourceReaderMetrics, includeSchemaChanges);
             this.debeziumDeserializationSchema = debeziumDeserializationSchema;
             this.sourceReaderMetrics = sourceReaderMetrics;
             this.includeSchemaChanges = includeSchemaChanges;
@@ -766,7 +766,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
             }
         }
 
-        private void processElement(
+        protected void processElement(
                 SourceRecord element, SourceOutput<SourceRecord> output, MySqlSplitState splitState)
                 throws Exception {
             if (isWatermarkEvent(element)) {

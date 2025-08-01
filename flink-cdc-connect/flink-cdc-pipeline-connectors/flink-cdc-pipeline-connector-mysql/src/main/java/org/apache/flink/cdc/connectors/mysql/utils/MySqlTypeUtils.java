@@ -127,7 +127,8 @@ public class MySqlTypeUtils {
         String typeName = column.typeName();
         switch (typeName) {
             case BIT:
-                return column.length() == 1
+                // column.length() might be -1
+                return column.length() <= 1
                         ? DataTypes.BOOLEAN()
                         : DataTypes.BINARY((column.length() + 7) / 8);
             case BOOL:

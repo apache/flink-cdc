@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.reader;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
@@ -119,6 +120,8 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         outputCollector.currentMessageTimestamp = RecordUtils.getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
+
+    public void applySplit(MySqlSplit split) {}
 
     private void reportMetrics(SourceRecord element) {
 

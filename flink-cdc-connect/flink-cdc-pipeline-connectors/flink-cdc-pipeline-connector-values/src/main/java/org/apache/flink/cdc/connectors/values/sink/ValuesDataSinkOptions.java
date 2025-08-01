@@ -28,7 +28,7 @@ public class ValuesDataSinkOptions {
                     .booleanType()
                     .defaultValue(false)
                     .withDescription(
-                            "True if the DataChangeEvent need to be materialized in memory.");
+                            "True if the SchemaChangeEvent and DataChangeEvent need to be materialized in memory.");
 
     public static final ConfigOption<Boolean> PRINT_ENABLED =
             ConfigOptions.key("print.enabled")
