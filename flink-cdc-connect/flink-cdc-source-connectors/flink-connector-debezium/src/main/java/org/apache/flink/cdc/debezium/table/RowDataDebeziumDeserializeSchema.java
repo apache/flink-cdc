@@ -81,6 +81,8 @@ public final class RowDataDebeziumDeserializeSchema
     /** Whether the deserializer needs to handle metadata columns. */
     private final boolean hasMetadata;
 
+    private final boolean appendOnly;
+
     /**
      * A wrapped output collector which is used to append metadata columns after physical columns.
      */
@@ -116,6 +118,7 @@ public final class RowDataDebeziumDeserializeSchema
         this.resultTypeInfo = checkNotNull(resultTypeInfo);
         this.validator = checkNotNull(validator);
         this.changelogMode = checkNotNull(changelogMode);
+        this.appendOnly = appendOnly;
     }
 
     @Override
@@ -161,7 +164,7 @@ public final class RowDataDebeziumDeserializeSchema
     }
 
     private void emit(SourceRecord inRecord, RowData physicalRow, Collector<RowData> collector) {
-        if (!hasMetadata) {
+        if (!hasMetadata && !appendOnly) {
             collector.collect(physicalRow);
             return;
         }

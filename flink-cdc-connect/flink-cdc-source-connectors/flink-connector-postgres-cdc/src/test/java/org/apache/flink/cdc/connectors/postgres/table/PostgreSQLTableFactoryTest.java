@@ -59,6 +59,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_IN
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
@@ -155,6 +156,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -168,6 +170,7 @@ class PostgreSQLTableFactoryTest {
         options.put("changelog-mode", "upsert");
         options.put("scan.incremental.snapshot.backfill.skip", "true");
         options.put("scan.newly-added-table.enabled", "true");
+        options.put("scan.read-changelog-as-append-only.enabled", "true");
 
         DynamicTableSource actualSource = createTableSource(options);
         Properties dbzProperties = new Properties();
@@ -203,6 +206,7 @@ class PostgreSQLTableFactoryTest {
                         true,
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        true,
                         SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -249,6 +253,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
@@ -305,6 +310,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
@@ -351,6 +357,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue(),
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
                         SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }

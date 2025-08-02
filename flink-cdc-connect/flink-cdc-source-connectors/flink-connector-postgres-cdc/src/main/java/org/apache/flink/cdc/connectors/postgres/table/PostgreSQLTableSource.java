@@ -86,6 +86,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean scanNewlyAddedTableEnabled;
     private final int lsnCommitCheckpointsDelay;
     private final boolean assignUnboundedChunkFirst;
+    private final boolean appendOnly;
     private final boolean publishViaPartitionRoot;
 
     // --------------------------------------------------------------------------------------------
@@ -128,6 +129,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
+            boolean appendOnly,
             boolean publishViaPartitionRoot) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -161,11 +163,16 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.appendOnly = appendOnly;
         this.publishViaPartitionRoot = publishViaPartitionRoot;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
+        if (appendOnly) {
+            return ChangelogMode.insertOnly();
+        }
+
         switch (changelogMode) {
             case UPSERT:
                 return org.apache.flink.table.connector.ChangelogMode.upsert();
@@ -193,6 +200,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                                 PostgreSQLDeserializationConverterFactory.instance())
                         .setValueValidator(new PostgresValueValidator(schemaName, tableName))
                         .setChangelogMode(changelogMode)
+                        .setAppendOnly(appendOnly)
                         .build();
 
         if (enableParallelRead) {
@@ -296,6 +304,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         scanNewlyAddedTableEnabled,
                         lsnCommitCheckpointsDelay,
                         assignUnboundedChunkFirst,
+                        appendOnly,
                         publishViaPartitionRoot);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
@@ -340,7 +349,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
-                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
+                && Objects.equals(appendOnly, that.appendOnly);
     }
 
     @Override
@@ -375,7 +385,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 closeIdleReaders,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                appendOnly);
     }
 
     @Override

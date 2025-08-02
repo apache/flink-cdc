@@ -113,7 +113,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")
                             .withNetwork(NETWORK)
-                            .withNetworkAliases("mysql")
+                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     // ------------------------------------------------------------------------------------------

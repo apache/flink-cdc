@@ -40,8 +40,7 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                     .defaultValue("decoderbufs")
                     .withDescription(
                             "The name of the Postgres logical decoding plug-in installed on the server.\n"
-                                    + "Supported values are decoderbufs, wal2json, wal2json_rds, wal2json_streaming,\n"
-                                    + "wal2json_rds_streaming and pgoutput.");
+                                    + "Supported values are decoderbufs and pgoutput.");
 
     public static final ConfigOption<String> SLOT_NAME =
             ConfigOptions.key("slot.name")

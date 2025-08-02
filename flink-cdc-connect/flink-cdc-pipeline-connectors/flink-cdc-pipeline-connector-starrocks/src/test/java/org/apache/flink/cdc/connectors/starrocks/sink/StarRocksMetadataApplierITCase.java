@@ -42,6 +42,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksContainer;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksSinkTestBase;
@@ -435,15 +436,16 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
 
         DataSink starRocksSink = createStarRocksDataSink(config);
 
+        String schemaOperatorUid = "$$_schema_operator_$$";
+
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
-                        "$$_schema_operator_$$",
+                        schemaOperatorUid,
                         DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
                         "UTC");
 
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+        OperatorIDGenerator schemaOperatorIDGenerator = new OperatorIDGenerator(schemaOperatorUid);
 
         stream =
                 schemaOperatorTranslator.translateRegular(
@@ -461,7 +463,8 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 new SinkDef("starrocks", "Dummy StarRocks Sink", config),
                 stream,
                 starRocksSink,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                new OperatorUidGenerator());
 
         env.execute("StarRocks Schema Evolution Test");
     }
