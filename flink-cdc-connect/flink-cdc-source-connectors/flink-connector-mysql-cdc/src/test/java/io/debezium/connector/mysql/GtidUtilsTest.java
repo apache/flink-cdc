@@ -48,7 +48,11 @@ class GtidUtilsTest {
         serverGtidSet = new GtidSet("A:1-100:102-200,B:20-200");
         restoredGtidSet = new GtidSet("A:106-150:152-200,C:1-100");
         assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet))
-                .hasToString("A:1-100:102-200,B:20-200,C:1-100");
+                .hasToString("A:1-100:102-150:152-200,B:20-200,C:1-100");
+
+        serverGtidSet = new GtidSet("A:1-100");
+        restoredGtidSet = new GtidSet("A:100-150:152-200");
+        assertThat(fixRestoredGtidSet(serverGtidSet, restoredGtidSet)).hasToString("A:1-100");
     }
 
     @Test
