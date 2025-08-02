@@ -106,7 +106,7 @@ class PostgresDialectTest extends PostgresTestBase {
         PostgresSourceConfigFactory configFactoryOfInventoryPartitionedDatabase =
                 getMockPostgresSourceConfigFactory(
                         inventoryPartitionedDatabase, "inventory_partitioned", "products", 10);
-        configFactoryOfInventoryPartitionedDatabase.setPublishViaPartitionRoot(true);
+        configFactoryOfInventoryPartitionedDatabase.setIncludePartitionedTables(true);
         PostgresDialect dialectOfInventoryPartitionedDatabase =
                 new PostgresDialect(configFactoryOfInventoryPartitionedDatabase.create(0));
         List<TableId> tableIdsOfInventoryPartitionedDatabase =

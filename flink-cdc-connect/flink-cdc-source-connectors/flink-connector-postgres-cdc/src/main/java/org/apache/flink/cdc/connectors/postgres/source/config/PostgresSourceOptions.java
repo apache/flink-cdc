@@ -88,8 +88,8 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "committed after multiple checkpoint delays instead of after each checkpoint completion.\n"
                                     + "This allows continuous recycle of log files in stream phase.");
 
-    public static final ConfigOption<Boolean> SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED =
-            ConfigOptions.key("scan.publish-via-partition-root.enabled")
+    public static final ConfigOption<Boolean> SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED =
+            ConfigOptions.key("scan.include-partitioned-tables.enabled")
                     .booleanType()
                     .defaultValue(Boolean.FALSE)
                     .withDescription(

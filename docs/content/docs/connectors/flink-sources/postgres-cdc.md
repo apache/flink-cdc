@@ -279,7 +279,7 @@ SELECT * FROM shipments;
       </td>
     </tr>
     <tr>
-      <td>scan.publish-via-partition-root.enabled</td>
+      <td>scan.include-partitioned-tables.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>

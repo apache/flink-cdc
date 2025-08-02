@@ -64,8 +64,8 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_SN
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
+import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
-import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
 
 /** Test for {@link PostgreSQLTableSource} created by {@link PostgreSQLTableFactory}. */
@@ -157,7 +157,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
-                        SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
+                        SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -207,7 +207,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         true,
-                        SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
+                        SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -254,7 +254,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
-                        SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
+                        SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue());
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
         expectedSource.metadataKeys =
                 Arrays.asList("row_kind", "op_ts", "database_name", "schema_name", "table_name");
@@ -311,7 +311,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
-                        SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
+                        SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
@@ -358,7 +358,7 @@ class PostgreSQLTableFactoryTest {
                         SCAN_LSN_COMMIT_CHECKPOINTS_DELAY.defaultValue(),
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue(),
                         SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.defaultValue(),
-                        SCAN_PUBLISH_VIA_PARTITION_ROOT_ENABLED.defaultValue());
+                        SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED.defaultValue());
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 

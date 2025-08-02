@@ -37,11 +37,11 @@ public class TableDiscoveryUtils {
             String database,
             JdbcConnection jdbc,
             RelationalTableFilters tableFilters,
-            boolean publishViaPartitionRoot)
+            boolean includePartitionedTables)
             throws SQLException {
 
         String[] tableTypes = new String[] {"TABLE"};
-        if (publishViaPartitionRoot) {
+        if (includePartitionedTables) {
             tableTypes = new String[] {"TABLE", "PARTITIONED TABLE"};
         }
         Set<TableId> allTableIds = jdbc.readTableNames(database, null, null, tableTypes);

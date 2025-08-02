@@ -52,7 +52,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private int lsnCommitCheckpointsDelay;
 
-    private boolean publishViaPartitionRoot;
+    private boolean includePartitionedTables;
 
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
@@ -136,7 +136,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 scanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
-                publishViaPartitionRoot);
+                includePartitionedTables);
     }
 
     /**
@@ -186,7 +186,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     }
 
     /** Enable include partitioned table. */
-    public void setPublishViaPartitionRoot(boolean publishViaPartitionRoot) {
-        this.publishViaPartitionRoot = publishViaPartitionRoot;
+    public void setIncludePartitionedTables(boolean includePartitionedTables) {
+        this.includePartitionedTables = includePartitionedTables;
     }
 }

@@ -87,7 +87,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final int lsnCommitCheckpointsDelay;
     private final boolean assignUnboundedChunkFirst;
     private final boolean appendOnly;
-    private final boolean publishViaPartitionRoot;
+    private final boolean includePartitionedTables;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -130,7 +130,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean appendOnly,
-            boolean publishViaPartitionRoot) {
+            boolean includePartitionedTables) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -164,7 +164,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.appendOnly = appendOnly;
-        this.publishViaPartitionRoot = publishViaPartitionRoot;
+        this.includePartitionedTables = includePartitionedTables;
     }
 
     @Override
@@ -233,7 +233,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
-                            .publishViaPartitionRoot(publishViaPartitionRoot)
+                            .includePartitionedTables(includePartitionedTables)
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
@@ -305,7 +305,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         lsnCommitCheckpointsDelay,
                         assignUnboundedChunkFirst,
                         appendOnly,
-                        publishViaPartitionRoot);
+                        includePartitionedTables);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -350,7 +350,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
-                && Objects.equals(appendOnly, that.appendOnly);
+                && Objects.equals(appendOnly, that.appendOnly)
+                && Objects.equals(includePartitionedTables, that.includePartitionedTables);
     }
 
     @Override
@@ -386,7 +387,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                includePartitionedTables);
     }
 
     @Override

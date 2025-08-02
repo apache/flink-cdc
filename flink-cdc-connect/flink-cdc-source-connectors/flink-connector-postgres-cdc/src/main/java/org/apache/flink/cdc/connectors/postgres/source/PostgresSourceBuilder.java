@@ -300,8 +300,8 @@ public class PostgresSourceBuilder<T> {
     }
 
     /** Whether the connector should read partitioned tables via partition root or not. */
-    public PostgresSourceBuilder<T> publishViaPartitionRoot(boolean publishViaPartitionRoot) {
-        this.configFactory.setPublishViaPartitionRoot(publishViaPartitionRoot);
+    public PostgresSourceBuilder<T> includePartitionedTables(boolean includePartitionedTables) {
+        this.configFactory.setIncludePartitionedTables(includePartitionedTables);
         return this;
     }
 
