@@ -176,9 +176,9 @@ public class IcebergTypeUtils {
             case TIMESTAMP_WITH_TIME_ZONE:
                 fieldGetter =
                         (row) ->
-                                TimestampData.fromTimestamp(
+                                TimestampData.fromInstant(
                                         row.getZonedTimestamp(fieldPos, getPrecision(fieldType))
-                                                .toTimestamp());
+                                                .toInstant());
                 break;
             case ROW:
                 final int rowFieldCount = getFieldCount(fieldType);
