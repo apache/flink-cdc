@@ -48,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
+import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 
 /** Event deserializer for {@link MySqlDataSource}. */
@@ -146,8 +148,11 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected TableId getTableId(SourceRecord record) {
-        String[] parts = record.topic().split("\\.");
-        return TableId.tableId(parts[1], parts[2]);
+        Struct value = (Struct) record.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        String dbName = source.getString(DATABASE_NAME_KEY);
+        String tableName = source.getString(TABLE_NAME_KEY);
+        return TableId.tableId(dbName, tableName);
     }
 
     @Override

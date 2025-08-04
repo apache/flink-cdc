@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
+import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -155,7 +156,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
 
     private String showCreateTable(JdbcConnection jdbc, TableId tableId) {
         final String showCreateTableQuery =
-                String.format("SHOW CREATE TABLE `%s`.`%s`", tableId.catalog(), tableId.table());
+                String.format("SHOW CREATE TABLE %s", StatementUtils.quote(tableId));
         try {
             return jdbc.queryAndMap(
                     showCreateTableQuery,
@@ -177,7 +178,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         List<String> primaryKeys = new ArrayList<>();
         try {
             return jdbc.queryAndMap(
-                    String.format("DESC `%s`.`%s`", tableId.catalog(), tableId.table()),
+                    String.format("DESC %s", StatementUtils.quote(tableId)),
                     rs -> {
                         while (rs.next()) {
                             MySqlFieldDefinition meta = new MySqlFieldDefinition();
