@@ -65,6 +65,7 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
@@ -926,6 +927,62 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
         jobClient.cancel().get();
         iterator.close();
+    }
+
+    @Test
+    void testSqlInjection() throws Exception {
+        String sqlInjection = "customer`; DROP TABLE important_data;";
+        try {
+            testMySqlParallelSource(
+                    1,
+                    FailoverType.JM,
+                    FailoverPhase.SNAPSHOT,
+                    new String[] {sqlInjection},
+                    "customers",
+                    "id",
+                    new HashMap<>());
+        } catch (Exception e) {
+            ExceptionUtils.assertThrowableWithMessage(
+                    e,
+                    String.format(
+                            "Can't find any matched tables, please check your configured database-name: [%s] and table-name: [%s\\.customer`; DROP TABLE important_data;]",
+                            customDatabase.getDatabaseName(), customDatabase.getDatabaseName()));
+        }
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        MySqlSource<String> source =
+                MySqlSource.<String>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(customDatabase.getDatabaseName())
+                        .tableList(sqlInjection)
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .deserializer(new StringDebeziumDeserializationSchema())
+                        .serverId(getServerId())
+                        .serverTimeZone("UTC")
+                        .build();
+        DataStreamSource<String> stream =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "MySQL CDC Source");
+        CollectResultIterator<String> iterator = addCollector(env, stream);
+        JobClient jobClient = env.executeAsync();
+        iterator.setJobClient(jobClient);
+
+        try {
+            // Wait until we receive all 21 snapshot records
+            int numSnapshotRecordsExpected = 21;
+            int numSnapshotRecordsReceived = 0;
+            while (numSnapshotRecordsReceived < numSnapshotRecordsExpected && iterator.hasNext()) {
+                iterator.next();
+                numSnapshotRecordsReceived++;
+            }
+        } catch (Exception e) {
+            ExceptionUtils.assertThrowableWithMessage(
+                    e,
+                    String.format(
+                            "Can't find any matched tables, please check your configured database-name: [%s] and table-name: [customer`; DROP TABLE important_data;]",
+                            customDatabase.getDatabaseName()));
+        }
     }
 
     private <T> CollectResultIterator<T> addCollector(
