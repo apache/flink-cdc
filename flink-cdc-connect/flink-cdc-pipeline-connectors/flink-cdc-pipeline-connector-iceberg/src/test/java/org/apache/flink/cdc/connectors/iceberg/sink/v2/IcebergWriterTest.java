@@ -273,8 +273,8 @@ public class IcebergWriterTest {
         Catalog catalog =
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
-        IcebergWriter icebergWriter =
-                new IcebergWriter(catalogOptions, 1, 1, ZoneId.systemDefault());
+        ZoneId pipelineZoneId = ZoneId.systemDefault();
+        IcebergWriter icebergWriter = new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId);
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
 
@@ -330,7 +330,7 @@ public class IcebergWriterTest {
                             LocalZonedTimestampData.fromInstant(Instant.ofEpochSecond(0)),
                             ZonedTimestampData.fromZonedDateTime(
                                     ZonedDateTime.ofInstant(
-                                            Instant.ofEpochSecond(0), ZoneId.of("Asia/Shanghai")))
+                                            Instant.ofEpochSecond(0), pipelineZoneId))
                         });
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, record1);
         icebergWriter.write(dataChangeEvent, null);
@@ -342,7 +342,7 @@ public class IcebergWriterTest {
         List<String> result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
-                        "char, varchar, string, false, [1,2,3,4,5,], [1,2,3,4,5,6,7,8,9,10,], 0.00, 1, 2, 12345, 12345, 123.456, 123456.789, 00:00:12.345, 2003-10-20, 1970-01-01T00:00, 1970-01-01T00:00Z, 1970-01-01T08:00Z");
+                        "char, varchar, string, false, [1,2,3,4,5,], [1,2,3,4,5,6,7,8,9,10,], 0.00, 1, 2, 12345, 12345, 123.456, 123456.789, 00:00:12.345, 2003-10-20, 1970-01-01T00:00, 1970-01-01T00:00Z, 1970-01-01T00:00Z");
     }
 
     /** Mock CommitRequestImpl. */
