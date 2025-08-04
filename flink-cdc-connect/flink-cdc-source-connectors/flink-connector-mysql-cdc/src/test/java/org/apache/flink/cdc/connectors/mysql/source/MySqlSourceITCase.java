@@ -65,7 +65,6 @@ import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.ExceptionUtils;
 
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.jdbc.JdbcConnection;
@@ -931,31 +930,35 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     @Test
     void testSqlInjection() throws Exception {
-        String sqlInjection = "customer`; DROP TABLE important_data;";
-        try {
-            testMySqlParallelSource(
-                    1,
-                    FailoverType.JM,
-                    FailoverPhase.SNAPSHOT,
-                    new String[] {sqlInjection},
-                    "customers",
-                    "id",
-                    new HashMap<>());
-        } catch (Exception e) {
-            ExceptionUtils.assertThrowableWithMessage(
-                    e,
-                    String.format(
-                            "Can't find any matched tables, please check your configured database-name: [%s] and table-name: [%s\\.customer`; DROP TABLE important_data;]",
-                            customDatabase.getDatabaseName(), customDatabase.getDatabaseName()));
+        customDatabase.createAndInitialize();
+        String sqlInjectionTable = "sqlInjection; DROP TABLE important_data;";
+        getConnection()
+                .execute(
+                        String.format(
+                                "CREATE TABLE `%s`.`%s` (\n"
+                                        + "    id INTEGER NOT NULL PRIMARY KEY,\n"
+                                        + "    name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
+                                        + "    address VARCHAR(1024),\n"
+                                        + "    phone_number VARCHAR(512),\n"
+                                        + "    email VARCHAR(255)\n"
+                                        + ");\n",
+                                customDatabase.getDatabaseName(), sqlInjectionTable));
+        int numSnapshotRecordsExpected = 21;
+        for (int i = 0; i < numSnapshotRecordsExpected; i++) {
+            getConnection()
+                    .execute(
+                            String.format(
+                                    "INSERT INTO `%s`.`%s` VALUES (%s, 'flink', 'Shanghai', '123567891234', 'flink@apache.org');",
+                                    customDatabase.getDatabaseName(), sqlInjectionTable, i));
         }
-
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
         MySqlSource<String> source =
                 MySqlSource.<String>builder()
                         .hostname(MYSQL_CONTAINER.getHost())
                         .port(MYSQL_CONTAINER.getDatabasePort())
                         .databaseList(customDatabase.getDatabaseName())
-                        .tableList(sqlInjection)
+                        .tableList(customDatabase.getDatabaseName() + "\\.sql.*")
                         .username(customDatabase.getUsername())
                         .password(customDatabase.getPassword())
                         .deserializer(new StringDebeziumDeserializationSchema())
@@ -968,20 +971,27 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         JobClient jobClient = env.executeAsync();
         iterator.setJobClient(jobClient);
 
-        try {
-            // Wait until we receive all 21 snapshot records
-            int numSnapshotRecordsExpected = 21;
-            int numSnapshotRecordsReceived = 0;
-            while (numSnapshotRecordsReceived < numSnapshotRecordsExpected && iterator.hasNext()) {
-                iterator.next();
-                numSnapshotRecordsReceived++;
-            }
-        } catch (Exception e) {
-            ExceptionUtils.assertThrowableWithMessage(
-                    e,
-                    String.format(
-                            "Can't find any matched tables, please check your configured database-name: [%s] and table-name: [customer`; DROP TABLE important_data;]",
-                            customDatabase.getDatabaseName()));
+        int numSnapshotRecordsReceived = 0;
+        while (numSnapshotRecordsReceived < numSnapshotRecordsExpected && iterator.hasNext()) {
+            String record = iterator.next();
+            assertThat(record).contains("table=sqlInjection; DROP TABLE important_data;");
+            numSnapshotRecordsReceived++;
+        }
+        int numBinlogRecordsExpected = 21;
+        for (int i = 0; i < numBinlogRecordsExpected; i++) {
+            getConnection()
+                    .execute(
+                            String.format(
+                                    "INSERT INTO `%s`.`%s` VALUES (%s, 'flink', 'Shanghai', '123567891234', 'flink@apache.org');",
+                                    customDatabase.getDatabaseName(),
+                                    sqlInjectionTable,
+                                    numSnapshotRecordsReceived + i));
+        }
+        int numBinlogRecordsReceived = 0;
+        while (numBinlogRecordsReceived < numBinlogRecordsExpected && iterator.hasNext()) {
+            String record = iterator.next();
+            assertThat(record).contains("table=sqlInjection; DROP TABLE important_data;");
+            numBinlogRecordsReceived++;
         }
     }
 
