@@ -24,6 +24,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
+import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlDeserializationConverterFactory;
@@ -931,25 +932,28 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
     @Test
     void testSqlInjection() throws Exception {
         customDatabase.createAndInitialize();
-        String sqlInjectionTable = "sqlInjection; DROP TABLE important_data;";
+        String sqlInjectionTable = "sqlInjection`; DROP TABLE important_data; --";
         getConnection()
                 .execute(
                         String.format(
-                                "CREATE TABLE `%s`.`%s` (\n"
+                                "CREATE TABLE %s.%s (\n"
                                         + "    id INTEGER NOT NULL PRIMARY KEY,\n"
                                         + "    name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
                                         + "    address VARCHAR(1024),\n"
                                         + "    phone_number VARCHAR(512),\n"
                                         + "    email VARCHAR(255)\n"
                                         + ");\n",
-                                customDatabase.getDatabaseName(), sqlInjectionTable));
+                                StatementUtils.quote(customDatabase.getDatabaseName()),
+                                StatementUtils.quote(sqlInjectionTable)));
         int numSnapshotRecordsExpected = 21;
         for (int i = 0; i < numSnapshotRecordsExpected; i++) {
             getConnection()
                     .execute(
                             String.format(
-                                    "INSERT INTO `%s`.`%s` VALUES (%s, 'flink', 'Shanghai', '123567891234', 'flink@apache.org');",
-                                    customDatabase.getDatabaseName(), sqlInjectionTable, i));
+                                    "INSERT INTO %s.%s VALUES (%s, 'flink', 'Shanghai', '123567891234', 'flink@apache.org');",
+                                    StatementUtils.quote(customDatabase.getDatabaseName()),
+                                    StatementUtils.quote(sqlInjectionTable),
+                                    i));
         }
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
@@ -974,7 +978,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         int numSnapshotRecordsReceived = 0;
         while (numSnapshotRecordsReceived < numSnapshotRecordsExpected && iterator.hasNext()) {
             String record = iterator.next();
-            assertThat(record).contains("table=sqlInjection; DROP TABLE important_data;");
+            assertThat(record).contains("sqlInjection`; DROP TABLE important_data; --");
             numSnapshotRecordsReceived++;
         }
         int numBinlogRecordsExpected = 21;
@@ -982,15 +986,15 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             getConnection()
                     .execute(
                             String.format(
-                                    "INSERT INTO `%s`.`%s` VALUES (%s, 'flink', 'Shanghai', '123567891234', 'flink@apache.org');",
-                                    customDatabase.getDatabaseName(),
-                                    sqlInjectionTable,
+                                    "INSERT INTO %s.%s VALUES (%s, 'flink', 'Shanghai', '123567891234', 'flink@apache.org');",
+                                    StatementUtils.quote(customDatabase.getDatabaseName()),
+                                    StatementUtils.quote(sqlInjectionTable),
                                     numSnapshotRecordsReceived + i));
         }
         int numBinlogRecordsReceived = 0;
         while (numBinlogRecordsReceived < numBinlogRecordsExpected && iterator.hasNext()) {
             String record = iterator.next();
-            assertThat(record).contains("table=sqlInjection; DROP TABLE important_data;");
+            assertThat(record).contains("table=sqlInjection`; DROP TABLE important_data; --");
             numBinlogRecordsReceived++;
         }
     }

@@ -45,6 +45,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
@@ -258,25 +259,28 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
     void testSqlInjection() throws Exception {
         inventoryDatabase.createAndInitialize();
         env.setParallelism(1);
-        String sqlInjectionTable = "sqlInjection; DROP TABLE important_data;";
+        String sqlInjectionTable = "sqlInjection`; DROP TABLE important_data; --";
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), sqlInjectionTable);
         try (Connection connection = inventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     String.format(
-                            "CREATE TABLE `%s`.`%s` (  "
+                            "CREATE TABLE %s.%s (  "
                                     + "id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,\n"
                                     + "  name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
                                     + "  description VARCHAR(512),\n"
                                     + "  weight FLOAT(6)"
                                     + ");\n",
-                            inventoryDatabase.getDatabaseName(), sqlInjectionTable));
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
             statement.execute(
                     String.format(
-                            "ALTER TABLE `%s`.`%s` AUTO_INCREMENT = 101;",
-                            inventoryDatabase.getDatabaseName(), sqlInjectionTable));
+                            "ALTER TABLE %s.%s AUTO_INCREMENT = 101;",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
             statement.execute(
                     String.format(
-                            "INSERT INTO `%s`.`%s`\n"
+                            "INSERT INTO %s.%s\n"
                                     + "VALUES (default,\"scooter\",\"Small 2-wheel scooter\",3.14),\n"
                                     + "       (default,\"car battery\",\"12V car battery\",8.1),\n"
                                     + "       (default,\"12-pack drill bits\",\"12-pack of drill bits with sizes ranging from #40 to #3\",0.8),\n"
@@ -286,7 +290,8 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     + "       (default,\"rocks\",\"box of assorted rocks\",5.3),\n"
                                     + "       (default,\"jacket\",\"water resistent black wind breaker\",0.1),\n"
                                     + "       (default,\"spare tire\",\"24 inch spare tire\",22.2);",
-                            inventoryDatabase.getDatabaseName(), sqlInjectionTable));
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
         }
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
@@ -311,11 +316,6 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
         Thread.sleep(10_000);
-
-        TableId tableId =
-                TableId.tableId(
-                        inventoryDatabase.getDatabaseName(),
-                        "sqlInjection; DROP TABLE important_data;");
         CreateTableEvent createTableEvent =
                 new CreateTableEvent(
                         tableId,
@@ -336,8 +336,9 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     String.format(
-                            "ALTER TABLE `%s`.`%s` ADD COLUMN `desc1` VARCHAR(45) NULL AFTER `weight`;",
-                            inventoryDatabase.getDatabaseName(), sqlInjectionTable));
+                            "ALTER TABLE %s.%s ADD COLUMN `desc1` VARCHAR(45) NULL AFTER `weight`;",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
             expectedBinlog.add(
                     new AddColumnEvent(
                             tableId,
@@ -348,10 +349,11 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                             "weight"))));
             statement.execute(
                     String.format(
-                            "INSERT INTO `%s`.`%s`\n"
+                            "INSERT INTO %s.%s\n"
                                     + "VALUES (default,\"scooter\",\"Small 2-wheel scooter\",3.14, 1.1),\n"
                                     + "       (default,\"car battery\",\"12V car battery\",8.1, 1.1);",
-                            inventoryDatabase.getDatabaseName(), sqlInjectionTable));
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
             RowType rowType =
                     RowType.of(
                             DataTypes.INT().notNull(),
