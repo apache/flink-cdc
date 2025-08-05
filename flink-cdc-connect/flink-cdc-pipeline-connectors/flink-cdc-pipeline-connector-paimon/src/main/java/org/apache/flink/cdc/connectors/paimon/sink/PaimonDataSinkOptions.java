@@ -29,6 +29,9 @@ public class PaimonDataSinkOptions {
     // prefix for passing properties for table creation.
     public static final String PREFIX_TABLE_PROPERTIES = "table.properties.";
 
+    // prefix for passing table-specific properties.
+    public static final String PREFIX_SPECIFIC_TABLE_PROPERTIES = "specific.table.properties.";
+
     // prefix for passing properties for catalog creation.
     public static final String PREFIX_CATALOG_PROPERTIES = "catalog.properties.";
 

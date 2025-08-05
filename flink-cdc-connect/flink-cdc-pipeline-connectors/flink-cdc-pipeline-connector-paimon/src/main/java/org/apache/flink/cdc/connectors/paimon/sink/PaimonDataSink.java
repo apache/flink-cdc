@@ -44,6 +44,9 @@ public class PaimonDataSink implements DataSink, Serializable {
     // options for creating Paimon table.
     private final Map<String, String> tableOptions;
 
+    // options that apply to a specific table
+    private final Map<String, String> tableSpecificOptions;
+
     private final String commitUser;
 
     private final Map<TableId, List<String>> partitionMaps;
@@ -57,6 +60,7 @@ public class PaimonDataSink implements DataSink, Serializable {
     public PaimonDataSink(
             Options options,
             Map<String, String> tableOptions,
+            Map<String, String> tableSpecificOptions,
             String commitUser,
             Map<TableId, List<String>> partitionMaps,
             PaimonRecordSerializer<Event> serializer,
@@ -64,6 +68,7 @@ public class PaimonDataSink implements DataSink, Serializable {
             String schemaOperatorUid) {
         this.options = options;
         this.tableOptions = tableOptions;
+        this.tableSpecificOptions = tableSpecificOptions;
         this.commitUser = commitUser;
         this.partitionMaps = partitionMaps;
         this.serializer = serializer;
@@ -79,7 +84,8 @@ public class PaimonDataSink implements DataSink, Serializable {
 
     @Override
     public MetadataApplier getMetadataApplier() {
-        return new PaimonMetadataApplier(options, tableOptions, partitionMaps);
+        return new PaimonMetadataApplier(
+                options, tableOptions, tableSpecificOptions, partitionMaps);
     }
 
     @Override

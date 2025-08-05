@@ -250,7 +250,8 @@ class PaimonMetadataApplierTest {
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
         MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, new HashMap<>(), new HashMap<>());
         CreateTableEvent createTableEvent =
                 new CreateTableEvent(
                         TableId.parse("test.table1"),
@@ -295,7 +296,8 @@ class PaimonMetadataApplierTest {
         Map<TableId, List<String>> partitionMaps = new HashMap<>();
         partitionMaps.put(TableId.parse("test.table1"), Arrays.asList("col3", "col4"));
         MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, partitionMaps);
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, new HashMap<>(), partitionMaps);
         CreateTableEvent createTableEvent =
                 new CreateTableEvent(
                         TableId.parse("test.table1"),
@@ -540,7 +542,8 @@ class PaimonMetadataApplierTest {
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
         MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, new HashMap<>(), new HashMap<>());
         CreateTableEvent createTableEvent =
                 new CreateTableEvent(
                         TableId.parse("test.table_with_comment"),
@@ -579,5 +582,140 @@ class PaimonMetadataApplierTest {
         Assertions.assertThat(table.partitionKeys()).isEmpty();
         Assertions.assertThat(table.options()).containsEntry("bucket", "-1");
         Assertions.assertThat(table.comment()).contains("comment of table_with_comment");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    void testCreateTableWithTableSpecificOptions(String metastore)
+            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "10");
+
+        Map<String, String> tableSpecificOptions = new HashMap<>();
+        // Table-specific option for test.table1
+        tableSpecificOptions.put("specific.table.properties.test.table1.compaction.min.file-num", "5");
+        tableSpecificOptions.put("specific.table.properties.test.table1.write-buffer-size", "256MB");
+        // Table-specific option for test.table2
+        tableSpecificOptions.put("specific.table.properties.test.table2.compaction.min.file-num", "3");
+        tableSpecificOptions.put("specific.table.properties.test.table2.write-buffer-size", "128MB");
+
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, tableSpecificOptions, new HashMap<>());
+
+        // Create first table
+        CreateTableEvent createTableEvent1 =
+                new CreateTableEvent(
+                        TableId.parse("test.table1"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent1);
+        Table table1 = catalog.getTable(Identifier.fromString("test.table1"));
+
+        // Verify table1 has general table options and its specific options
+        Assertions.assertThat(table1.options()).containsEntry("bucket", "10");
+        Assertions.assertThat(table1.options()).containsEntry("compaction.min.file-num", "5");
+        Assertions.assertThat(table1.options()).containsEntry("write-buffer-size", "256MB");
+
+        // Create second table
+        CreateTableEvent createTableEvent2 =
+                new CreateTableEvent(
+                        TableId.parse("test.table2"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent2);
+        Table table2 = catalog.getTable(Identifier.fromString("test.table2"));
+
+        // Verify table2 has general table options and its specific options (different from table1)
+        Assertions.assertThat(table2.options()).containsEntry("bucket", "10");
+        Assertions.assertThat(table2.options()).containsEntry("compaction.min.file-num", "3");
+        Assertions.assertThat(table2.options()).containsEntry("write-buffer-size", "128MB");
+
+        // Create third table with no specific options
+        CreateTableEvent createTableEvent3 =
+                new CreateTableEvent(
+                        TableId.parse("test.table3"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent3);
+        Table table3 = catalog.getTable(Identifier.fromString("test.table3"));
+
+        // Verify table3 only has general table options
+        Assertions.assertThat(table3.options()).containsEntry("bucket", "10");
+        Assertions.assertThat(table3.options()).doesNotContainKey("compaction.min.file-num");
+        Assertions.assertThat(table3.options()).doesNotContainKey("write-buffer-size");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    void testTableSpecificOptionsPrecedenceOverTableOptions(String metastore)
+            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "10");
+        tableOptions.put(
+                "compaction.min.file-num", "8"); // This should be overridden by table-specific setting
+
+        Map<String, String> tableSpecificOptions = new HashMap<>();
+        // Table-specific option that conflicts with general table option
+        tableSpecificOptions.put("specific.table.properties.test.table1.compaction.min.file-num", "5");
+        tableSpecificOptions.put("specific.table.properties.test.table1.write-buffer-size", "256MB");
+
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, tableSpecificOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table1"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull())
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("col1")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        Table table = catalog.getTable(Identifier.fromString("test.table1"));
+
+        // Verify table-specific options take precedence over general table options
+        Assertions.assertThat(table.options()).containsEntry("bucket", "10");
+        Assertions.assertThat(table.options())
+                .containsEntry(
+                        "compaction.min.file-num",
+                        "5"); // Should be 5 (table-specific), not 8 (general table option)
+        Assertions.assertThat(table.options())
+                .containsEntry(
+                        "write-buffer-size", "256MB"); // Should be from table-specific options
     }
 }
