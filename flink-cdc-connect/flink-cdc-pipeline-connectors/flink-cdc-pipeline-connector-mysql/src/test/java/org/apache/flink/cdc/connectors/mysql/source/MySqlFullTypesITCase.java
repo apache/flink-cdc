@@ -468,7 +468,9 @@ class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     BinaryStringData.fromString(expectMultipointJsonText),
                     BinaryStringData.fromString(expectMultilineJsonText),
                     BinaryStringData.fromString(expectMultipolygonJsonText),
-                    BinaryStringData.fromString(expectGeometryCollectionJsonText)
+                    BinaryStringData.fromString(expectGeometryCollectionJsonText),
+                        BinaryStringData.fromString("long"),
+                        BinaryStringData.fromString("long varchar")
                 };
 
         // skip CreateTableEvent
@@ -670,6 +672,8 @@ class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DataTypes.BYTES(),
                     DataTypes.BYTES(),
                     DataTypes.INT(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING(),
