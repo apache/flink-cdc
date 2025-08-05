@@ -257,6 +257,54 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
                 .isEqualTo(Arrays.asList("inventory.products"));
     }
 
+    @Test
+    public void testTableValidationWithDifferentDatabases() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(
+                TABLES.key(),
+                "aia_test.public.aia_t_icc_jjdb,different_db.public.aia_t_icc_jjdb_extend");
+        options.put(SLOT_NAME.key(), slotName);
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(
+                        "The value of option tables all table names must have the same database name");
+    }
+
+    @Test
+    public void testTableValidationWithOriginalBugScenario() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        String tables =
+                POSTGRES_CONTAINER.getDatabaseName()
+                        + ".public.aia_t_icc_jjdb,"
+                        + POSTGRES_CONTAINER.getDatabaseName()
+                        + ".public.aia_t_icc_jjdb_\\\\d{6},"
+                        + POSTGRES_CONTAINER.getDatabaseName()
+                        + ".public.aia_t_icc_jjdb_extend";
+        options.put(TABLES.key(), tables);
+        options.put(SLOT_NAME.key(), slotName);
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot find any table by the option 'tables'");
+    }
+
     class MockContext implements Factory.Context {
 
         Configuration factoryConfiguration;
