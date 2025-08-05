@@ -89,7 +89,6 @@ class GtidUtilsTest {
         assertThat(mergeGtidSetInto(base, toMerge))
                 .hasToString(
                         "a32e8354-04b8-42a9-bfe3-12d71e809820:1-10,e21e8354-04b8-42a9-bfe3-12d71e809836:1-100");
-
         base =
                 new GtidSet(
                         "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100,c22e8354-04b8-42a9-bfe3-12d71e809831:1-100");
