@@ -140,6 +140,8 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false",
                     "execution.checkpointing.savepoint-dir: file:///opt/flink",
                     "restart-strategy.type: off",
+                    // Set off-heap memory explicitly to avoid "java.lang.OutOfMemoryError: Direct
+                    // buffer memory" error.
                     "taskmanager.memory.task.off-heap.size: 128mb");
     public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
 

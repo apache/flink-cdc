@@ -62,11 +62,9 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
                     "bind.listeners: INTERNAL://coordinator-server:0, CLIENT://coordinator-server:9123",
                     "internal.listener.name: INTERNAL",
                     "remote.data.dir: /tmp/fluss/remote-data",
-                    "# security properties",
                     "security.protocol.map: CLIENT:SASL, INTERNAL:PLAINTEXT",
                     "security.sasl.enabled.mechanisms: PLAIN",
                     "security.sasl.plain.jaas.config: com.alibaba.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
-                    "#authorizer.enabled: true",
                     "super.users: User:admin");
 
     private static final List<String> flussTabletServerProperties =
@@ -78,11 +76,9 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
                     "kv.snapshot.interval: 0s",
                     "data.dir: /tmp/fluss/data",
                     "remote.data.dir: /tmp/fluss/remote-data",
-                    "# security properties",
                     "security.protocol.map: CLIENT:SASL, INTERNAL:PLAINTEXT",
                     "security.sasl.enabled.mechanisms: PLAIN",
                     "security.sasl.plain.jaas.config: com.alibaba.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
-                    "#authorizer.enabled: true",
                     "super.users: User:admin");
 
     @Container
@@ -130,6 +126,9 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
 
     @Override
     protected List<String> copyJarToFlinkLib() {
+        // Due to a bug described in https://github.com/apache/fluss/pull/1267, it's not viable to
+        // pass Fluss dependency with `--jar` CLI option. We may remove this workaround and use
+        // `submitPipelineJob` to carry extra jar later.
         return Collections.singletonList("fluss-sql-connector.jar");
     }
 
