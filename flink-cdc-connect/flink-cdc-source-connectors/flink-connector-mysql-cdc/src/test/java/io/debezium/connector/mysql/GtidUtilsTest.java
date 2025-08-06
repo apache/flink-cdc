@@ -47,56 +47,53 @@ class GtidUtilsTest {
         return Stream.of(
                 Arguments.of(
                         "Basic example with a straightforward subset",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-50:63-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-50:63-100"),
-                Arguments.of(
-                        "Restored starts midrange, single gap",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:45-80",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-80"),
+                        "A:1-100",
+                        "A:1-50:63-100",
+                        "A:1-50:63-100"),
                 Arguments.of(
                         "Multiple intervals with gaps in restored",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:45-80:83-90:92-98",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-80:83-90:92-98"),
+                        "A:1-100",
+                        "A:45-80:83-90:92-98",
+                        "A:1-80:83-90:92-98"),
                 Arguments.of(
                         "Server has disjoint intervals, restored partially overlaps",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-50:60-90:95-200",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:45-50:65-70:96-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-50:65-70:96-100"),
-                Arguments.of(
-                        "Restored completely covers server range",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100"),
+                        "A:1-50:60-90:95-200",
+                        "A:45-50:65-70:96-100",
+                        "A:1-50:65-70:96-100"),
                 Arguments.of(
                         "Restored partially covers server range",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100:102-200",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:106-150:152-200",
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100:102-150:152-200"));
+                        "A:1-100:102-200",
+                        "A:106-150:152-200",
+                        "A:1-100:102-150:152-200"),
+                Arguments.of(
+                        "Restored end exceeds server range",
+                        "A:1-100,B:1-200:205-300",
+                        "A:1-110,B:1-201:210-230:245-305",
+                        "A:1-100,B:1-200:210-230:245-300"),
+                Arguments.of(
+                        "Multiple UUIDs with different overlaps",
+                        "A:1-100,B:1-50",
+                        "A:45-80,B:30-60,C:1-20",
+                        "A:1-80,B:1-50,C:1-20"),
+                Arguments.of("Restored starts after server ends", "A:1-100", "A:80-150", "A:1-100"),
+                Arguments.of(
+                        "Complex overlapping intervals",
+                        "A:1-20:30-50:60-80",
+                        "A:15-35:45-65:75-85",
+                        "A:1-20:30-35:45-50:60-65:75-80"));
     }
 
     @Test
     void testMergingGtidSets() {
-        GtidSet base = new GtidSet("e21e8354-04b8-42a9-bfe3-12d71e809836:1-100");
-        GtidSet toMerge = new GtidSet("e21e8354-04b8-42a9-bfe3-12d71e809836:1-10");
-        assertThat(mergeGtidSetInto(base, toMerge))
-                .hasToString("e21e8354-04b8-42a9-bfe3-12d71e809836:1-100");
+        GtidSet base = new GtidSet("A:1-100");
+        GtidSet toMerge = new GtidSet("A:1-10");
+        assertThat(mergeGtidSetInto(base, toMerge)).hasToString("A:1-100");
 
-        base = new GtidSet("e21e8354-04b8-42a9-bfe3-12d71e809836:1-100");
-        toMerge = new GtidSet("a32e8354-04b8-42a9-bfe3-12d71e809820:1-10");
-        assertThat(mergeGtidSetInto(base, toMerge))
-                .hasToString(
-                        "a32e8354-04b8-42a9-bfe3-12d71e809820:1-10,e21e8354-04b8-42a9-bfe3-12d71e809836:1-100");
-        base =
-                new GtidSet(
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-100,c22e8354-04b8-42a9-bfe3-12d71e809831:1-100");
-        toMerge =
-                new GtidSet(
-                        "e21e8354-04b8-42a9-bfe3-12d71e809836:1-10,a32e8354-04b8-42a9-bfe3-12d71e809820:1-10");
-        assertThat(mergeGtidSetInto(base, toMerge))
-                .hasToString(
-                        "a32e8354-04b8-42a9-bfe3-12d71e809820:1-10,c22e8354-04b8-42a9-bfe3-12d71e809831:1-100,e21e8354-04b8-42a9-bfe3-12d71e809836:1-100");
+        base = new GtidSet("A:1-100");
+        toMerge = new GtidSet("C:1-10");
+        assertThat(mergeGtidSetInto(base, toMerge)).hasToString("A:1-100,C:1-10");
+        base = new GtidSet("A:1-100,B:1-100");
+        toMerge = new GtidSet("A:1-10,C:1-10");
+        assertThat(mergeGtidSetInto(base, toMerge)).hasToString("A:1-100,B:1-100,C:1-10");
     }
 }
