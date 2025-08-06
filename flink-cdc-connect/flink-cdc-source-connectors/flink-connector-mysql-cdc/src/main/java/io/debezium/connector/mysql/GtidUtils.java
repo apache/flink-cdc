@@ -48,23 +48,34 @@ public class GtidUtils {
 
                 List<com.github.shyiko.mysql.binlog.GtidSet.Interval> merged = new ArrayList<>();
 
+                // Process each server interval
                 for (GtidSet.Interval serverInterval : serverIntervals) {
-                    if (serverInterval.getEnd() < earliestRestoredTx) {
+                    // First, check if any part comes before earliest restored
+                    if (serverInterval.getStart() < earliestRestoredTx) {
+                        long end = Math.min(serverInterval.getEnd(), earliestRestoredTx - 1);
                         merged.add(
                                 new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                        serverInterval.getStart(), serverInterval.getEnd()));
-                    } else if (serverInterval.getStart() < earliestRestoredTx
-                            && serverInterval.getEnd() >= earliestRestoredTx) {
-                        merged.add(
-                                new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                        serverInterval.getStart(), earliestRestoredTx - 1));
+                                        serverInterval.getStart(), end));
                     }
-                }
 
-                for (GtidSet.Interval restoredInterval : restoredIntervals) {
-                    merged.add(
-                            new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                    restoredInterval.getStart(), restoredInterval.getEnd()));
+                    // Then check for overlaps with restored intervals
+                    for (GtidSet.Interval restoredInterval : restoredIntervals) {
+                        if (serverInterval.getStart() <= restoredInterval.getEnd()
+                                && serverInterval.getEnd() >= restoredInterval.getStart()) {
+                            // There's an overlap - add the intersection
+                            long intersectionStart =
+                                    Math.max(
+                                            serverInterval.getStart(), restoredInterval.getStart());
+                            long intersectionEnd =
+                                    Math.min(serverInterval.getEnd(), restoredInterval.getEnd());
+
+                            if (intersectionStart <= intersectionEnd) {
+                                merged.add(
+                                        new com.github.shyiko.mysql.binlog.GtidSet.Interval(
+                                                intersectionStart, intersectionEnd));
+                            }
+                        }
+                    }
                 }
 
                 GtidSet.UUIDSet mergedUuidSet =
