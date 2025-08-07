@@ -195,7 +195,27 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     BinaryStringData.fromString(
                             "{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187}"),
                     BinaryStringData.fromString(
-                            "{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326}")
+                            "{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326}"),
+                    true,
+                    new byte[] {10},
+                    new byte[] {42},
+                    BinaryStringData.fromString("abc"),
+                    1209600000000L,
+                    BinaryStringData.fromString(
+                            "{\"order_id\": 10248, \"product\": \"Notebook\", \"quantity\": 5}"),
+                    BinaryStringData.fromString(
+                            "{\"product\": \"Pen\", \"order_id\": 10249, \"quantity\": 10}"),
+                    BinaryStringData.fromString(
+                            "<user>\n"
+                                    + "        <id>123</id>\n"
+                                    + "        <name>Alice</name>\n"
+                                    + "        <email>alice@example.com</email>\n"
+                                    + "        <preferences>\n"
+                                    + "            <theme>dark</theme>\n"
+                                    + "            <notifications>true</notifications>\n"
+                                    + "        </preferences>\n"
+                                    + "    </user>"),
+                    BinaryStringData.fromString("(3.456,7.890)")
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -258,6 +278,15 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.DATE(),
                     DataTypes.TIME(0),
                     DataTypes.DECIMAL(DecimalType.DEFAULT_PRECISION, DecimalType.DEFAULT_SCALE),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.BOOLEAN(),
+                    DataTypes.BINARY(8),
+                    DataTypes.BINARY(20),
+                    DataTypes.CHAR(3),
+                    DataTypes.BIGINT(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING());
 }
