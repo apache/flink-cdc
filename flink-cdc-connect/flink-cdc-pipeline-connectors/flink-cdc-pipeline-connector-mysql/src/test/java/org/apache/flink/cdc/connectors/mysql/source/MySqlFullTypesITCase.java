@@ -469,8 +469,8 @@ class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     BinaryStringData.fromString(expectMultilineJsonText),
                     BinaryStringData.fromString(expectMultipolygonJsonText),
                     BinaryStringData.fromString(expectGeometryCollectionJsonText),
-                        BinaryStringData.fromString("long"),
-                        BinaryStringData.fromString("long varchar")
+                    BinaryStringData.fromString("long"),
+                    BinaryStringData.fromString("long varchar")
                 };
 
         // skip CreateTableEvent
