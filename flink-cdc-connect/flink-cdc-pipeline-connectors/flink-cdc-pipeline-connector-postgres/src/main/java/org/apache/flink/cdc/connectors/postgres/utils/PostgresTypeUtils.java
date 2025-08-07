@@ -26,6 +26,37 @@ import io.debezium.relational.Column;
 
 /** A utility class for converting Postgres types to Flink types. */
 public class PostgresTypeUtils {
+    private static final String PG_BIT = "bit";
+    private static final String PG_BIT_ARRAY = "_bit";
+
+    private static final String PG_VARBIT = "varbit";
+    private static final String PG_VARBIT_ARRAY = "_varbit";
+
+    private static final String PG_OID = "OID";
+
+    private static final String PG_CHAR = "char";
+    private static final String PG_CHAR_ARRAY = "_char";
+
+    private static final String PG_TIMETZ = "timetz";
+    private static final String PG_TIMETZ_ARRAY = "_timetz";
+
+    private static final String PG_INTERVAL = "interval";
+    private static final String PG_INTERVAL_ARRAY = "_interval";
+
+    private static final String PG_JSON = "json";
+    private static final String PG_JSONB = "jsonb";
+    private static final String PG_XML = "xml";
+    private static final String PG_POINT = "point";
+    private static final String PG_LTREE = "ltree";
+    private static final String PG_CITEXT = "citext";
+    private static final String PG_INET = "inet";
+    private static final String PG_INT4RANGE = "int4range";
+    private static final String PG_INT8RANGE = "int8range";
+    private static final String PG_NUMRANGE = "numrange";
+    private static final String PG_TSTZRANGE = "tstzrange";
+    private static final String PG_DATERANGE = "daterange";
+    private static final String PG_ENUM = "enum";
+
     private static final String PG_SMALLSERIAL = "smallserial";
     private static final String PG_SERIAL = "serial";
     private static final String PG_BIGSERIAL = "bigserial";
@@ -55,8 +86,8 @@ public class PostgresTypeUtils {
     private static final String PG_TIME_ARRAY = "_time";
     private static final String PG_TEXT = "text";
     private static final String PG_TEXT_ARRAY = "_text";
-    private static final String PG_CHAR = "bpchar";
-    private static final String PG_CHAR_ARRAY = "_bpchar";
+    private static final String PG_BPCHAR = "bpchar";
+    private static final String PG_BPCHAR_ARRAY = "_bpchar";
     private static final String PG_CHARACTER = "character";
     private static final String PG_CHARACTER_ARRAY = "_character";
     private static final String PG_CHARACTER_VARYING = "varchar";
@@ -88,6 +119,13 @@ public class PostgresTypeUtils {
         switch (typeName) {
             case PG_BOOLEAN:
                 return DataTypes.BOOLEAN();
+            case PG_BIT:
+            case PG_VARBIT:
+                if (precision == 1) {
+                    return DataTypes.BOOLEAN();
+                } else {
+                    return DataTypes.BINARY(precision);
+                }
             case PG_BOOLEAN_ARRAY:
                 return DataTypes.ARRAY(DataTypes.BOOLEAN());
             case PG_BYTEA:
@@ -106,8 +144,11 @@ public class PostgresTypeUtils {
                 return DataTypes.ARRAY(DataTypes.INT());
             case PG_BIGINT:
             case PG_BIGSERIAL:
+            case PG_OID:
+            case PG_INTERVAL:
                 return DataTypes.BIGINT();
             case PG_BIGINT_ARRAY:
+            case PG_INTERVAL_ARRAY:
                 return DataTypes.ARRAY(DataTypes.BIGINT());
             case PG_REAL:
                 return DataTypes.FLOAT();
@@ -130,9 +171,11 @@ public class PostgresTypeUtils {
                 }
                 return DataTypes.ARRAY(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0));
             case PG_CHAR:
+            case PG_BPCHAR:
             case PG_CHARACTER:
                 return DataTypes.CHAR(precision);
             case PG_CHAR_ARRAY:
+            case PG_BPCHAR_ARRAY:
             case PG_CHARACTER_ARRAY:
                 return DataTypes.ARRAY(DataTypes.CHAR(precision));
             case PG_CHARACTER_VARYING:
@@ -143,6 +186,10 @@ public class PostgresTypeUtils {
             case PG_GEOMETRY:
             case PG_GEOGRAPHY:
             case PG_UUID:
+            case PG_JSON:
+            case PG_JSONB:
+            case PG_XML:
+            case PG_POINT:
                 return DataTypes.STRING();
             case PG_TEXT_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
@@ -155,8 +202,10 @@ public class PostgresTypeUtils {
             case PG_TIMESTAMPTZ_ARRAY:
                 return DataTypes.ARRAY(new ZonedTimestampType(scale));
             case PG_TIME:
+            case PG_TIMETZ:
                 return DataTypes.TIME(scale);
             case PG_TIME_ARRAY:
+            case PG_TIMETZ_ARRAY:
                 return DataTypes.ARRAY(DataTypes.TIME(scale));
             case PG_DATE:
                 return DataTypes.DATE();
