@@ -121,7 +121,10 @@ public class StatefulTaskContext implements AutoCloseable {
 
         Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
         this.databaseSchema =
-                DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
+                DebeziumUtils.createMySqlDatabaseSchema(
+                        connectorConfig,
+                        tableIdCaseInsensitive,
+                        sourceConfig.isParseOnLineSchemaChanges());
 
         this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
 

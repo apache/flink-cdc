@@ -104,7 +104,9 @@ public class DebeziumUtils {
 
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
     public static MySqlDatabaseSchema createMySqlDatabaseSchema(
-            MySqlConnectorConfig dbzMySqlConfig, boolean isTableIdCaseSensitive) {
+            MySqlConnectorConfig dbzMySqlConfig,
+            boolean isTableIdCaseSensitive,
+            boolean parseOnLineSchemaChanges) {
         TopicSelector<TableId> topicSelector = MySqlTopicSelector.defaultSelector(dbzMySqlConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         MySqlValueConverters valueConverters = getValueConverters(dbzMySqlConfig);
@@ -113,7 +115,8 @@ public class DebeziumUtils {
                 valueConverters,
                 topicSelector,
                 schemaNameAdjuster,
-                isTableIdCaseSensitive);
+                isTableIdCaseSensitive,
+                parseOnLineSchemaChanges);
     }
 
     /** Fetch current binlog offsets in MySql Server. */
