@@ -148,6 +148,32 @@ class MySqlBinlogSplitTest {
         Assertions.assertThat(binlogSplit.getTables()).isEqualTo(expectedTables);
     }
 
+    @Test
+    public void duplicateSplitInfo() {
+        FinishedSnapshotSplitInfo info =
+                new FinishedSnapshotSplitInfo(
+                        new TableId("catalog", "schema", "table"),
+                        "split",
+                        null,
+                        null,
+                        BinlogOffset.ofLatest());
+        List<FinishedSnapshotSplitInfo> infos = new ArrayList<>();
+        infos.add(info);
+        infos.add(info);
+
+        Assert.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        new MySqlBinlogSplit(
+                                "binlog-split",
+                                BinlogOffset.ofLatest(),
+                                null,
+                                infos,
+                                Collections.emptyMap(),
+                                0,
+                                false));
+    }
+
     /** A mock implementation for {@link Table} which is used for unit tests. */
     private static class MockTable implements Table {
         private final TableId tableId;
