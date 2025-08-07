@@ -66,6 +66,10 @@ public class PostgresTypeUtils {
     private static final String PG_CHARACTER_VARYING = "varchar";
     private static final String PG_CHARACTER_VARYING_ARRAY = "_varchar";
     private static final String PG_UUID = "uuid";
+    private static final String PG_BIT = "bit";
+    private static final String PG_BIT_ARRAY = "_bit";
+    private static final String PG_VARBIT = "varbit";
+    private static final String PG_VARBIT_ARRAY = "_varbit";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
@@ -165,6 +169,21 @@ public class PostgresTypeUtils {
                 return DataTypes.DATE();
             case PG_DATE_ARRAY:
                 return DataTypes.ARRAY(DataTypes.DATE());
+            case PG_BIT:
+                // Fix for FLINK-35907: Handle bit(1) as BOOLEAN, bit(n) as BYTES
+                if (precision == 1) {
+                    return DataTypes.BOOLEAN();
+                } else {
+                    return DataTypes.BYTES();
+                }
+            case PG_BIT_ARRAY:
+                // For bit arrays, always use BYTES array
+                return DataTypes.ARRAY(DataTypes.BYTES());
+            case PG_VARBIT:
+                // Variable-length bit strings always as BYTES
+                return DataTypes.BYTES();
+            case PG_VARBIT_ARRAY:
+                return DataTypes.ARRAY(DataTypes.BYTES());
             default:
                 throw new UnsupportedOperationException(
                         String.format("Doesn't support Postgres type '%s' yet", typeName));

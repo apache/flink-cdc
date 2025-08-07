@@ -167,6 +167,143 @@ class PostgresTypeUtilsTest {
                 .isEqualTo(DataTypes.DECIMAL(10, 2));
     }
 
+    // ========== BIT TYPE TESTS FOR FLINK-35907 ==========
+
+    @Test
+    void testBitSinglePrecision() {
+        // Test BIT(1) -> BOOLEAN (FLINK-35907 fix)
+        Column column = createColumn("bit", 1, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BOOLEAN());
+    }
+
+    @Test
+    void testBitSinglePrecisionNotNull() {
+        // Test BIT(1) NOT NULL -> BOOLEAN NOT NULL
+        Column column = createColumn("bit", 1, 0, false);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BOOLEAN().notNull());
+    }
+
+    @Test
+    void testBitMultiplePrecision() {
+        // Test BIT(8) -> BYTES (FLINK-35907 fix)
+        Column column = createColumn("bit", 8, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BYTES());
+    }
+
+    @Test
+    void testBitLargePrecision() {
+        // Test BIT(16) -> BYTES (FLINK-35907 fix)
+        Column column = createColumn("bit", 16, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BYTES());
+    }
+
+    @Test
+    void testBitMultiplePrecisionNotNull() {
+        // Test BIT(8) NOT NULL -> BYTES NOT NULL
+        Column column = createColumn("bit", 8, 0, false);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BYTES().notNull());
+    }
+
+    @Test
+    void testVarbit() {
+        // Test VARBIT -> BYTES (FLINK-35907 fix)
+        Column column = createColumn("varbit", 32, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BYTES());
+    }
+
+    @Test
+    void testVarbitNotNull() {
+        // Test VARBIT NOT NULL -> BYTES NOT NULL
+        Column column = createColumn("varbit", 32, 0, false);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BYTES().notNull());
+    }
+
+    @Test
+    void testVarbitNoPrecision() {
+        // Test VARBIT without precision -> BYTES
+        Column column = createColumn("varbit", 0, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.BYTES());
+    }
+
+    @Test
+    void testBitArray() {
+        // Test BIT[] -> ARRAY<BYTES> (FLINK-35907 fix)
+        Column column = createColumn("_bit", 1, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.ARRAY(DataTypes.BYTES()));
+    }
+
+    @Test
+    void testBitArrayNotNull() {
+        // Test BIT[] NOT NULL -> ARRAY<BYTES> NOT NULL
+        Column column = createColumn("_bit", 1, 0, false);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.ARRAY(DataTypes.BYTES()).notNull());
+    }
+
+    @Test
+    void testVarbitArray() {
+        // Test VARBIT[] -> ARRAY<BYTES> (FLINK-35907 fix)
+        Column column = createColumn("_varbit", 32, 0, true);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.ARRAY(DataTypes.BYTES()));
+    }
+
+    @Test
+    void testVarbitArrayNotNull() {
+        // Test VARBIT[] NOT NULL -> ARRAY<BYTES> NOT NULL
+        Column column = createColumn("_varbit", 32, 0, false);
+        DataType dataType = PostgresTypeUtils.fromDbzColumn(column);
+        assertThat(dataType).isEqualTo(DataTypes.ARRAY(DataTypes.BYTES()).notNull());
+    }
+
+    @Test
+    void testBitTypesWithDecimalHandlingMode() {
+        // Test that bit types are not affected by decimal.handling.mode setting
+        Properties props = new Properties();
+        props.setProperty("decimal.handling.mode", "string");
+
+        Column bitColumn = createColumn("bit", 1, 0, true);
+        DataType bitType = PostgresTypeUtils.fromDbzColumn(bitColumn, props);
+        assertThat(bitType).isEqualTo(DataTypes.BOOLEAN());
+
+        Column bit8Column = createColumn("bit", 8, 0, true);
+        DataType bit8Type = PostgresTypeUtils.fromDbzColumn(bit8Column, props);
+        assertThat(bit8Type).isEqualTo(DataTypes.BYTES());
+
+        Column varbitColumn = createColumn("varbit", 32, 0, true);
+        DataType varbitType = PostgresTypeUtils.fromDbzColumn(varbitColumn, props);
+        assertThat(varbitType).isEqualTo(DataTypes.BYTES());
+    }
+
+    @Test
+    void testBitTypeBoundaryConditions() {
+        // Test boundary conditions for bit type precision
+
+        // Precision = 0 should still map to BYTES (edge case)
+        Column bit0Column = createColumn("bit", 0, 0, true);
+        DataType bit0Type = PostgresTypeUtils.fromDbzColumn(bit0Column);
+        assertThat(bit0Type).isEqualTo(DataTypes.BYTES());
+
+        // Precision = 2 should map to BYTES (not BOOLEAN)
+        Column bit2Column = createColumn("bit", 2, 0, true);
+        DataType bit2Type = PostgresTypeUtils.fromDbzColumn(bit2Column);
+        assertThat(bit2Type).isEqualTo(DataTypes.BYTES());
+
+        // Large precision should still map to BYTES
+        Column bitLargeColumn = createColumn("bit", 1024, 0, true);
+        DataType bitLargeType = PostgresTypeUtils.fromDbzColumn(bitLargeColumn);
+        assertThat(bitLargeType).isEqualTo(DataTypes.BYTES());
+    }
+
     /** Creates a mock Debezium Column for testing. */
     private Column createColumn(String typeName, int length, int scale, boolean optional) {
         return Column.editor()
