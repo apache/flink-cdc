@@ -328,12 +328,11 @@ MongoDB 的更改事件记录在消息之前没有更新。因此，我们只能
     <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
         快照读取阶段是否先分配 UnboundedChunk。<br>
         这有助于降低 TaskManager 在快照阶段同步最后一个chunk时遇到内存溢出 (OOM) 的风险。<br> 
-        这是一项实验特性，默认为 false。
       </td>
     </tr>
     <tr>
