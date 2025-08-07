@@ -162,7 +162,7 @@ public class JaninoCompiler {
         Object value = sqlLiteral.getValue();
         if (sqlLiteral instanceof SqlCharStringLiteral) {
             // Double quotation marks represent strings in Janino.
-            value = "\"" + ((NlsString) value).getValue() + "\"";
+            value = "\"" + sqlLiteral.getValueAs(NlsString.class).getValue() + "\"";
         } else if (sqlLiteral instanceof SqlNumericLiteral) {
             if (((SqlNumericLiteral) sqlLiteral).isInteger()) {
                 long longValue = sqlLiteral.longValue(true);
