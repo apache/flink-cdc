@@ -72,6 +72,8 @@ CREATE TABLE common_types
     multiline_c          MULTILINESTRING,
     multipolygon_c       MULTIPOLYGON,
     geometrycollection_c GEOMETRYCOLLECTION,
+    long_c               LONG,
+    long_varchar_c       LONG VARCHAR,
     PRIMARY KEY (id)
 ) DEFAULT CHARSET=utf8;
 
@@ -94,7 +96,8 @@ VALUES (DEFAULT, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215
         ST_GeomFromText('MULTIPOINT((1 1),(2 2))'),
         ST_GeomFromText('MultiLineString((1 1,2 2,3 3),(4 4,5 5))'),
         ST_GeomFromText('MULTIPOLYGON(((0 0, 10 0, 10 10, 0 10, 0 0)), ((5 5, 7 5, 7 7, 5 7, 5 5)))'),
-        ST_GeomFromText('GEOMETRYCOLLECTION(POINT(10 10), POINT(30 30), LINESTRING(15 15, 20 20))'));
+        ST_GeomFromText('GEOMETRYCOLLECTION(POINT(10 10), POINT(30 30), LINESTRING(15 15, 20 20))'),
+        'long','long varchar');
 
 CREATE TABLE time_types
 (

@@ -465,6 +465,8 @@ class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             DataTypes.STRING(),
                                             DataTypes.STRING(),
                                             DataTypes.STRING(),
+                                            DataTypes.STRING(),
+                                            DataTypes.STRING(),
                                             DataTypes.STRING()
                                         },
                                         new String[] {
@@ -520,7 +522,9 @@ class MySqlMetadataAccessorITCase extends MySqlSourceTestBase {
                                             "multipoint_c",
                                             "multiline_c",
                                             "multipolygon_c",
-                                            "geometrycollection_c"
+                                            "geometrycollection_c",
+                                            "long_c",
+                                            "long_varchar_c",
                                         }))
                         .build();
         assertThat(actualSchema).isEqualTo(expectedSchema);

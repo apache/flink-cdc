@@ -83,6 +83,8 @@ public class MySqlTypeUtils {
     private static final String MEDIUMTEXT = "MEDIUMTEXT";
     private static final String TEXT = "TEXT";
     private static final String LONGTEXT = "LONGTEXT";
+    private static final String LONG_VARCHAR = "LONG VARCHAR";
+    private static final String LONG = "LONG";
     private static final String DATE = "DATE";
     private static final String TIME = "TIME";
     private static final String DATETIME = "DATETIME";
@@ -217,6 +219,8 @@ public class MySqlTypeUtils {
             case TEXT:
             case MEDIUMTEXT:
             case LONGTEXT:
+            case LONG_VARCHAR:
+            case LONG:
             case JSON:
             case ENUM:
             case GEOMETRY:
