@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,7 +43,10 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     private final BinlogOffset startingOffset;
     private final BinlogOffset endingOffset;
+
+    /** Split IDs of all elements must be unique. */
     private final List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos;
+
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
     private final boolean isSuspended;
@@ -58,6 +62,19 @@ public class MySqlBinlogSplit extends MySqlSplit {
             int totalFinishedSplitSize,
             boolean isSuspended) {
         super(splitId);
+
+        Set<String> seenSplitIds = new HashSet<>();
+        for (FinishedSnapshotSplitInfo splitInfo : finishedSnapshotSplitInfos) {
+            if (seenSplitIds.contains(splitInfo.getSplitId())) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Found duplicate split ID %s in finished snapshot split infos",
+                                splitInfo.getSplitId()));
+            }
+
+            seenSplitIds.add(splitInfo.getSplitId());
+        }
+
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
         this.finishedSnapshotSplitInfos = finishedSnapshotSplitInfos;
