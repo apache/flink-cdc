@@ -62,7 +62,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     private final AssignerStatus assignerStatus;
 
     /** Whether the table identifier is case-sensitive. */
-    private final boolean isTableIdCaseSensitive;
+    private final boolean isTableIdCaseInsensitive;
 
     /** Whether the remaining tables are keep when snapshot state. */
     private final boolean isRemainingTablesCheckpointed;
@@ -80,7 +80,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             boolean isRemainingTablesCheckpointed,
             ChunkSplitterState chunkSplitterState) {
         this.alreadyProcessedTables = alreadyProcessedTables;
@@ -89,7 +89,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         this.splitFinishedOffsets = splitFinishedOffsets;
         this.assignerStatus = assignerStatus;
         this.remainingTables = remainingTables;
-        this.isTableIdCaseSensitive = isTableIdCaseSensitive;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
         this.tableSchemas = tableSchemas;
         this.chunkSplitterState = chunkSplitterState;
@@ -123,8 +123,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return remainingTables;
     }
 
-    public boolean isTableIdCaseSensitive() {
-        return isTableIdCaseSensitive;
+    public boolean isTableIdCaseInsensitive() {
+        return isTableIdCaseInsensitive;
     }
 
     public boolean isRemainingTablesCheckpointed() {
@@ -145,7 +145,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         }
         SnapshotPendingSplitsState that = (SnapshotPendingSplitsState) o;
         return assignerStatus == that.assignerStatus
-                && isTableIdCaseSensitive == that.isTableIdCaseSensitive
+                && isTableIdCaseInsensitive == that.isTableIdCaseInsensitive
                 && isRemainingTablesCheckpointed == that.isRemainingTablesCheckpointed
                 && Objects.equals(remainingTables, that.remainingTables)
                 && Objects.equals(alreadyProcessedTables, that.alreadyProcessedTables)
@@ -164,7 +164,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 assignedSplits,
                 splitFinishedOffsets,
                 assignerStatus,
-                isTableIdCaseSensitive,
+                isTableIdCaseInsensitive,
                 isRemainingTablesCheckpointed,
                 chunkSplitterState);
     }
@@ -184,8 +184,8 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
                 + splitFinishedOffsets
                 + ", assignerStatus="
                 + assignerStatus
-                + ", isTableIdCaseSensitive="
-                + isTableIdCaseSensitive
+                + ", isTableIdCaseInsensitive="
+                + isTableIdCaseInsensitive
                 + ", isRemainingTablesCheckpointed="
                 + isRemainingTablesCheckpointed
                 + ", chunkSplitterState="

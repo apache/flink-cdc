@@ -342,7 +342,7 @@ class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
                         sourceConfig,
                         DEFAULT_PARALLELISM,
                         discoverTables,
-                        sourceDialect.isDataCollectionIdCaseSensitive(sourceConfig),
+                        sourceDialect.isDataCollectionIdCaseInsensitive(sourceConfig),
                         sourceDialect,
                         offsetFactory);
         snapshotSplitAssigner.initEnumeratorMetrics(

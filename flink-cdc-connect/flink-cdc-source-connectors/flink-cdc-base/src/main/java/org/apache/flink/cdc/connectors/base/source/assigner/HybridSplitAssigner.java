@@ -71,7 +71,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
             C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
             SplitEnumeratorContext<? extends SourceSplit> enumeratorContext) {
@@ -81,7 +81,7 @@ public class HybridSplitAssigner<C extends SourceConfig> implements SplitAssigne
                         sourceConfig,
                         currentParallelism,
                         remainingTables,
-                        isTableIdCaseSensitive,
+                        isTableIdCaseInsensitive,
                         dialect,
                         offsetFactory),
                 false,

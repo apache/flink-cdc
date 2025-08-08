@@ -67,7 +67,7 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable,
     }
 
     /** Check if the CollectionId is case-sensitive or not. */
-    boolean isDataCollectionIdCaseSensitive(C sourceConfig);
+    boolean isDataCollectionIdCaseInsensitive(C sourceConfig);
 
     /** Returns the {@link ChunkSplitter} which used to split collection to splits. */
     @Deprecated

@@ -111,7 +111,7 @@ public class StatefulTaskContext implements AutoCloseable {
 
     public void configure(MySqlSplit mySqlSplit) {
         // initial stateful objects
-        final boolean tableIdCaseInsensitive = connection.isTableIdCaseSensitive();
+        final boolean tableIdCaseInsensitive = connection.isTableIdCaseInsensitive();
         this.topicSelector = MySqlTopicSelector.defaultSelector(connectorConfig);
         EmbeddedFlinkDatabaseHistory.registerHistory(
                 sourceConfig
