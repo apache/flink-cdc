@@ -60,7 +60,6 @@ import org.slf4j.LoggerFactory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset.BINLOG_FILENAME_OFFSET_KEY;
 import static org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetUtils.initializeEffectiveOffset;
@@ -119,9 +118,12 @@ public class StatefulTaskContext implements AutoCloseable {
                         .getString(EmbeddedFlinkDatabaseHistory.DATABASE_HISTORY_INSTANCE_NAME),
                 mySqlSplit.getTableSchemas().values());
 
-        Optional.ofNullable(databaseSchema).ifPresent(MySqlDatabaseSchema::close);
-        this.databaseSchema =
-                DebeziumUtils.createMySqlDatabaseSchema(connectorConfig, tableIdCaseInsensitive);
+        // ignore refresh schema.
+        if (null == this.databaseSchema) {
+            this.databaseSchema =
+                    DebeziumUtils.createMySqlDatabaseSchema(
+                            connectorConfig, tableIdCaseInsensitive);
+        }
 
         this.mySqlPartition = new MySqlPartition(connectorConfig.getLogicalName());
 
