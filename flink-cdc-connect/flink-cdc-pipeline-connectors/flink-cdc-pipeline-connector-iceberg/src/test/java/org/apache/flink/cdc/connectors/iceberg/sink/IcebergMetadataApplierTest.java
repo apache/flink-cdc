@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.PhysicalColumn;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.connectors.iceberg.sink.utils.HiveContainer;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -37,6 +38,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
 import java.util.Arrays;
@@ -45,6 +47,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,14 +57,35 @@ public class IcebergMetadataApplierTest {
     @TempDir public static java.nio.file.Path temporaryFolder;
 
     @Test
-    public void testApplySchemaChange() {
+    public void testApplySchemaChangeHiveCatalog() throws InterruptedException {
+        File warehouse = new File(temporaryFolder.toFile(), UUID.randomUUID().toString());
+        if (!warehouse.exists()) {
+            warehouse.mkdirs();
+        }
+        warehouse.setExecutable(true, false);
+        HiveContainer hiveContainer = new HiveContainer(warehouse.getAbsolutePath());
+        Startables.deepStart(Stream.of(hiveContainer)).join();
+        Thread.sleep(20000);
+        Map<String, String> catalogOptions = new HashMap<>();
+        catalogOptions.put("type", "hive");
+        catalogOptions.put("warehouse", warehouse.toString());
+        catalogOptions.put("cache-enabled", "false");
+        catalogOptions.put("uri", hiveContainer.getMetastoreUri());
+        runSchemaChangeTest(catalogOptions);
+    }
+
+    @Test
+    public void testApplySchemaChangeHadoopCatalog() throws InterruptedException {
         Map<String, String> catalogOptions = new HashMap<>();
         String warehouse =
                 new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
         catalogOptions.put("type", "hadoop");
         catalogOptions.put("warehouse", warehouse);
         catalogOptions.put("cache-enabled", "false");
+        runSchemaChangeTest(catalogOptions);
+    }
 
+    public void runSchemaChangeTest(Map<String, String> catalogOptions) {
         Catalog catalog =
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
