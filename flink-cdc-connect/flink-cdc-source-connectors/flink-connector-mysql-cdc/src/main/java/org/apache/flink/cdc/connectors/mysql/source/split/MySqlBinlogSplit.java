@@ -74,14 +74,14 @@ public class MySqlBinlogSplit extends MySqlSplit {
             List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos,
             Map<TableId, TableChange> tableSchemas,
             int totalFinishedSplitSize) {
-        super(splitId);
-        this.startingOffset = startingOffset;
-        this.endingOffset = endingOffset;
-        this.finishedSnapshotSplitInfos = finishedSnapshotSplitInfos;
-        this.tableSchemas = tableSchemas;
-        this.totalFinishedSplitSize = totalFinishedSplitSize;
-        this.isSuspended = false;
-        this.tablesForLog = getTablesForLog();
+        this(
+                splitId,
+                startingOffset,
+                endingOffset,
+                finishedSnapshotSplitInfos,
+                tableSchemas,
+                totalFinishedSplitSize,
+                false);
     }
 
     public BinlogOffset getStartingOffset() {
