@@ -36,28 +36,8 @@ limitations under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-base</artifactId>
+            <artifactId>flink-connector-mysql-cdc</artifactId>
             <version>${project.version}</version>
-        </dependency>
-
-        <!-- Debezium dependencies -->
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-connector-debezium</artifactId>
-            <version>${project.version}</version>
-            <exclusions>
-                <exclusion>
-                    <artifactId>kafka-log4j-appender</artifactId>
-                    <groupId>org.apache.kafka</groupId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <!-- OceanBase Log Client -->
-        <dependency>
-            <groupId>com.oceanbase</groupId>
-            <artifactId>oblogclient-logproxy</artifactId>
-            <version>${oblogclient.version}</version>
         </dependency>
 
         <!-- The MySQL JDBC driver for reading snapshot-->
