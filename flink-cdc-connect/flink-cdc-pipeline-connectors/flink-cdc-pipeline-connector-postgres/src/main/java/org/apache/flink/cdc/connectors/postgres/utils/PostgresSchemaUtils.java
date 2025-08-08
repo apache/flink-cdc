@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.postgres.utils;
 
+import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.connector.postgresql.TypeRegistry;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -40,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -165,16 +168,16 @@ public class PostgresSchemaUtils {
                             topicSelector,
                             valueConverterBuilder.build(jdbc.getTypeRegistry()));
             Table tableSchema = postgresSchema.tableFor(tableId);
-            return toSchema(tableSchema);
+            return toSchema(tableSchema, sourceConfig.getDbzProperties(), jdbc.getTypeRegistry());
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresReplicationConnection", e);
         }
     }
 
-    public static Schema toSchema(Table table) {
+    public static Schema toSchema(Table table, Properties dbzProperties, TypeRegistry typeRegistry) {
         List<Column> columns =
                 table.columns().stream()
-                        .map(PostgresSchemaUtils::toColumn)
+                        .map(column -> toColumn(column,  dbzProperties, typeRegistry))
                         .collect(Collectors.toList());
 
         return Schema.newBuilder()
@@ -184,16 +187,16 @@ public class PostgresSchemaUtils {
                 .build();
     }
 
-    public static Column toColumn(io.debezium.relational.Column column) {
+    public static Column toColumn(io.debezium.relational.Column column, Properties dbzProperties, TypeRegistry typeRegistry) {
         if (column.defaultValueExpression().isPresent()) {
             return Column.physicalColumn(
                     column.name(),
-                    PostgresTypeUtils.fromDbzColumn(column),
+                    PostgresTypeUtils.fromDbzColumn(column, dbzProperties, typeRegistry),
                     column.comment(),
                     column.defaultValueExpression().get());
         } else {
             return Column.physicalColumn(
-                    column.name(), PostgresTypeUtils.fromDbzColumn(column), column.comment());
+                    column.name(), PostgresTypeUtils.fromDbzColumn(column, dbzProperties, typeRegistry), column.comment());
         }
     }
 

@@ -21,7 +21,7 @@ DROP SCHEMA IF EXISTS inventory CASCADE;
 CREATE SCHEMA inventory;
 -- postgis is installed into public schema
 SET search_path TO inventory, public;
-
+CREATE EXTENSION IF NOT EXISTS ltree;
 
 CREATE TABLE full_types
 (
@@ -55,6 +55,7 @@ CREATE TABLE full_types
     jsonb_c             JSONB,
     xml_C               XML,
     location            POINT,
+    ltree               LTREE,
     PRIMARY KEY (id)
 );
 
@@ -73,4 +74,4 @@ VALUES (1, '2', 32767, 65535, 2147483647, 5.5, 6.6, 123.12345, 404.4443, true,
             <theme>dark</theme>
             <notifications>true</notifications>
         </preferences>
-    </user>','(3.456,7.890)'::point);
+    </user>','(3.456,7.890)'::point,'foo.bar.baz');

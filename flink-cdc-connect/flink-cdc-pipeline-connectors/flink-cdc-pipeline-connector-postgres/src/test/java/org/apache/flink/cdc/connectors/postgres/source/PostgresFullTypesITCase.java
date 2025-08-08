@@ -193,9 +193,9 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     64822000,
                     DecimalData.fromBigDecimal(new BigDecimal("500"), 10, 0),
                     BinaryStringData.fromString(
-                            "{\"hexewkb\":\"0101000020730c00001c7c613255de6540787aa52c435c42c0\",\"srid\":3187}"),
+                            "{\"coordinates\":[{\"x\":174.9479,\"y\":-36.7208,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true}],\"type\":\"Point\",\"srid\":3187}"),
                     BinaryStringData.fromString(
-                            "{\"hexewkb\":\"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0\",\"srid\":4326}"),
+                            "{\"coordinates\":[{\"x\":169.1321,\"y\":-44.7032,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true},{\"x\":167.8974,\"y\":-44.6414,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true}],\"type\":\"MultiLineString\",\"srid\":4326}"),
                     true,
                     new byte[] {10},
                     new byte[] {42},
@@ -207,15 +207,17 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                             "{\"product\": \"Pen\", \"order_id\": 10249, \"quantity\": 10}"),
                     BinaryStringData.fromString(
                             "<user>\n"
-                                    + "        <id>123</id>\n"
-                                    + "        <name>Alice</name>\n"
-                                    + "        <email>alice@example.com</email>\n"
-                                    + "        <preferences>\n"
-                                    + "            <theme>dark</theme>\n"
-                                    + "            <notifications>true</notifications>\n"
-                                    + "        </preferences>\n"
-                                    + "    </user>"),
-                    BinaryStringData.fromString("(3.456,7.890)")
+                                    + "<id>123</id>\n"
+                                    + "<name>Alice</name>\n"
+                                    + "<email>alice@example.com</email>\n"
+                                    + "<preferences>\n"
+                                    + "<theme>dark</theme>\n"
+                                    + "<notifications>true</notifications>\n"
+                                    + "</preferences>\n"
+                                    + "</user>"),
+                    BinaryStringData.fromString(
+                            "{\"coordinates\":[{\"x\":3.456,\"y\":7.89,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true}],\"type\":\"Point\",\"srid\":0}"),
+                        BinaryStringData.fromString("foo.bar.baz")
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -288,5 +290,5 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING(),
-                    DataTypes.STRING());
+                    DataTypes.STRING(),DataTypes.STRING());
 }
