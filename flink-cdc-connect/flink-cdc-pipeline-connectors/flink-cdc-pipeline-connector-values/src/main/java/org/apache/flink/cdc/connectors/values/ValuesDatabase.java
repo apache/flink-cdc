@@ -81,8 +81,15 @@ public class ValuesDatabase {
 
         private Set<SchemaChangeEventType> enabledSchemaEvolutionTypes;
 
+        private final boolean materializedInMemory;
+
         public ValuesMetadataApplier() {
+            this(true);
+        }
+
+        public ValuesMetadataApplier(boolean materializedInMemory) {
             this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
+            this.materializedInMemory = materializedInMemory;
         }
 
         @Override
@@ -109,7 +116,9 @@ public class ValuesDatabase {
 
         @Override
         public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
-            applySchemaChangeEvent(schemaChangeEvent);
+            if (materializedInMemory) {
+                applySchemaChangeEvent(schemaChangeEvent);
+            }
         }
     }
 
