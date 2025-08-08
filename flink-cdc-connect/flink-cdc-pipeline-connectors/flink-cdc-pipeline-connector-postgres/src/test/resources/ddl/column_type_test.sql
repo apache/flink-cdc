@@ -22,6 +22,10 @@ CREATE SCHEMA inventory;
 -- postgis is installed into public schema
 SET search_path TO inventory, public;
 CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS citext;
+CREATE EXTENSION IF NOT EXISTS hstore;
+
+CREATE TYPE status AS ENUM ('pending', 'approved', 'rejected');
 
 CREATE TABLE full_types
 (
@@ -55,7 +59,17 @@ CREATE TABLE full_types
     jsonb_c             JSONB,
     xml_C               XML,
     location            POINT,
-    ltree               LTREE,
+    ltree_c               LTREE,
+    username CITEXT NOT NULL,
+    attributes HSTORE,
+    inet_c              INET,
+    int4range_c           INT4RANGE,
+    int8range_c            INT8RANGE,
+    numrange_c            NUMRANGE,
+    tsrange_c TSRANGE,
+    tsTZrange_c TSTZRANGE,
+    daterange_c DATERANGE,
+    status status NOT NULL,
     PRIMARY KEY (id)
 );
 
@@ -74,4 +88,5 @@ VALUES (1, '2', 32767, 65535, 2147483647, 5.5, 6.6, 123.12345, 404.4443, true,
             <theme>dark</theme>
             <notifications>true</notifications>
         </preferences>
-    </user>','(3.456,7.890)'::point,'foo.bar.baz');
+    </user>','(3.456,7.890)'::point,'foo.bar.baz','JohnDoe','color => "blue", size => "L"','192.168.1.1'::inet,'[1, 10)'::int4range,'[1000000000, 5000000000)'::int8range,'[5.5, 20.75)'::numrange,
+       '["2023-08-01 08:00:00", "2023-08-01 12:00:00")','["2023-08-01 08:00:00+00", "2023-08-01 12:00:00+00")','["2023-08-01", "2023-08-15")','pending');

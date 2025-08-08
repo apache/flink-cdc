@@ -17,16 +17,17 @@
 
 package org.apache.flink.cdc.connectors.postgres.utils;
 
-import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
-import io.debezium.connector.postgresql.TypeRegistry;
+import io.debezium.jdbc.JdbcValueConverters;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.table.types.logical.DecimalType;
 
+import io.debezium.connector.postgresql.PgOid;
+import io.debezium.connector.postgresql.PostgresType;
+import io.debezium.connector.postgresql.TypeRegistry;
 import io.debezium.relational.Column;
-import org.postgresql.core.Oid;
 
 import java.util.Properties;
 
@@ -34,8 +35,9 @@ import java.util.Properties;
 public class PostgresTypeUtils {
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
-    public static DataType fromDbzColumn(Column column, Properties dbzProperties, TypeRegistry typeRegistry) {
-        DataType dataType = convertFromColumn(column, dbzProperties, typeRegistry);
+    public static DataType fromDbzColumn(
+            Column column, PostgresConnectorConfig dbzConfig, TypeRegistry typeRegistry) {
+        DataType dataType = convertFromColumn(column, dbzConfig, typeRegistry);
         if (column.isOptional()) {
             return dataType;
         } else {
@@ -47,11 +49,14 @@ public class PostgresTypeUtils {
      * Returns a corresponding Flink data type from a debezium {@link Column} with nullable always
      * be true.
      */
-    private static DataType convertFromColumn(Column column, Properties dbzProperties, TypeRegistry typeRegistry) {
+    private static DataType convertFromColumn(
+            Column column, PostgresConnectorConfig dbzConfig, TypeRegistry typeRegistry) {
         int nativeType = column.nativeType();
 
         int precision = column.length();
         int scale = column.scale().orElse(0);
+
+        JdbcValueConverters.DecimalMode decimalMode =   dbzConfig.getDecimalMode();
 
         switch (nativeType) {
             case PgOid.BOOL:
@@ -100,10 +105,7 @@ public class PostgresTypeUtils {
                 return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
             case PgOid.NUMERIC_ARRAY:
                 // see SPARK-26538: handle numeric without explicit precision and scale.
-                if (precision > 0) {
-                    return DataTypes.ARRAY(DataTypes.DECIMAL(precision, scale));
-                }
-                return DataTypes.ARRAY(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0));
+                return handleDecimalMode(precision,scale, decimalMode);
             case PgOid.CHAR:
             case PgOid.BPCHAR:
                 return DataTypes.CHAR(precision);
@@ -120,6 +122,13 @@ public class PostgresTypeUtils {
             case PgOid.JSON:
             case PgOid.JSONB:
             case PgOid.XML:
+            case PgOid.INET_OID:
+            case PgOid.INT4RANGE_OID:
+            case PgOid.NUM_RANGE_OID:
+            case PgOid.INT8RANGE_OID:
+            case PgOid.TSRANGE_OID:
+            case PgOid.TSTZRANGE_OID:
+            case PgOid.DATERANGE_OID:
                 return DataTypes.STRING();
             case PgOid.TEXT_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
@@ -144,9 +153,42 @@ public class PostgresTypeUtils {
             default:
                 if (nativeType == typeRegistry.ltreeOid()) {
                     return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.geometryOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.geographyOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.citextOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.hstoreOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.ltreeArrayOid()) {
+                    return DataTypes.ARRAY(DataTypes.STRING());
+                } else if (nativeType == typeRegistry.geometryArrayOid()) {
+                    return DataTypes.ARRAY(DataTypes.STRING());
+                }
+                final PostgresType resolvedType = typeRegistry.get(nativeType);
+                if (resolvedType.isEnumType()) {
+                    return DataTypes.STRING();
                 }
                 throw new UnsupportedOperationException(
-                        String.format("Doesn't support Postgres type '%s', Postgres oid '%d' yet", column.typeName(),column.nativeType()));
+                        String.format(
+                                "Doesn't support Postgres type '%s', Postgres oid '%d' yet",
+                                column.typeName(), column.nativeType()));
+        }
+    }
+    public static DataType handleDecimalMode(int precision, int scale,JdbcValueConverters.DecimalMode mode) {
+        switch (mode) {
+            case PRECISE:
+                if (precision > 0 && precision <= 38) {
+                    return DataTypes.DECIMAL(precision, scale);
+                }
+                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
+            case DOUBLE:
+                return DataTypes.DOUBLE();
+            case STRING:
+                return DataTypes.STRING();
+            default:
+                throw new IllegalArgumentException("Unknown decimal mode: " + mode);
         }
     }
 }

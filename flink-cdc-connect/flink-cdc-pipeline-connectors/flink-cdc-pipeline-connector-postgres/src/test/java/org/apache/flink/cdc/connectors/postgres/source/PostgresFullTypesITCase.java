@@ -217,7 +217,19 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                                     + "</user>"),
                     BinaryStringData.fromString(
                             "{\"coordinates\":[{\"x\":3.456,\"y\":7.89,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true}],\"type\":\"Point\",\"srid\":0}"),
-                        BinaryStringData.fromString("foo.bar.baz")
+                    BinaryStringData.fromString("foo.bar.baz"),
+                    BinaryStringData.fromString("JohnDoe"),
+                    BinaryStringData.fromString("{\"size\":\"L\",\"color\":\"blue\"}"),
+                    BinaryStringData.fromString("192.168.1.1"),
+                    BinaryStringData.fromString("[1,10)"),
+                    BinaryStringData.fromString("[1000000000,5000000000)"),
+                    BinaryStringData.fromString("[5.5,20.75)"),
+                    BinaryStringData.fromString(
+                            "[\"2023-08-01 08:00:00\",\"2023-08-01 12:00:00\")"),
+                    BinaryStringData.fromString(
+                            "[\"2023-08-01 16:00:00+08\",\"2023-08-01 20:00:00+08\")"),
+                    BinaryStringData.fromString("[2023-08-01,2023-08-15)"),
+                    BinaryStringData.fromString("pending"),
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -290,5 +302,17 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING(),
-                    DataTypes.STRING(),DataTypes.STRING());
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING());
 }
