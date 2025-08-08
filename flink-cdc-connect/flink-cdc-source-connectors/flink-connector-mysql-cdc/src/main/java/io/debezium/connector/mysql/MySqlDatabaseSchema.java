@@ -112,9 +112,9 @@ public class MySqlDatabaseSchema extends HistorizedRelationalDatabaseSchema {
             valueConverter,
             getTableFilter());
     this.ddlChanges = this.ddlParser.getDdlChanges();
+    this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
     this.connectorConfig = connectorConfig;
     filters = connectorConfig.getTableFilters();
-    this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
   }
 
   /**
@@ -158,11 +158,13 @@ public class MySqlDatabaseSchema extends HistorizedRelationalDatabaseSchema {
    * table to schema change history.
    */
   private boolean isTableIncluded(String MethodName,TableId tableId) {
-    // 先应用原有过滤规则
     boolean isIncludedByOriginalFilter = filters.dataCollectionFilter().isIncluded(tableId);
+    LOGGER.info("MethodName: {},Including isIncludedByOriginalFilter table that would otherwise be filtered: {}," +
+                    "isIncludedByOriginalFilter:{}",
+            MethodName, tableId,isIncludedByOriginalFilter);
     if (parseOnLineSchemaChanges) {
       if (!isIncludedByOriginalFilter && isGhostTable(tableId)) {
-        LOGGER.info("MethodName{},Including gh-ost table that would otherwise be filtered: {}",MethodName, tableId);
+        LOGGER.info("MethodName: {},Including gh-ost table that would otherwise be filtered: {}",MethodName, tableId);
         return true;
       }
     }
@@ -226,7 +228,10 @@ public class MySqlDatabaseSchema extends HistorizedRelationalDatabaseSchema {
     // - or DDLs for monitored objects
     if (!databaseHistory.storeOnlyCapturedTables() || isGlobalSetVariableStatement(schemaChange.getDdl(), schemaChange.getDatabase())
             || schemaChange.getTables().stream().map(Table::id).anyMatch(x->isTableIncluded("applySchemaChange",x))) {
-      LOGGER.info("Recorded DDL statements for database '{}': {}", schemaChange.getDatabase(), schemaChange.getDdl());
+      boolean applySchemaChange = schemaChange.getTables().stream().map(Table::id).anyMatch(x -> isTableIncluded("applySchemaChange", x));
+      LOGGER.info("Recorded DDL statements for database '{}': {},{},{},{}", schemaChange.getDatabase(),
+              schemaChange.getDdl()
+              ,applySchemaChange,!databaseHistory.storeOnlyCapturedTables(),isGlobalSetVariableStatement(schemaChange.getDdl(), schemaChange.getDatabase()));
       record(schemaChange, schemaChange.getTableChanges());
     }
   }
@@ -239,7 +244,7 @@ public class MySqlDatabaseSchema extends HistorizedRelationalDatabaseSchema {
 
   public List<SchemaChangeEvent> parseStreamingDdl(MySqlPartition partition, String ddlStatements, String databaseName,
                                                    MySqlOffsetContext offset, Instant sourceTime) {
-    LOGGER.debug("Processing streaming DDL '{}' for database '{}'", ddlStatements, databaseName);
+    LOGGER.info("Processing streaming DDL '{}' for database '{}'", ddlStatements, databaseName);
     return parseDdl(partition, ddlStatements, databaseName, offset, sourceTime, false);
   }
 
@@ -265,10 +270,7 @@ public class MySqlDatabaseSchema extends HistorizedRelationalDatabaseSchema {
       }
     }
     // No need to send schema events or store DDL if no table has changed
-    if (!databaseHistory.storeOnlyCapturedTables() || isGlobalSetVariableStatement(ddlStatements, databaseName) || ddlChanges.anyMatch(event -> {
-      TableId tableId = this.getTableId(event);
-      return tableId != null && isTableIncluded("parseDdl",tableId);
-    })) {
+    if (!databaseHistory.storeOnlyCapturedTables() || isGlobalSetVariableStatement(ddlStatements, databaseName) || ddlChanges.anyMatch(filters,parseOnLineSchemaChanges)){
 
       // We are supposed to _also_ record the schema changes as SourceRecords, but these need to be filtered
       // by database. Unfortunately, the databaseName on the event might not be the same database as that
@@ -407,13 +409,12 @@ public class MySqlDatabaseSchema extends HistorizedRelationalDatabaseSchema {
    *         connector's configuration
    */
   public boolean assignTableNumber(long tableNumber, TableId id) {
-
+    if (!isTableIncluded("assignTableNumber",id)) {
+      excludeTableIdsByTableNumber.put(tableNumber, id);
+      return false;
+    }
     final TableSchema tableSchema = schemaFor(id);
     if (tableSchema == null) {
-      if (isTableIncluded("assignTableNumber",id)) {
-        tableIdsByTableNumber.put(tableNumber, id);
-        return true;
-      }
       excludeTableIdsByTableNumber.put(tableNumber, id);
       return false;
     }

@@ -10,11 +10,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import io.debezium.annotation.NotThreadSafe;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables.TableFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Copied from Debezium project.
@@ -25,9 +28,11 @@ import io.debezium.relational.Tables.TableFilter;
 @NotThreadSafe
 public class DdlChanges implements DdlParserListener {
 
+  private final static Logger LOGGER = LoggerFactory.getLogger(DdlChanges.class);
   private final String terminator;
   private final List<Event> events = new ArrayList<>();
   private final Set<String> databaseNames = new HashSet<>();
+  private static final Pattern GHOST_TABLE_PATTERN = Pattern.compile("^_(.*)_(del|gho|ghc)$");
 
   /**
    * Create a new changes object with ';' as the terminator token.
@@ -253,8 +258,31 @@ public class DdlChanges implements DdlParserListener {
             || databaseFilter.test(((SetVariableEvent) event).databaseName().get())));
   }
 
-  public boolean anyMatch(Predicate<Event> predicate) {
-    return events.stream().anyMatch(predicate);
+  public boolean anyMatch(RelationalTableFilters filters,boolean parserOnlineDDL) {
+    Predicate<String> databaseFilter = filters.databaseFilter();
+    TableFilter tableFilter = filters.dataCollectionFilter();
+    return events.stream().anyMatch(event -> {
+      if (event instanceof DatabaseEvent) {
+        DatabaseEvent dbEvent = (DatabaseEvent) event;
+        return databaseFilter.test(dbEvent.databaseName());
+      }
+      if (event instanceof TableEvent) {
+        TableEvent tableEvent = (TableEvent) event;
+        TableId tableId = tableEvent.tableId();
+        boolean isIncludedByFilter = tableFilter.isIncluded(tableId);
+        boolean isGhostTable = parserOnlineDDL
+                && tableId != null
+                && GHOST_TABLE_PATTERN.matcher(tableId.table()).matches();
+        LOGGER.info("isIncludedByFilter:{},isGhostTable:{},result:{}", isIncludedByFilter, isGhostTable,isIncludedByFilter || isGhostTable);
+        return isIncludedByFilter || isGhostTable;
+      }
+      if (event instanceof SetVariableEvent) {
+        SetVariableEvent varEvent = (SetVariableEvent) event;
+        return !varEvent.databaseName().isPresent()
+                || (varEvent.databaseName().isPresent()
+                && databaseFilter.test(varEvent.databaseName().get()));
+      }
+      return false;
+    });
   }
-
 }
