@@ -210,6 +210,12 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     }
 
     protected DataType inferMap(Object value, Schema schema) {
-        throw new UnsupportedOperationException("Unsupported type MAP");
+        Schema keySchema = schema.keySchema();
+        Schema valueSchema = schema.valueSchema();
+
+        DataType keyType = keySchema != null ? infer(null, keySchema) : DataTypes.STRING();
+        DataType valueType = valueSchema != null ? infer(null, valueSchema) : DataTypes.STRING();
+
+        return DataTypes.MAP(keyType, valueType);
     }
 }

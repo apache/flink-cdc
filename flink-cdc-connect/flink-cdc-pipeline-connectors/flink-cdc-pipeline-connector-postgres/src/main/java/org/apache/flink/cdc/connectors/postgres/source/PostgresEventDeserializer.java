@@ -26,8 +26,6 @@ import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.data.TimestampData;
 
-import com.esri.core.geometry.ogc.OGCGeometry;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geography;
@@ -36,8 +34,8 @@ import io.debezium.data.geometry.Point;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.locationtech.jts.io.WKBReader;
 
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -51,8 +49,6 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     private static final long serialVersionUID = 1L;
     private List<PostgreSQLReadableMetadata> readableMetadataList;
 
-    public static final String SRID = "srid";
-    public static final String HEXEWKB = "hexewkb";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public PostgresEventDeserializer(DebeziumChangelogMode changelogMode) {
@@ -120,16 +116,19 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
             try {
                 Struct geometryStruct = (Struct) dbzObj;
                 byte[] wkb = geometryStruct.getBytes("wkb");
-                String geoJson = OGCGeometry.fromBinary(ByteBuffer.wrap(wkb)).asGeoJson();
-                JsonNode originGeoNode = OBJECT_MAPPER.readTree(geoJson);
+
+                WKBReader wkbReader = new WKBReader();
+                org.locationtech.jts.geom.Geometry jtsGeom = wkbReader.read(wkb);
+
                 Optional<Integer> srid = Optional.ofNullable(geometryStruct.getInt32("srid"));
                 Map<String, Object> geometryInfo = new HashMap<>();
-                String geometryType = originGeoNode.get("type").asText();
+                String geometryType = jtsGeom.getGeometryType();
                 geometryInfo.put("type", geometryType);
+
                 if (geometryType.equals("GeometryCollection")) {
-                    geometryInfo.put("geometries", originGeoNode.get("geometries"));
+                    geometryInfo.put("geometries", jtsGeom.toText());
                 } else {
-                    geometryInfo.put("coordinates", originGeoNode.get("coordinates"));
+                    geometryInfo.put("coordinates", jtsGeom.getCoordinates());
                 }
                 geometryInfo.put("srid", srid.orElse(0));
                 return BinaryStringData.fromString(OBJECT_MAPPER.writeValueAsString(geometryInfo));
