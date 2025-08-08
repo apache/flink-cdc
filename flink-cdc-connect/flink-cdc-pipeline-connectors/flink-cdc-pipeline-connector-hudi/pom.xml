@@ -1,0 +1,397 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Licensed to the Apache Software Foundation (ASF) under one or more
+contributor license agreements.  See the NOTICE file distributed with
+this work for additional information regarding copyright ownership.
+The ASF licenses this file to You under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with
+the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <artifactId>flink-cdc-pipeline-connectors</artifactId>
+        <groupId>org.apache.flink</groupId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>flink-cdc-pipeline-connector-hudi</artifactId>
+    <packaging>jar</packaging>
+
+    <name>flink-cdc-pipeline-connector-hudi</name>
+
+    <properties>
+        <hudi.version>1.1.0</hudi.version>
+        <hadoop.version>2.10.2</hadoop.version>
+        <mockito.version>3.4.6</mockito.version>
+        <metrics.version>4.1.1</metrics.version>
+        <caffeine.version>2.9.1</caffeine.version>
+        <jetty.version>9.4.57.v20241219</jetty.version>
+        <javalin.version>4.6.7</javalin.version>
+        <avro.version>1.11.4</avro.version>
+        <httpcore.version>4.4.16</httpcore.version>
+        <httpclient.version>4.5.14</httpclient.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-common</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-flink</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-io</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-client-common</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-flink-client</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hive-sync</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-sync-common</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-timeline-service</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-flink${flink.major.version}.x</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hadoop-common</artifactId>
+            <version>${hudi.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <version>${hadoop.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-hadoop-compatibility_2.12</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-runtime</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-parquet</artifactId>
+            <version>${flink.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- Parquet -->
+        <dependency>
+            <groupId>org.apache.parquet</groupId>
+            <artifactId>parquet-avro</artifactId>
+            <version>1.13.1</version>
+        </dependency>
+
+        <!-- Dropwizard Metrics -->
+        <dependency>
+            <groupId>io.dropwizard.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>${metrics.version}</version>
+        </dependency>
+
+        <!-- caffeine -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>${caffeine.version}</version>
+        </dependency>
+
+        <!-- jetty -->
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-util</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
+
+        <!-- javalin -->
+        <dependency>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin</artifactId>
+            <version>${javalin.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
+
+        <!-- Avro -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <version>${avro.version}</version>
+        </dependency>
+
+        <!-- jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>jackson-module-afterburner</artifactId>
+        </dependency>
+
+        <!-- tests -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-inline</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-junit-jupiter</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Kryo - needed because Hudi marks it as provided scope -->
+        <dependency>
+            <groupId>com.esotericsoftware</groupId>
+            <artifactId>kryo-shaded</artifactId>
+            <version>4.0.2</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Httpcomponents -->
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>fluent-hc</artifactId>
+            <version>${httpclient.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpcore</artifactId>
+            <version>${httpcore.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>${httpclient.version}</version>
+        </dependency>
+
+        <!-- test -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-composer</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-metrics-dropwizard</artifactId>
+            <version>${flink.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>test-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <artifactSet>
+                                <includes>
+                                    <include>org.apache.hudi:*</include>
+
+                                    <!-- Kryo - shaded to avoid version conflicts with Flink -->
+                                    <include>com.esotericsoftware:kryo-shaded</include>
+                                    <include>com.esotericsoftware:minlog</include>
+                                    <include>org.objenesis:objenesis</include>
+
+                                    <include>com.yammer.metrics:metrics-core</include>
+                                    <include>com.beust:jcommander</include>
+                                    <include>io.javalin:javalin</include>
+                                    <include>org.jetbrains.kotlin:*</include>
+                                    <include>org.rocksdb:rocksdbjni</include>
+                                    <include>org.antlr:stringtemplate</include>
+                                    <!-- Parquet -->
+                                    <include>org.apache.parquet:parquet-avro</include>
+                                    <include>org.apache.parquet:parquet-hadoop</include>
+                                    <include>org.apache.parquet:parquet-column</include>
+                                    <include>org.apache.parquet:parquet-common</include>
+                                    <include>org.apache.parquet:parquet-format-structures</include>
+                                    <include>org.apache.parquet:parquet-encoding</include>
+                                    <include>org.apache.parquet:parquet-jackson</include>
+
+                                    <include>org.apache.avro:avro</include>
+                                    <include>joda-time:joda-time</include>
+                                    <include>com.fasterxml.jackson.core:jackson-annotations</include>
+                                    <include>com.fasterxml.jackson.core:jackson-core</include>
+                                    <include>com.fasterxml.jackson.core:jackson-databind</include>
+                                    <include>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</include>
+
+                                    <include>com.lmax:disruptor</include>
+                                    <include>com.github.davidmoten:guava-mini</include>
+                                    <include>com.github.davidmoten:hilbert-curve</include>
+                                    <include>com.github.ben-manes.caffeine:caffeine</include>
+                                    <include>com.twitter:bijection-avro_${scala.binary.version}</include>
+                                    <include>com.twitter:bijection-core_${scala.binary.version}</include>
+                                    <include>io.dropwizard.metrics:metrics-core</include>
+                                    <include>io.dropwizard.metrics:metrics-graphite</include>
+                                    <include>io.dropwizard.metrics:metrics-jmx</include>
+                                    <include>io.prometheus:simpleclient</include>
+                                    <include>io.prometheus:simpleclient_httpserver</include>
+                                    <include>io.prometheus:simpleclient_dropwizard</include>
+                                    <include>io.prometheus:simpleclient_pushgateway</include>
+                                    <include>io.prometheus:simpleclient_common</include>
+                                    <include>com.uber.m3:tally-m3</include>
+                                    <include>com.uber.m3:tally-core</include>
+
+                                    <!-- Used for HUDI TimelineService -->
+                                    <include>org.eclipse.jetty:*</include>
+                                    <include>org.eclipse.jetty.websocket:*</include>
+                                    <include>javax.servlet:javax.servlet-api</include>
+                                    <include>org.apache.httpcomponents:*</include>
+
+                                    <include>org.apache.flink:flink-json</include>
+                                    <include>org.apache.flink:flink-metrics-dropwizard</include>
+
+                                    <include>org.apache.hive:hive-common</include>
+                                    <include>org.apache.hive:hive-service</include>
+                                    <include>org.apache.hive:hive-service-rpc</include>
+                                    <include>org.apache.hive:hive-exec</include>
+                                    <include>org.apache.hive:hive-standalone-metastore</include>
+                                    <include>org.apache.hive:hive-metastore</include>
+                                    <include>org.apache.hive:hive-jdbc</include>
+                                    <include>org.datanucleus:datanucleus-core</include>
+                                    <include>org.datanucleus:datanucleus-api-jdo</include>
+                                    <include>org.apache.thrift:libfb303</include>
+                                    <include>org.apache.orc:orc-core</include>
+
+                                    <include>commons-codec:commons-codec</include>
+                                    <include>commons-io:commons-io</include>
+                                    <include>org.openjdk.jol:jol-core</include>
+
+                                    <include>com.fasterxml.jackson.module:jackson-module-afterburner</include>
+                                    <include>io.airlift:aircompressor</include>
+
+                                </includes>
+                            </artifactSet>
+                            <relocations>
+                                <!-- Relocate Avro to avoid version conflicts -->
+                                <relocation>
+                                    <pattern>org.apache.avro</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.hudi.shaded.avro</shadedPattern>
+                                </relocation>
+                                <!-- Relocate Kryo to avoid version conflicts -->
+                                <relocation>
+                                    <pattern>com.esotericsoftware.kryo.</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.hudi.shaded.com.esotericsoftware.kryo.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.esotericsoftware.reflectasm.</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.hudi.shaded.com.esotericsoftware.reflectasm.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.esotericsoftware.minlog.</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.hudi.shaded.com.esotericsoftware.minlog.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.objenesis.</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.hudi.shaded.org.objenesis.</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Prevent Error: packaged jar contains files with incompatible licenses -->
+                                        <exclude>META-INF/maven/org.openjdk.jol/jol-core/pom.xml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
