@@ -23,7 +23,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.Table;
@@ -243,6 +242,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
+
         List<String> recordsInSnapshotPhase =
                 new ArrayList<>(
                         Arrays.asList(
@@ -261,6 +261,7 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         recordsInSnapshotPhase =
                 recordsInSnapshotPhase.stream().sorted().collect(Collectors.toList());
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
+        Thread.sleep(3600000L);
     }
 
     /**
