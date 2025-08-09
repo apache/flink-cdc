@@ -22,7 +22,6 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 
-import org.apache.paimon.CoreOptions;
 import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.schema.SchemaChange;
 
@@ -36,7 +35,6 @@ import java.util.Optional;
  * represent different types of schema modifications.
  */
 public class SchemaChangeProvider {
-
     /**
      * Creates a SchemaChange object for adding a column without specifying its position.
      *
@@ -60,13 +58,9 @@ public class SchemaChangeProvider {
         Optional.ofNullable(column.getDefaultValueExpression())
                 .ifPresent(
                         value -> {
-                            String key =
-                                    String.format(
-                                            "%s.%s.%s",
-                                            CoreOptions.FIELDS_PREFIX,
-                                            column.getName(),
-                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
-                            result.add(SchemaChangeProvider.setOption(key, value));
+                            result.add(
+                                    SchemaChange.updateColumnDefaultValue(
+                                            new String[] {column.getName()}, value));
                         });
         return result;
     }
@@ -98,13 +92,9 @@ public class SchemaChangeProvider {
         Optional.ofNullable(column.getDefaultValueExpression())
                 .ifPresent(
                         value -> {
-                            String key =
-                                    String.format(
-                                            "%s.%s.%s",
-                                            CoreOptions.FIELDS_PREFIX,
-                                            column.getName(),
-                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
-                            result.add(SchemaChangeProvider.setOption(key, value));
+                            result.add(
+                                    SchemaChange.updateColumnDefaultValue(
+                                            new String[] {column.getName()}, value));
                         });
         return result;
     }
@@ -134,11 +124,6 @@ public class SchemaChangeProvider {
             String oldColumnName, String newColumnName, Map<String, String> options) {
         List<SchemaChange> result = new ArrayList<>();
         result.add(SchemaChange.renameColumn(oldColumnName, newColumnName));
-        String defaultValue = options.get(defaultValueOptionKey(oldColumnName));
-        if (defaultValue != null) {
-            result.add(SchemaChange.removeOption(defaultValueOptionKey(oldColumnName)));
-            result.add(SchemaChange.setOption(defaultValueOptionKey(newColumnName), defaultValue));
-        }
         return result;
     }
 
@@ -151,14 +136,7 @@ public class SchemaChangeProvider {
     public static List<SchemaChange> drop(String columnName) {
         List<SchemaChange> result = new ArrayList<>();
         result.add(SchemaChange.dropColumn(columnName));
-        result.add(SchemaChange.removeOption(defaultValueOptionKey(columnName)));
         return result;
-    }
-
-    public static String defaultValueOptionKey(String columnName) {
-        return String.format(
-                "%s.%s.%s",
-                CoreOptions.FIELDS_PREFIX, columnName, CoreOptions.DEFAULT_VALUE_SUFFIX);
     }
 
     /**

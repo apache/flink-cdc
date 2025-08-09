@@ -136,12 +136,10 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "col2", DataTypes.INT()),
-                                new DataField(2, "col3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "col3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
-
-        Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).options())
-                .containsEntry("fields.col3.default-value", "col3DefValue");
 
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newcol2");
@@ -154,7 +152,8 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "newcol2", DataTypes.INT()),
-                                new DataField(2, "newcol3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
@@ -168,7 +167,8 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "newcol2", DataTypes.STRING()),
-                                new DataField(2, "newcol3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
@@ -181,7 +181,8 @@ class PaimonMetadataApplierTest {
                 new RowType(
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
-                                new DataField(2, "newcol3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
