@@ -369,23 +369,21 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                     String.format(
                             "Tables format must db.schema.table, can not 'tables' = %s",
                             TABLES.key()));
-            if (tableNameParts.length == 3) {
-                String currentDbName = tableNameParts[0];
+            String currentDbName = tableNameParts[0];
 
+            checkState(
+                    isValidPostgresDbName(currentDbName),
+                    String.format(
+                            "The value of option %s does not conform to PostgresSQL database name naming conventions",
+                            TABLES.key()));
+            if (dbName == null) {
+                dbName = currentDbName;
+            } else {
                 checkState(
-                        isValidPostgresDbName(currentDbName),
+                        dbName.equals(currentDbName),
                         String.format(
-                                "The value of option %s does not conform to PostgresSQL database name naming conventions",
+                                "The value of option %s all table names must have the same database name",
                                 TABLES.key()));
-                if (dbName == null) {
-                    dbName = currentDbName;
-                } else {
-                    checkState(
-                            !dbName.equals(currentDbName),
-                            String.format(
-                                    "The value of option %s all table names must have the same database name",
-                                    TABLES.key()));
-                }
             }
         }
 
