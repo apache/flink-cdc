@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions.PREFIX_CATALOG_PROPERTIES;
+import static org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions.PREFIX_SPECIFIC_TABLE_PROPERTIES;
 import static org.apache.flink.cdc.connectors.paimon.sink.PaimonDataSinkOptions.PREFIX_TABLE_PROPERTIES;
 
 /** A {@link DataSinkFactory} to create {@link PaimonDataSink}. */
@@ -49,15 +50,21 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
     @Override
     public DataSink createDataSink(Context context) {
         FactoryHelper.createFactoryHelper(this, context)
-                .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
+                .validateExcept(PREFIX_TABLE_PROPERTIES, PREFIX_SPECIFIC_TABLE_PROPERTIES, PREFIX_CATALOG_PROPERTIES);
 
         Map<String, String> allOptions = context.getFactoryConfiguration().toMap();
         Map<String, String> catalogOptions = new HashMap<>();
         Map<String, String> tableOptions = new HashMap<>();
+        Map<String, String> tableSpecificOptions = new HashMap<>();
         allOptions.forEach(
                 (key, value) -> {
                     if (key.startsWith(PREFIX_TABLE_PROPERTIES)) {
-                        tableOptions.put(key.substring(PREFIX_TABLE_PROPERTIES.length()), value);
+                        String keyWithoutPrefix = key.substring(PREFIX_TABLE_PROPERTIES.length());
+                        // General table option: table.properties.<property>
+                        tableOptions.put(keyWithoutPrefix, value);
+                    } else if (key.startsWith(PREFIX_SPECIFIC_TABLE_PROPERTIES)) {
+                        // Table-specific option: specific.table.properties.<database>.<table>.<property>
+                        tableSpecificOptions.put(key, value);
                     } else if (key.startsWith(PaimonDataSinkOptions.PREFIX_CATALOG_PROPERTIES)) {
                         catalogOptions.put(
                                 key.substring(
@@ -103,6 +110,7 @@ public class PaimonDataSinkFactory implements DataSinkFactory {
         return new PaimonDataSink(
                 options,
                 tableOptions,
+                tableSpecificOptions,
                 commitUser,
                 partitionMaps,
                 serializer,

@@ -67,8 +67,11 @@ public class PaimonMetadataApplier implements MetadataApplier {
     // Catalog is unSerializable.
     private transient Catalog catalog;
 
-    // currently, we set table options for all tables using the same options.
+    // options that apply to all tables
     private final Map<String, String> tableOptions;
+
+    // options that apply to a specific table
+    private final Map<String, String> tableSpecificOptions;
 
     private final Options catalogOptions;
 
@@ -79,6 +82,7 @@ public class PaimonMetadataApplier implements MetadataApplier {
     public PaimonMetadataApplier(Options catalogOptions) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = new HashMap<>();
+        this.tableSpecificOptions = new HashMap<>();
         this.partitionMaps = new HashMap<>();
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
@@ -86,9 +90,11 @@ public class PaimonMetadataApplier implements MetadataApplier {
     public PaimonMetadataApplier(
             Options catalogOptions,
             Map<String, String> tableOptions,
+            Map<String, String> tableSpecificOptions,
             Map<TableId, List<String>> partitionMaps) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
+        this.tableSpecificOptions = tableSpecificOptions;
         this.partitionMaps = partitionMaps;
         this.enabledSchemaEvolutionTypes = getSupportedSchemaEvolutionTypes();
     }
@@ -189,10 +195,32 @@ public class PaimonMetadataApplier implements MetadataApplier {
                     primaryKeys.add(partitionColumn);
                 }
             }
+
+            // Build effective options: start with general table options, then add table-specific options
+            // Table-specific options take precedence over general table options for the same key
+            Map<String, String> effectiveOptions = new HashMap<>();
+
+            // First, add general table options
+            effectiveOptions.putAll(tableOptions);
+
+            // Then, add table-specific options for this table (these take precedence)
+            String tablePrefix =
+                    "specific.table.properties."
+                            + event.tableId().getSchemaName()
+                            + "."
+                            + event.tableId().getTableName()
+                            + ".";
+            for (Map.Entry<String, String> entry : tableSpecificOptions.entrySet()) {
+                if (entry.getKey().startsWith(tablePrefix)) {
+                    String propertyName = entry.getKey().substring(tablePrefix.length());
+                    effectiveOptions.put(propertyName, entry.getValue());
+                }
+            }
+
             builder.partitionKeys(partitionKeys)
                     .primaryKey(primaryKeys)
                     .comment(schema.comment())
-                    .options(tableOptions)
+                    .options(effectiveOptions)
                     .options(schema.options());
             catalog.createTable(tableIdToIdentifier(event), builder.build(), true);
         } catch (Catalog.TableAlreadyExistException
