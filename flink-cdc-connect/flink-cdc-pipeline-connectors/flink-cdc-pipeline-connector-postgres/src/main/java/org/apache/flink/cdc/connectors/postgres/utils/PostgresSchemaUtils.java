@@ -36,10 +36,7 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -165,16 +162,16 @@ public class PostgresSchemaUtils {
                             topicSelector,
                             valueConverterBuilder.build(jdbc.getTypeRegistry()));
             Table tableSchema = postgresSchema.tableFor(tableId);
-            return toSchema(tableSchema);
+            return toSchema(tableSchema, sourceConfig);
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresReplicationConnection", e);
         }
     }
 
-    public static Schema toSchema(Table table) {
+    public static Schema toSchema(Table table, PostgresSourceConfig sourceConfig) {
         List<Column> columns =
                 table.columns().stream()
-                        .map(PostgresSchemaUtils::toColumn)
+                        .map(column -> toColumn(column, sourceConfig))
                         .collect(Collectors.toList());
 
         return Schema.newBuilder()
@@ -184,16 +181,25 @@ public class PostgresSchemaUtils {
                 .build();
     }
 
-    public static Column toColumn(io.debezium.relational.Column column) {
+    public static Column toColumn(
+            io.debezium.relational.Column column, PostgresSourceConfig sourceConfig) {
+        // Extract debezium properties from source config if available
+        Properties debeziumProperties = null;
+        if (sourceConfig != null) {
+            debeziumProperties = sourceConfig.getDbzProperties();
+        }
+
         if (column.defaultValueExpression().isPresent()) {
             return Column.physicalColumn(
                     column.name(),
-                    PostgresTypeUtils.fromDbzColumn(column),
+                    PostgresTypeUtils.fromDbzColumn(column, debeziumProperties),
                     column.comment(),
                     column.defaultValueExpression().get());
         } else {
             return Column.physicalColumn(
-                    column.name(), PostgresTypeUtils.fromDbzColumn(column), column.comment());
+                    column.name(),
+                    PostgresTypeUtils.fromDbzColumn(column, debeziumProperties),
+                    column.comment());
         }
     }
 

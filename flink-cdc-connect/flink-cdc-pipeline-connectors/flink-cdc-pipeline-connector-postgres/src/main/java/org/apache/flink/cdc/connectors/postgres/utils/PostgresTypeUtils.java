@@ -20,12 +20,18 @@ package org.apache.flink.cdc.connectors.postgres.utils;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
-import org.apache.flink.table.types.logical.DecimalType;
+import org.apache.flink.cdc.connectors.postgres.source.utils.DebeziumConfigUtils;
 
 import io.debezium.relational.Column;
 
+import java.util.Properties;
+
+import static org.apache.flink.cdc.connectors.postgres.source.utils.DebeziumConfigUtils.DecimalHandlingMode;
+import static org.apache.flink.cdc.connectors.postgres.source.utils.DebeziumConfigUtils.getDecimalHandlingMode;
+
 /** A utility class for converting Postgres types to Flink types. */
 public class PostgresTypeUtils {
+
     private static final String PG_SMALLSERIAL = "smallserial";
     private static final String PG_SERIAL = "serial";
     private static final String PG_BIGSERIAL = "bigserial";
@@ -64,10 +70,22 @@ public class PostgresTypeUtils {
     private static final String PG_UUID = "uuid";
     private static final String PG_GEOMETRY = "geometry";
     private static final String PG_GEOGRAPHY = "geography";
+    private static final String PG_BIT = "bit";
+    private static final String PG_BIT_ARRAY = "_bit";
+    private static final String PG_VARBIT = "varbit";
+    private static final String PG_VARBIT_ARRAY = "_varbit";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
-        DataType dataType = convertFromColumn(column);
+        return fromDbzColumn(column, null);
+    }
+
+    /**
+     * Returns a corresponding Flink data type from a debezium {@link Column} with Debezium
+     * properties.
+     */
+    public static DataType fromDbzColumn(Column column, Properties debeziumProperties) {
+        DataType dataType = convertFromColumn(column, debeziumProperties);
         if (column.isOptional()) {
             return dataType;
         } else {
@@ -79,7 +97,8 @@ public class PostgresTypeUtils {
      * Returns a corresponding Flink data type from a debezium {@link Column} with nullable always
      * be true.
      */
-    private static DataType convertFromColumn(Column column) {
+    private static DataType convertFromColumn(Column column, Properties debeziumProperties) {
+        DecimalHandlingMode decimalMode = getDecimalHandlingMode(debeziumProperties);
         String typeName = column.typeName();
 
         int precision = column.length();
@@ -118,17 +137,12 @@ public class PostgresTypeUtils {
             case PG_DOUBLE_PRECISION_ARRAY:
                 return DataTypes.ARRAY(DataTypes.DOUBLE());
             case PG_NUMERIC:
-                // see SPARK-26538: handle numeric without explicit precision and scale.
-                if (precision > 0) {
-                    return DataTypes.DECIMAL(precision, scale);
-                }
-                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
+                return DebeziumConfigUtils.handleNumericTypeForCommon(
+                        precision, scale, decimalMode);
             case PG_NUMERIC_ARRAY:
-                // see SPARK-26538: handle numeric without explicit precision and scale.
-                if (precision > 0) {
-                    return DataTypes.ARRAY(DataTypes.DECIMAL(precision, scale));
-                }
-                return DataTypes.ARRAY(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0));
+                return DataTypes.ARRAY(
+                        DebeziumConfigUtils.handleNumericTypeForCommon(
+                                precision, scale, decimalMode));
             case PG_CHAR:
             case PG_CHARACTER:
                 return DataTypes.CHAR(precision);
@@ -162,6 +176,21 @@ public class PostgresTypeUtils {
                 return DataTypes.DATE();
             case PG_DATE_ARRAY:
                 return DataTypes.ARRAY(DataTypes.DATE());
+            case PG_BIT:
+                // Fix for FLINK-35907: Handle bit(1) as BOOLEAN, bit(n) as BYTES
+                if (precision == 1) {
+                    return DataTypes.BOOLEAN();
+                } else {
+                    return DataTypes.BYTES();
+                }
+            case PG_BIT_ARRAY:
+                // For bit arrays, always use BYTES array
+                return DataTypes.ARRAY(DataTypes.BYTES());
+            case PG_VARBIT:
+                // Variable-length bit strings always as BYTES
+                return DataTypes.BYTES();
+            case PG_VARBIT_ARRAY:
+                return DataTypes.ARRAY(DataTypes.BYTES());
             default:
                 throw new UnsupportedOperationException(
                         String.format("Doesn't support Postgres type '%s' yet", typeName));
