@@ -154,7 +154,7 @@ Data Type Mapping
     <thead>
       <tr>
         <th class="text-left">Flink CDC type</th>
-        <th class="text-left">StarRocks type</th>
+        <th class="text-left">Fluss type</th>
         <th class="text-left" style="width:60%;">Note</th>
       </tr>
     </thead>
