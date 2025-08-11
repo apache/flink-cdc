@@ -449,12 +449,12 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     public void applyChangeEvent(ChangeEvent changeEvent) {
         org.apache.flink.cdc.common.event.TableId flinkTableId = changeEvent.tableId();
 
-        io.debezium.relational.TableId debeziumTableId = new io.debezium.relational.TableId(
-                flinkTableId.getNamespace(),
-                flinkTableId.getSchemaName(),
-                flinkTableId.getTableName());
+        io.debezium.relational.TableId debeziumTableId =
+                new io.debezium.relational.TableId(
+                        flinkTableId.getNamespace(),
+                        flinkTableId.getSchemaName(),
+                        flinkTableId.getTableName());
 
         createTableEventCache.put(debeziumTableId, (CreateTableEvent) changeEvent);
     }
-
 }
