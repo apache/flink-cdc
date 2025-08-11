@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 
 import io.debezium.connector.postgresql.PostgresObjectUtils;
 import io.debezium.connector.postgresql.PostgresSchema;
@@ -72,24 +73,21 @@ public class PostgresSchemaUtils {
     public static List<TableId> listTables(
             PostgresSourceConfig sourceConfig, @Nullable String dbName) {
         try (PostgresConnection jdbc = getPostgresDialect(sourceConfig).openJdbcConnection()) {
-
             List<String> databases =
                     dbName != null
                             ? Collections.singletonList(dbName)
                             : Collections.singletonList(sourceConfig.getDatabaseList().get(0));
-
-            List<TableId> tableIds = new ArrayList<>();
-            for (String database : databases) {
-                List<TableId> tableIdList =
-                        jdbc.getAllTableIds(database).stream()
-                                .map(PostgresSchemaUtils::toCdcTableId)
-                                .collect(Collectors.toList());
-                tableIds.addAll(tableIdList);
-            }
-            return tableIds;
+            return listTables(jdbc, databases.toArray(new String[0]));
         } catch (SQLException e) {
             throw new RuntimeException("Error to list databases: " + e.getMessage(), e);
         }
+    }
+
+    public static List<TableId> listTables(PostgresConnection jdbc, String... databases)
+            throws SQLException {
+        return TableDiscoveryUtils.listTables(jdbc, databases).stream()
+                .map(PostgresSchemaUtils::toCdcTableId)
+                .collect(Collectors.toList());
     }
 
     public static Schema getTableSchema(PostgresSourceConfig sourceConfig, TableId tableId) {

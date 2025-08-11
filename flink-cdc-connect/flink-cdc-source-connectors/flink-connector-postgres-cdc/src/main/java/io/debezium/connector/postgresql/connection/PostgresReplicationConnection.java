@@ -6,6 +6,8 @@
 
 package io.debezium.connector.postgresql.connection;
 
+import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
+
 import io.debezium.DebeziumException;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresSchema;
@@ -34,8 +36,6 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -274,24 +274,8 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
     }
 
     private Set<TableId> determineCapturedTables() throws Exception {
-        Set<TableId> allTableIds = jdbcConnection.getAllTableIds(connectorConfig.databaseName());
-
-        Set<TableId> capturedTables = new HashSet<>();
-
-        for (TableId tableId : allTableIds) {
-            if (tableFilter.dataCollectionFilter().isIncluded(tableId)) {
-                LOGGER.trace("Adding table {} to the list of captured tables", tableId);
-                capturedTables.add(tableId);
-            } else {
-                LOGGER.trace(
-                        "Ignoring table {} as it's not included in the filter configuration",
-                        tableId);
-            }
-        }
-
-        return capturedTables.stream()
-                .sorted()
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return TableDiscoveryUtils.listTables(
+                connectorConfig.databaseName(), jdbcConnection.connect(), tableFilter);
     }
 
     protected void initReplicationSlot() throws SQLException, InterruptedException {

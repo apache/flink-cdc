@@ -28,7 +28,6 @@ import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
-import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
@@ -37,7 +36,6 @@ import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.relational.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -126,20 +124,13 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
 
     private void generateCreateTableEvent(PostgresSourceConfig sourceConfig) {
         try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-            List<TableId> capturedTableIds =
-                    TableDiscoveryUtils.listTables(
-                            sourceConfig.getDatabaseList().get(0),
-                            jdbc,
-                            sourceConfig.getTableFilters());
-            for (TableId tableId : capturedTableIds) {
+            for (org.apache.flink.cdc.common.event.TableId tableId :
+                    PostgresSchemaUtils.listTables(
+                            sourceConfig, sourceConfig.getDatabaseList().get(0))) {
                 Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-                createTableEventCache.add(
-                        new CreateTableEvent(
-                                org.apache.flink.cdc.common.event.TableId.tableId(
-                                        tableId.schema(), tableId.table()),
-                                schema));
+                createTableEventCache.add(new CreateTableEvent(tableId, schema));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
         }
     }

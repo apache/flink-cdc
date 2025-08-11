@@ -6,6 +6,8 @@
 
 package io.debezium.connector.postgresql.connection;
 
+import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
+
 import com.zaxxer.hikari.pool.HikariProxyConnection;
 import io.debezium.DebeziumException;
 import io.debezium.annotation.VisibleForTesting;
@@ -856,7 +858,7 @@ public class PostgresConnection extends JdbcConnection {
      * @throws SQLException if a database exception occurred
      */
     public Set<TableId> getAllTableIds(String catalogName) throws SQLException {
-        return readTableNames(catalogName, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
+        return TableDiscoveryUtils.listTables(catalogName, this.connect(), null);
     }
 
     @FunctionalInterface

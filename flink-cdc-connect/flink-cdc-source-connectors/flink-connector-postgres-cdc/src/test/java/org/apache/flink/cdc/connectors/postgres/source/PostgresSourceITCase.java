@@ -612,13 +612,13 @@ class PostgresSourceITCase extends PostgresTestBase {
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
     void testHeartBeat(String scanStartupMode) throws Exception {
-        try (PostgresConnection connection = getConnection()) {
+        try (PostgresConnection connection = getConnection(customDatabase)) {
             connection.execute("CREATE TABLE IF NOT EXISTS heart_beat_table(a int)");
             connection.commit();
         }
 
         TableId tableId = new TableId(null, "public", "heart_beat_table");
-        try (PostgresConnection connection = getConnection()) {
+        try (PostgresConnection connection = getConnection(customDatabase)) {
             Assertions.assertThat(getCountOfTable(connection, tableId)).isZero();
         }
 
@@ -633,7 +633,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 new String[] {"Customers"},
                 RestartStrategies.noRestart(),
                 options);
-        try (PostgresConnection connection = getConnection()) {
+        try (PostgresConnection connection = getConnection(customDatabase)) {
             assertThat(getCountOfTable(connection, tableId)).isGreaterThan(0);
         }
     }
@@ -976,7 +976,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         JobID jobId = optionalJobClient.get().getJobID();
 
         for (String tableName : captureCustomerTables) {
-            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeFirstPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -991,7 +992,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             waitUntilJobRunning(tableResult);
         }
         for (String tableName : captureCustomerTables) {
-            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeSecondPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -1029,7 +1031,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         JobID jobId = optionalJobClient.get().getJobID();
 
         for (String tableName : captureCustomerTables) {
-            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeFirstPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -1044,7 +1047,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             waitUntilJobRunning(tableResult);
         }
         for (String tableName : captureCustomerTables) {
-            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeSecondPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -1092,7 +1096,8 @@ class PostgresSourceITCase extends PostgresTestBase {
 
                             for (String tableName : captureCustomerTables) {
                                 makeFirstPartStreamEvents(
-                                        getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+                                        getConnection(customDatabase),
+                                        new TestTableId(SCHEMA_NAME, tableName));
                             }
                             // wait for the stream reading
                             Thread.sleep(2000L);
@@ -1121,7 +1126,8 @@ class PostgresSourceITCase extends PostgresTestBase {
             waitUntilJobRunning(tableResult);
         }
         for (String tableName : captureCustomerTables) {
-            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeSecondPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         List<String> expectedStreamData = new ArrayList<>();
@@ -1149,7 +1155,8 @@ class PostgresSourceITCase extends PostgresTestBase {
         JobID jobId = optionalJobClient.get().getJobID();
 
         for (String tableName : captureCustomerTables) {
-            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeFirstPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading
@@ -1165,7 +1172,8 @@ class PostgresSourceITCase extends PostgresTestBase {
                         for (String tableName : captureCustomerTables) {
                             try {
                                 makeSecondPartStreamEvents(
-                                        getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+                                        getConnection(customDatabase),
+                                        new TestTableId(SCHEMA_NAME, tableName));
                             } catch (SQLException e) {
                                 throw new RuntimeException(e);
                             }
@@ -1199,14 +1207,15 @@ class PostgresSourceITCase extends PostgresTestBase {
         JobID jobId = optionalJobClient.get().getJobID();
 
         for (String tableName : captureCustomerTables) {
-            makeFirstPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeFirstPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
 
         // wait for the stream reading and isCommitOffset is true
         Thread.sleep(20000L);
 
         String confirmedFlushLsn;
-        try (PostgresConnection connection = getConnection()) {
+        try (PostgresConnection connection = getConnection(customDatabase)) {
             confirmedFlushLsn = getConfirmedFlushLsn(connection);
         }
         if (failoverPhase == PostgresTestUtils.FailoverPhase.STREAM) {
@@ -1220,10 +1229,11 @@ class PostgresSourceITCase extends PostgresTestBase {
         // wait for the stream reading and isCommitOffset is true
         Thread.sleep(30000L);
         for (String tableName : captureCustomerTables) {
-            makeSecondPartStreamEvents(getConnection(), new TestTableId(SCHEMA_NAME, tableName));
+            makeSecondPartStreamEvents(
+                    getConnection(customDatabase), new TestTableId(SCHEMA_NAME, tableName));
         }
         Thread.sleep(5000L);
-        try (PostgresConnection connection = getConnection()) {
+        try (PostgresConnection connection = getConnection(customDatabase)) {
             Assertions.assertThat(getConfirmedFlushLsn(connection)).isNotEqualTo(confirmedFlushLsn);
         }
     }
@@ -1314,16 +1324,6 @@ class PostgresSourceITCase extends PostgresTestBase {
         } finally {
             connection.close();
         }
-    }
-
-    private PostgresConnection getConnection() {
-        Map<String, String> properties = new HashMap<>();
-        properties.put("hostname", customDatabase.getHost());
-        properties.put("port", String.valueOf(customDatabase.getDatabasePort()));
-        properties.put("user", customDatabase.getUsername());
-        properties.put("password", customDatabase.getPassword());
-        properties.put("dbname", customDatabase.getDatabaseName());
-        return createConnection(properties);
     }
 
     private static long getCountOfTable(JdbcConnection jdbc, TableId tableId) throws SQLException {

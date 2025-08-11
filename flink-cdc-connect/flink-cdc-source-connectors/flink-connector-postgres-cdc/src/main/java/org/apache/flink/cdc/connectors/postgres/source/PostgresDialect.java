@@ -52,6 +52,7 @@ import io.debezium.schema.TopicSelector;
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -176,9 +177,12 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     @Override
     public List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig) {
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-            return TableDiscoveryUtils.listTables(
-                    // there is always a single database provided
-                    sourceConfig.getDatabaseList().get(0), jdbc, sourceConfig.getTableFilters());
+            return new ArrayList<>(
+                    TableDiscoveryUtils.listTables(
+                            // there is always a single database provided
+                            sourceConfig.getDatabaseList().get(0),
+                            jdbc,
+                            sourceConfig.getTableFilters()));
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
         }
@@ -190,8 +194,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             // fetch table schemas
-            Map<TableId, TableChange> tableSchemas = queryTableSchema(jdbc, capturedTableIds);
-            return tableSchemas;
+            return queryTableSchema(jdbc, capturedTableIds);
         } catch (Exception e) {
             throw new FlinkRuntimeException(
                     "Error to discover table schemas: " + e.getMessage(), e);
