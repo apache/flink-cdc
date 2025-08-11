@@ -36,6 +36,11 @@ import io.debezium.relational.TableId;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import javax.annotation.Nullable;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -47,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
@@ -526,6 +532,92 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                         "product_no",
                         true);
         assertThat(splits).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @MethodSource
+    void testFinishedSnapshotSplitInfosAreInOrderOfAssignment(
+            String table1Name, String table2Name) {
+        List<String> tableNames = new ArrayList<>();
+        tableNames.add(table1Name);
+
+        SnapshotPendingSplitsState state;
+
+        try (MySqlSnapshotSplitAssigner assigner = createAssigner(tableNames, null)) {
+            state = processAllSplitsAndSnapshotState(assigner, 1L);
+        }
+
+        tableNames.add(table2Name);
+
+        try (MySqlSnapshotSplitAssigner assigner = createAssigner(tableNames, state)) {
+            state = processAllSplitsAndSnapshotState(assigner, 2L);
+        }
+
+        try (MySqlSnapshotSplitAssigner assigner = createAssigner(tableNames, state)) {
+            List<String> finishedSnapshotSplitTableNames =
+                    assigner.getFinishedSplitInfos().stream()
+                            .map(i -> i.getTableId().table())
+                            .collect(Collectors.toList());
+
+            assertThat(finishedSnapshotSplitTableNames).isEqualTo(tableNames);
+        }
+    }
+
+    /**
+     * Use various combinations of table names to ensure that the finished snapshot split infos are
+     * in the order of assignment, not the order of table names.
+     */
+    public static Stream<Arguments> testFinishedSnapshotSplitInfosAreInOrderOfAssignment() {
+        String table1Name = "customers";
+        String table2Name = "customers_1";
+
+        return Stream.of(
+                Arguments.of(table1Name, table2Name), Arguments.of(table2Name, table1Name));
+    }
+
+    private MySqlSnapshotSplitAssigner createAssigner(
+            List<String> tableNames, @Nullable SnapshotPendingSplitsState state) {
+        int currentParallelism = 1;
+
+        if (state == null) {
+            return new MySqlSnapshotSplitAssigner(
+                    createConfiguration(tableNames),
+                    currentParallelism,
+                    new ArrayList<>(),
+                    true,
+                    getMySqlSplitEnumeratorContext());
+        }
+
+        return new MySqlSnapshotSplitAssigner(
+                createConfiguration(tableNames),
+                currentParallelism,
+                state,
+                getMySqlSplitEnumeratorContext());
+    }
+
+    private MySqlSourceConfig createConfiguration(List<String> tableNames) {
+        return getConfig(
+                customerDatabase,
+                Integer.MAX_VALUE,
+                CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
+                CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
+                tableNames.toArray(new String[0]),
+                "id",
+                true,
+                false);
+    }
+
+    private SnapshotPendingSplitsState processAllSplitsAndSnapshotState(
+            MySqlSnapshotSplitAssigner assigner, long checkpointId) {
+        assigner.open();
+
+        Optional<MySqlSplit> optional;
+        while ((optional = assigner.getNext()).isPresent()) {
+            assigner.onFinishedSplits(
+                    Collections.singletonMap(optional.get().splitId(), BinlogOffset.ofLatest()));
+        }
+
+        return assigner.snapshotState(checkpointId);
     }
 
     private List<String> getTestAssignSnapshotSplits(
