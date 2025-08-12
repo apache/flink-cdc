@@ -120,6 +120,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
+        LOG.info("Starting MySqlNoGtid containers...");
+        Startables.deepStart(Stream.of(MYSQL_CONTAINER_NOGTID)).join();
+        LOG.info("Container MySqlNoGtid is started.");
     }
 
     @AfterAll
@@ -127,6 +130,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
+        LOG.info("Stopping MySqlNoGtid containers...");
+        MYSQL_CONTAINER_NOGTID.stop();
+        LOG.info("Container MySqlNoGtid is stopped.");
     }
 
     @AfterEach
