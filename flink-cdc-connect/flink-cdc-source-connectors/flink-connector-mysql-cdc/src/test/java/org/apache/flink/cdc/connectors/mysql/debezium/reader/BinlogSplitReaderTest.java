@@ -66,6 +66,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -465,6 +467,53 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[2001, user_22, Shanghai, 123567891234]",
                     "+I[2002, user_23, Shanghai, 123567891234]",
                     "+I[2003, user_24, Shanghai, 123567891234]"
+                };
+        List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+        assertEqualsInOrder(Arrays.asList(expected), actual);
+
+        reader.close();
+    }
+
+    @Test
+    void testReadBinlogWithoutGtidFromLatestOffset() throws Exception {
+        customerDatabaseNoGtid.createAndInitialize();
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL_CONTAINER_NOGTID,
+                        customerDatabaseNoGtid,
+                        StartupOptions.latest(),
+                        new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        // Create reader and submit splits
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = createBinlogReader(sourceConfig);
+        reader.submitSplit(split);
+
+        // Create some binlog events
+        makeCustomersBinlogEvents(
+                mySqlConnection, customerDatabaseNoGtid.qualifiedTableName("customers"), false);
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        String[] expected =
+                new String[] {
+                        "-U[103, user_3, Shanghai, 123567891234]",
+                        "+U[103, user_3, Hangzhou, 123567891234]",
+                        "-D[102, user_2, Shanghai, 123567891234]",
+                        "+I[102, user_2, Shanghai, 123567891234]",
+                        "-U[103, user_3, Hangzhou, 123567891234]",
+                        "+U[103, user_3, Shanghai, 123567891234]",
+                        "-U[1010, user_11, Shanghai, 123567891234]",
+                        "+U[1010, Hangzhou, Shanghai, 123567891234]",
+                        "+I[2001, user_22, Shanghai, 123567891234]",
+                        "+I[2002, user_23, Shanghai, 123567891234]",
+                        "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
         assertEqualsInOrder(Arrays.asList(expected), actual);
@@ -1007,7 +1056,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testBinlogOffsetCompareWithSnapshotAndBinlogPhase() throws Exception {
-        Startables.deepStart(Stream.of(MYSQL_CONTAINER_NOGTID)).join();
         // Preparations
         customerDatabaseNoGtid.createAndInitialize();
         MySqlSourceConfig sourceConfig =
@@ -1064,7 +1112,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         List<SourceRecord> sourceRecords =
                 pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord);
-        MYSQL_CONTAINER_NOGTID.stop();
         Assertions.assertThat(sourceRecords).isEmpty();
     }
 
