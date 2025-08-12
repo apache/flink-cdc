@@ -374,7 +374,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
             checkState(
                     isValidPostgresDbName(currentDbName),
                     String.format(
-                            "The value of option %s does not conform to PostgresSQL database name naming conventions",
+                            "The value of option %s all table names must have the same database name",
                             TABLES.key()));
             if (dbName == null) {
                 dbName = currentDbName;
