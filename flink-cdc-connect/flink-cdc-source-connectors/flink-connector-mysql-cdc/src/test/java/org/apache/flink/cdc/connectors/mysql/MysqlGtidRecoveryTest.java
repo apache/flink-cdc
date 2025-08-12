@@ -34,8 +34,9 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
+/** Test gtid recovery in mysql. */
 public class MysqlGtidRecoveryTest extends MySqlSourceTestBase {
 
     private static final String SCHEMA = "flink-test";
@@ -85,7 +86,7 @@ public class MysqlGtidRecoveryTest extends MySqlSourceTestBase {
                         })
                 .start();
 
-        assertTrue(latch.await(30, TimeUnit.SECONDS), "Should receive missing GTIDs");
+        assertThat(latch.await(30, TimeUnit.SECONDS)).isTrue();
         client.disconnect();
 
         assertEqualsInAnyOrder(expectedReceivedGtids, receivedGtidNumbers);
