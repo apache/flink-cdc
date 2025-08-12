@@ -66,8 +66,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -509,17 +507,17 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         DataTypes.FIELD("phone_number", DataTypes.STRING()));
         String[] expected =
                 new String[] {
-                        "-U[103, user_3, Shanghai, 123567891234]",
-                        "+U[103, user_3, Hangzhou, 123567891234]",
-                        "-D[102, user_2, Shanghai, 123567891234]",
-                        "+I[102, user_2, Shanghai, 123567891234]",
-                        "-U[103, user_3, Hangzhou, 123567891234]",
-                        "+U[103, user_3, Shanghai, 123567891234]",
-                        "-U[1010, user_11, Shanghai, 123567891234]",
-                        "+U[1010, Hangzhou, Shanghai, 123567891234]",
-                        "+I[2001, user_22, Shanghai, 123567891234]",
-                        "+I[2002, user_23, Shanghai, 123567891234]",
-                        "+I[2003, user_24, Shanghai, 123567891234]"
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+U[1010, Hangzhou, Shanghai, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]"
                 };
         List<String> actual = readBinlogSplits(dataType, reader, expected.length);
         assertEqualsInOrder(Arrays.asList(expected), actual);
