@@ -276,7 +276,7 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         assertThatThrownBy(() -> factory.createDataSource(context))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(
-                        "The value of option tables all table names must have the same database name");
+                        "The value of option `tables` is `aia_test.public.aia_t_icc_jjdb,different_db.public.aia_t_icc_jjdb_extend`, but not all table names have the same database name");
     }
 
     @Test
