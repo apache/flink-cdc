@@ -111,7 +111,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                                 + "  port: %d\n"
                                 + "  username: %s\n"
                                 + "  password: %s\n"
-                                + "  tables: %s.inventory.\\.*\n"
+                                + "  tables: %s.inventory.products,%s.inventory.customers\n"
                                 + "  slot.name: %s\n"
                                 + "  scan.startup.mode: initial\n"
                                 + "  server-time-zone: UTC\n"
@@ -126,6 +126,7 @@ public class PostgresE2eITCase extends PipelineTestEnvironment {
                         5432,
                         POSTGRES_TEST_USER,
                         POSTGRES_TEST_PASSWORD,
+                        postgresInventoryDatabase.getDatabaseName(),
                         postgresInventoryDatabase.getDatabaseName(),
                         slotName,
                         parallelism);
