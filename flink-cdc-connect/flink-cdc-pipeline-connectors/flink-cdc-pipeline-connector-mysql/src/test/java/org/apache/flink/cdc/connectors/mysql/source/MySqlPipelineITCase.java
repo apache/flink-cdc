@@ -1046,6 +1046,18 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                     new TruncateTableEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "orders")));
 
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `varchar0` VARCHAR(0) NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "varchar0", DataTypes.STRING())))));
+
             // Test drop table DDL
             statement.execute(
                     String.format(

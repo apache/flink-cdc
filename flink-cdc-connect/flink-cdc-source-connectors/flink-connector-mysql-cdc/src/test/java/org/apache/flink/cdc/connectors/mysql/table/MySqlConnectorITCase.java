@@ -568,6 +568,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "    multiline_c STRING,\n"
                                 + "    multipolygon_c STRING,\n"
                                 + "    geometrycollection_c STRING,\n"
+                                + "    varchar_len0_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -653,7 +654,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "multipoint_c, \n"
                                 + "multiline_c, \n"
                                 + "multipolygon_c, \n"
-                                + "geometrycollection_c \n"
+                                + "geometrycollection_c, \n"
+                                + "varchar_len0_c \n"
                                 + " FROM full_types");
 
         CloseableIterator<Row> iterator = result.collect();
@@ -702,6 +704,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + expectMultipolygonJsonText
                             + ", "
                             + expectGeometryCollectionJsonText
+                            + ", "
+                            + ""
                             + "]",
                     "-U[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295,"
                             + " 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102,"
@@ -725,6 +729,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + expectMultipolygonJsonText
                             + ", "
                             + expectGeometryCollectionJsonText
+                            + ", "
+                            + ""
                             + "]",
                     "+U[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295,"
                             + " 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102,"
@@ -748,6 +754,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + expectMultipolygonJsonText
                             + ", "
                             + expectGeometryCollectionJsonText
+                            + ", "
+                            + ""
                             + "]",
                 };
 
