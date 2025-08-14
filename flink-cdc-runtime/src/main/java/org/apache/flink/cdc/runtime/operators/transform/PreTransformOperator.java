@@ -132,7 +132,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         // Historically, transform operator maintains internal state to help transforming schemas
         // correctly after restart.
         // However, it is not required after
-        // https://code.alibaba-inc.com/ververica/flink-cdc/codereview/21946168 got merged, since
+        // [FLINK-38045] got merged, since
         // MySQL source will emit correct CreateTableEvents from state.
     }
 

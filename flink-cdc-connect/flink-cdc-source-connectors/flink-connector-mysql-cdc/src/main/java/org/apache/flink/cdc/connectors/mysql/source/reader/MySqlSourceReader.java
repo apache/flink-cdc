@@ -438,7 +438,7 @@ public class MySqlSourceReader<T>
                         binlogSplit.splitId(),
                         MySqlBinlogSplit.appendFinishedSplitInfos(
                                 binlogSplit, newAddedMetadataGroup));
-                LOG.info(
+                LOG.debug(
                         "Source reader {} fills metadata of group {} to binlog split",
                         subtaskId,
                         newAddedMetadataGroup.size());
