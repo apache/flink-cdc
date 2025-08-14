@@ -636,7 +636,6 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                                 PostgresDataSourceFactory.IDENTIFIER,
                                 new EventTypeInfo())
                         .executeAndCollect();
-
         Map<String, String> expectedMap = new HashMap<>();
         expectedMap.put("a", "1");
         expectedMap.put("b", "2");
@@ -649,6 +648,63 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                         ((BinaryMapData) snapshotObjects[1])
                                 .toJavaMap(DataTypes.STRING(), DataTypes.STRING());
         Assertions.assertThat(expectedMap).isEqualTo(snapshotMap);
+    }
+
+    @Test
+    public void testJsonTypes() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty("hstore.handling.mode", "map");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.json_types")
+                                .startupOptions(StartupOptions.initial())
+                                .debeziumProperties(debeziumProps)
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    1,
+                    BinaryStringData.fromString("{\"key1\":\"value1\"}"),
+                    BinaryStringData.fromString("{\"key1\":\"value1\",\"key2\":\"value2\"}"),
+                    BinaryStringData.fromString(
+                            "[{\"key1\":\"value1\",\"key2\":{\"key2_1\":\"value2_1\",\"key2_2\":\"value2_2\"},\"key3\":[\"value3\"],\"key4\":[\"value4_1\",\"value4_2\"]},{\"key5\":\"value5\"}]"),
+                    BinaryStringData.fromBytes("{\"key1\": \"value1\"}".getBytes()),
+                    BinaryStringData.fromBytes(
+                            "{\"key1\": \"value1\", \"key2\": \"value2\"}".getBytes()),
+                    BinaryStringData.fromBytes(
+                            "[{\"key1\": \"value1\", \"key2\": {\"key2_1\": \"value2_1\", \"key2_2\": \"value2_2\"}, \"key3\": [\"value3\"], \"key4\": [\"value4_1\", \"value4_2\"]}, {\"key5\": \"value5\"}]"
+                                    .getBytes()),
+                    1L
+                };
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Object[] ob = recordFields(snapshotRecord, JSON_TYPES);
+        Assertions.assertThat(recordFields(snapshotRecord, JSON_TYPES)).isEqualTo(expectedSnapshot);
     }
 
     private <T> Tuple2<List<T>, List<CreateTableEvent>> fetchResultsAndCreateTableEvent(
@@ -776,4 +832,15 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
 
     private static final RowType HSTORE_TYPES_WITH_ADAPTIVE =
             RowType.of(DataTypes.INT(), DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()));
+
+    private static final RowType JSON_TYPES =
+            RowType.of(
+                    DataTypes.INT(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.BIGINT());
 }

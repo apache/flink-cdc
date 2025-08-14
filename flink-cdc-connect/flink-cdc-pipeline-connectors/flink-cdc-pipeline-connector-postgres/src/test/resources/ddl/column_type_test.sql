@@ -131,3 +131,29 @@ ALTER TABLE inventory.hstore_types
 
 INSERT INTO hstore_types
 VALUES (1, 'a => 1, b => 2');
+
+CREATE TABLE json_types (
+                            id        SERIAL PRIMARY KEY,
+                            json_c0   JSON,
+                            json_c1   JSON,
+                            json_c2   JSON,
+                            jsonb_c0   JSONB,
+                            jsonb_c1   JSONB,
+                            jsonb_c2   JSONB,
+                            int_c     INTEGER
+);
+
+ALTER TABLE inventory.json_types
+    REPLICA IDENTITY FULL;
+
+INSERT INTO json_types (id,json_c0, json_c1, json_c2, jsonb_c0, jsonb_c1, jsonb_c2, int_c)
+VALUES
+    (1,
+        '{"key1":"value1"}',
+        '{"key1":"value1","key2":"value2"}',
+        '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]',
+        '{"key1":"value1"}'::jsonb,
+        '{"key1":"value1","key2":"value2"}'::jsonb,
+        '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]'::jsonb,
+     1
+    );
