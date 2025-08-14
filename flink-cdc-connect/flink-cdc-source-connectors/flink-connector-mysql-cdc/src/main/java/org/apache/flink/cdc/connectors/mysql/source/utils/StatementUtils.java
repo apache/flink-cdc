@@ -17,10 +17,13 @@
 
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.jdbc.JdbcConnection;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
+import io.debezium.util.Strings;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -29,6 +32,8 @@ import java.util.Iterator;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EXCLUDE_LIST;
+import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_INCLUDE_LIST;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.rowToArray;
 
 /** Utils to prepare SQL statement. */
@@ -130,9 +135,44 @@ public class StatementUtils {
                 });
     }
 
+    public static String buildProjection(Table table, MySqlSourceConfig sourceConfig) {
+        String projection = "*";
+        String columnExcludeList =
+                sourceConfig.getDbzConfiguration().getString(COLUMN_EXCLUDE_LIST);
+        String columnIncludeList =
+                sourceConfig.getDbzConfiguration().getString(COLUMN_INCLUDE_LIST);
+        boolean isColumnsFiltered =
+                !(Strings.isNullOrEmpty(columnExcludeList)
+                        && Strings.isNullOrEmpty(columnIncludeList));
+        // TODO: After DBZ-5727, we can directly use the isColumnsFiltered method provided by
+        // debezium
+        if (isColumnsFiltered) {
+            TableId tableId = table.id();
+            projection =
+                    table.columns().stream()
+                            .filter(
+                                    column ->
+                                            sourceConfig
+                                                    .getMySqlConnectorConfig()
+                                                    .getColumnFilter()
+                                                    .matches(
+                                                            tableId.catalog(),
+                                                            tableId.schema(),
+                                                            tableId.table(),
+                                                            column.name()))
+                            .map(column -> quote(column.name()))
+                            .collect(Collectors.joining(", "));
+        }
+        return projection;
+    }
+
     public static String buildSplitScanQuery(
-            TableId tableId, RowType pkRowType, boolean isFirstSplit, boolean isLastSplit) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true);
+            TableId tableId,
+            RowType pkRowType,
+            boolean isFirstSplit,
+            boolean isLastSplit,
+            String projection) {
+        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, -1, true, projection);
     }
 
     private static String buildSplitQuery(
@@ -141,7 +181,8 @@ public class StatementUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             int limitSize,
-            boolean isScanningData) {
+            boolean isScanningData,
+            String projection) {
         final String condition;
 
         if (isFirstSplit && isLastSplit) {
@@ -174,7 +215,11 @@ public class StatementUtils {
 
         if (isScanningData) {
             return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
+                    tableId,
+                    limitSize,
+                    projection,
+                    Optional.ofNullable(condition),
+                    Optional.empty());
         } else {
             final String orderBy =
                     pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));

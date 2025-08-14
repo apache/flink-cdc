@@ -66,6 +66,8 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private final boolean includeSchemaChanges;
     private final boolean tinyInt1isBit;
     private final boolean includeComments;
+    private final List<String> columnIncludeList;
+    private final List<String> columnExcludeList;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
@@ -77,14 +79,18 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
             boolean tinyInt1isBit,
-            boolean isTableIdCaseInsensitive) {
+            boolean isTableIdCaseInsensitive,
+            List<String> columnIncludeList,
+            List<String> columnExcludeList) {
         this(
                 changelogMode,
                 includeSchemaChanges,
                 new ArrayList<>(),
                 includeSchemaChanges,
                 tinyInt1isBit,
-                isTableIdCaseInsensitive);
+                isTableIdCaseInsensitive,
+                columnIncludeList,
+                columnExcludeList);
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
@@ -94,13 +100,17 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             List<MySqlReadableMetadata> readableMetadataList,
             boolean includeComments,
             boolean tinyInt1isBit,
-            boolean isTableIdCaseInsensitive) {
+            boolean isTableIdCaseInsensitive,
+            List<String> columnIncludeList,
+            List<String> columnExcludeList) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
         this.includeComments = includeComments;
         this.tinyInt1isBit = tinyInt1isBit;
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+        this.columnIncludeList = columnIncludeList;
+        this.columnExcludeList = columnExcludeList;
     }
 
     @Override
@@ -109,7 +119,11 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             if (customParser == null) {
                 customParser =
                         new CustomMySqlAntlrDdlParser(
-                                includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
+                                includeComments,
+                                tinyInt1isBit,
+                                isTableIdCaseInsensitive,
+                                columnIncludeList,
+                                columnExcludeList);
                 tables = new Tables();
             }
 
