@@ -84,7 +84,7 @@ jobs:
           docker run --rm --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
 
       - name: Upload documentation
-        uses: burnett01/rsync-deployments@7.0.2
+        uses: burnett01/rsync-deployments@0dc935cdecc5f5e571865e60d2a6cdc673704823
         with:
           switches: --archive --compress --delete
           path: docs/target/
@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload documentation alias
         if: env.flink_alias != ''
-        uses: burnett01/rsync-deployments@7.0.2
+        uses: burnett01/rsync-deployments@0dc935cdecc5f5e571865e60d2a6cdc673704823
         with:
           switches: --archive --compress --delete
           path: docs/target/
