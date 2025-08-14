@@ -101,6 +101,7 @@ public abstract class MySqlSourceTestBase extends TestLogger {
                         .withPassword("flinkpw")
                         .withNetwork(NETWORK)
                         .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
+                        .withCommand("--wait_timeout=300", "--interactive_timeout=300")
                         .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 
