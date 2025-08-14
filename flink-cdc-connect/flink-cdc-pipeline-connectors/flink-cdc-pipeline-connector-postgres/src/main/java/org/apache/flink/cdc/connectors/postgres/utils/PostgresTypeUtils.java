@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.table.types.logical.DecimalType;
 
+import io.debezium.config.CommonConnectorConfig;
 import io.debezium.connector.postgresql.PgOid;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresType;
@@ -63,6 +64,9 @@ public class PostgresTypeUtils {
                                 .getConfig()
                                 .getString(PostgresConnectorConfig.INTERVAL_HANDLING_MODE));
 
+        PostgresConnectorConfig.BinaryHandlingMode binaryHandlingMode =
+                dbzConfig.binaryHandlingMode();
+
         TemporalPrecisionMode temporalPrecisionMode = dbzConfig.getTemporalPrecisionMode();
 
         JdbcValueConverters.DecimalMode decimalMode =
@@ -89,9 +93,9 @@ public class PostgresTypeUtils {
             case PgOid.BOOL_ARRAY:
                 return DataTypes.ARRAY(DataTypes.BOOLEAN());
             case PgOid.BYTEA:
-                return DataTypes.BYTES();
+                return handleBinaryWithBinaryMode(binaryHandlingMode);
             case PgOid.BYTEA_ARRAY:
-                return DataTypes.ARRAY(DataTypes.BYTES());
+                return DataTypes.ARRAY(handleBinaryWithBinaryMode(binaryHandlingMode));
             case PgOid.INT2:
                 return DataTypes.SMALLINT();
             case PgOid.INT2_ARRAY:
@@ -153,15 +157,14 @@ public class PostgresTypeUtils {
             case PgOid.TSRANGE_OID:
             case PgOid.TSTZRANGE_OID:
             case PgOid.DATERANGE_OID:
-            case PgOid.TIMETZ:
                 return DataTypes.STRING();
             case PgOid.TEXT_ARRAY:
-            case PgOid.TIMETZ_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
             case PgOid.TIMESTAMP:
-                return handleTimestampWithTemporalMode(temporalPrecisionMode);
+                return handleTimestampWithTemporalMode(temporalPrecisionMode, scale);
             case PgOid.TIMESTAMP_ARRAY:
-                return DataTypes.ARRAY(handleTimestampWithTemporalMode(temporalPrecisionMode));
+                return DataTypes.ARRAY(
+                        handleTimestampWithTemporalMode(temporalPrecisionMode, scale));
             case PgOid.TIMESTAMPTZ:
                 return new ZonedTimestampType(scale);
             case PgOid.TIMESTAMPTZ_ARRAY:
@@ -205,7 +208,8 @@ public class PostgresTypeUtils {
             int precision, int scale, JdbcValueConverters.DecimalMode mode) {
         switch (mode) {
             case PRECISE:
-                if (precision > 0 && precision <= 38) {
+                if (precision > DecimalType.DEFAULT_SCALE
+                        && precision <= DecimalType.MAX_PRECISION) {
                     return DataTypes.DECIMAL(precision, scale);
                 }
                 return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, DecimalType.DEFAULT_SCALE);
@@ -215,6 +219,19 @@ public class PostgresTypeUtils {
                 return DataTypes.STRING();
             default:
                 throw new IllegalArgumentException("Unknown decimal mode: " + mode);
+        }
+    }
+
+    public static DataType handleBinaryWithBinaryMode(
+            CommonConnectorConfig.BinaryHandlingMode mode) {
+        switch (mode) {
+            case BYTES:
+                return DataTypes.BYTES();
+            case BASE64:
+            case HEX:
+                return DataTypes.STRING();
+            default:
+                throw new IllegalArgumentException("Unknown binary mode: " + mode);
         }
     }
 
@@ -266,12 +283,12 @@ public class PostgresTypeUtils {
         }
     }
 
-    public static DataType handleTimestampWithTemporalMode(TemporalPrecisionMode mode) {
+    public static DataType handleTimestampWithTemporalMode(TemporalPrecisionMode mode, int scale) {
         switch (mode) {
             case ADAPTIVE:
             case ADAPTIVE_TIME_MICROSECONDS:
             case CONNECT:
-                return DataTypes.BIGINT();
+                return DataTypes.TIMESTAMP(scale);
             default:
                 throw new IllegalArgumentException("Unknown temporal precision mode: " + mode);
         }

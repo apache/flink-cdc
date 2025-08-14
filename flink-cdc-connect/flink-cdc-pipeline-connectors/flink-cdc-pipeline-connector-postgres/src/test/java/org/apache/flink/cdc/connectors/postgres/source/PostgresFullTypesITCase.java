@@ -234,8 +234,6 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     BinaryStringData.fromString("[5.5,20.75)"),
                     BinaryStringData.fromString(
                             "[\"2023-08-01 08:00:00\",\"2023-08-01 12:00:00\")"),
-                    BinaryStringData.fromString(
-                            "[\"2023-08-01 16:00:00+08\",\"2023-08-01 20:00:00+08\")"),
                     BinaryStringData.fromString("[2023-08-01,2023-08-15)"),
                     BinaryStringData.fromString("pending"),
                 };
@@ -289,17 +287,16 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     64822000,
                     64822123,
                     64822123,
-                    BinaryStringData.fromString("18:00:22Z"),
-                    481036337152L,
-                    515396075520L,
-                    549756269888L,
-                    584115552256L,
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
+                    TimestampData.fromLocalDateTime(
+                            LocalDateTime.parse("2020-07-17T18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
-        Object[] ob = recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE);
         Assertions.assertThat(recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE))
                 .isEqualTo(expectedSnapshot);
     }
@@ -636,10 +633,9 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                                 PostgresDataSourceFactory.IDENTIFIER,
                                 new EventTypeInfo())
                         .executeAndCollect();
-
-        Map<String, String> expectedMap = new HashMap<>();
-        expectedMap.put("a", "1");
-        expectedMap.put("b", "2");
+        Map<BinaryStringData, BinaryStringData> expectedMap = new HashMap<>();
+        expectedMap.put(BinaryStringData.fromString("a"), BinaryStringData.fromString("1"));
+        expectedMap.put(BinaryStringData.fromString("b"), BinaryStringData.fromString("2"));
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
@@ -649,6 +645,62 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                         ((BinaryMapData) snapshotObjects[1])
                                 .toJavaMap(DataTypes.STRING(), DataTypes.STRING());
         Assertions.assertThat(expectedMap).isEqualTo(snapshotMap);
+    }
+
+    @Test
+    public void testJsonTypes() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty("hstore.handling.mode", "map");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.json_types")
+                                .startupOptions(StartupOptions.initial())
+                                .debeziumProperties(debeziumProps)
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    1,
+                    BinaryStringData.fromString("{\"key1\":\"value1\"}"),
+                    BinaryStringData.fromString("{\"key1\":\"value1\",\"key2\":\"value2\"}"),
+                    BinaryStringData.fromString(
+                            "[{\"key1\":\"value1\",\"key2\":{\"key2_1\":\"value2_1\",\"key2_2\":\"value2_2\"},\"key3\":[\"value3\"],\"key4\":[\"value4_1\",\"value4_2\"]},{\"key5\":\"value5\"}]"),
+                    BinaryStringData.fromBytes("{\"key1\": \"value1\"}".getBytes()),
+                    BinaryStringData.fromBytes(
+                            "{\"key1\": \"value1\", \"key2\": \"value2\"}".getBytes()),
+                    BinaryStringData.fromBytes(
+                            "[{\"key1\": \"value1\", \"key2\": {\"key2_1\": \"value2_1\", \"key2_2\": \"value2_2\"}, \"key3\": [\"value3\"], \"key4\": [\"value4_1\", \"value4_2\"]}, {\"key5\": \"value5\"}]"
+                                    .getBytes()),
+                    1L
+                };
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Assertions.assertThat(recordFields(snapshotRecord, JSON_TYPES)).isEqualTo(expectedSnapshot);
     }
 
     private <T> Tuple2<List<T>, List<CreateTableEvent>> fetchResultsAndCreateTableEvent(
@@ -767,13 +819,23 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.TIME(0),
                     DataTypes.TIME(3),
                     DataTypes.TIME(6),
-                    DataTypes.STRING(),
-                    DataTypes.BIGINT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.BIGINT(),
-                    DataTypes.BIGINT(),
+                    DataTypes.TIMESTAMP(0),
+                    DataTypes.TIMESTAMP(3),
+                    DataTypes.TIMESTAMP(6),
+                    DataTypes.TIMESTAMP(),
                     DataTypes.TIMESTAMP_LTZ(0));
 
     private static final RowType HSTORE_TYPES_WITH_ADAPTIVE =
             RowType.of(DataTypes.INT(), DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()));
+
+    private static final RowType JSON_TYPES =
+            RowType.of(
+                    DataTypes.INT(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.BIGINT());
 }

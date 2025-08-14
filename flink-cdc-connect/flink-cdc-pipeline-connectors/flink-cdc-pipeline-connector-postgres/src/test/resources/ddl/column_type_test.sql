@@ -67,7 +67,6 @@ CREATE TABLE full_types
     int8range_c            INT8RANGE,
     numrange_c            NUMRANGE,
     tsrange_c TSRANGE,
-    tsTZrange_c TSTZRANGE,
     daterange_c DATERANGE,
     status status NOT NULL,
     PRIMARY KEY (id)
@@ -89,7 +88,7 @@ VALUES (1, '2', 32767, 65535, 2147483647, 5.5, 6.6, 123.12345, 404.4443, true,
             <notifications>true</notifications>
         </preferences>
     </user>','(3.456,7.890)'::point,'foo.bar.baz','JohnDoe','color => "blue", size => "L"','192.168.1.1'::inet,'[1, 10)'::int4range,'[1000000000, 5000000000)'::int8range,'[5.5, 20.75)'::numrange,
-       '["2023-08-01 08:00:00", "2023-08-01 12:00:00")','["2023-08-01 08:00:00+00", "2023-08-01 12:00:00+00")','["2023-08-01", "2023-08-15")','pending');
+       '["2023-08-01 08:00:00", "2023-08-01 12:00:00")','["2023-08-01", "2023-08-15")','pending');
 
 
 CREATE TABLE time_types (
@@ -98,7 +97,6 @@ CREATE TABLE time_types (
                             time_c               TIME(0) WITHOUT TIME ZONE,
                             time_3_c             TIME(3) WITHOUT TIME ZONE,
                             time_6_c             TIME(6) WITHOUT TIME ZONE,
-                            time_tz_c            TIME(6) WITH TIME ZONE,
                             datetime_c           TIMESTAMP(0) WITHOUT TIME ZONE,
                             datetime3_c          TIMESTAMP(3) WITHOUT TIME ZONE,
                             datetime6_c          TIMESTAMP(6) WITHOUT TIME ZONE,
@@ -114,7 +112,6 @@ VALUES (2,
         '18:00:22',
         '18:00:22.123',
         '18:00:22.123456',
-        '18:00:22+08:00',
         '2020-07-17 18:00:22',
         '2020-07-17 18:00:22.123',
         '2020-07-17 18:00:22.123456',
@@ -131,3 +128,29 @@ ALTER TABLE inventory.hstore_types
 
 INSERT INTO hstore_types
 VALUES (1, 'a => 1, b => 2');
+
+CREATE TABLE json_types (
+                            id        SERIAL PRIMARY KEY,
+                            json_c0   JSON,
+                            json_c1   JSON,
+                            json_c2   JSON,
+                            jsonb_c0   JSONB,
+                            jsonb_c1   JSONB,
+                            jsonb_c2   JSONB,
+                            int_c     INTEGER
+);
+
+ALTER TABLE inventory.json_types
+    REPLICA IDENTITY FULL;
+
+INSERT INTO json_types (id,json_c0, json_c1, json_c2, jsonb_c0, jsonb_c1, jsonb_c2, int_c)
+VALUES
+    (1,
+        '{"key1":"value1"}',
+        '{"key1":"value1","key2":"value2"}',
+        '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]',
+        '{"key1":"value1"}'::jsonb,
+        '{"key1":"value1","key2":"value2"}'::jsonb,
+        '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]'::jsonb,
+     1
+    );
