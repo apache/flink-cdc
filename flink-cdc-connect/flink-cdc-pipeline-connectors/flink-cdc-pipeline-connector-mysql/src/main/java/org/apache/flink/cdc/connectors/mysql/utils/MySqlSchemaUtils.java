@@ -33,10 +33,15 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
@@ -45,6 +50,10 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils.
 /** Utilities for converting from debezium {@link Table} types to {@link Schema}. */
 public class MySqlSchemaUtils {
 
+    private static final String[] TABLE_QUERY = {"TABLE"};
+    private static final Set<String> SYSTEM_DB_SET =
+            new HashSet<>(
+                    Arrays.asList("information_schema", "mysql", "sys", "performance_schema"));
     private static final Logger LOG = LoggerFactory.getLogger(MySqlSchemaUtils.class);
 
     public static List<String> listDatabases(MySqlSourceConfig sourceConfig) {
@@ -58,16 +67,23 @@ public class MySqlSchemaUtils {
     public static List<TableId> listTables(
             MySqlSourceConfig sourceConfig, @Nullable String dbName) {
         try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
-            List<String> databases =
-                    dbName != null ? Collections.singletonList(dbName) : listDatabases(jdbc);
-
             List<TableId> tableIds = new ArrayList<>();
-            for (String database : databases) {
-                tableIds.addAll(listTables(jdbc, database));
+            try (Connection connection = jdbc.connection()) {
+                DatabaseMetaData metaData = connection.getMetaData();
+                try (ResultSet resultSet = metaData.getTables(dbName, null, "%", TABLE_QUERY)) {
+                    while (resultSet.next()) {
+                        String database = resultSet.getString("TABLE_CAT");
+                        if (SYSTEM_DB_SET.contains(database)) {
+                            continue;
+                        }
+                        String tableName = resultSet.getString("TABLE_NAME");
+                        tableIds.add(TableId.tableId(database, tableName));
+                    }
+                }
             }
             return tableIds;
         } catch (SQLException e) {
-            throw new RuntimeException("Error to list databases: " + e.getMessage(), e);
+            throw new RuntimeException("Error to list tables: " + dbName, e);
         }
     }
 
@@ -86,16 +102,22 @@ public class MySqlSchemaUtils {
         // -------------------
         // Get the list of databases ...
         LOG.info("Read list of available databases");
-        final List<String> databaseNames = new ArrayList<>();
-        jdbc.query(
-                "SHOW DATABASES WHERE `database` NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')",
-                rs -> {
-                    while (rs.next()) {
-                        databaseNames.add(rs.getString(1));
+        try (Connection connection = jdbc.connection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            try (ResultSet resultSet = metaData.getCatalogs()) {
+                List<String> databaseNames = new ArrayList<>();
+                while (resultSet.next()) {
+                    String dbName = resultSet.getString("TABLE_CAT");
+                    if (SYSTEM_DB_SET.contains(dbName)) {
+                        continue;
                     }
-                });
-        LOG.info("\t list of available databases are: {}", databaseNames);
-        return databaseNames;
+                    databaseNames.add(dbName);
+                }
+
+                LOG.info("\t list of available databases are:{}", databaseNames);
+                return databaseNames;
+            }
+        }
     }
 
     public static List<TableId> listTables(JdbcConnection jdbc, String dbName) throws SQLException {
