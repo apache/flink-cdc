@@ -29,7 +29,6 @@ import java.util.Map;
 /** Builder of {@link PreTransformOperator}. */
 public class PreTransformOperatorBuilder {
     private final List<TransformRule> transformRules = new ArrayList<>();
-    private boolean shouldStoreSchemasInState;
 
     private final List<Tuple3<String, String, Map<String, String>>> udfFunctions =
             new ArrayList<>();
@@ -77,13 +76,7 @@ public class PreTransformOperatorBuilder {
         return this;
     }
 
-    public PreTransformOperatorBuilder shouldStoreSchemasInState(
-            boolean shouldStoreSchemasInState) {
-        this.shouldStoreSchemasInState = shouldStoreSchemasInState;
-        return this;
-    }
-
     public PreTransformOperator build() {
-        return new PreTransformOperator(transformRules, udfFunctions, shouldStoreSchemasInState);
+        return new PreTransformOperator(transformRules, udfFunctions);
     }
 }
