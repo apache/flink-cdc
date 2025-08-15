@@ -20,6 +20,7 @@ package org.apache.flink.cdc.debezium.event;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -31,6 +32,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -222,8 +224,17 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         return convertToRecord((RowType) type, dbzObj, schema);
                     }
                 };
-            case ARRAY:
             case MAP:
+                return new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        return convertToMap(dbzObj, schema);
+                    }
+                };
+            case ARRAY:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
@@ -424,6 +435,41 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         } else {
             return fieldConverter.convert(fieldValue, fieldSchema);
         }
+    }
+
+    protected Object convertToMap(Object dbzObj, Schema schema) throws Exception {
+        if (dbzObj == null) {
+            return null;
+        }
+
+        // Obtain the schema for the keys and values of a Map"
+        Schema keySchema = schema.keySchema();
+        Schema valueSchema = schema.valueSchema();
+
+        // Infer the data types of keys and values
+        DataType keyType =
+                keySchema != null
+                        ? schemaDataTypeInference.infer(null, keySchema)
+                        : DataTypes.STRING();
+
+        DataType valueType =
+                valueSchema != null
+                        ? schemaDataTypeInference.infer(null, valueSchema)
+                        : DataTypes.STRING();
+
+        DeserializationRuntimeConverter keyConverter = createConverter(keyType);
+        DeserializationRuntimeConverter valueConverter = createConverter(valueType);
+
+        Map<?, ?> map = (Map<?, ?>) dbzObj;
+        Map<Object, Object> convertedMap = new java.util.HashMap<>(map.size());
+
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object convertedKey = convertField(keyConverter, entry.getKey(), keySchema);
+            Object convertedValue = convertField(valueConverter, entry.getValue(), valueSchema);
+            convertedMap.put(convertedKey, convertedValue);
+        }
+
+        return new GenericMapData(convertedMap);
     }
 
     private static DeserializationRuntimeConverter wrapIntoNullableConverter(
