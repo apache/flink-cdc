@@ -76,7 +76,8 @@ class PaimonHashFunctionTest {
         TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
         Map<String, String> tableOptions = new HashMap<>();
         MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, new HashMap<>(), new HashMap<>());
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING().notNull())
@@ -132,7 +133,8 @@ class PaimonHashFunctionTest {
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "10");
         MetadataApplier metadataApplier =
-                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+                new PaimonMetadataApplier(
+                        catalogOptions, tableOptions, new HashMap<>(), new HashMap<>());
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("col1", DataTypes.STRING().notNull())
