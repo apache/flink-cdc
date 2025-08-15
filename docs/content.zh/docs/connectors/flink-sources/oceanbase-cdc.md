@@ -136,7 +136,7 @@ OceanBase CDC 源端读取方案：
 部署 OceanBase 数据库和 Binlog 服务
 ----------------------
 
-1. 按照 [文档](https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000003378399) 部署 OceanBase 数据库。
+1. 按照 [文档](https://www.oceanbase.com/docs/common-oceanbase-database-cn-1000000002012734) 部署 OceanBase 数据库。
 2. 按照 [文档](https://www.oceanbase.com/docs/common-oblogproxy-doc-1000000003053708) 部署 OceanBase Binlog 服务。
 
 

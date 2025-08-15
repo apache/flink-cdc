@@ -36,7 +36,7 @@ limitations under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-sql-connector-mysql-cdc</artifactId>
+            <artifactId>flink-connector-mysql-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>
@@ -58,10 +58,76 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>org.apache.flink:flink-sql-connector-mysql-cdc</include>
+                                    <include>io.debezium:debezium-api</include>
+                                    <include>io.debezium:debezium-embedded</include>
+                                    <include>io.debezium:debezium-core</include>
+                                    <include>io.debezium:debezium-ddl-parser</include>
+                                    <include>io.debezium:debezium-connector-mysql</include>
+                                    <include>org.apache.flink:flink-cdc-common</include>
+                                    <include>org.apache.flink:flink-connector-debezium</include>
+                                    <include>org.apache.flink:flink-connector-mysql-cdc</include>
+                                    <include>org.antlr:antlr4-runtime</include>
+                                    <include>org.apache.kafka:*</include>
+                                    <include>com.zendesk:mysql-binlog-connector-java</include>
+                                    <include>com.fasterxml.*:*</include>
+                                    <include>com.google.guava:*</include>
+                                    <include>com.esri.geometry:esri-geometry-api</include>
+                                    <include>com.zaxxer:HikariCP</include>
+                                    <!--  Include fixed version 30.1.1-jre-14.0 of flink shaded guava  -->
+                                    <include>org.apache.flink:flink-shaded-guava</include>
                                     <include>org.apache.flink:flink-connector-oceanbase-cdc</include>
                                 </includes>
                             </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>org.apache.kafka:*</artifact>
+                                    <excludes>
+                                        <exclude>kafka/kafka-version.properties</exclude>
+                                        <exclude>LICENSE</exclude>
+                                        <!-- Does not contain anything relevant.
+                                            Cites a binary dependency on jersey, but this is neither reflected in the
+                                            dependency graph, nor are any jersey files bundled. -->
+                                        <exclude>NOTICE</exclude>
+                                        <exclude>common/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.kafka</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.antlr</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.org.antlr
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.fasterxml</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.google</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.esri.geometry</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.shaded.com.esri.geometry</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.com.zaxxer
+                                    </shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
