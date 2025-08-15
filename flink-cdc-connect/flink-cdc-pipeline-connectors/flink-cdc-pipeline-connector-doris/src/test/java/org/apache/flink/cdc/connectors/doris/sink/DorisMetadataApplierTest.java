@@ -44,7 +44,7 @@ class DorisMetadataApplierTest {
                 (String)
                         convertMethod.invoke(
                                 metadataApplier,
-                                DorisSchemaUtils.MYSQL_INVALID_TIMESTAMP,
+                                DorisSchemaUtils.MYSQL_DEFAULT_TIMESTAMP_VALUE,
                                 DataTypes.TIMESTAMP());
         Assertions.assertThat(result).isEqualTo(DorisSchemaUtils.DEFAULT_DATETIME);
 

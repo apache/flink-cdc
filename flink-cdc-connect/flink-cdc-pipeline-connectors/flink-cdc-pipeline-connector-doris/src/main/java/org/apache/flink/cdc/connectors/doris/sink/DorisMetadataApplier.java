@@ -328,7 +328,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                 || dataType instanceof TimestampType
                 || dataType instanceof ZonedTimestampType) {
 
-            if (DorisSchemaUtils.MYSQL_INVALID_TIMESTAMP.equals(defaultValue)) {
+            if (DorisSchemaUtils.MYSQL_DEFAULT_TIMESTAMP_VALUE.equals(defaultValue)) {
                 return DorisSchemaUtils.DEFAULT_DATETIME;
             }
         }
