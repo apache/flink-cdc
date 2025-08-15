@@ -75,7 +75,7 @@ public class SqlServerDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
+    public boolean isDataCollectionIdCaseInsensitive(JdbcSourceConfig sourceConfig) {
         return true;
     }
 

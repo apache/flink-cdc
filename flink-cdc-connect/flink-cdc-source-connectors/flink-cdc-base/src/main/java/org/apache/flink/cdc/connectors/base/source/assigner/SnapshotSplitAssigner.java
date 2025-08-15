@@ -84,7 +84,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
     private final boolean isRemainingTablesCheckpointed;
 
     private ChunkSplitter chunkSplitter;
-    private boolean isTableIdCaseSensitive;
+    private boolean isTableIdCaseInsensitive;
 
     @Nullable private Long checkpointIdToFinish;
     private final DataSourceDialect<C> dialect;
@@ -102,7 +102,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             C sourceConfig,
             int currentParallelism,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory) {
         this(
@@ -115,7 +115,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 new HashMap<>(),
                 INITIAL_ASSIGNING,
                 remainingTables,
-                isTableIdCaseSensitive,
+                isTableIdCaseInsensitive,
                 true,
                 dialect,
                 offsetFactory,
@@ -139,7 +139,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                 checkpoint.getSplitFinishedOffsets(),
                 checkpoint.getSnapshotAssignerStatus(),
                 checkpoint.getRemainingTables(),
-                checkpoint.isTableIdCaseSensitive(),
+                checkpoint.isTableIdCaseInsensitive(),
                 checkpoint.isRemainingTablesCheckpointed(),
                 dialect,
                 offsetFactory,
@@ -157,7 +157,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
             Map<String, Offset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
             List<TableId> remainingTables,
-            boolean isTableIdCaseSensitive,
+            boolean isTableIdCaseInsensitive,
             boolean isRemainingTablesCheckpointed,
             DataSourceDialect<C> dialect,
             OffsetFactory offsetFactory,
@@ -183,7 +183,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
         this.assignerStatus = assignerStatus;
         this.remainingTables = new CopyOnWriteArrayList<>(remainingTables);
         this.isRemainingTablesCheckpointed = isRemainingTablesCheckpointed;
-        this.isTableIdCaseSensitive = isTableIdCaseSensitive;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
         this.dialect = dialect;
         this.offsetFactory = offsetFactory;
         this.splitFinishedCheckpointIds = splitFinishedCheckpointIds;
@@ -524,7 +524,7 @@ public class SnapshotSplitAssigner<C extends SourceConfig> implements SplitAssig
                         splitFinishedOffsets,
                         assignerStatus,
                         remainingTables,
-                        isTableIdCaseSensitive,
+                        isTableIdCaseInsensitive,
                         true,
                         splitFinishedCheckpointIds,
                         chunkSplitter.snapshotState(checkpointId));
