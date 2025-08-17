@@ -20,6 +20,9 @@ package org.apache.flink.cdc.connectors.paimon.sink;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
+import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
 
 import org.apache.paimon.flink.LogicalTypeConversion;
@@ -35,6 +38,9 @@ import java.util.Optional;
  * represent different types of schema modifications.
  */
 public class SchemaChangeProvider {
+
+    public static final String DEFAULT_DATETIME = "1970-01-01 00:00:00";
+    public static final String MYSQL_DEFAULT_TIMESTAMP_VALUE = "0000-00-00 00:00:00";
     /**
      * Creates a SchemaChange object for adding a column without specifying its position.
      *
@@ -55,7 +61,9 @@ public class SchemaChangeProvider {
         // if default value express exists, we need to set the default value to the table
         // option
         Column column = columnWithPosition.getAddColumn();
-        Optional.ofNullable(column.getDefaultValueExpression())
+        Optional.ofNullable(
+                        convertInvalidTimestampDefaultValue(
+                                column.getDefaultValueExpression(), column.getType()))
                 .ifPresent(
                         value -> {
                             result.add(
@@ -89,7 +97,9 @@ public class SchemaChangeProvider {
         // if default value express exists, we need to set the default value to the table
         // option
         Column column = columnWithPosition.getAddColumn();
-        Optional.ofNullable(column.getDefaultValueExpression())
+        Optional.ofNullable(
+                        convertInvalidTimestampDefaultValue(
+                                column.getDefaultValueExpression(), column.getType()))
                 .ifPresent(
                         value -> {
                             result.add(
@@ -148,5 +158,23 @@ public class SchemaChangeProvider {
      */
     public static SchemaChange setOption(String key, String value) {
         return SchemaChange.setOption(key, value);
+    }
+
+    private static String convertInvalidTimestampDefaultValue(
+            String defaultValue, DataType dataType) {
+        if (defaultValue == null) {
+            return null;
+        }
+
+        if (dataType instanceof LocalZonedTimestampType
+                || dataType instanceof TimestampType
+                || dataType instanceof ZonedTimestampType) {
+
+            if (MYSQL_DEFAULT_TIMESTAMP_VALUE.equals(defaultValue)) {
+                return DEFAULT_DATETIME;
+            }
+        }
+
+        return defaultValue;
     }
 }
