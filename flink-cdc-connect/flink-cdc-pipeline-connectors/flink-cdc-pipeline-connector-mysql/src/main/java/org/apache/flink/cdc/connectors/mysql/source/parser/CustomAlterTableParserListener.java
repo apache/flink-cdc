@@ -226,6 +226,9 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                                                         null))));
                     } else if (ctx.AFTER() != null) {
                         String afterColumn = parser.parseName(ctx.uid(1));
+                        if (isTableIdCaseInsensitive) {
+                            afterColumn = afterColumn.toLowerCase(Locale.ROOT);
+                        }
                         changes.add(
                                 new AddColumnEvent(
                                         currentTable,
