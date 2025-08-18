@@ -212,10 +212,16 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             return schemaChangeEvent;
         }
         TableId tableId = schemaChangeEvent.tableId();
-        Schema upstreamSchema =
-                schemaMaps.containsKey(tableId)
-                        ? schemaMaps.get(tableId).getUpstreamSchemaInfo().getSchema()
-                        : schemaEvolutionClient.getLatestEvolvedSchema(tableId).orElse(null);
+        Schema upstreamSchema;
+        try {
+            upstreamSchema =
+                    schemaMaps.containsKey(tableId)
+                            ? schemaMaps.get(tableId).getUpstreamSchemaInfo().getSchema()
+                            : schemaEvolutionClient.getLatestEvolvedSchema(tableId).orElse(null);
+        } catch (Exception e) {
+            // In batch mode, we can't get schema from registry.
+            upstreamSchema = null;
+        }
         if (!SchemaUtils.isSchemaChangeEventRedundant(upstreamSchema, schemaChangeEvent)) {
             upstreamSchema = SchemaUtils.applySchemaChangeEvent(upstreamSchema, schemaChangeEvent);
         }
@@ -242,8 +248,13 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             throws Exception {
         TableId tableId = dataChangeEvent.tableId();
         if (!schemaMaps.containsKey(dataChangeEvent.tableId())) {
-            Optional<Schema> schema =
-                    schemaEvolutionClient.getLatestEvolvedSchema(dataChangeEvent.tableId());
+            Optional<Schema> schema;
+            try {
+                schema = schemaEvolutionClient.getLatestEvolvedSchema(dataChangeEvent.tableId());
+            } catch (Exception e) {
+                // In batch mode, we can't get schema from registry.
+                schema = Optional.empty();
+            }
             if (schema.isPresent()) {
                 MixedSchemaInfo mixedSchemaInfo =
                         new MixedSchemaInfo(
