@@ -97,7 +97,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testParseAlterStatementWhenTableNameIsUpper() throws Exception {
+    public void testParseAlterStatementWhenTableNameAndColumnIsUpper() throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
@@ -177,7 +177,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
         List<Event> expected = new ArrayList<>();
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` CHANGE COLUMN `description` `desc` VARCHAR(255) NULL DEFAULT NULL;",
+                        "ALTER TABLE `%s`.`products` CHANGE COLUMN `DESCRIPTION` `DESC` VARCHAR(255) NULL DEFAULT NULL;",
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AlterColumnTypeEvent(
@@ -196,7 +196,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` ADD COLUMN `desc1` VARCHAR(45) NULL AFTER `weight`;",
+                        "ALTER TABLE `%s`.`products` ADD COLUMN `DESC1` VARCHAR(45) NULL AFTER `weight`;",
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AddColumnEvent(
@@ -209,7 +209,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` ADD COLUMN `col1` VARCHAR(45) NULL AFTER `weight`, ADD COLUMN `col2` VARCHAR(55) NULL AFTER `desc1`;",
+                        "ALTER TABLE `%s`.`products` ADD COLUMN `col1` VARCHAR(45) NULL AFTER `weight`, ADD COLUMN `COL2` VARCHAR(55) NULL AFTER `desc1`;",
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AddColumnEvent(
@@ -250,13 +250,13 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AlterColumnTypeEvent(
-                        tableId, Collections.singletonMap("DESC3", DataTypes.VARCHAR(255))));
+                        tableId, Collections.singletonMap("desc3", DataTypes.VARCHAR(255))));
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` DROP COLUMN `DESC3`;",
+                        "ALTER TABLE `%s`.`products` DROP COLUMN `desc3`;",
                         inventoryDatabase.getDatabaseName()));
-        expected.add(new DropColumnEvent(tableId, Collections.singletonList("DESC3")));
+        expected.add(new DropColumnEvent(tableId, Collections.singletonList("desc3")));
 
         // Should not catch SchemaChangeEvent of tables other than `products`
         statement.execute(
