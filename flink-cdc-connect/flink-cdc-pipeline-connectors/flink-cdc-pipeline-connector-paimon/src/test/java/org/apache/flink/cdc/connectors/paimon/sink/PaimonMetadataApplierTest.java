@@ -37,6 +37,7 @@ import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataTypes;
 import org.apache.paimon.types.RowType;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -580,5 +581,54 @@ class PaimonMetadataApplierTest {
         Assertions.assertThat(table.partitionKeys()).isEmpty();
         Assertions.assertThat(table.options()).containsEntry("bucket", "-1");
         Assertions.assertThat(table.comment()).contains("comment of table_with_comment");
+    }
+
+    @Test
+    public void testMysqlDefaultTimestampValueConversionInAddColumn()
+            throws SchemaEvolveException, Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException {
+        initialize("filesystem");
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.timestamp_test"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "name",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "created_time",
+                                org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP(),
+                                null,
+                                SchemaChangeProvider.INVALID_OR_MISSING_DATATIME)));
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "updated_time",
+                                org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ(),
+                                null,
+                                SchemaChangeProvider.INVALID_OR_MISSING_DATATIME)));
+
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(TableId.parse("test.timestamp_test"), addedColumns);
+        metadataApplier.applySchemaChange(addColumnEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.timestamp_test"));
+
+        Assertions.assertThat(table).isNotNull();
     }
 }

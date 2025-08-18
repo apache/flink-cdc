@@ -200,7 +200,8 @@ public class DorisMetadataApplier implements MetadataApplier {
                     new FieldSchema(
                             column.getName(),
                             typeString,
-                            column.getDefaultValueExpression(),
+                            convertInvalidTimestampDefaultValue(
+                                    column.getDefaultValueExpression(), column.getType()),
                             column.getComment()));
         }
         return fieldSchemaMap;
@@ -237,7 +238,8 @@ public class DorisMetadataApplier implements MetadataApplier {
                         new FieldSchema(
                                 column.getName(),
                                 buildTypeString(column.getType()),
-                                column.getDefaultValueExpression(),
+                                convertInvalidTimestampDefaultValue(
+                                        column.getDefaultValueExpression(), column.getType()),
                                 column.getComment());
                 schemaChangeManager.addColumn(
                         tableId.getSchemaName(), tableId.getTableName(), addFieldSchema);
@@ -315,5 +317,22 @@ public class DorisMetadataApplier implements MetadataApplier {
         } catch (Exception e) {
             throw new SchemaEvolveException(dropTableEvent, "fail to drop table", e);
         }
+    }
+
+    private String convertInvalidTimestampDefaultValue(String defaultValue, DataType dataType) {
+        if (defaultValue == null) {
+            return null;
+        }
+
+        if (dataType instanceof LocalZonedTimestampType
+                || dataType instanceof TimestampType
+                || dataType instanceof ZonedTimestampType) {
+
+            if (DorisSchemaUtils.INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+                return DorisSchemaUtils.DEFAULT_DATETIME;
+            }
+        }
+
+        return defaultValue;
     }
 }
