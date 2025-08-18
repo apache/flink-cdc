@@ -320,10 +320,12 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     String oldColumnName =
-                            isTableIdCaseInsensitive ? column.name().toLowerCase() : column.name();
+                            isTableIdCaseInsensitive
+                                    ? column.name().toLowerCase(Locale.ROOT)
+                                    : column.name();
                     String newColumnName = parser.parseName(ctx.newColumn);
                     if (isTableIdCaseInsensitive && newColumnName != null) {
-                        newColumnName = newColumnName.toLowerCase();
+                        newColumnName = newColumnName.toLowerCase(Locale.ROOT);
                     }
 
                     Map<String, DataType> typeMapping = new HashMap<>();
@@ -346,7 +348,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     public void enterAlterByDropColumn(MySqlParser.AlterByDropColumnContext ctx) {
         String removedColName = parser.parseName(ctx.uid());
         if (isTableIdCaseInsensitive && removedColName != null) {
-            removedColName = removedColName.toLowerCase();
+            removedColName = removedColName.toLowerCase(Locale.ROOT);
         }
         changes.add(new DropColumnEvent(currentTable, Collections.singletonList(removedColName)));
         super.enterAlterByDropColumn(ctx);
@@ -400,10 +402,12 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     String oldColumnName =
-                            isTableIdCaseInsensitive ? column.name().toLowerCase() : column.name();
+                            isTableIdCaseInsensitive
+                                    ? column.name().toLowerCase(Locale.ROOT)
+                                    : column.name();
                     String newColumnName = parser.parseName(ctx.newColumn);
                     if (isTableIdCaseInsensitive && newColumnName != null) {
-                        newColumnName = newColumnName.toLowerCase();
+                        newColumnName = newColumnName.toLowerCase(Locale.ROOT);
                     }
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
