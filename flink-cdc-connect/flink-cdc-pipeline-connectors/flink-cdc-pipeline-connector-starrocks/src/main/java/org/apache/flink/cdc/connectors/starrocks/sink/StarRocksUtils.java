@@ -54,7 +54,7 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
 public class StarRocksUtils {
 
     public static final String DEFAULT_DATETIME = "1970-01-01 00:00:00";
-    public static final String MYSQL_DEFAULT_TIMESTAMP_VALUE = "0000-00-00 00:00:00";
+    public static final String INVALID_OR_MISSING_DATATIME = "0000-00-00 00:00:00";
 
     /** Convert a source table to {@link StarRocksTable}. */
     public static StarRocksTable toStarRocksTable(
@@ -402,7 +402,7 @@ public class StarRocksUtils {
                 || dataType instanceof org.apache.flink.cdc.common.types.TimestampType
                 || dataType instanceof org.apache.flink.cdc.common.types.ZonedTimestampType) {
 
-            if (MYSQL_DEFAULT_TIMESTAMP_VALUE.equals(defaultValue)) {
+            if (INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
                 return DEFAULT_DATETIME;
             }
         }

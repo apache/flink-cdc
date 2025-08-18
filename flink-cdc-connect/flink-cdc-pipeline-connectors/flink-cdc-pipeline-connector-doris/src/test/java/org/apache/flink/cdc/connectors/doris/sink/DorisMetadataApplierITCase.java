@@ -544,13 +544,13 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                                         "created_time",
                                         DataTypes.TIMESTAMP(),
                                         null,
-                                        DorisSchemaUtils.MYSQL_DEFAULT_TIMESTAMP_VALUE))
+                                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME))
                         .column(
                                 new PhysicalColumn(
                                         "updated_time",
                                         DataTypes.TIMESTAMP_LTZ(),
                                         null,
-                                        DorisSchemaUtils.MYSQL_DEFAULT_TIMESTAMP_VALUE))
+                                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME))
                         .primaryKey("id")
                         .build();
 
@@ -593,14 +593,14 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         "created_time",
                         DataTypes.TIMESTAMP(),
                         null,
-                        DorisSchemaUtils.MYSQL_DEFAULT_TIMESTAMP_VALUE);
+                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME);
 
         PhysicalColumn updatedTimeCol =
                 new PhysicalColumn(
                         "updated_time",
                         DataTypes.TIMESTAMP_LTZ(),
                         null,
-                        DorisSchemaUtils.MYSQL_DEFAULT_TIMESTAMP_VALUE);
+                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME);
 
         events.add(
                 new AddColumnEvent(

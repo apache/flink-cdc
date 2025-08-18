@@ -614,14 +614,14 @@ class PaimonMetadataApplierTest {
                                 "created_time",
                                 org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP(),
                                 null,
-                                SchemaChangeProvider.MYSQL_DEFAULT_TIMESTAMP_VALUE)));
+                                SchemaChangeProvider.INVALID_OR_MISSING_DATATIME)));
         addedColumns.add(
                 AddColumnEvent.last(
                         Column.physicalColumn(
                                 "updated_time",
                                 org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ(),
                                 null,
-                                SchemaChangeProvider.MYSQL_DEFAULT_TIMESTAMP_VALUE)));
+                                SchemaChangeProvider.INVALID_OR_MISSING_DATATIME)));
 
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(TableId.parse("test.timestamp_test"), addedColumns);

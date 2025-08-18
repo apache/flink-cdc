@@ -40,7 +40,7 @@ import java.util.Optional;
 public class SchemaChangeProvider {
 
     public static final String DEFAULT_DATETIME = "1970-01-01 00:00:00";
-    public static final String MYSQL_DEFAULT_TIMESTAMP_VALUE = "0000-00-00 00:00:00";
+    public static final String INVALID_OR_MISSING_DATATIME = "0000-00-00 00:00:00";
     /**
      * Creates a SchemaChange object for adding a column without specifying its position.
      *
@@ -170,7 +170,7 @@ public class SchemaChangeProvider {
                 || dataType instanceof TimestampType
                 || dataType instanceof ZonedTimestampType) {
 
-            if (MYSQL_DEFAULT_TIMESTAMP_VALUE.equals(defaultValue)) {
+            if (INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
                 return DEFAULT_DATETIME;
             }
         }
