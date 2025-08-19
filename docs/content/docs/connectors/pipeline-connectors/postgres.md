@@ -364,11 +364,11 @@ Notice:
     </tr>
     <tr>
       <td>INTERVAL [P]</td>
-      <td>STRING(when interval.handling.mode is set to string)</td>
+      <td>STRING(when <code>debezium.interval.handling.mode</code> is set to string)</td>
     </tr>
     <tr>
       <td>BYTEA</td>
-      <td>BYTES or STRING (when binary.handling.mode is set to base64 or base64-url-safe or hex)</td>
+      <td>BYTES or STRING (when <code>debezium.binary.handling.mode</code> is set to base64 or base64-url-safe or hex)</td>
     </tr>
     <tr>
       <td>
@@ -434,9 +434,9 @@ When the time.precision.mode property is set to adaptive, the default, the conne
 </div>
 
 ### Decimal types Mapping
-The setting of the PostgreSQL connector configuration property decimal.handling.mode determines how the connector maps decimal types.
+The setting of the PostgreSQL connector configuration property <code>debezium.decimal.handling.mode</code> determines how the connector maps decimal types.
 
-When the decimal.handling.mode property is set to precise, the connector uses the Kafka Connect org.apache.kafka.connect.data.Decimal logical type for all DECIMAL, NUMERIC and MONEY columns. This is the default mode.
+When the <code>debezium.decimal.handling.mode</code> property is set to precise, the connector uses the Kafka Connect org.apache.kafka.connect.data.Decimal logical type for all DECIMAL, NUMERIC and MONEY columns. This is the default mode.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -475,7 +475,7 @@ When the decimal.handling.mode property is set to precise, the connector uses th
 </table>
 </div>
 
-When the decimal.handling.mode property is set to double, the connector represents all DECIMAL, NUMERIC and MONEY values as Java double values and encodes them as shown in the following table.
+When the <code>debezium.decimal.handling.mode</code> property is set to double, the connector represents all DECIMAL, NUMERIC and MONEY values as Java double values and encodes them as shown in the following table.
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -505,7 +505,7 @@ When the decimal.handling.mode property is set to double, the connector represen
 </table>
 </div>
 
-The last possible setting for the decimal.handling.mode configuration property is string. In this case, the connector represents DECIMAL, NUMERIC and MONEY values as their formatted string representation, and encodes them as shown in the following table.
+The last possible setting for the <code>debezium.decimal.handling.mode</code> configuration property is string. In this case, the connector represents DECIMAL, NUMERIC and MONEY values as their formatted string representation, and encodes them as shown in the following table.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -534,12 +534,12 @@ The last possible setting for the decimal.handling.mode configuration property i
 </table>
 </div>
 
-PostgreSQL supports NaN (not a number) as a special value to be stored in DECIMAL/NUMERIC values when the setting of decimal.handling.mode is string or double. In this case, the connector encodes NaN as either Double.NaN or the string constant NAN.
+PostgreSQL supports NaN (not a number) as a special value to be stored in DECIMAL/NUMERIC values when the setting of <code>debezium.decimal.handling.mode</code> is string or double. In this case, the connector encodes NaN as either Double.NaN or the string constant NAN.
 
 ### HSTORE type Mapping
-The setting of the PostgreSQL connector configuration property hstore.handling.mode determines how the connector maps HSTORE values.
+The setting of the PostgreSQL connector configuration property <code>debezium.hstore.handling.mode</code> determines how the connector maps HSTORE values.
 
-When the hstore.handling.mode property is set to json (the default), the connector represents HSTORE values as string representations of JSON values and encodes them as shown in the following table. When the hstore.handling.mode property is set to map, the connector uses the MAP schema type for HSTORE values.
+When the <code>debezium.hstore.handling.mode</code> property is set to json (the default), the connector represents HSTORE values as string representations of JSON values and encodes them as shown in the following table. When the <code>debezium.hstore.handling.mode</code> property is set to map, the connector uses the MAP schema type for HSTORE values.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -552,12 +552,12 @@ When the hstore.handling.mode property is set to json (the default), the connect
        <tr>
         <td>
          HSTORE
-        <td>STRING(hstore.handling.mode=string)</td>
+        <td>STRING(<code>`debezium.hstore.handling.mode`=`string`</code>)</td>
       </tr>
       <tr>
         <td>
          HSTORE
-        <td>MAP(hstore.handling.mode=map)</td>
+        <td>MAP(<code>`debezium.hstore.handling.mode`=`map`</code>)</td>
       </tr>
     </tbody>
 </table>

@@ -369,11 +369,11 @@ pipeline:
     </tr>
     <tr>
       <td>INTERVAL [P]</td>
-      <td>STRING(when interval.handling.mode is set to string)</td>
+      <td>STRING(when <code>debezium.interval.handling.mode</code> is set to string)</td>
     </tr>
     <tr>
       <td>BYTEA</td>
-      <td>BYTES or STRING (when binary.handling.mode is set to base64 or base64-url-safe or hex)</td>
+      <td>BYTES or STRING (when <code>debezium.binary.handling.mode</code> is set to base64 or base64-url-safe or hex)</td>
     </tr>
     <tr>
       <td>
@@ -439,9 +439,9 @@ time.precision.mode=connect
 </div>
 
 ### Decimal types Mapping
-PostgreSQL 连接器配置属性 decimal.handling.mode 的设置决定了连接器如何映射十进制类型。
+PostgreSQL 连接器配置属性 <code>debezium.decimal.handling.mode</code> 的设置决定了连接器如何映射十进制类型。
 
-当 decimal.handling.mode 属性设置为 precise（精确）时，连接器会对所有 DECIMAL、NUMERIC 和 MONEY 列使用 Kafka Connect 的 org.apache.kafka.connect.data.Decimal 逻辑类型。这是默认模式。
+当 <code>debezium.decimal.handling.mode</code> 属性设置为 precise（精确）时，连接器会对所有 DECIMAL、NUMERIC 和 MONEY 列使用 Kafka Connect 的 org.apache.kafka.connect.data.Decimal 逻辑类型。这是默认模式。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -480,7 +480,7 @@ PostgreSQL 连接器配置属性 decimal.handling.mode 的设置决定了连接�
 </table>
 </div>
 
-当 decimal.handling.mode 属性设置为 double 时，连接器将所有 DECIMAL、NUMERIC 和 MONEY 值表示为 Java 的 double 值，并按照下表所示进行编码。
+当 <code>debezium.decimal.handling.mode</code> 属性设置为 double 时，连接器将所有 DECIMAL、NUMERIC 和 MONEY 值表示为 Java 的 double 值，并按照下表所示进行编码。
 
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
@@ -510,7 +510,7 @@ PostgreSQL 连接器配置属性 decimal.handling.mode 的设置决定了连接�
 </table>
 </div>
 
-decimal.handling.mode 配置属性的最后一个可选设置是 string（字符串）。在这种情况下，连接器将 DECIMAL、NUMERIC 和 MONEY 值表示为其格式化的字符串形式，并按照下表所示进行编码。
+<code>debezium.decimal.handling.mode</code> 配置属性的最后一个可选设置是 string（字符串）。在这种情况下，连接器将 DECIMAL、NUMERIC 和 MONEY 值表示为其格式化的字符串形式，并按照下表所示进行编码。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -539,12 +539,12 @@ decimal.handling.mode 配置属性的最后一个可选设置是 string（字符
 </table>
 </div>
 
-当 decimal.handling.mode 的设置为 string 或 double 时，PostgreSQL 支持将 NaN（非数字）作为一个特殊值存储在 DECIMAL/NUMERIC 值中。在这种情况下，连接器会将 NaN 编码为 Double.NaN 或字符串常量 NAN。
+当 <code>debezium.decimal.handling.mode</code> 的设置为 string 或 double 时，PostgreSQL 支持将 NaN（非数字）作为一个特殊值存储在 DECIMAL/NUMERIC 值中。在这种情况下，连接器会将 NaN 编码为 Double.NaN 或字符串常量 NAN。
 
 ### HSTORE type Mapping
-PostgreSQL 连接器配置属性 hstore.handling.mode 的设置决定了连接器如何映射 HSTORE 值。
+PostgreSQL 连接器配置属性 <code>debezium.hstore.handling.mode</code> 的设置决定了连接器如何映射 HSTORE 值。
 
-当 hstore.handling.mode 属性设置为 json（默认值）时，连接器将 HSTORE 值表示为 JSON 值的字符串形式，并按照下表所示进行编码。当 hstore.handling.mode 属性设置为 map 时，连接器对 HSTORE 值使用 MAP 模式类型。
+当 <code>debezium.hstore.handling.mode</code> 属性设置为 json（默认值）时，连接器将 HSTORE 值表示为 JSON 值的字符串形式，并按照下表所示进行编码。当 <code>debezium.hstore.handling.mode</code> 属性设置为 map 时，连接器对 HSTORE 值使用 MAP 模式类型。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -557,12 +557,12 @@ PostgreSQL 连接器配置属性 hstore.handling.mode 的设置决定了连接�
        <tr>
         <td>
          HSTORE
-        <td>STRING(hstore.handling.mode=string)</td>
+        <td>STRING(<code>`debezium.hstore.handling.mode`=`string`</code>)</td>
       </tr>
       <tr>
         <td>
          HSTORE
-        <td>MAP(hstore.handling.mode=map)</td>
+        <td>MAP(<code>`debezium.hstore.handling.mode`=`map`</code>)</td>
       </tr>
     </tbody>
 </table>
