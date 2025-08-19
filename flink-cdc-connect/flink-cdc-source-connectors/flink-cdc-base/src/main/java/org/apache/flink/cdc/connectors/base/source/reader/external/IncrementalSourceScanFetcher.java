@@ -99,6 +99,7 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
                     try {
                         snapshotSplitReadTask.execute(taskContext);
                     } catch (Exception e) {
+
                         setReadException(e);
                     }
                 });
