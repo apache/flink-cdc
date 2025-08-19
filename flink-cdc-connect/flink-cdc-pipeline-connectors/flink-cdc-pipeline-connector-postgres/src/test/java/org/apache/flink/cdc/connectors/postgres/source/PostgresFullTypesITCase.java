@@ -201,7 +201,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     64822000,
                     DecimalData.fromBigDecimal(new BigDecimal("500"), 10, 0),
                     BinaryStringData.fromString(
-                            "{\"coordinates\":[{\"x\":174.9479,\"y\":-36.7208,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true}],\"type\":\"Point\",\"srid\":3187}"),
+                            "{\"coordinates\":[{\"x\":174.9479,\"y\":-36.7208,\"z\":\"NaN\",\"valid\":true,\"m\":\"NaN\"}],\"type\":\"Point\",\"srid\":3187}"),
                     BinaryStringData.fromString(
                             "{\"coordinates\":[{\"x\":169.1321,\"y\":-44.7032,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true},{\"x\":167.8974,\"y\":-44.6414,\"z\":\"NaN\",\"m\":\"NaN\",\"valid\":true}],\"type\":\"MultiLineString\",\"srid\":4326}"),
                     true,
