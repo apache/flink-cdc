@@ -40,8 +40,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -86,7 +88,9 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
     }
 
     @Override
-    public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
+    public Future<?> submitTask(FetchTask<SourceSplitBase> fetchTask) {
+        CompletableFuture<Void> completableFuture = new CompletableFuture<>();
+
         this.snapshotSplitReadTask = fetchTask;
         this.currentSnapshotSplit = fetchTask.getSplit().asSnapshotSplit();
         taskContext.configure(currentSnapshotSplit);
@@ -94,10 +98,11 @@ public class IncrementalSourceScanFetcher implements Fetcher<SourceRecords, Sour
         this.hasNextElement.set(true);
         this.reachEnd.set(false);
 
-        executorService.execute(
+        return executorService.submit(
                 () -> {
                     try {
                         snapshotSplitReadTask.execute(taskContext);
+                        completableFuture.complete(null);
                     } catch (Exception e) {
                         setReadException(e);
                     }

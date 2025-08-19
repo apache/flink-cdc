@@ -62,6 +62,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -129,7 +130,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     }
 
     @Override
-    public void submitSplit(MySqlSplit mySqlSplit) {
+    public Future<?> submitSplit(MySqlSplit mySqlSplit) {
         this.currentSnapshotSplit = mySqlSplit.asSnapshotSplit();
         statefulTaskContext.configure(currentSnapshotSplit);
         this.queue = statefulTaskContext.getQueue();
@@ -150,7 +151,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         currentSnapshotSplit,
                         hooks,
                         statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill());
-        executorService.execute(
+        return executorService.submit(
                 () -> {
                     try {
                         currentTaskRunning = true;
