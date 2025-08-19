@@ -90,10 +90,8 @@ public class PaimonWriterHelper {
             Column upstreamColumn = upstreamColumns.get(i);
             Column physicalColumn = physicalColumns.get(i);
             // Case sensitive.
-            if (!upstreamColumn.getName().equals(physicalColumn.getName())) {
-                return false;
-            }
-            if (!upstreamColumn.getType().equals(physicalColumn.getType())) {
+            if (!upstreamColumn.getName().equals(physicalColumn.getName())
+                    || !upstreamColumn.getType().equals(physicalColumn.getType())) {
                 return false;
             }
         }
