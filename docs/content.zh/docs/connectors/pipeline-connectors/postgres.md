@@ -399,15 +399,16 @@ pipeline:
 </div>
 
 ### Temporal types Mapping
-除了包含时区信息的 PostgreSQL 的 TIMESTAMPTZ 数据类型之外，其他时间类型如何映射取决于连接器配置属性 time.precision.mode 的值。以下各节将描述这些映射关系：
-time.precision.mode=adaptive
+除了包含时区信息的 PostgreSQL 的 TIMESTAMPTZ 数据类型之外，其他时间类型如何映射取决于连接器配置属性 <code>debezium.time.precision.mode</code> 的值。以下各节将描述这些映射关系：
+- debezium.time.precision.mode=adaptive
+- debezium.time.precision.mode=adaptive_time_microseconds
+- debezium.time.precision.mode=connect
 
-time.precision.mode=adaptive_time_microseconds
+注意： 受限当前CDC对时间类型的支持，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Integer类型，并精度为3，后续将进行完善。
 
-time.precision.mode=connect
+<u>debezium.time.precision.mode=adaptive</u>
 
-
-当 time.precision.mode 属性设置为默认的 adaptive（自适应）时，连接器会根据列的数据类型定义来确定字面类型和语义类型。这可以确保事件能够精确地表示数据库中的值。
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，连接器会根据列的数据类型定义来确定字面类型和语义类型。这可以确保事件能够精确地表示数据库中的值。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -426,7 +427,7 @@ time.precision.mode=connect
         <td>
           TIME([P])
         </td>
-        <td>TIME([P])</td>
+        <td>INTEGER</td>
       </tr>
       <tr>
         <td>
@@ -621,11 +622,11 @@ PostgreSQL 通过 PostGIS 扩展支持空间数据类型：
     <tbody>
       <tr>
         <td>GEOMETRY(POINT, xx)</td>
-        <td>{"coordinates":[{"x":174.9479,"y":-36.7208,"z":"NaN","m":"NaN","valid":true}],"type":"Point","srid":3187}"</td>
+        <td>{"coordinates":"[[174.9479, -36.7208]]","type":"Point","srid":3187}"</td>
       </tr>
       <tr>
         <td>GEOGRAPHY(MULTILINESTRING)</td>
-        <td>{"coordinates":[{"x":169.1321,"y":-44.7032,"z":"NaN","m":"NaN","valid":true},{"x":167.8974,"y":-44.6414,"z":"NaN","m":"NaN","valid":true}],"type":"MultiLineString","srid":4326}</td>
+        <td>{"coordinates":"[[169.1321, -44.7032],[167.8974, -44.6414]]","type":"MultiLineString","srid":4326}</td>
       </tr>
     </tbody>
 </table>

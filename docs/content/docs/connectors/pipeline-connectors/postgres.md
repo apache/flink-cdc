@@ -394,15 +394,16 @@ Notice:
 </div>
 
 ### Temporal types Mapping
-Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of the time.precision.mode connector configuration property. The following sections describe these mappings:
-time.precision.mode=adaptive
+Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.the time.precision.mode</code> connector configuration property. The following sections describe these mappings:
+- debezium.time.precision.mode=adaptive
+- debezium.time.precision.mode=adaptive_time_microseconds
+- debezium.time.precision.mode=connect 
 
-time.precision.mode=adaptive_time_microseconds
+Note: Due to current CDC limitations in supporting time types, when <code>debezium.time.precision.mode</code> is set to "adaptive", "adaptive_time_microseconds", or when using Connect time types, all time values are converted to the Integer type with a precision of 3. This will be improved in future updates.
 
-time.precision.mode=connect
-time.precision.mode=adaptive
+<u>debezium.time.precision.mode=adaptive</u>
 
-When the time.precision.mode property is set to adaptive, the default, the connector determines the literal type and semantic type based on the column’s data type definition. This ensures that events exactly represent the values in the database.
+When the <code>debezium.time.precision.mode</code> property is set to adaptive, the default, the connector determines the literal type and semantic type based on the column’s data type definition. This ensures that events exactly represent the values in the database.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -421,7 +422,7 @@ When the time.precision.mode property is set to adaptive, the default, the conne
         <td>
           TIME([P])
         </td>
-        <td>TIME([P])</td>
+        <td>INTEGER</td>
       </tr>
       <tr>
         <td>
@@ -616,11 +617,11 @@ The former is used for small-area planar data, while the latter is used for larg
     <tbody>
       <tr>
         <td>GEOMETRY(POINT, xx)</td>
-        <td>{"coordinates":[{"x":174.9479,"y":-36.7208,"z":"NaN","m":"NaN","valid":true}],"type":"Point","srid":3187}"</td>
+        <td>{"coordinates":"[[174.9479, -36.7208]]","type":"Point","srid":3187}"</td>
       </tr>
       <tr>
         <td>GEOGRAPHY(MULTILINESTRING)</td>
-        <td>{"coordinates":[{"x":169.1321,"y":-44.7032,"z":"NaN","m":"NaN","valid":true},{"x":167.8974,"y":-44.6414,"z":"NaN","m":"NaN","valid":true}],"type":"MultiLineString","srid":4326}</td>
+        <td>{"coordinates":"[[169.1321, -44.7032],[167.8974, -44.6414]]","type":"MultiLineString","srid":4326}</td>
       </tr>
     </tbody>
 </table>

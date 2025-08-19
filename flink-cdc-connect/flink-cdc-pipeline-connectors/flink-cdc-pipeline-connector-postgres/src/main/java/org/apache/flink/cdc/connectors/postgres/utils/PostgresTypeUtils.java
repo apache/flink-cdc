@@ -277,7 +277,7 @@ public class PostgresTypeUtils {
             case ADAPTIVE:
             case ADAPTIVE_TIME_MICROSECONDS:
             case CONNECT:
-                return DataTypes.TIME(scale);
+                return DataTypes.INT();
             default:
                 throw new IllegalArgumentException("Unknown temporal precision mode: " + mode);
         }

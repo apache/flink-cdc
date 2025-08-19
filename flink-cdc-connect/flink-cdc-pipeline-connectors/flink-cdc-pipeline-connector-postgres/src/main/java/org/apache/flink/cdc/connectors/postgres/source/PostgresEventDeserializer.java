@@ -34,8 +34,10 @@ import io.debezium.data.geometry.Point;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.io.WKBReader;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -128,7 +130,17 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
                 if (geometryType.equals("GeometryCollection")) {
                     geometryInfo.put("geometries", jtsGeom.toText());
                 } else {
-                    geometryInfo.put("coordinates", jtsGeom.getCoordinates());
+                    Coordinate[] coordinates = jtsGeom.getCoordinates();
+                    List<double[]> coordinateList = new ArrayList<>();
+                    if (coordinates != null) {
+                        for (Coordinate coordinate : coordinates) {
+                            coordinateList.add(new double[] {coordinate.x, coordinate.y});
+                            geometryInfo.put(
+                                    "coordinates", new double[] {coordinate.x, coordinate.y});
+                        }
+                    }
+                    geometryInfo.put(
+                            "coordinates", OBJECT_MAPPER.writeValueAsString(coordinateList));
                 }
                 geometryInfo.put("srid", srid.orElse(0));
                 return BinaryStringData.fromString(OBJECT_MAPPER.writeValueAsString(geometryInfo));
