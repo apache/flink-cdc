@@ -24,6 +24,7 @@ import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
 
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
+import io.debezium.data.geometry.Point;
 import org.apache.kafka.connect.data.Schema;
 
 /** {@link DataType} inference for PostgresSQL debezium {@link Schema}. */
@@ -35,7 +36,8 @@ public class PostgresSchemaDataTypeInference extends DebeziumSchemaDataTypeInfer
     protected DataType inferStruct(Object value, Schema schema) {
         // the Geometry datatype in PostgresSQL will be converted to
         // a String with Json format
-        if (Geography.LOGICAL_NAME.equals(schema.name())
+        if (Point.LOGICAL_NAME.equals(schema.name())
+                || Geography.LOGICAL_NAME.equals(schema.name())
                 || Geometry.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.STRING();
         } else {

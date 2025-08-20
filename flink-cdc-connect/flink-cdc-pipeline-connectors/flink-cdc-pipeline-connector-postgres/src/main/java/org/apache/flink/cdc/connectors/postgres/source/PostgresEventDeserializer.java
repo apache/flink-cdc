@@ -30,11 +30,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
-import io.debezium.util.HexConverter;
+import io.debezium.data.geometry.Point;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.io.WKBReader;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -48,8 +51,6 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     private static final long serialVersionUID = 1L;
     private List<PostgreSQLReadableMetadata> readableMetadataList;
 
-    public static final String SRID = "srid";
-    public static final String HEXEWKB = "hexewkb";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public PostgresEventDeserializer(DebeziumChangelogMode changelogMode) {
@@ -111,15 +112,37 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     protected Object convertToString(Object dbzObj, Schema schema) {
         // the Geometry datatype in PostgreSQL will be converted to
         // a String with Json format
-        if (Geometry.LOGICAL_NAME.equals(schema.name())
+        if (Point.LOGICAL_NAME.equals(schema.name())
+                || Geometry.LOGICAL_NAME.equals(schema.name())
                 || Geography.LOGICAL_NAME.equals(schema.name())) {
             try {
                 Struct geometryStruct = (Struct) dbzObj;
                 byte[] wkb = geometryStruct.getBytes("wkb");
-                Optional<Integer> srid = Optional.ofNullable(geometryStruct.getInt32(SRID));
-                Map<String, Object> geometryInfo = new HashMap<>(2);
-                geometryInfo.put(HEXEWKB, HexConverter.convertToHexString(wkb));
-                geometryInfo.put(SRID, srid.orElse(0));
+
+                WKBReader wkbReader = new WKBReader();
+                org.locationtech.jts.geom.Geometry jtsGeom = wkbReader.read(wkb);
+
+                Optional<Integer> srid = Optional.ofNullable(geometryStruct.getInt32("srid"));
+                Map<String, Object> geometryInfo = new HashMap<>();
+                String geometryType = jtsGeom.getGeometryType();
+                geometryInfo.put("type", geometryType);
+
+                if (geometryType.equals("GeometryCollection")) {
+                    geometryInfo.put("geometries", jtsGeom.toText());
+                } else {
+                    Coordinate[] coordinates = jtsGeom.getCoordinates();
+                    List<double[]> coordinateList = new ArrayList<>();
+                    if (coordinates != null) {
+                        for (Coordinate coordinate : coordinates) {
+                            coordinateList.add(new double[] {coordinate.x, coordinate.y});
+                            geometryInfo.put(
+                                    "coordinates", new double[] {coordinate.x, coordinate.y});
+                        }
+                    }
+                    geometryInfo.put(
+                            "coordinates", OBJECT_MAPPER.writeValueAsString(coordinateList));
+                }
+                geometryInfo.put("srid", srid.orElse(0));
                 return BinaryStringData.fromString(OBJECT_MAPPER.writeValueAsString(geometryInfo));
             } catch (Exception e) {
                 throw new IllegalArgumentException(

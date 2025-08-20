@@ -22,52 +22,24 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.table.types.logical.DecimalType;
 
+import io.debezium.config.CommonConnectorConfig;
+import io.debezium.connector.postgresql.PgOid;
+import io.debezium.connector.postgresql.PostgresConnectorConfig;
+import io.debezium.connector.postgresql.PostgresType;
+import io.debezium.connector.postgresql.TypeRegistry;
+import io.debezium.jdbc.JdbcValueConverters;
+import io.debezium.jdbc.TemporalPrecisionMode;
 import io.debezium.relational.Column;
+
+import static io.debezium.connector.postgresql.PostgresConnectorConfig.MONEY_FRACTION_DIGITS;
 
 /** A utility class for converting Postgres types to Flink types. */
 public class PostgresTypeUtils {
-    private static final String PG_SMALLSERIAL = "smallserial";
-    private static final String PG_SERIAL = "serial";
-    private static final String PG_BIGSERIAL = "bigserial";
-    private static final String PG_BYTEA = "bytea";
-    private static final String PG_BYTEA_ARRAY = "_bytea";
-    private static final String PG_SMALLINT = "int2";
-    private static final String PG_SMALLINT_ARRAY = "_int2";
-    private static final String PG_INTEGER = "int4";
-    private static final String PG_INTEGER_ARRAY = "_int4";
-    private static final String PG_BIGINT = "int8";
-    private static final String PG_BIGINT_ARRAY = "_int8";
-    private static final String PG_REAL = "float4";
-    private static final String PG_REAL_ARRAY = "_float4";
-    private static final String PG_DOUBLE_PRECISION = "float8";
-    private static final String PG_DOUBLE_PRECISION_ARRAY = "_float8";
-    private static final String PG_NUMERIC = "numeric";
-    private static final String PG_NUMERIC_ARRAY = "_numeric";
-    private static final String PG_BOOLEAN = "bool";
-    private static final String PG_BOOLEAN_ARRAY = "_bool";
-    private static final String PG_TIMESTAMP = "timestamp";
-    private static final String PG_TIMESTAMP_ARRAY = "_timestamp";
-    private static final String PG_TIMESTAMPTZ = "timestamptz";
-    private static final String PG_TIMESTAMPTZ_ARRAY = "_timestamptz";
-    private static final String PG_DATE = "date";
-    private static final String PG_DATE_ARRAY = "_date";
-    private static final String PG_TIME = "time";
-    private static final String PG_TIME_ARRAY = "_time";
-    private static final String PG_TEXT = "text";
-    private static final String PG_TEXT_ARRAY = "_text";
-    private static final String PG_CHAR = "bpchar";
-    private static final String PG_CHAR_ARRAY = "_bpchar";
-    private static final String PG_CHARACTER = "character";
-    private static final String PG_CHARACTER_ARRAY = "_character";
-    private static final String PG_CHARACTER_VARYING = "varchar";
-    private static final String PG_CHARACTER_VARYING_ARRAY = "_varchar";
-    private static final String PG_UUID = "uuid";
-    private static final String PG_GEOMETRY = "geometry";
-    private static final String PG_GEOGRAPHY = "geography";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
-    public static DataType fromDbzColumn(Column column) {
-        DataType dataType = convertFromColumn(column);
+    public static DataType fromDbzColumn(
+            Column column, PostgresConnectorConfig dbzConfig, TypeRegistry typeRegistry) {
+        DataType dataType = convertFromColumn(column, dbzConfig, typeRegistry);
         if (column.isOptional()) {
             return dataType;
         } else {
@@ -79,92 +51,258 @@ public class PostgresTypeUtils {
      * Returns a corresponding Flink data type from a debezium {@link Column} with nullable always
      * be true.
      */
-    private static DataType convertFromColumn(Column column) {
-        String typeName = column.typeName();
+    private static DataType convertFromColumn(
+            Column column, PostgresConnectorConfig dbzConfig, TypeRegistry typeRegistry) {
+        int nativeType = column.nativeType();
 
         int precision = column.length();
         int scale = column.scale().orElse(0);
 
-        switch (typeName) {
-            case PG_BOOLEAN:
+        PostgresConnectorConfig.IntervalHandlingMode intervalHandlingMode =
+                PostgresConnectorConfig.IntervalHandlingMode.parse(
+                        dbzConfig
+                                .getConfig()
+                                .getString(PostgresConnectorConfig.INTERVAL_HANDLING_MODE));
+
+        PostgresConnectorConfig.BinaryHandlingMode binaryHandlingMode =
+                dbzConfig.binaryHandlingMode();
+
+        TemporalPrecisionMode temporalPrecisionMode = dbzConfig.getTemporalPrecisionMode();
+
+        JdbcValueConverters.DecimalMode decimalMode =
+                dbzConfig.getDecimalMode() != null
+                        ? dbzConfig.getDecimalMode()
+                        : JdbcValueConverters.DecimalMode.PRECISE;
+
+        PostgresConnectorConfig.HStoreHandlingMode hStoreHandlingMode =
+                PostgresConnectorConfig.HStoreHandlingMode.parse(
+                        dbzConfig
+                                .getConfig()
+                                .getString(PostgresConnectorConfig.HSTORE_HANDLING_MODE));
+
+        switch (nativeType) {
+            case PgOid.BOOL:
                 return DataTypes.BOOLEAN();
-            case PG_BOOLEAN_ARRAY:
+            case PgOid.BIT:
+            case PgOid.VARBIT:
+                if (precision == 1) {
+                    return DataTypes.BOOLEAN();
+                } else {
+                    return DataTypes.BINARY(precision);
+                }
+            case PgOid.BOOL_ARRAY:
                 return DataTypes.ARRAY(DataTypes.BOOLEAN());
-            case PG_BYTEA:
-                return DataTypes.BYTES();
-            case PG_BYTEA_ARRAY:
-                return DataTypes.ARRAY(DataTypes.BYTES());
-            case PG_SMALLINT:
-            case PG_SMALLSERIAL:
+            case PgOid.BYTEA:
+                return handleBinaryWithBinaryMode(binaryHandlingMode);
+            case PgOid.BYTEA_ARRAY:
+                return DataTypes.ARRAY(handleBinaryWithBinaryMode(binaryHandlingMode));
+            case PgOid.INT2:
                 return DataTypes.SMALLINT();
-            case PG_SMALLINT_ARRAY:
+            case PgOid.INT2_ARRAY:
                 return DataTypes.ARRAY(DataTypes.SMALLINT());
-            case PG_INTEGER:
-            case PG_SERIAL:
+            case PgOid.INT4:
                 return DataTypes.INT();
-            case PG_INTEGER_ARRAY:
+            case PgOid.INT4_ARRAY:
                 return DataTypes.ARRAY(DataTypes.INT());
-            case PG_BIGINT:
-            case PG_BIGSERIAL:
+            case PgOid.INT8:
+            case PgOid.OID:
                 return DataTypes.BIGINT();
-            case PG_BIGINT_ARRAY:
+            case PgOid.INTERVAL:
+                return handleIntervalWithIntervalHandlingMode(intervalHandlingMode);
+            case PgOid.INTERVAL_ARRAY:
+                return DataTypes.ARRAY(
+                        handleIntervalWithIntervalHandlingMode(intervalHandlingMode));
+            case PgOid.INT8_ARRAY:
                 return DataTypes.ARRAY(DataTypes.BIGINT());
-            case PG_REAL:
+            case PgOid.FLOAT4:
                 return DataTypes.FLOAT();
-            case PG_REAL_ARRAY:
+            case PgOid.FLOAT4_ARRAY:
                 return DataTypes.ARRAY(DataTypes.FLOAT());
-            case PG_DOUBLE_PRECISION:
+            case PgOid.FLOAT8:
                 return DataTypes.DOUBLE();
-            case PG_DOUBLE_PRECISION_ARRAY:
+            case PgOid.FLOAT8_ARRAY:
                 return DataTypes.ARRAY(DataTypes.DOUBLE());
-            case PG_NUMERIC:
+            case PgOid.NUMERIC:
                 // see SPARK-26538: handle numeric without explicit precision and scale.
-                if (precision > 0) {
+                return handleNumericWithDecimalMode(precision, scale, decimalMode);
+            case PgOid.NUMERIC_ARRAY:
+                // see SPARK-26538: handle numeric without explicit precision and scale.
+                return DataTypes.ARRAY(handleNumericWithDecimalMode(precision, scale, decimalMode));
+            case PgOid.MONEY:
+                return handleMoneyWithDecimalMode(
+                        dbzConfig.getConfig().getInteger(MONEY_FRACTION_DIGITS), decimalMode);
+            case PgOid.CHAR:
+            case PgOid.BPCHAR:
+                return DataTypes.CHAR(precision);
+            case PgOid.CHAR_ARRAY:
+            case PgOid.BPCHAR_ARRAY:
+                return DataTypes.ARRAY(DataTypes.CHAR(precision));
+            case PgOid.VARCHAR:
+                return DataTypes.VARCHAR(precision);
+            case PgOid.VARCHAR_ARRAY:
+                return DataTypes.ARRAY(DataTypes.VARCHAR(precision));
+            case PgOid.TEXT:
+            case PgOid.POINT:
+            case PgOid.UUID:
+            case PgOid.JSON:
+            case PgOid.JSONB:
+            case PgOid.XML:
+            case PgOid.INET_OID:
+            case PgOid.CIDR_OID:
+            case PgOid.MACADDR_OID:
+            case PgOid.MACADDR8_OID:
+            case PgOid.INT4RANGE_OID:
+            case PgOid.NUM_RANGE_OID:
+            case PgOid.INT8RANGE_OID:
+            case PgOid.TSRANGE_OID:
+            case PgOid.TSTZRANGE_OID:
+            case PgOid.DATERANGE_OID:
+                return DataTypes.STRING();
+            case PgOid.TEXT_ARRAY:
+                return DataTypes.ARRAY(DataTypes.STRING());
+            case PgOid.TIMESTAMP:
+                return handleTimestampWithTemporalMode(temporalPrecisionMode, scale);
+            case PgOid.TIMESTAMP_ARRAY:
+                return DataTypes.ARRAY(
+                        handleTimestampWithTemporalMode(temporalPrecisionMode, scale));
+            case PgOid.TIMESTAMPTZ:
+                return new ZonedTimestampType(scale);
+            case PgOid.TIMESTAMPTZ_ARRAY:
+                return DataTypes.ARRAY(new ZonedTimestampType(scale));
+            case PgOid.TIME:
+                return handleTimeWithTemporalMode(temporalPrecisionMode, scale);
+            case PgOid.TIME_ARRAY:
+                return DataTypes.ARRAY(handleTimeWithTemporalMode(temporalPrecisionMode, scale));
+            case PgOid.DATE:
+                return handleDateWithTemporalMode(temporalPrecisionMode);
+            case PgOid.DATE_ARRAY:
+                return DataTypes.ARRAY(handleDateWithTemporalMode(temporalPrecisionMode));
+            default:
+                if (nativeType == typeRegistry.ltreeOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.geometryOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.geographyOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.citextOid()) {
+                    return DataTypes.STRING();
+                } else if (nativeType == typeRegistry.hstoreOid()) {
+                    return handleHstoreWithHstoreMode(hStoreHandlingMode);
+                } else if (nativeType == typeRegistry.ltreeArrayOid()) {
+                    return DataTypes.ARRAY(DataTypes.STRING());
+                } else if (nativeType == typeRegistry.geometryArrayOid()) {
+                    return DataTypes.ARRAY(DataTypes.STRING());
+                }
+                final PostgresType resolvedType = typeRegistry.get(nativeType);
+                if (resolvedType.isEnumType()) {
+                    return DataTypes.STRING();
+                }
+                throw new UnsupportedOperationException(
+                        String.format(
+                                "Doesn't support Postgres type '%s', Postgres oid '%d' yet",
+                                column.typeName(), column.nativeType()));
+        }
+    }
+
+    public static DataType handleNumericWithDecimalMode(
+            int precision, int scale, JdbcValueConverters.DecimalMode mode) {
+        switch (mode) {
+            case PRECISE:
+                if (precision > DecimalType.DEFAULT_SCALE
+                        && precision <= DecimalType.MAX_PRECISION) {
                     return DataTypes.DECIMAL(precision, scale);
                 }
-                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0);
-            case PG_NUMERIC_ARRAY:
-                // see SPARK-26538: handle numeric without explicit precision and scale.
-                if (precision > 0) {
-                    return DataTypes.ARRAY(DataTypes.DECIMAL(precision, scale));
-                }
-                return DataTypes.ARRAY(DataTypes.DECIMAL(DecimalType.MAX_PRECISION, 0));
-            case PG_CHAR:
-            case PG_CHARACTER:
-                return DataTypes.CHAR(precision);
-            case PG_CHAR_ARRAY:
-            case PG_CHARACTER_ARRAY:
-                return DataTypes.ARRAY(DataTypes.CHAR(precision));
-            case PG_CHARACTER_VARYING:
-                return DataTypes.VARCHAR(precision);
-            case PG_CHARACTER_VARYING_ARRAY:
-                return DataTypes.ARRAY(DataTypes.VARCHAR(precision));
-            case PG_TEXT:
-            case PG_GEOMETRY:
-            case PG_GEOGRAPHY:
-            case PG_UUID:
+                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, DecimalType.DEFAULT_SCALE);
+            case DOUBLE:
+                return DataTypes.DOUBLE();
+            case STRING:
                 return DataTypes.STRING();
-            case PG_TEXT_ARRAY:
-                return DataTypes.ARRAY(DataTypes.STRING());
-            case PG_TIMESTAMP:
-                return DataTypes.TIMESTAMP(scale);
-            case PG_TIMESTAMP_ARRAY:
-                return DataTypes.ARRAY(DataTypes.TIMESTAMP(scale));
-            case PG_TIMESTAMPTZ:
-                return new ZonedTimestampType(scale);
-            case PG_TIMESTAMPTZ_ARRAY:
-                return DataTypes.ARRAY(new ZonedTimestampType(scale));
-            case PG_TIME:
-                return DataTypes.TIME(scale);
-            case PG_TIME_ARRAY:
-                return DataTypes.ARRAY(DataTypes.TIME(scale));
-            case PG_DATE:
-                return DataTypes.DATE();
-            case PG_DATE_ARRAY:
-                return DataTypes.ARRAY(DataTypes.DATE());
             default:
-                throw new UnsupportedOperationException(
-                        String.format("Doesn't support Postgres type '%s' yet", typeName));
+                throw new IllegalArgumentException("Unknown decimal mode: " + mode);
+        }
+    }
+
+    public static DataType handleBinaryWithBinaryMode(
+            CommonConnectorConfig.BinaryHandlingMode mode) {
+        switch (mode) {
+            case BYTES:
+                return DataTypes.BYTES();
+            case BASE64:
+            case HEX:
+                return DataTypes.STRING();
+            default:
+                throw new IllegalArgumentException("Unknown binary mode: " + mode);
+        }
+    }
+
+    public static DataType handleMoneyWithDecimalMode(
+            int moneyFractionDigits, JdbcValueConverters.DecimalMode mode) {
+        switch (mode) {
+            case PRECISE:
+                return DataTypes.DECIMAL(DecimalType.MAX_PRECISION, moneyFractionDigits);
+            case DOUBLE:
+                return DataTypes.DOUBLE();
+            case STRING:
+                return DataTypes.STRING();
+            default:
+                throw new IllegalArgumentException("Unknown decimal mode: " + mode);
+        }
+    }
+
+    public static DataType handleIntervalWithIntervalHandlingMode(
+            PostgresConnectorConfig.IntervalHandlingMode mode) {
+        switch (mode) {
+            case NUMERIC:
+                return DataTypes.BIGINT();
+            case STRING:
+                return DataTypes.STRING();
+            default:
+                throw new IllegalArgumentException("Unknown interval mode: " + mode);
+        }
+    }
+
+    public static DataType handleDateWithTemporalMode(TemporalPrecisionMode mode) {
+        switch (mode) {
+            case ADAPTIVE:
+            case ADAPTIVE_TIME_MICROSECONDS:
+            case CONNECT:
+                return DataTypes.DATE();
+            default:
+                throw new IllegalArgumentException("Unknown temporal precision mode: " + mode);
+        }
+    }
+
+    public static DataType handleTimeWithTemporalMode(TemporalPrecisionMode mode, int scale) {
+        switch (mode) {
+            case ADAPTIVE:
+            case ADAPTIVE_TIME_MICROSECONDS:
+            case CONNECT:
+                return DataTypes.INT();
+            default:
+                throw new IllegalArgumentException("Unknown temporal precision mode: " + mode);
+        }
+    }
+
+    public static DataType handleTimestampWithTemporalMode(TemporalPrecisionMode mode, int scale) {
+        switch (mode) {
+            case ADAPTIVE:
+            case ADAPTIVE_TIME_MICROSECONDS:
+            case CONNECT:
+                return DataTypes.TIMESTAMP(scale);
+            default:
+                throw new IllegalArgumentException("Unknown temporal precision mode: " + mode);
+        }
+    }
+
+    public static DataType handleHstoreWithHstoreMode(
+            PostgresConnectorConfig.HStoreHandlingMode mode) {
+        switch (mode) {
+            case JSON:
+                return DataTypes.STRING();
+            case MAP:
+                return DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING());
+            default:
+                throw new IllegalArgumentException("Unknown hstore mode: " + mode);
         }
     }
 }
