@@ -325,7 +325,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     return TimeData.fromNanoOfDay((long) dbzObj);
             }
         } else if (dbzObj instanceof Integer) {
-            return TimeData.fromNanoOfDay((int) dbzObj * 1_000_000L);
+            return TimeData.fromMillisOfDay((int) dbzObj);
         }
         // get number of milliseconds of the day
         return TimeData.fromLocalTime(TemporalConversions.toLocalTime(dbzObj));
