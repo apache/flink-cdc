@@ -255,4 +255,13 @@ public class PostgresDataSourceOptions {
                     .withDescription(
                             "List of readable metadata from SourceRecord to be passed to downstream, split by `,`. "
                                     + "Available readable metadata are: op_ts.");
+
+    @Experimental
+    public static final ConfigOption<Boolean>
+            SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED =
+                    ConfigOptions.key("scan.incremental.snapshot.unbounded-chunk-first.enabled")
+                            .booleanType()
+                            .defaultValue(false)
+                            .withDescription(
+                                    "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.  Defaults to false.");
 }
