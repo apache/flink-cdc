@@ -27,6 +27,7 @@ import java.util.Objects;
 public class TimeData implements Comparable<TimeData> {
 
     private static final int SECONDS_TO_MILLIS = 1000;
+    private static final int MILLIS_TO_MICRO = 1000;
     private static final int MILLIS_TO_NANO = 1_000_000;
 
     private final int millisOfDay;
@@ -41,6 +42,10 @@ public class TimeData implements Comparable<TimeData> {
 
     public static TimeData fromMillisOfDay(int millisOfDay) {
         return new TimeData(millisOfDay);
+    }
+
+    public static TimeData fromMicroOfDay(long microOfDay) {
+        return new TimeData((int) (microOfDay / MILLIS_TO_MICRO));
     }
 
     public static TimeData fromNanoOfDay(long nanoOfDay) {
