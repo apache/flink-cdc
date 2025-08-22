@@ -184,7 +184,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+I[1016, user_17, Shanghai, 123567891234]",
                     "+I[1019, user_20, Shanghai, 123567891234]",
                     "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                    "+I[2000, user_21, China:Shanghai, 123567891234]"
                 };
         // Step 2: wait the snapshot splits finished reading
         List<String> actualRecords = consumeSnapshotRecords(reader, dataType);
@@ -295,7 +295,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                     "+I[1016, user_17, Shanghai, 123567891234]",
                     "+I[1019, user_20, Shanghai, 123567891234]",
                     "+I[1018, user_19, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]"
+                    "+I[2000, user_21, China:Shanghai, 123567891234]"
                 };
         // Step 2: wait the snapshot splits finished reading
         List<String> actualRecords = consumeSnapshotRecords(reader, dataType);

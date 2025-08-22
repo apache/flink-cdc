@@ -437,11 +437,10 @@ public class MySqlSourceConfigFactory implements Serializable {
                 jdbcProperties,
                 chunkKeyColumns,
                 skipSnapshotBackfill,
-                snapshotFilters,
-                skipSnapshotBackfill,
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                snapshotFilters);
     }
 }

@@ -417,7 +417,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
 
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource(tableName, chunkColumnName);
+        MySqlSource<RowData> sleepingSource = buildSleepingSource(tableName, chunkColumnName, null);
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -709,6 +709,154 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         // seen as stream event. This will occur data duplicate. For example, user_20 will be
         // deleted twice, and user_15213 will be inserted twice.
         assertEqualsInAnyOrder(expectedRecords, records);
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void testSnapshotFilters(String tableName, String chunkColumnName) throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        // Filter user with `id > 200`
+        // The sleeping source will sleep awhile after send per record
+        MySqlSource<RowData> sleepingSource =
+                buildSleepingSource(tableName, chunkColumnName, "id > 200");
+        DataStreamSource<RowData> source =
+                env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
+
+        String[] expectedSnapshotData =
+                new String[] {
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, China:Shanghai, 123567891234]"
+                };
+        TypeSerializer<RowData> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectSinkOperatorFactory<RowData> factory =
+                new CollectSinkOperatorFactory(serializer, accumulatorName);
+        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
+        CollectResultIterator<RowData> iterator =
+                new CollectResultIterator(
+                        operator.getOperatorIdFuture(),
+                        serializer,
+                        accumulatorName,
+                        env.getCheckpointConfig(),
+                        10000L);
+        CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        JobClient jobClient = env.executeAsync("snapshotSplitTest");
+        iterator.setJobClient(jobClient);
+        JobID jobId = jobClient.getJobID();
+
+        // Trigger failover once some snapshot records has been sent by sleeping source
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    FailoverType.JM,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(100));
+        }
+
+        // Check all snapshot records are sent with exactly-once semantics
+        assertEqualsInAnyOrder(
+                Arrays.asList(expectedSnapshotData),
+                fetchRowData(iterator, expectedSnapshotData.length));
+        assertThat(hasNextData(iterator)).isFalse();
+
+        jobClient.cancel().get();
+    }
+
+    @ParameterizedTest
+    @MethodSource("parameters")
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public void testSnapshotFiltersEscape(String tableName, String chunkColumnName)
+            throws Exception {
+        customDatabase.createAndInitialize();
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(DEFAULT_PARALLELISM);
+        env.enableCheckpointing(5000L);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
+
+        // Filter user with `id > 200`
+        // The sleeping source will sleep awhile after send per record
+        MySqlSource<RowData> sleepingSource =
+                buildSleepingSource(tableName, chunkColumnName, "address != 'China:Shanghai'");
+        DataStreamSource<RowData> source =
+                env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
+
+        String[] expectedSnapshotData =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]"
+                };
+        TypeSerializer<RowData> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectSinkOperatorFactory<RowData> factory =
+                new CollectSinkOperatorFactory(serializer, accumulatorName);
+        CollectSinkOperator<RowData> operator = (CollectSinkOperator) factory.getOperator();
+        CollectResultIterator<RowData> iterator =
+                new CollectResultIterator(
+                        operator.getOperatorIdFuture(),
+                        serializer,
+                        accumulatorName,
+                        env.getCheckpointConfig(),
+                        10000L);
+        CollectStreamSink<RowData> sink = new CollectStreamSink(source, factory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        JobClient jobClient = env.executeAsync("snapshotSplitTest");
+        iterator.setJobClient(jobClient);
+        JobID jobId = jobClient.getJobID();
+
+        // Trigger failover once some snapshot records has been sent by sleeping source
+        if (iterator.hasNext()) {
+            triggerFailover(
+                    FailoverType.JM,
+                    jobId,
+                    miniClusterResource.get().getMiniCluster(),
+                    () -> sleepMs(100));
+        }
+
+        // Check all snapshot records are sent with exactly-once semantics
+        assertEqualsInAnyOrder(
+                Arrays.asList(expectedSnapshotData),
+                fetchRowData(iterator, expectedSnapshotData.length));
+        assertThat(hasNextData(iterator)).isFalse();
+        jobClient.cancel().get();
     }
 
     private List<String> testBackfillWhenWritingEvents(
@@ -1020,7 +1168,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private MySqlSource<RowData> buildSleepingSource(String tableName, String chunkColumnName) {
+    private MySqlSource<RowData> buildSleepingSource(
+            String tableName, String chunkColumnName, String snapshotFilter) {
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
                         Arrays.asList(

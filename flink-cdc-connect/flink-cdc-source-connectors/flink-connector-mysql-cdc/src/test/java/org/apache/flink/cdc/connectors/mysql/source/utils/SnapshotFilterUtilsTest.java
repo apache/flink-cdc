@@ -18,13 +18,12 @@
 package org.apache.flink.cdc.connectors.mysql.source.utils;
 
 import io.debezium.relational.TableId;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils}. */
 public class SnapshotFilterUtilsTest {
@@ -34,14 +33,16 @@ public class SnapshotFilterUtilsTest {
         Map<String, String> map = new HashMap<>();
         map.put("db.user", "id > 100");
         map.put("db.order_[0-9]+", "id > 200");
-        assertEquals(
-                "id > 100", SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.user")));
-        assertEquals(
-                "id > 200",
-                SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.order_1")));
-        assertEquals(
-                "id > 200",
-                SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.order_2")));
-        assertNull(SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.shop")));
+
+        assertThat(SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.user")))
+                .isEqualTo("id > 100");
+
+        assertThat(SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.order_1")))
+                .isEqualTo("id > 200");
+
+        assertThat(SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.order_2")))
+                .isEqualTo("id > 200");
+
+        assertThat(SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.shop"))).isNull();
     }
 }

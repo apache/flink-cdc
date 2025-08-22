@@ -58,7 +58,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOpt
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions.USE_LEGACY_JSON_FORMAT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 /** Test for {@link MySqlTableSource} created by {@link MySqlTableSourceFactory}. */
 class MySqlTableSourceFactoryTest {
@@ -333,10 +333,10 @@ class MySqlTableSourceFactoryTest {
                         Duration.ofMillis(15213),
                         "testCol",
                         true,
-                        true,
                         PARSE_ONLINE_SCHEMA_CHANGES.defaultValue(),
                         true,
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
+                        false,
                         "id > 200");
         Assertions.assertThat(actualSource)
                 .isEqualTo(expectedSource)
@@ -485,7 +485,7 @@ class MySqlTableSourceFactoryTest {
                         SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST.defaultValue(),
                         false,
                         null);
-        assertEquals(expectedSource, actualSource);
+        assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test

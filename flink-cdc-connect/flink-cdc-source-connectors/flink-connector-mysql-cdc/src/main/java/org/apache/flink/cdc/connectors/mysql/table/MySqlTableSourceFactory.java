@@ -154,12 +154,11 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 heartbeatInterval,
                 chunkKeyColumn,
                 skipSnapshotBackFill,
-                snapshotFilter,
-                skipSnapshotBackFill,
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                snapshotFilter);
     }
 
     @Override

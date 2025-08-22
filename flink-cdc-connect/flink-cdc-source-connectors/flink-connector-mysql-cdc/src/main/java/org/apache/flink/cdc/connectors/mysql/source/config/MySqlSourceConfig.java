@@ -110,7 +110,6 @@ public class MySqlSourceConfig implements Serializable {
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
             boolean assignUnboundedChunkFirst,
-            boolean skipSnapshotBackfill,
             Map<String, String> snapshotFilters) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
