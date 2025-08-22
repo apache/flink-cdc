@@ -20,6 +20,7 @@ package org.apache.flink.cdc.debezium.event;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
@@ -235,6 +236,15 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     }
                 };
             case ARRAY:
+                return new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        return convertToArray(dbzObj, schema);
+                    }
+                };
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
@@ -470,6 +480,57 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
 
         return new GenericMapData(convertedMap);
+    }
+
+    protected Object convertToArray(Object dbzObj, Schema schema) throws Exception {
+        if (dbzObj == null) {
+            return null;
+        }
+
+        Schema elementSchema = schema.valueSchema();
+        DataType elementType = schemaDataTypeInference.infer(null, elementSchema);
+        DeserializationRuntimeConverter elementConverter = createConverter(elementType);
+
+        if (dbzObj instanceof java.util.List) {
+            java.util.List<?> list = (java.util.List<?>) dbzObj;
+            Object[] array = new Object[list.size()];
+
+            for (int i = 0; i < list.size(); i++) {
+                Object element = list.get(i);
+                if (element != null) {
+                    if (elementSchema.type() == Schema.Type.ARRAY) {
+                        array[i] = convertToArray(element, elementSchema);
+                    } else {
+                        array[i] = elementConverter.convert(element, elementSchema);
+                    }
+                }
+            }
+
+            return new GenericArrayData(array);
+        } else if (dbzObj.getClass().isArray()) {
+            Object[] inputArray = (Object[]) dbzObj;
+            Object[] convertedArray = new Object[inputArray.length];
+
+            for (int i = 0; i < inputArray.length; i++) {
+                if (inputArray[i] != null) {
+                    if (elementSchema.type() == Schema.Type.ARRAY) {
+                        convertedArray[i] = convertToArray(inputArray[i], elementSchema);
+                    } else {
+                        convertedArray[i] = elementConverter.convert(inputArray[i], elementSchema);
+                    }
+                }
+            }
+
+            return new GenericArrayData(convertedArray);
+        } else {
+            Object[] array = new Object[1];
+            if (elementSchema.type() == Schema.Type.ARRAY) {
+                array[0] = convertToArray(dbzObj, elementSchema);
+            } else {
+                array[0] = elementConverter.convert(dbzObj, elementSchema);
+            }
+            return new GenericArrayData(array);
+        }
     }
 
     private static DeserializationRuntimeConverter wrapIntoNullableConverter(

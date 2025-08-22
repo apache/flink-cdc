@@ -206,7 +206,13 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     }
 
     protected DataType inferArray(Object value, Schema schema) {
-        throw new UnsupportedOperationException("Unsupported type ARRAY");
+        Schema elementSchema = schema.valueSchema();
+        if (elementSchema != null) {
+            DataType elementType = infer(null, elementSchema);
+            return DataTypes.ARRAY(elementType);
+        } else {
+            return DataTypes.ARRAY(DataTypes.STRING());
+        }
     }
 
     protected DataType inferMap(Object value, Schema schema) {
