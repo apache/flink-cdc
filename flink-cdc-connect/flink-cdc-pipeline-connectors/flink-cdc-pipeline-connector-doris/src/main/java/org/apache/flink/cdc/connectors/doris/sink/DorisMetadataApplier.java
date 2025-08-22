@@ -45,6 +45,7 @@ import org.apache.flink.util.CollectionUtil;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.doris.flink.catalog.DorisTypeMapper;
 import org.apache.doris.flink.catalog.doris.DataModel;
 import org.apache.doris.flink.catalog.doris.FieldSchema;
@@ -149,16 +150,14 @@ public class DorisMetadataApplier implements MetadataApplier {
             TableSchema tableSchema = new TableSchema();
             tableSchema.setTable(tableId.getTableName());
             tableSchema.setDatabase(tableId.getSchemaName());
+            tableSchema.setModel(
+                    CollectionUtils.isEmpty(schema.primaryKeys())
+                            ? DataModel.DUPLICATE
+                            : DataModel.UNIQUE);
             tableSchema.setFields(buildFields(schema));
+            tableSchema.setKeys(buildKeys(schema));
             tableSchema.setDistributeKeys(buildDistributeKeys(schema));
             tableSchema.setTableComment(schema.comment());
-
-            if (CollectionUtil.isNullOrEmpty(schema.primaryKeys())) {
-                tableSchema.setModel(DataModel.DUPLICATE);
-            } else {
-                tableSchema.setKeys(schema.primaryKeys());
-                tableSchema.setModel(DataModel.UNIQUE);
-            }
 
             Map<String, String> tableProperties =
                     DorisDataSinkOptions.getPropertiesByPrefix(
@@ -205,6 +204,10 @@ public class DorisMetadataApplier implements MetadataApplier {
                             column.getComment()));
         }
         return fieldSchemaMap;
+    }
+
+    private List<String> buildKeys(Schema schema) {
+        return buildDistributeKeys(schema);
     }
 
     private List<String> buildDistributeKeys(Schema schema) {
