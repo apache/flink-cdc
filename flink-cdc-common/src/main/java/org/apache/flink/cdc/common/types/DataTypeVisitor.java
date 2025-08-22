@@ -56,6 +56,8 @@ public interface DataTypeVisitor<R> {
 
     R visit(TimeType timeType);
 
+    R visit(ZoneTimeType zoneTimeType);
+
     R visit(TimestampType timestampType);
 
     R visit(ZonedTimestampType zonedTimestampType);

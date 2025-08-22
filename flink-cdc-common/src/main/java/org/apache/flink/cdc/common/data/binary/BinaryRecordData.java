@@ -25,12 +25,14 @@ import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZoneTimeData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
 
 import java.nio.ByteOrder;
+import java.time.ZoneId;
 
 /**
  * An implementation of {@link RecordData} which is backed by {@link MemorySegment} instead of
@@ -162,6 +164,12 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
         final long offsetAndSize = segments[0].getLong(fieldOffset);
         return BinarySegmentUtils.readDecimalData(
                 segments, offset, offsetAndSize, precision, scale);
+    }
+
+    @Override
+    public ZoneTimeData getZoneTime(int pos, int precision) {
+        String[] parts = getString(pos).toString().split(TIMESTAMP_DELIMITER);
+        return ZoneTimeData.fromNanoOfDay(Long.parseLong(parts[0]), ZoneId.of(parts[2]));
     }
 
     @Override

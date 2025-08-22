@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZoneTimeData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
@@ -61,6 +62,8 @@ public class DataTypeUtils {
             case DATE:
             case TIME_WITHOUT_TIME_ZONE:
                 return Integer.class;
+            case TIME_WITH_TIME_ZONE:
+                return ZoneTimeData.class;
             case BIGINT:
                 return Long.class;
             case FLOAT:
