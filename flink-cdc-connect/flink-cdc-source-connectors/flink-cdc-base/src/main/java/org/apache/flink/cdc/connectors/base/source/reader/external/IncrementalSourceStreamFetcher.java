@@ -47,6 +47,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isEndWatermarkEvent;
+
 /** Fetcher to fetch data from table split, the split is the stream split {@link StreamSplit}. */
 public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceStreamFetcher.class);
@@ -116,10 +118,19 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
+        // what happens if currentTaskRunning
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
-                if (shouldEmit(event.getRecord())) {
+                if (isEndWatermarkEvent(event.getRecord())) {
+                    LOG.info("Read split {} end watermark event", currentStreamSplit);
+                    try {
+                        stopReadTask();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    break;
+                } else if (shouldEmit(event.getRecord())) {
                     sourceRecords.add(event.getRecord());
                 } else {
                     LOG.debug("{} data change event should not emit", event);
@@ -263,6 +274,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     }
 
     public void stopReadTask() throws Exception {
+        // todo: ji
         this.currentTaskRunning = false;
 
         if (taskContext != null) {
