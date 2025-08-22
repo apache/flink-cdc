@@ -245,13 +245,24 @@ pipeline:
         分块元数据的组大小，如果元数据大小超过该组大小，则元数据将被划分为多个组。
       </td>
     </tr>
-<tr>
+    <tr>
       <td>metadata.list</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
       <td>String</td>
       <td>
         源记录中可读取的元数据列表，将传递给下游并在转换模块中使用，各字段以逗号分隔。可用的可读元数据包括：op_ts。
+      </td>
+    </tr>
+    <tr>
+     <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+     <td>optional</td>
+     <td style="word-wrap: break-word;">false</td>
+     <td>String</td>
+     <td>
+        在快照读取阶段，是否优先分配无界分块。<br>
+        这有助于降低在对最大无界分块进行快照时，TaskManager 发生内存溢出（OOM）错误的风险。<br>
+        此为实验性选项，默认值为 false。
       </td>
     </tr>
     </tbody>
