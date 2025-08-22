@@ -22,6 +22,7 @@ import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZoneTimeData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
@@ -37,6 +38,7 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.ZoneTimeType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -60,6 +62,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.types.DataTypes.DECIMAL;
+import static org.apache.flink.cdc.common.types.DataTypes.TIME_TZ;
 import static org.apache.flink.cdc.common.types.DataTypes.VARCHAR;
 import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.coerceObject;
 import static org.apache.flink.cdc.common.utils.SchemaMergingUtils.coerceRow;
@@ -98,6 +101,8 @@ class SchemaMergingUtilsTest {
     private static final DataType DATE = DataTypes.DATE();
     private static final DataType TIME = DataTypes.TIME();
 
+    private static final DataType TIME_TZ = DataTypes.TIME_TZ(ZoneTimeType.MAX_PRECISION);
+
     private static final DataType ROW = DataTypes.ROW(INT, STRING);
     private static final DataType ARRAY = DataTypes.ARRAY(STRING);
     private static final DataType MAP = DataTypes.MAP(INT, STRING);
@@ -121,6 +126,7 @@ class SchemaMergingUtilsTest {
                     DOUBLE,
                     // Date and time types
                     TIMESTAMP,
+                    TIME_TZ,
                     TIMESTAMP_LTZ,
                     TIMESTAMP_TZ,
                     TIME,
@@ -631,6 +637,7 @@ class SchemaMergingUtilsTest {
                         Tuple2.of(TIMESTAMP, STRING),
                         Tuple2.of(DATE, STRING),
                         Tuple2.of(TIME, STRING),
+                        Tuple2.of(TIME_TZ, TIME_TZ),
                         Tuple2.of(ROW, STRING),
                         Tuple2.of(ARRAY, STRING),
                         Tuple2.of(MAP, STRING),
@@ -764,7 +771,7 @@ class SchemaMergingUtilsTest {
                         Tuple4.of(
                                 DATE, dateOf(2020, 4, 4), TIMESTAMP_TZ, zTsOf("2020", "04", "04")),
                         Tuple4.of(DATE, dateOf(2021, 5, 5), STRING, binStrOf("2021-05-05")),
-
+                        Tuple4.of(TIME_TZ, timeOf(10, 10, 10), TIME_TZ, binStrOf("10:10:10")),
                         // From TIMESTAMP
                         Tuple4.of(
                                 TIMESTAMP,
@@ -1169,6 +1176,12 @@ class SchemaMergingUtilsTest {
 
     private static long dateOf(int year, int month, int dayOfMonth) {
         return LocalDate.of(year, month, dayOfMonth).toEpochDay();
+    }
+
+    private static ZoneTimeData timeOf(int hour, int minute, int second) {
+        return ZoneTimeData.fromMillsOfDay(
+                Instant.parse(String.format("%s:%s:%s", hour, minute, second)).toEpochMilli(),
+                ZoneId.of("UTC"));
     }
 
     private static TimestampData tsOf(String year, String month, String dayOfMonth) {

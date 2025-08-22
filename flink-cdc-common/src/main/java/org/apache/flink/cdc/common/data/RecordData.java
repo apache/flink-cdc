@@ -127,6 +127,14 @@ public interface RecordData {
     DecimalData getDecimal(int pos, int precision, int scale);
 
     /**
+     * Returns the zone time value at the given position.
+     *
+     * <p>The precision is required to determine whether the time value was stored in a compact
+     * representation (see {@link ZoneTimeData}).
+     */
+    ZoneTimeData getZoneTime(int pos, int precision);
+
+    /**
      * Returns the timestamp value at the given position.
      *
      * <p>The precision is required to determine whether the timestamp value was stored in a compact
@@ -200,6 +208,9 @@ public interface RecordData {
             case DATE:
             case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = record -> record.getInt(fieldPos);
+                break;
+            case TIME_WITH_TIME_ZONE:
+                fieldGetter = record -> record.getZoneTime(fieldPos, getPrecision(fieldType));
                 break;
             case BIGINT:
                 fieldGetter = record -> record.getLong(fieldPos);

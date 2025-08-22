@@ -88,6 +88,8 @@ public enum DataTypeRoot {
 
     TIME_WITHOUT_TIME_ZONE(DataTypeFamily.PREDEFINED, DataTypeFamily.DATETIME, DataTypeFamily.TIME),
 
+    TIME_WITH_TIME_ZONE(DataTypeFamily.PREDEFINED, DataTypeFamily.DATETIME, DataTypeFamily.TIME),
+
     TIMESTAMP_WITHOUT_TIME_ZONE(
             DataTypeFamily.PREDEFINED, DataTypeFamily.DATETIME, DataTypeFamily.TIMESTAMP),
 
