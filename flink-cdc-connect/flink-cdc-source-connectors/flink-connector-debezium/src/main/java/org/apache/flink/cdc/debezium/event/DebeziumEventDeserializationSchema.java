@@ -320,7 +320,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         if (dbzObj instanceof Long) {
             switch (schema.name()) {
                 case MicroTime.SCHEMA_NAME:
-                    return TimeData.fromNanoOfDay((long) dbzObj * 1000);
+                    return TimeData.fromMicroOfDay((long) dbzObj);
                 case NanoTime.SCHEMA_NAME:
                     return TimeData.fromNanoOfDay((long) dbzObj);
             }
