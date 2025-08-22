@@ -134,9 +134,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
     }
 
-    @ParameterizedTest(name = "chunkFirstEnable: {0}")
+    @ParameterizedTest(name = "unboundedChunkFirst: {0}")
     @ValueSource(booleans = {true, false})
-    public void testInitialStartupModeWithOpts(boolean chunkFirstEnable) throws Exception {
+    public void testInitialStartupModeWithOpts(boolean unboundedChunkFirst) throws Exception {
         inventoryDatabase.createAndInitialize();
         Configuration sourceConfiguration = new Configuration();
         sourceConfiguration.set(PostgresDataSourceOptions.HOSTNAME, POSTGRES_CONTAINER.getHost());
@@ -156,7 +156,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         sourceConfiguration.set(PostgresDataSourceOptions.METADATA_LIST, "op_ts");
         sourceConfiguration.set(
                 PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED,
-                chunkFirstEnable);
+                unboundedChunkFirst);
 
         Factory.Context context =
                 new FactoryHelper.DefaultContext(
