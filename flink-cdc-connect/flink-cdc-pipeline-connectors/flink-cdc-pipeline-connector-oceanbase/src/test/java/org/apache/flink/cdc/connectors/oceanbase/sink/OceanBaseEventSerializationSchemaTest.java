@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.oceanbase.sink;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -144,7 +145,7 @@ class OceanBaseEventSerializationSchemaTest {
                         table2,
                         generator2.generate(
                                 new Object[] {
-                                    (int) LocalDate.of(2023, 11, 27).toEpochDay(),
+                                    DateData.fromLocalDate(LocalDate.of(2023, 11, 27)),
                                     3.4f,
                                     BinaryStringData.fromString("insert table2")
                                 }));
@@ -202,7 +203,7 @@ class OceanBaseEventSerializationSchemaTest {
                 DataChangeEvent.insertEvent(
                         table2,
                         newGenerator2.generate(
-                                new Object[] {(int) LocalDate.of(2023, 11, 28).toEpochDay()}));
+                                new Object[] {DateData.fromLocalDate(LocalDate.of(2023, 11, 28))}));
         verifySerializeResult(
                 table2, "[2023-11-28]", Objects.requireNonNull(serializer.serialize(insertEvent3)));
     }

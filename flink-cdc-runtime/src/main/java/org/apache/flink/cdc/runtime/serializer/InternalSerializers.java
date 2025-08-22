@@ -22,11 +22,13 @@ import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
+import org.apache.flink.cdc.runtime.serializer.data.DateDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.DecimalDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.LocalZonedTimestampDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.RecordDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.StringDataSerializer;
+import org.apache.flink.cdc.runtime.serializer.data.TimeDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.TimestampDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.ZonedTimestampDataSerializer;
 
@@ -61,9 +63,11 @@ public class InternalSerializers {
             case SMALLINT:
                 return ShortSerializer.INSTANCE;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 return IntSerializer.INSTANCE;
+            case DATE:
+                return DateDataSerializer.INSTANCE;
+            case TIME_WITHOUT_TIME_ZONE:
+                return TimeDataSerializer.INSTANCE;
             case BIGINT:
                 return LongSerializer.INSTANCE;
             case FLOAT:

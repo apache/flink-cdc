@@ -20,11 +20,13 @@ package org.apache.flink.cdc.runtime.serializer.data.writer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
@@ -222,6 +224,16 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
                                 String.valueOf(value.getNanoOfMillisecond()),
                                 value.getZoneId()));
         writeString(pos, new BinaryStringData(timestampString));
+    }
+
+    @Override
+    public void writeDate(int pos, DateData value) {
+        writeInt(pos, value.toEpochDay());
+    }
+
+    @Override
+    public void writeTime(int pos, TimeData value, int precision) {
+        writeInt(pos, value.toMillisOfDay());
     }
 
     private void zeroBytes(int offset, int size) {
