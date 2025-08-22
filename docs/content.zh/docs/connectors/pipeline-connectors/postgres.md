@@ -398,6 +398,8 @@ pipeline:
 </table>
 </div>
 
+注意：由于Debezium版本不支持多维数组，目前只支持PostgresSQL的单维数组，如:'ARRAY[1,2,3]'，'int[]'。
+
 ### Temporal types Mapping
 除了包含时区信息的 PostgreSQL 的 TIMESTAMPTZ 数据类型之外，其他时间类型如何映射取决于连接器配置属性 <code>debezium.time.precision.mode</code> 的值。以下各节将描述这些映射关系：
 - debezium.time.precision.mode=adaptive

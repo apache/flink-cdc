@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
@@ -98,7 +99,9 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                             "-c",
                             "max_replication_slots=20",
                             "-c",
-                            "wal_level=logical");
+                            "wal_level=logical",
+                            "-c",
+                            "max_wal_senders=20");
 
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -703,6 +706,108 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         Assertions.assertThat(recordFields(snapshotRecord, JSON_TYPES)).isEqualTo(expectedSnapshot);
     }
 
+    @Test
+    public void testArrayTypes() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.array_types")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+
+        Object[] actualSnapshotObjects = recordFields(snapshotRecord, ARRAY_TYPES);
+
+        Assertions.assertThat(actualSnapshotObjects[0]).isEqualTo(1); // id column
+
+        ArrayData actualTagsArray = (ArrayData) actualSnapshotObjects[1];
+        Assertions.assertThat(actualTagsArray.getString(0))
+                .isEqualTo(BinaryStringData.fromString("electronics"));
+        Assertions.assertThat(actualTagsArray.getString(1))
+                .isEqualTo(BinaryStringData.fromString("gadget"));
+        Assertions.assertThat(actualTagsArray.getString(2))
+                .isEqualTo(BinaryStringData.fromString("sale"));
+
+        ArrayData actualScoresArray = (ArrayData) actualSnapshotObjects[2];
+        Assertions.assertThat(actualScoresArray.getInt(0)).isEqualTo(85);
+        Assertions.assertThat(actualScoresArray.getInt(1)).isEqualTo(90);
+        Assertions.assertThat(actualScoresArray.getInt(2)).isEqualTo(78);
+
+        ArrayData actualIntArray = (ArrayData) actualSnapshotObjects[3];
+        Assertions.assertThat(actualIntArray.getInt(0)).isEqualTo(42);
+    }
+
+    @Test
+    public void testArrayTypesUnsupportedMatrix() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.array_types_unsupported_matrix")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        try {
+            List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        } catch (Exception e) {
+            Assertions.assertThat(getRootCause(e))
+                    .hasMessage(
+                            "Unable convert multidimensional array value '[null, null]' to a flat array.");
+        }
+    }
+
+    public Throwable getRootCause(Throwable throwable) {
+        Throwable cause = throwable;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause;
+    }
+
     private <T> Tuple2<List<T>, List<CreateTableEvent>> fetchResultsAndCreateTableEvent(
             Iterator<T> iter, int size) {
         List<T> result = new ArrayList<>(size);
@@ -838,4 +943,13 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.BIGINT());
+    private static final RowType ARRAY_TYPES =
+            RowType.of(
+                    DataTypes.INT(),
+                    DataTypes.ARRAY(DataTypes.STRING()),
+                    DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.ARRAY(DataTypes.INT()));
+
+    private static final RowType ARRAY_TYPES_MATRIX =
+            RowType.of(DataTypes.INT(), DataTypes.ARRAY(DataTypes.ARRAY(DataTypes.INT())));
 }
