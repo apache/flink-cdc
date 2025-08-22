@@ -286,7 +286,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         Object[] expectedSnapshot =
                 new Object[] {
                     2,
-                    18460,
+                    DateData.fromEpochDay(18460),
                     64822000,
                     64822123,
                     64822123,
