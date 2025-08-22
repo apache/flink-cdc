@@ -68,4 +68,9 @@ public class TruncateTableEvent implements SchemaChangeEvent {
     public SchemaChangeEventType getType() {
         return SchemaChangeEventType.TRUNCATE_TABLE;
     }
+
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new TruncateTableEvent(newTableId);
+    }
 }

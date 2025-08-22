@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SelectorsTest {
 
     @Test
-    public void testTableSelector() {
+    void testTableSelector() {
 
         // nameSpace, schemaName, tableName
         Selectors selectors =

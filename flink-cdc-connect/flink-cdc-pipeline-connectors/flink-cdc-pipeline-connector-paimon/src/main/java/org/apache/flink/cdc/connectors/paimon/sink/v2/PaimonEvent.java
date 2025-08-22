@@ -20,35 +20,41 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
 
+import java.util.List;
+
 /** Contains the data to be written for {@link PaimonWriter}. */
 public class PaimonEvent {
 
     // Identifier for the Paimon table to be written.
     Identifier tableId;
 
-    // The actual record to be written to Paimon table.
-    GenericRow genericRow;
+    // The actual records to be written to Paimon table, contains full changelog(before/after).
+    List<GenericRow> genericRows;
 
     // if true, means that table schema has changed right before this genericRow.
     boolean shouldRefreshSchema;
     int bucket;
 
-    public PaimonEvent(Identifier tableId, GenericRow genericRow) {
+    public PaimonEvent(Identifier tableId, List<GenericRow> genericRows) {
         this.tableId = tableId;
-        this.genericRow = genericRow;
+        this.genericRows = genericRows;
         this.shouldRefreshSchema = false;
     }
 
-    public PaimonEvent(Identifier tableId, GenericRow genericRow, boolean shouldRefreshSchema) {
+    public PaimonEvent(
+            Identifier tableId, List<GenericRow> genericRows, boolean shouldRefreshSchema) {
         this.tableId = tableId;
-        this.genericRow = genericRow;
+        this.genericRows = genericRows;
         this.shouldRefreshSchema = shouldRefreshSchema;
     }
 
     public PaimonEvent(
-            Identifier tableId, GenericRow genericRow, boolean shouldRefreshSchema, int bucket) {
+            Identifier tableId,
+            List<GenericRow> genericRows,
+            boolean shouldRefreshSchema,
+            int bucket) {
         this.tableId = tableId;
-        this.genericRow = genericRow;
+        this.genericRows = genericRows;
         this.shouldRefreshSchema = shouldRefreshSchema;
         this.bucket = bucket;
     }
@@ -69,12 +75,12 @@ public class PaimonEvent {
         this.shouldRefreshSchema = shouldRefreshSchema;
     }
 
-    public GenericRow getGenericRow() {
-        return genericRow;
+    public List<GenericRow> getGenericRows() {
+        return genericRows;
     }
 
-    public void setGenericRow(GenericRow genericRow) {
-        this.genericRow = genericRow;
+    public void setGenericRows(List<GenericRow> genericRows) {
+        this.genericRows = genericRows;
     }
 
     public int getBucket() {

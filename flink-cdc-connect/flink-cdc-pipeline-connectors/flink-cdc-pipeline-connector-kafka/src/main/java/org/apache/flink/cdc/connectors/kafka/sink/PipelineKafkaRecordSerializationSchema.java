@@ -22,6 +22,8 @@ import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Selectors;
+import org.apache.flink.cdc.connectors.kafka.utils.KafkaSinkUtils;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -57,6 +59,13 @@ public class PipelineKafkaRecordSerializationSchema
     // key value pairs to be put into Kafka Record Header.
     public final Map<String, String> customHeaders;
 
+    private final String mappingRuleString;
+
+    private Map<Selectors, String> selectorsToTopicMap;
+
+    // A cache to speed up TableId to Topic mapping.
+    private Map<TableId, String> tableIdToTopicCache;
+
     public static final String NAMESPACE_HEADER_KEY = "namespace";
 
     public static final String SCHEMA_NAME_HEADER_KEY = "schemaName";
@@ -69,7 +78,8 @@ public class PipelineKafkaRecordSerializationSchema
             SerializationSchema<Event> valueSerialization,
             String unifiedTopic,
             boolean addTableToHeaderEnabled,
-            String customHeaderString) {
+            String customHeaderString,
+            String mappingRuleString) {
         this.keySerialization = keySerialization;
         this.valueSerialization = checkNotNull(valueSerialization);
         this.unifiedTopic = unifiedTopic;
@@ -90,6 +100,7 @@ public class PipelineKafkaRecordSerializationSchema
             }
         }
         partition = partitionStrategy.equals(PartitionStrategy.ALL_TO_ZERO) ? 0 : null;
+        this.mappingRuleString = mappingRuleString;
     }
 
     @Override
@@ -102,7 +113,7 @@ public class PipelineKafkaRecordSerializationSchema
             // skip sending SchemaChangeEvent.
             return null;
         }
-        String topic = unifiedTopic == null ? changeEvent.tableId().toString() : unifiedTopic;
+        String topic = inferTopicName(changeEvent.tableId());
         RecordHeaders recordHeaders = new RecordHeaders();
         if (addTableToHeaderEnabled) {
             String namespace =
@@ -128,10 +139,30 @@ public class PipelineKafkaRecordSerializationSchema
                 topic, partition, null, keySerialized, valueSerialized, recordHeaders);
     }
 
+    private String inferTopicName(TableId tableId) {
+        return tableIdToTopicCache.computeIfAbsent(
+                tableId,
+                (table -> {
+                    if (unifiedTopic != null && !unifiedTopic.isEmpty()) {
+                        return unifiedTopic;
+                    }
+                    if (selectorsToTopicMap != null && !selectorsToTopicMap.isEmpty()) {
+                        for (Map.Entry<Selectors, String> entry : selectorsToTopicMap.entrySet()) {
+                            if (entry.getKey().isMatch(tableId)) {
+                                return entry.getValue();
+                            }
+                        }
+                    }
+                    return table.toString();
+                }));
+    }
+
     @Override
     public void open(
             SerializationSchema.InitializationContext context, KafkaSinkContext sinkContext)
             throws Exception {
+        this.selectorsToTopicMap = KafkaSinkUtils.parseSelectorsToTopicMap(mappingRuleString);
+        this.tableIdToTopicCache = new HashMap<>();
         valueSerialization.open(context);
     }
 }

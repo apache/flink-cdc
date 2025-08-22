@@ -20,8 +20,8 @@ package org.apache.flink.cdc.connectors.mysql;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.test.util.AbstractTestBase;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -47,15 +47,15 @@ public abstract class LegacyMySqlTestBase extends AbstractTestBase {
                             .withPassword("flinkpw")
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
-    public static void startContainers() {
+    @BeforeAll
+    static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         LOG.info("Stopping containers...");
         MYSQL_CONTAINER.stop();
         LOG.info("Containers are stopped.");

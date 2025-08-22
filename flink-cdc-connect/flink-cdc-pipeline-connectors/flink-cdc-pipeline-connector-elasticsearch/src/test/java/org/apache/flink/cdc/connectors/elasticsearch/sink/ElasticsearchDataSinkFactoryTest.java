@@ -1,18 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one或多个
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional信息 regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express或 implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 package org.apache.flink.cdc.connectors.elasticsearch.sink;
@@ -29,14 +31,21 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /** Tests for {@link ElasticsearchDataSinkFactory}. */
-public class ElasticsearchDataSinkFactoryTest {
+class ElasticsearchDataSinkFactoryTest {
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(ElasticsearchDataSinkFactoryTest.class);
 
     private static final String ELASTICSEARCH_IDENTIFIER = "elasticsearch";
 
@@ -57,18 +66,12 @@ public class ElasticsearchDataSinkFactoryTest {
         DataSinkFactory sinkFactory = getElasticsearchDataSinkFactory();
         List<String> requiredKeys = getRequiredKeys(sinkFactory);
         for (String requiredKey : requiredKeys) {
-            // 创建一个新的配置 Map，包含所有必需选项
             Map<String, String> options = new HashMap<>(createValidOptions());
-            // 移除当前正在测试的必需选项
             options.remove(requiredKey);
             Configuration conf = Configuration.fromMap(options);
-            // 打印日志以确保我们在测试缺少必需选项的情况
-            System.out.println("Testing missing required option: " + requiredKey);
+            LOG.info("Testing missing required option: {}", requiredKey);
 
-            // 添加创建 DataSink 对象的代码
             Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
-
-                    // Assertions to check for missing required option
                     .isInstanceOf(ValidationException.class)
                     .hasMessageContaining(
                             String.format(
@@ -92,10 +95,8 @@ public class ElasticsearchDataSinkFactoryTest {
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
-        // 打印日志以确保我们在测试不受支持的选项
-        System.out.println("Testing unsupported option");
+        LOG.info("Testing unsupported option");
 
-        // Assertions to check for unsupported options
         Assertions.assertThatThrownBy(() -> createDataSink(sinkFactory, conf))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining(
@@ -121,14 +122,53 @@ public class ElasticsearchDataSinkFactoryTest {
                                 .put("version", "7") // Added version to the test configuration
                                 .build());
 
-        // 打印日志以确保我们在测试带前缀的必需选项
-        System.out.println("Testing prefixed required option");
+        LOG.info("Testing prefixed required option");
 
         DataSink dataSink = createDataSink(sinkFactory, conf);
         Assertions.assertThat(dataSink).isInstanceOf(ElasticsearchDataSink.class);
     }
 
+    /**
+     * Test the `validateShardingSeparator` method with illegal sharding separators. This test
+     * checks two scenarios: 1. Separators containing illegal characters. 2. A separator with
+     * uppercase letters.
+     */
+    @Test
+    void testIllegalShardingSeparator()
+            throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        ElasticsearchDataSinkFactory sinkFactory =
+                (ElasticsearchDataSinkFactory) getElasticsearchDataSinkFactory();
+        Method method =
+                ElasticsearchDataSinkFactory.class.getDeclaredMethod(
+                        "validateShardingSeparator", String.class);
+        method.setAccessible(true);
+
+        // Test an array of invalid separators with illegal characters
+        String[] invalidSeparators = {"*", " ", ">", "<", "|", "?", "\"", ",", "#", "\\"};
+        for (String invalidSeparator : invalidSeparators) {
+            Throwable thrown =
+                    Assertions.catchThrowable(() -> method.invoke(sinkFactory, invalidSeparator));
+            Assertions.assertThat(extractException(thrown))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining(
+                            "sharding.suffix.separator is malformed, elasticsearch index cannot include \\, /, *, ?, \", <, >, |, ` ` (space character), ,, #");
+        }
+
+        // Test a separator with uppercase letters
+        Throwable thrown = Assertions.catchThrowable(() -> method.invoke(sinkFactory, "_TEST"));
+        Assertions.assertThat(extractException(thrown))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining(
+                        "sharding.suffix.separator is malformed, elasticsearch index only support lowercase.");
+    }
+
     // Helper methods
+
+    /** Helper method to extract the actual cause from an InvocationTargetException. */
+    private Throwable extractException(Throwable ex) {
+        Assertions.assertThat(ex).isInstanceOf(InvocationTargetException.class);
+        return ex.getCause();
+    }
 
     private DataSinkFactory getElasticsearchDataSinkFactory() {
         DataSinkFactory sinkFactory =

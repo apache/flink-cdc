@@ -99,6 +99,11 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
     private final String chunkKeyColumn;
     final boolean skipSnapshotBackFill;
     private final String snapshotFilter;
+    final boolean parseOnlineSchemaChanges;
+    private final boolean useLegacyJsonFormat;
+    private final boolean assignUnboundedChunkFirst;
+
+    private final boolean appendOnly;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -137,6 +142,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
             Duration heartbeatInterval,
             @Nullable String chunkKeyColumn,
             boolean skipSnapshotBackFill,
+            boolean parseOnlineSchemaChanges,
+            boolean useLegacyJsonFormat,
+            boolean assignUnboundedChunkFirst,
+            boolean appendOnly,
             @Nullable String snapshotFilter) {
         this.physicalSchema = physicalSchema;
         this.port = port;
@@ -161,18 +170,26 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.jdbcProperties = jdbcProperties;
+        this.parseOnlineSchemaChanges = parseOnlineSchemaChanges;
         // Mutable attributes
         this.producedDataType = physicalSchema.toPhysicalRowDataType();
         this.metadataKeys = Collections.emptyList();
         this.heartbeatInterval = heartbeatInterval;
         this.chunkKeyColumn = chunkKeyColumn;
         this.skipSnapshotBackFill = skipSnapshotBackFill;
+        this.useLegacyJsonFormat = useLegacyJsonFormat;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.appendOnly = appendOnly;
         this.snapshotFilter = snapshotFilter;
     }
 
     @Override
     public ChangelogMode getChangelogMode() {
-        return ChangelogMode.all();
+        if (appendOnly) {
+            return ChangelogMode.insertOnly();
+        } else {
+            return ChangelogMode.all();
+        }
     }
 
     @Override
@@ -191,6 +208,7 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         .setServerTimeZone(serverTimeZone)
                         .setUserDefinedConverterFactory(
                                 MySqlDeserializationConverterFactory.instance())
+                        .setAppendOnly(appendOnly)
                         .build();
         if (enableParallelRead) {
             MySqlSource<RowData> parallelSource =
@@ -223,6 +241,9 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                             .heartbeatInterval(heartbeatInterval)
                             .chunkKeyColumn(new ObjectPath(database, tableName), chunkKeyColumn)
                             .skipSnapshotBackfill(skipSnapshotBackFill)
+                            .parseOnLineSchemaChanges(parseOnlineSchemaChanges)
+                            .useLegacyJsonFormat(useLegacyJsonFormat)
+                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
                             .snapshotFilters(
                                     escapeDot(database) + "." + escapeDot(tableName),
                                     snapshotFilter)
@@ -312,6 +333,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                         heartbeatInterval,
                         chunkKeyColumn,
                         skipSnapshotBackFill,
+                        parseOnlineSchemaChanges,
+                        useLegacyJsonFormat,
+                        assignUnboundedChunkFirst,
+                        appendOnly,
                         snapshotFilter);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
@@ -355,7 +380,12 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 && Objects.equals(heartbeatInterval, that.heartbeatInterval)
                 && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
                 && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill)
-                && Objects.equals(snapshotFilter, that.snapshotFilter);
+                && Objects.equals(snapshotFilter, that.snapshotFilter)
+                && Objects.equals(skipSnapshotBackFill, that.skipSnapshotBackFill)
+                && parseOnlineSchemaChanges == that.parseOnlineSchemaChanges
+                && useLegacyJsonFormat == that.useLegacyJsonFormat
+                && assignUnboundedChunkFirst == that.assignUnboundedChunkFirst
+                && Objects.equals(appendOnly, that.appendOnly);
     }
 
     @Override
@@ -389,6 +419,10 @@ public class MySqlTableSource implements ScanTableSource, SupportsReadingMetadat
                 heartbeatInterval,
                 chunkKeyColumn,
                 skipSnapshotBackFill,
+                parseOnlineSchemaChanges,
+                useLegacyJsonFormat,
+                assignUnboundedChunkFirst,
+                appendOnly,
                 snapshotFilter);
     }
 

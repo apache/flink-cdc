@@ -22,8 +22,10 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
+import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+import org.apache.flink.table.data.TimestampData;
 
 import com.esri.core.geometry.ogc.OGCGeometry;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -39,12 +41,15 @@ import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
+import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 
 /** Event deserializer for {@link MySqlDataSource}. */
@@ -59,21 +64,52 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean includeSchemaChanges;
+    private final boolean tinyInt1isBit;
+    private final boolean includeComments;
 
     private transient Tables tables;
     private transient CustomMySqlAntlrDdlParser customParser;
 
+    private List<MySqlReadableMetadata> readableMetadataList;
+    private boolean isTableIdCaseInsensitive;
+
     public MySqlEventDeserializer(
-            DebeziumChangelogMode changelogMode, boolean includeSchemaChanges) {
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
+        this(
+                changelogMode,
+                includeSchemaChanges,
+                new ArrayList<>(),
+                includeSchemaChanges,
+                tinyInt1isBit,
+                isTableIdCaseInsensitive);
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+    }
+
+    public MySqlEventDeserializer(
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            List<MySqlReadableMetadata> readableMetadataList,
+            boolean includeComments,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
+        this.readableMetadataList = readableMetadataList;
+        this.includeComments = includeComments;
+        this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser();
+                customParser =
+                        new CustomMySqlAntlrDdlParser(
+                                includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
                 tables = new Tables();
             }
 
@@ -112,13 +148,28 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected TableId getTableId(SourceRecord record) {
-        String[] parts = record.topic().split("\\.");
-        return TableId.tableId(parts[1], parts[2]);
+        Struct value = (Struct) record.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        String dbName = source.getString(DATABASE_NAME_KEY);
+        String tableName = source.getString(TABLE_NAME_KEY);
+        return TableId.tableId(dbName, tableName);
     }
 
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
-        return Collections.emptyMap();
+        Map<String, String> metadataMap = new HashMap<>();
+        readableMetadataList.forEach(
+                (mySqlReadableMetadata -> {
+                    Object metadata = mySqlReadableMetadata.getConverter().read(record);
+                    if (mySqlReadableMetadata.equals(MySqlReadableMetadata.OP_TS)) {
+                        metadataMap.put(
+                                mySqlReadableMetadata.getKey(),
+                                String.valueOf(((TimestampData) metadata).getMillisecond()));
+                    } else {
+                        metadataMap.put(mySqlReadableMetadata.getKey(), String.valueOf(metadata));
+                    }
+                }));
+        return metadataMap;
     }
 
     @Override

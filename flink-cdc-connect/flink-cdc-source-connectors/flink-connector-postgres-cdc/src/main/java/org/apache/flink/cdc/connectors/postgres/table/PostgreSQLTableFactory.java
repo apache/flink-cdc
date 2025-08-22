@@ -23,7 +23,6 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.postgres.utils.OptionUtils;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -44,7 +43,9 @@ import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.TAB
 import static org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED;
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHANGELOG_MODE;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -116,6 +117,9 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean isScanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
+        boolean assignUnboundedChunkFirst =
+                config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        boolean appendOnly = config.get(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
 
         if (enableParallelRead) {
             validateIntegerOption(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE, splitSize, 1);
@@ -131,7 +135,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                     "The Postgres CDC connector does not support 'latest-offset' startup mode when 'scan.incremental.snapshot.enabled' is disabled, you can enable 'scan.incremental.snapshot.enabled' to use this startup mode.");
         }
 
-        OptionUtils.printOptions(IDENTIFIER, ((Configuration) config).toMap());
+        OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
         return new PostgreSQLTableSource(
                 physicalSchema,
@@ -161,7 +165,9 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 closeIdlerReaders,
                 skipSnapshotBackfill,
                 isScanNewlyAddedTableEnabled,
-                lsnCommitCheckpointsDelay);
+                lsnCommitCheckpointsDelay,
+                assignUnboundedChunkFirst,
+                appendOnly);
     }
 
     @Override
@@ -204,6 +210,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         options.add(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         return options;
     }
 
@@ -211,6 +219,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
 
     private static final String SCAN_STARTUP_MODE_VALUE_SNAPSHOT = "snapshot";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
+    private static final String SCAN_STARTUP_MODE_VALUE_COMMITTED = "committed-offset";
 
     private static StartupOptions getStartupOptions(ReadableConfig config) {
         String modeString = config.get(SCAN_STARTUP_MODE);
@@ -222,6 +231,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 return StartupOptions.snapshot();
             case SCAN_STARTUP_MODE_VALUE_LATEST:
                 return StartupOptions.latest();
+            case SCAN_STARTUP_MODE_VALUE_COMMITTED:
+                return StartupOptions.committed();
 
             default:
                 throw new ValidationException(
@@ -231,6 +242,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                                 SCAN_STARTUP_MODE_VALUE_INITIAL,
                                 SCAN_STARTUP_MODE_VALUE_SNAPSHOT,
                                 SCAN_STARTUP_MODE_VALUE_LATEST,
+                                SCAN_STARTUP_MODE_VALUE_COMMITTED,
                                 modeString));
         }
     }

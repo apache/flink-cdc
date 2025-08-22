@@ -41,7 +41,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/3.1.0/flink-sql-connector-postgres-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/{{< param Version >}}/flink-sql-connector-postgres-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -236,12 +236,64 @@ Connector Options
           so it does not need to be explicitly configured 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' = 'true'
       </td>
     </tr>
+    <tr>
+      <td>scan.lsn-commit.checkpoints-num-delay</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">3</td>
+      <td>Integer</td>
+      <td>The number of checkpoint delays before starting to commit the LSN offsets. <br>
+          The checkpoint LSN offsets will be committed in rolling fashion, the earliest checkpoint identifier will be committed first from the delayed checkpoints.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to skip backfill in snapshot reading phase.<br> 
+        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
+        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
+        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.read-changelog-as-append-only.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to convert the changelog stream to an append-only stream.<br>
+        This feature is only used in special scenarios where you need to save upstream table deletion messages. For example, in a logical deletion scenario, users are not allowed to physically delete downstream messages. In this case, this feature is used in conjunction with the row_kind metadata field. Therefore, the downstream can save all detailed data at first, and then use the row_kind field to determine whether to perform logical deletion.<br>
+        The option values are as follows:<br>
+          <li>true: All types of messages (including INSERT, DELETE, UPDATE_BEFORE, and UPDATE_AFTER) will be converted into INSERT messages.</li>
+          <li>false (default): All types of messages are sent as is.</li>
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
 <div>
 
-Note: `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-slot-name).
+### Notes
+
+#### `slot.name` option
+
+The `slot.name` is recommended to set for different tables to avoid the potential `PSQLException: ERROR: replication slot "flink" is active for PID 974` error. See more [here](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#postgresql-property-slot-name).
+
+#### `scan.lsn-commit.checkpoints-num-delay` option
+
+When consuming PostgreSQL logs, the LSN offset must be committed to trigger the log data cleanup for the corresponding slot. However, once the LSN offset is committed, earlier offsets become invalid. To ensure access to earlier LSN offsets for job recovery, we delay the LSN commit by `scan.lsn-commit.checkpoints-num-delay` (default value is `3`) checkpoints. This feature is available when config option `scan.incremental.snapshot.enabled` is set to true.
 
 ### Incremental Snapshot Options
 
@@ -271,8 +323,7 @@ The following options is available only when `scan.incremental.snapshot.enabled=
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"
-           and "latest-offset".
+      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" and "snapshot".
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
@@ -316,7 +367,10 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+            <br>
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          </td>
     </tr>
     <tr>
           <td>chunk-key.even-distribution.factor.lower-bound</td>
@@ -427,12 +481,22 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) PostgreSQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) PostgreSQL CDC Source doesn't need to acquire global read lock before snapshot reading
 
-During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by primary key of table,
+During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
 and then PostgreSQL CDC Source assigns the chunks to multiple readers to read the data of snapshot chunk.
 
 ### Exactly-Once Processing
 
 The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works).
+
+### Startup Reading Position
+
+The config option `scan.startup.mode` specifies the startup mode for PostgreSQL CDC consumer. The valid enumerations are:
+
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the replication slot.
+- `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
+  the end of the replication which means only have the changes since the connector was started.
+- `committed-offset`: Skip snapshot phase and start reading events from a `confirmed_flush_lsn` offset of replication slot.
+- `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
 
 ### DataStream Source
 
@@ -520,6 +584,61 @@ public class PostgreSQLSourceExample {
   }
 }
 ```
+
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 PostgreSQL，Group 的名称会类似于 `test_database.test_schema.test_table`。
+
+### Tables Without primary keys
+
+Starting from version 3.4.0, Postgres CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+
+There are two places that need to be taken care of.
+
+1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
+2. The processing semantics of a Postgres CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
+* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+#### Warning
+
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a Postgres table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+
+#### Problem Scenario
+
+- **Table Structure:**
+    - **Primary Key:** `id`
+    - **Chunk Key Column:** `pid` (Not a primary key)
+
+- **Snapshot Splits:**
+    - **Split 0:** `1 < pid <= 3`
+    - **Split 1:** `3 < pid <= 5`
+
+- **Operation:**
+    - Two different subtasks are reading Split 0 and Split 1 concurrently.
+    - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+
+- **Result:**
+    - **Split 0:** Contains the record `[id=0, pid=2]`
+    - **Split 1:** Contains the record `[id=0, pid=4]`
+
+Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
 
 Data Type Mapping
 ----------------

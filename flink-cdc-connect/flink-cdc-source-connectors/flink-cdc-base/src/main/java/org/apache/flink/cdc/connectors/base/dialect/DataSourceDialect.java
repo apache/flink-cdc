@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.base.dialect;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -60,11 +61,19 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable,
      */
     Offset displayCurrentOffset(C sourceConfig);
 
+    /** Displays committed offset from the database e.g. query Postgresql confirmed_lsn */
+    default Offset displayCommittedOffset(C sourceConfig) {
+        throw new UnsupportedOperationException();
+    }
+
     /** Check if the CollectionId is case-sensitive or not. */
     boolean isDataCollectionIdCaseSensitive(C sourceConfig);
 
     /** Returns the {@link ChunkSplitter} which used to split collection to splits. */
+    @Deprecated
     ChunkSplitter createChunkSplitter(C sourceConfig);
+
+    ChunkSplitter createChunkSplitter(C sourceConfig, ChunkSplitterState chunkSplitterState);
 
     /** The fetch task used to fetch data of a snapshot split or stream split. */
     FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase);

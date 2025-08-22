@@ -25,9 +25,10 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
-import org.apache.flink.cdc.runtime.testutils.operators.EventOperatorTestHarness;
+import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -38,7 +39,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 
 /** Unit tests for the {@link PreTransformOperator}. */
-public class PreTransformOperatorTest {
+class PreTransformOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -181,6 +182,24 @@ public class PreTransformOperatorTest {
                     .primaryKey("id")
                     .build();
 
+    private static final Schema COL_NAME_MAPPING_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("foo", DataTypes.INT())
+                    .physicalColumn("bar", DataTypes.INT())
+                    .physicalColumn("foo-bar", DataTypes.INT())
+                    .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("class", DataTypes.INT())
+                    .build();
+
+    private static final Schema EXPECTED_COL_NAME_MAPPING_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("foo", DataTypes.INT())
+                    .physicalColumn("bar", DataTypes.INT())
+                    .physicalColumn("foo-bar", DataTypes.INT())
+                    .physicalColumn("bar-foo", DataTypes.INT())
+                    .physicalColumn("class", DataTypes.INT())
+                    .build();
+
     @Test
     void testEventTransform() throws Exception {
         PreTransformOperator transform =
@@ -191,11 +210,13 @@ public class PreTransformOperatorTest {
                                 null,
                                 "col2",
                                 "col12",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -289,10 +310,11 @@ public class PreTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
-    public void testNullabilityColumn() throws Exception {
+    void testNullabilityColumn() throws Exception {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
@@ -301,11 +323,13 @@ public class PreTransformOperatorTest {
                                 null,
                                 "id",
                                 "id",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -319,10 +343,11 @@ public class PreTransformOperatorTest {
                         new StreamRecord<>(
                                 new CreateTableEvent(
                                         CUSTOMERS_TABLEID, EXPECTED_NULLABILITY_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
-    public void testReduceTransformColumn() throws Exception {
+    void testReduceTransformColumn() throws Exception {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
@@ -331,11 +356,13 @@ public class PreTransformOperatorTest {
                                 "newage > 17 and ref2 > 17",
                                 "id",
                                 "id",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -426,10 +453,11 @@ public class PreTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
-    public void testWildcardTransformColumn() throws Exception {
+    void testWildcardTransformColumn() throws Exception {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
@@ -438,11 +466,13 @@ public class PreTransformOperatorTest {
                                 "newage > 17",
                                 "id",
                                 "id",
-                                "key1=value1,key2=value2")
+                                "key1=value1,key2=value2",
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -516,6 +546,7 @@ public class PreTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -528,9 +559,9 @@ public class PreTransformOperatorTest {
                                 " __table_name__ = 'metadata_table' ")
                         .build();
 
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -542,6 +573,7 @@ public class PreTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(METADATA_TABLEID, EXPECTED_METADATA_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -554,18 +586,22 @@ public class PreTransformOperatorTest {
                                 "age < 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, name as roleName",
                                 "age >= 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -579,6 +615,7 @@ public class PreTransformOperatorTest {
                         new StreamRecord<>(
                                 new CreateTableEvent(
                                         CUSTOMERS_TABLEID, EXPECTED_MULTITRANSFORM_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -591,18 +628,22 @@ public class PreTransformOperatorTest {
                                 "age < 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, age, name, sex, 'Juvenile' as roleName",
                                 "age >= 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -615,6 +656,7 @@ public class PreTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 
     @Test
@@ -622,18 +664,27 @@ public class PreTransformOperatorTest {
         PreTransformOperator transform =
                 PreTransformOperator.newBuilder()
                         .addTransform(
-                                CUSTOMERS_TABLEID.identifier(), null, "age < 18", "id", null, null)
+                                CUSTOMERS_TABLEID.identifier(),
+                                null,
+                                "age < 18",
+                                "id",
+                                null,
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .addTransform(
                                 CUSTOMERS_TABLEID.identifier(),
                                 "id, age, UPPER(name) as name, sex",
                                 "age >= 18",
                                 "id",
                                 null,
-                                null)
+                                null,
+                                null,
+                                new SupportedMetadataColumn[0])
                         .build();
-        EventOperatorTestHarness<PreTransformOperator, Event>
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
-                        new EventOperatorTestHarness<>(transform, 1);
+                        RegularEventOperatorTestHarness.with(transform, 1);
         // Initialization
         transformFunctionEventEventOperatorTestHarness.open();
         // Create table
@@ -646,5 +697,35 @@ public class PreTransformOperatorTest {
                 .isEqualTo(
                         new StreamRecord<>(
                                 new CreateTableEvent(CUSTOMERS_TABLEID, MULTITRANSFORM_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testColumnNameMapping() throws Exception {
+        PreTransformOperator transform =
+                PreTransformOperator.newBuilder()
+                        .addTransform(
+                                CUSTOMERS_TABLEID.identifier(),
+                                "foo, `foo-bar`, foo-bar AS f0, `bar-foo` AS f1, class",
+                                " `foo-bar` > 1 and foo-bar > 1 and class > 1")
+                        .build();
+
+        RegularEventOperatorTestHarness<PreTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(CUSTOMERS_TABLEID, COL_NAME_MAPPING_SCHEMA);
+        transform.processElement(new StreamRecord<>(createTableEvent));
+
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        CUSTOMERS_TABLEID, EXPECTED_COL_NAME_MAPPING_SCHEMA)));
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 }

@@ -50,7 +50,7 @@ import java.util.Map;
 public abstract class SourceSplitSerializer
         implements SimpleVersionedSerializer<SourceSplitBase>, OffsetDeserializerSerializer {
 
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
     private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
             ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
@@ -109,6 +109,7 @@ public abstract class SourceSplitSerializer
             writeTableSchemas(streamSplit.getTableSchemas(), out);
             out.writeInt(streamSplit.getTotalFinishedSplitSize());
             out.writeBoolean(streamSplit.isSuspended());
+            out.writeBoolean(streamSplit.isSnapshotCompleted());
             final byte[] result = out.getCopyOfBuffer();
             out.clear();
             // optimization: cache the serialized from, so we avoid the byte work during repeated
@@ -126,6 +127,7 @@ public abstract class SourceSplitSerializer
             case 3:
             case 4:
             case 5:
+            case 6:
                 return deserializeSplit(version, serialized);
             default:
                 throw new IOException("Unknown version: " + version);
@@ -172,9 +174,15 @@ public abstract class SourceSplitSerializer
             }
 
             boolean isSuspended = false;
-            if (version == 5) {
+            if (version >= 5) {
                 isSuspended = in.readBoolean();
             }
+
+            boolean isSnapshotCompleted = false;
+            if (version >= 6) {
+                isSnapshotCompleted = in.readBoolean();
+            }
+
             in.releaseArrays();
             return new StreamSplit(
                     splitId,
@@ -183,7 +191,8 @@ public abstract class SourceSplitSerializer
                     finishedSplitsInfo,
                     tableChangeMap,
                     totalFinishedSplitSize,
-                    isSuspended);
+                    isSuspended,
+                    isSnapshotCompleted);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
         }
@@ -199,7 +208,7 @@ public abstract class SourceSplitSerializer
             boolean useCatalogBeforeSchema =
                     SerializerUtils.shouldUseCatalogBeforeSchema(entry.getKey());
             out.writeBoolean(useCatalogBeforeSchema);
-            out.writeUTF(entry.getKey().toString());
+            out.writeUTF(entry.getKey().toDoubleQuotedString());
             final String tableChangeStr =
                     documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
             final byte[] tableChangeBytes = tableChangeStr.getBytes(StandardCharsets.UTF_8);
@@ -225,6 +234,7 @@ public abstract class SourceSplitSerializer
                 case 3:
                 case 4:
                 case 5:
+                case 6:
                     final int len = in.readInt();
                     final byte[] bytes = new byte[len];
                     in.read(bytes);

@@ -24,6 +24,9 @@ limitations under the License.
 	<!-- Skip MethodNameCheck for DataTypes	-->
 	<suppress files="DataTypes.java" checks="MethodNameCheck"/>
 
+	<!-- Skip IllegalImport for Proxy classes -->
+	<suppress files=".*ExternalResourceProxy.java" checks="IllegalImport"/>
+
 	<!-- Classes copied from debezium -->
 	<suppress files="io[\\/]debezium[\\/]connector[\\/]postgresql[\\/]" checks=".*"/>
 	<suppress files="io[\\/]debezium[\\/]" checks=".*"/>

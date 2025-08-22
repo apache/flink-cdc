@@ -20,10 +20,17 @@ package org.apache.flink.cdc.cli;
 import org.apache.flink.cdc.cli.utils.ConfigurationUtils;
 import org.apache.flink.cdc.cli.utils.FlinkEnvironmentUtils;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.PipelineExecution;
+import org.apache.flink.configuration.DeploymentOptions;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
+
+import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -33,17 +40,22 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.cli.CliFrontendOptions.FLINK_CONFIG;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_ALLOW_NON_RESTORED_OPTION;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_CLAIM_MODE;
 import static org.apache.flink.cdc.cli.CliFrontendOptions.SAVEPOINT_PATH_OPTION;
+import static org.apache.flink.cdc.cli.CliFrontendOptions.TARGET;
+import static org.apache.flink.cdc.cli.CliFrontendOptions.USE_MINI_CLUSTER;
+import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.LOCAL;
+import static org.apache.flink.cdc.composer.flink.deployment.ComposeDeployment.REMOTE;
 
 /** The frontend entrypoint for the command-line interface of Flink CDC. */
 public class CliFrontend {
@@ -81,7 +93,7 @@ public class CliFrontend {
                     "Missing pipeline definition file path in arguments. ");
         }
 
-        Path pipelineDefPath = Paths.get(unparsedArgs.get(0));
+        Path pipelineDefPath = new Path(unparsedArgs.get(0));
         // Take the first unparsed argument as the pipeline definition file
         LOG.info("Real Path pipelineDefPath {}", pipelineDefPath);
         // Global pipeline configuration
@@ -89,10 +101,17 @@ public class CliFrontend {
 
         // Load Flink environment
         Path flinkHome = getFlinkHome(commandLine);
-        Configuration flinkConfig = FlinkEnvironmentUtils.loadFlinkConfiguration(flinkHome);
+        Configuration configuration = FlinkEnvironmentUtils.loadFlinkConfiguration(flinkHome);
+
+        // To override the Flink configuration
+        overrideFlinkConfiguration(configuration, commandLine);
+
+        org.apache.flink.configuration.Configuration flinkConfig =
+                org.apache.flink.configuration.Configuration.fromMap(configuration.toMap());
 
         // Savepoint
         SavepointRestoreSettings savepointSettings = createSavepointRestoreSettings(commandLine);
+        SavepointRestoreSettings.toConfiguration(savepointSettings, flinkConfig);
 
         // Additional JARs
         List<Path> additionalJars =
@@ -100,7 +119,7 @@ public class CliFrontend {
                                 Optional.ofNullable(
                                                 commandLine.getOptionValues(CliFrontendOptions.JAR))
                                         .orElse(new String[0]))
-                        .map(Paths::get)
+                        .map(Path::new)
                         .collect(Collectors.toList());
 
         // Build executor
@@ -109,9 +128,36 @@ public class CliFrontend {
                 pipelineDefPath,
                 flinkConfig,
                 globalPipelineConfig,
-                commandLine.hasOption(CliFrontendOptions.USE_MINI_CLUSTER),
                 additionalJars,
-                savepointSettings);
+                flinkHome);
+    }
+
+    private static void overrideFlinkConfiguration(
+            Configuration flinkConfig, CommandLine commandLine) {
+
+        String target =
+                commandLine.hasOption(USE_MINI_CLUSTER)
+                        ? LOCAL.getName()
+                        : commandLine.getOptionValue(TARGET, REMOTE.getName());
+        flinkConfig.set(
+                ConfigOptions.key(DeploymentOptions.TARGET.key()).stringType().defaultValue(target),
+                target);
+
+        Properties properties = commandLine.getOptionProperties(FLINK_CONFIG.getOpt());
+        LOG.info("Dynamic flink config items found: {}", properties);
+        for (String key : properties.stringPropertyNames()) {
+            String value = properties.getProperty(key);
+            if (StringUtils.isNullOrWhitespaceOnly(key)
+                    || StringUtils.isNullOrWhitespaceOnly(value)) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "null or white space argument for key or value: %s=%s",
+                                key, value));
+            }
+            ConfigOption<String> configOption =
+                    ConfigOptions.key(key.trim()).stringType().defaultValue(value.trim());
+            flinkConfig.set(configOption, value.trim());
+        }
     }
 
     private static SavepointRestoreSettings createSavepointRestoreSettings(
@@ -167,14 +213,14 @@ public class CliFrontend {
         String flinkHomeFromArgs = commandLine.getOptionValue(CliFrontendOptions.FLINK_HOME);
         if (flinkHomeFromArgs != null) {
             LOG.debug("Flink home is loaded by command-line argument: {}", flinkHomeFromArgs);
-            return Paths.get(flinkHomeFromArgs);
+            return new Path(flinkHomeFromArgs);
         }
 
         // Fallback to environment variable
         String flinkHomeFromEnvVar = System.getenv(FLINK_HOME_ENV_VAR);
         if (flinkHomeFromEnvVar != null) {
             LOG.debug("Flink home is loaded by environment variable: {}", flinkHomeFromEnvVar);
-            return Paths.get(flinkHomeFromEnvVar);
+            return new Path(flinkHomeFromEnvVar);
         }
 
         throw new IllegalArgumentException(
@@ -187,7 +233,7 @@ public class CliFrontend {
         // Try to get global config path from command line
         String globalConfig = commandLine.getOptionValue(CliFrontendOptions.GLOBAL_CONFIG);
         if (globalConfig != null) {
-            Path globalConfigPath = Paths.get(globalConfig);
+            Path globalConfigPath = new Path(globalConfig);
             LOG.info("Using global config in command line: {}", globalConfigPath);
             return ConfigurationUtils.loadConfigFile(globalConfigPath);
         }
@@ -196,7 +242,8 @@ public class CliFrontend {
         String flinkCdcHome = System.getenv(FLINK_CDC_HOME_ENV_VAR);
         if (flinkCdcHome != null) {
             Path globalConfigPath =
-                    Paths.get(flinkCdcHome).resolve("conf").resolve("flink-cdc.yaml");
+                    new Path(
+                            flinkCdcHome, Joiner.on(File.separator).join("conf", "flink-cdc.yaml"));
             LOG.info("Using global config in FLINK_CDC_HOME: {}", globalConfigPath);
             return ConfigurationUtils.loadConfigFile(globalConfigPath);
         }

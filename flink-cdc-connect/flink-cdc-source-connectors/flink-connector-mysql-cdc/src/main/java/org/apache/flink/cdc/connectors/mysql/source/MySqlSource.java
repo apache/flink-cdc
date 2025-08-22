@@ -32,6 +32,7 @@ import org.apache.flink.cdc.connectors.mysql.MySqlValidator;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlBinlogSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlHybridSplitAssigner;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
@@ -47,7 +48,6 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReaderCont
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
-import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -200,7 +200,22 @@ public class MySqlSource<T>
         validator.validate();
 
         final MySqlSplitAssigner splitAssigner;
-        if (!sourceConfig.getStartupOptions().isStreamOnly()) {
+        // In snapshot-only startup option, only split snapshots.
+        if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
+                boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                splitAssigner =
+                        new MySqlSnapshotSplitAssigner(
+                                sourceConfig,
+                                enumContext.currentParallelism(),
+                                new ArrayList<>(),
+                                isTableIdCaseSensitive,
+                                enumContext);
+            } catch (Exception e) {
+                throw new FlinkRuntimeException(
+                        "Failed to discover captured tables for enumerator", e);
+            }
+        } else if (!sourceConfig.getStartupOptions().isStreamOnly()) {
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
                 boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
                 splitAssigner =
@@ -208,7 +223,8 @@ public class MySqlSource<T>
                                 sourceConfig,
                                 enumContext.currentParallelism(),
                                 new ArrayList<>(),
-                                isTableIdCaseSensitive);
+                                isTableIdCaseSensitive,
+                                enumContext);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
                         "Failed to discover captured tables for enumerator", e);
@@ -233,7 +249,8 @@ public class MySqlSource<T>
                     new MySqlHybridSplitAssigner(
                             sourceConfig,
                             enumContext.currentParallelism(),
-                            (HybridPendingSplitsState) checkpoint);
+                            (HybridPendingSplitsState) checkpoint,
+                            enumContext);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(
@@ -271,7 +288,6 @@ public class MySqlSource<T>
     @FunctionalInterface
     interface RecordEmitterSupplier<T> extends Serializable {
 
-        RecordEmitter<SourceRecords, T, MySqlSplitState> get(
-                MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
+        MySqlRecordEmitter<T> get(MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
     }
 }

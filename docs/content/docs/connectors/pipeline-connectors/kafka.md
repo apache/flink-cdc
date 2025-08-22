@@ -141,6 +141,20 @@ Pipeline Connector Options
       <td>String</td>
       <td>custom headers for each kafka record. Each header are separated by ',', separate key and value by ':'. For example, we can set headers like 'key1:value1,key2:value2'. </td>
     </tr>
+    <tr>
+      <td>sink.tableId-to-topic.mapping</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Custom table mappings for each table from upstream tableId to downstream Kafka topic. Each mapping is separated by `;`, separate upstream tableId and downstream Kafka topic by `:`, For example, we can set `sink.tableId-to-topic.mapping` like `mydb.mytable1:topic1;mydb.mytable2:topic2`. </td>
+    </tr>
+    <tr>
+      <td>debezium-json.include-schema.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>If this parameter is configured, each debezium record will contain debezium schema information. Is only supported when using debezium-json. </td>
+    </tr>
     </tbody>
 </table>    
 </div>
@@ -171,6 +185,63 @@ An output example is:
   }
 }
 ```
+When `debezium-json.include-schema.enabled` is true, the output format will be:
+```json
+{
+  "schema":{
+    "type":"struct",
+    "fields":[
+      {
+        "type":"struct",
+        "fields":[
+          {
+            "type":"string",
+            "optional":true,
+            "field":"col1"
+          },
+          {
+            "type":"string",
+            "optional":true,
+            "field":"col2"
+          }
+        ],
+        "optional":true,
+        "field":"before"
+      },
+      {
+        "type":"struct",
+        "fields":[
+          {
+            "type":"string",
+            "optional":true,
+            "field":"col1"
+          },
+          {
+            "type":"string",
+            "optional":true,
+            "field":"col2"
+          }
+        ],
+        "optional":true,
+        "field":"after"
+      }
+    ],
+    "optional":false
+  },
+  "payload":{
+    "before": null,
+    "after": {
+      "col1": "1",
+      "col2": "1"
+    },
+    "op": "c",
+    "source": {
+      "db": "default_namespace",
+      "table": "table1"
+    }
+  }
+}
+```
 
 #### canal-json
 Refer to [Canal | Apache Flink](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/formats/canal/#available-metadata), canal-json format will contains `old`,`data`,`type`,`database`,`table`,`pkNames` elements, but `ts` is not included.      
@@ -195,12 +266,16 @@ An output example is:
 
 Data Type Mapping
 ----------------
+[Literal type](https://debezium.io/documentation/reference/3.1/connectors/mysql.html#mysql-data-types): defines the physical storage format of data (type field of the debezium schema)<br>
+[Semantic type](https://debezium.io/documentation/reference/3.1/connectors/mysql.html#mysql-data-types): defines the logical meaning of data (name field of the debezium schema).
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
       <tr>
         <th class="text-left">CDC type</th>
         <th class="text-left">JSON type</th>
+        <th class="text-left">Literal type</th>
+        <th class="text-left">Semantic type</th>
         <th class="text-left" style="width:60%;">NOTE</th>
       </tr>
     </thead>
@@ -208,24 +283,29 @@ Data Type Mapping
     <tr>
       <td>TINYINT</td>
       <td>TINYINT</td>
+      <td>INT16</td>
       <td></td>
     </tr>
     <tr>
       <td>SMALLINT</td>
       <td>SMALLINT</td>
+      <td>INT16</td>
       <td></td>
     </tr>
     <tr>
       <td>INT</td>
       <td>INT</td>
+      <td>INT32</td>
       <td></td>
     </tr>
     <tr>
       <td>BIGINT</td>
       <td>BIGINT</td>
+      <td>INT64</td>
       <td></td>
     </tr>
     <tr>
+      <td>FLOAT</td>
       <td>FLOAT</td>
       <td>FLOAT</td>
       <td></td>
@@ -233,14 +313,18 @@ Data Type Mapping
     <tr>
       <td>DOUBLE</td>
       <td>DOUBLE</td>
+      <td>DOUBLE</td>
       <td></td>
     </tr>
     <tr>
       <td>DECIMAL(p, s)</td>
       <td>DECIMAL(p, s)</td>
+      <td>BYTES</td>
+      <td>org.apache.kafka.connect.data.Decimal</td>
       <td></td>
     </tr>
     <tr>
+      <td>BOOLEAN</td>
       <td>BOOLEAN</td>
       <td>BOOLEAN</td>
       <td></td>
@@ -248,26 +332,34 @@ Data Type Mapping
     <tr>
       <td>DATE</td>
       <td>DATE</td>
+      <td>INT32</td>
+      <td>io.debezium.time.Date</td>
       <td></td>
     </tr>
     <tr>
-      <td>TIMESTAMP</td>
-      <td>TIMESTAMP</td>
+      <td>TIMESTAMP(p)</td>
+      <td>TIMESTAMP(p)</td>
+      <td>INT64</td>
+      <td>p <=3 io.debezium.time.Timestamp <br>p >3 io.debezium.time.MicroTimestamp </td>
       <td></td>
     </tr>
     <tr>
       <td>TIMESTAMP_LTZ</td>
       <td>TIMESTAMP_LTZ</td>
+      <td>STRING</td>
+      <td>io.debezium.time.ZonedTimestamp</td>
       <td></td>
     </tr>
     <tr>
       <td>CHAR(n)</td>
       <td>CHAR(n)</td>
+      <td>STRING</td>
       <td></td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n)</td>
+      <td>STRING</td>
       <td></td>
     </tr>
     </tbody>

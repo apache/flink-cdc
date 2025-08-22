@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.dispatcher.SignalEventDisp
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlSnapshotSplitReadTask;
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
@@ -66,6 +67,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
+import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+
 /**
  * A snapshot reader that reads data from Table in split level, the split is assigned by primary key
  * range.
@@ -92,6 +96,17 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
             new StoppableChangeEventSourceContext();
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
+
+    public SnapshotSplitReader(
+            MySqlSourceConfig sourceConfig, int subtaskId, SnapshotPhaseHooks hooks) {
+        this(
+                new StatefulTaskContext(
+                        sourceConfig,
+                        createBinaryClient(sourceConfig.getDbzConfiguration()),
+                        createMySqlConnection(sourceConfig)),
+                subtaskId,
+                hooks);
+    }
 
     public SnapshotSplitReader(
             StatefulTaskContext statefulTaskContext, int subtaskId, SnapshotPhaseHooks hooks) {
@@ -148,7 +163,6 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         // Step 2: read binlog events between low and high watermark and backfill
                         // changes into snapshot
                         backfill(snapshotResult, sourceContext);
-
                     } catch (Exception e) {
                         setReadException(e);
                     } finally {
@@ -268,79 +282,103 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         checkReadException();
 
         if (hasNextElement.get()) {
-            // data input: [low watermark event][snapshot events][high watermark event][binlog
-            // events][binlog-end event]
-            // data output: [low watermark event][normalized events][high watermark event]
-            boolean reachBinlogStart = false;
-            boolean reachBinlogEnd = false;
-            SourceRecord lowWatermark = null;
-            SourceRecord highWatermark = null;
-
-            Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
-            while (!reachBinlogEnd) {
-                checkReadException();
-                List<DataChangeEvent> batch = queue.poll();
-                for (DataChangeEvent event : batch) {
-                    SourceRecord record = event.getRecord();
-                    if (lowWatermark == null) {
-                        lowWatermark = record;
-                        assertLowWatermark(lowWatermark);
-                        continue;
-                    }
-
-                    if (highWatermark == null && RecordUtils.isHighWatermarkEvent(record)) {
-                        highWatermark = record;
-                        // snapshot events capture end and begin to capture binlog events
-                        reachBinlogStart = true;
-                        continue;
-                    }
-
-                    if (reachBinlogStart && RecordUtils.isEndWatermarkEvent(record)) {
-                        // capture to end watermark events, stop the loop
-                        reachBinlogEnd = true;
-                        break;
-                    }
-
-                    if (!reachBinlogStart) {
-                        if (record.key() != null) {
-                            snapshotRecords.put(
-                                    (Struct) record.key(), Collections.singletonList(record));
-                        } else {
-                            List<SourceRecord> records =
-                                    snapshotRecords.computeIfAbsent(
-                                            (Struct) record.value(), key -> new LinkedList<>());
-                            records.add(record);
-                        }
-                    } else {
-                        RecordUtils.upsertBinlog(
-                                snapshotRecords,
-                                record,
-                                currentSnapshotSplit.getSplitKeyType(),
-                                nameAdjuster,
-                                currentSnapshotSplit.getSplitStart(),
-                                currentSnapshotSplit.getSplitEnd());
-                    }
-                }
+            if (statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill()) {
+                return pollWithoutBuffer();
+            } else {
+                return pollWithBuffer();
             }
-            // snapshot split return its data once
-            hasNextElement.set(false);
-
-            final List<SourceRecord> normalizedRecords = new ArrayList<>();
-            normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(
-                    RecordUtils.formatMessageTimestamp(
-                            snapshotRecords.values().stream()
-                                    .flatMap(Collection::stream)
-                                    .collect(Collectors.toList())));
-            normalizedRecords.add(highWatermark);
-
-            final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
-            sourceRecordsSet.add(new SourceRecords(normalizedRecords));
-            return sourceRecordsSet.iterator();
         }
+
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
         return null;
+    }
+
+    public Iterator<SourceRecords> pollWithoutBuffer() throws InterruptedException {
+        checkReadException();
+        List<DataChangeEvent> batch = queue.poll();
+        final List<SourceRecord> records = new ArrayList<>();
+        for (DataChangeEvent event : batch) {
+            if (RecordUtils.isEndWatermarkEvent(event.getRecord())) {
+                hasNextElement.set(false);
+                break;
+            }
+            records.add(event.getRecord());
+        }
+
+        return Collections.singletonList(new SourceRecords(records)).iterator();
+    }
+
+    public Iterator<SourceRecords> pollWithBuffer() throws InterruptedException {
+        // data input: [low watermark event][snapshot events][high watermark event][binlog
+        // events][binlog-end event]
+        // data output: [low watermark event][normalized events][high watermark event]
+        boolean reachBinlogStart = false;
+        boolean reachBinlogEnd = false;
+        SourceRecord lowWatermark = null;
+        SourceRecord highWatermark = null;
+
+        Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
+        while (!reachBinlogEnd) {
+            checkReadException();
+            List<DataChangeEvent> batch = queue.poll();
+            for (DataChangeEvent event : batch) {
+                SourceRecord record = event.getRecord();
+                if (lowWatermark == null) {
+                    lowWatermark = record;
+                    assertLowWatermark(lowWatermark);
+                    continue;
+                }
+
+                if (highWatermark == null && RecordUtils.isHighWatermarkEvent(record)) {
+                    highWatermark = record;
+                    // snapshot events capture end and begin to capture binlog events
+                    reachBinlogStart = true;
+                    continue;
+                }
+
+                if (reachBinlogStart && RecordUtils.isEndWatermarkEvent(record)) {
+                    // capture to end watermark events, stop the loop
+                    reachBinlogEnd = true;
+                    break;
+                }
+
+                if (!reachBinlogStart) {
+                    if (record.key() != null) {
+                        snapshotRecords.put(
+                                (Struct) record.key(), Collections.singletonList(record));
+                    } else {
+                        List<SourceRecord> records =
+                                snapshotRecords.computeIfAbsent(
+                                        (Struct) record.value(), key -> new LinkedList<>());
+                        records.add(record);
+                    }
+                } else {
+                    RecordUtils.upsertBinlog(
+                            snapshotRecords,
+                            record,
+                            currentSnapshotSplit.getSplitKeyType(),
+                            nameAdjuster,
+                            currentSnapshotSplit.getSplitStart(),
+                            currentSnapshotSplit.getSplitEnd());
+                }
+            }
+        }
+        // snapshot split return its data once
+        hasNextElement.set(false);
+
+        final List<SourceRecord> normalizedRecords = new ArrayList<>();
+        normalizedRecords.add(lowWatermark);
+        normalizedRecords.addAll(
+                RecordUtils.formatMessageTimestamp(
+                        snapshotRecords.values().stream()
+                                .flatMap(Collection::stream)
+                                .collect(Collectors.toList())));
+        normalizedRecords.add(highWatermark);
+
+        final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+        sourceRecordsSet.add(new SourceRecords(normalizedRecords));
+        return sourceRecordsSet.iterator();
     }
 
     private void checkReadException() {
@@ -378,14 +416,8 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
     public void close() {
         try {
             stopCurrentTask();
-            if (statefulTaskContext.getConnection() != null) {
-                statefulTaskContext.getConnection().close();
-            }
-            if (statefulTaskContext.getBinaryLogClient() != null) {
-                statefulTaskContext.getBinaryLogClient().disconnect();
-            }
-            if (statefulTaskContext.getDatabaseSchema() != null) {
-                statefulTaskContext.getDatabaseSchema().close();
+            if (statefulTaskContext != null) {
+                statefulTaskContext.close();
             }
             if (executorService != null) {
                 executorService.shutdown();

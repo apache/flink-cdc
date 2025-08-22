@@ -18,98 +18,93 @@
 package org.apache.flink.cdc.connectors.base.source.assigner.state;
 
 import org.apache.flink.cdc.connectors.base.source.assigner.AssignerStatus;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.HybridPendingSplitsStateVersion5;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.PendingSplitsStateSerializerVersion5;
-import org.apache.flink.cdc.connectors.base.source.assigner.state.version5.SnapshotPendingSplitsStateVersion5;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
-import org.apache.flink.cdc.connectors.base.source.meta.split.SchemalessSnapshotSplit;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.table.types.logical.BigIntType;
 import org.apache.flink.table.types.logical.RowType;
 
-import io.debezium.relational.Column;
 import io.debezium.relational.Table;
-import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit.generateSplitId;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PendingSplitsStateSerializer}. */
-public class PendingSplitsStateSerializerTest {
-
-    private TableId tableId = TableId.parse("catalog.schema.table1");
-
+class PendingSplitsStateSerializerTest {
     @Test
-    public void testPendingSplitsStateSerializerAndDeserialize() throws IOException {
-        StreamPendingSplitsState streamPendingSplitsStateBefore =
-                new StreamPendingSplitsState(true);
-        PendingSplitsStateSerializer pendingSplitsStateSerializer =
-                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
-        PendingSplitsState streamSplitsStateAfter =
-                pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6, pendingSplitsStateSerializer.serialize(streamPendingSplitsStateBefore));
-        Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
+    void testSourceSplitSerializeAndDeserialize() throws IOException {
+        SnapshotSplit snapshotSplitBefore = constuctSnapshotSplit();
+        SourceSplitSerializer sourceSplitSerializer = constructSourceSplitSerializer();
+        SnapshotSplit snapshotSplitAfter =
+                (SnapshotSplit)
+                        sourceSplitSerializer.deserialize(
+                                sourceSplitSerializer.getVersion(),
+                                sourceSplitSerializer.serialize(snapshotSplitBefore));
 
-        SnapshotPendingSplitsState snapshotPendingSplitsStateBefore =
-                constructSnapshotPendingSplitsState(AssignerStatus.NEWLY_ADDED_ASSIGNING);
-        PendingSplitsState snapshotPendingSplitsStateAfter =
-                pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6,
-                        pendingSplitsStateSerializer.serialize(snapshotPendingSplitsStateBefore));
-        Assert.assertEquals(snapshotPendingSplitsStateBefore, snapshotPendingSplitsStateAfter);
+        assertThat(snapshotSplitAfter).isEqualTo(snapshotSplitBefore);
+        assertThat(snapshotSplitAfter.getTableSchemas())
+                .isEqualTo(snapshotSplitBefore.getTableSchemas());
+        StreamSplit streamSplitBefore = constuctStreamSplit();
+        StreamSplit streamSplitAfter =
+                (StreamSplit)
+                        sourceSplitSerializer.deserialize(
+                                sourceSplitSerializer.getVersion(),
+                                sourceSplitSerializer.serialize(streamSplitBefore));
 
-        HybridPendingSplitsState hybridPendingSplitsStateBefore =
-                new HybridPendingSplitsState(snapshotPendingSplitsStateBefore, false);
-        PendingSplitsState hybridPendingSplitsStateAfter =
-                pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        6, pendingSplitsStateSerializer.serialize(hybridPendingSplitsStateBefore));
-        Assert.assertEquals(hybridPendingSplitsStateBefore, hybridPendingSplitsStateAfter);
+        assertThat(streamSplitAfter).isEqualTo(streamSplitBefore);
     }
 
     @Test
-    public void testPendingSplitsStateSerializerCompatibility() throws IOException {
-        StreamPendingSplitsState streamPendingSplitsStateBefore =
-                new StreamPendingSplitsState(true);
-        PendingSplitsStateSerializer pendingSplitsStateSerializer =
+    void testOutputIsFinallyCleared() throws Exception {
+        PendingSplitsStateSerializer serializer =
                 new PendingSplitsStateSerializer(constructSourceSplitSerializer());
-        PendingSplitsState streamSplitsStateAfter =
-                pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        5,
-                        PendingSplitsStateSerializerVersion5.serialize(
-                                streamPendingSplitsStateBefore));
-        Assert.assertEquals(streamPendingSplitsStateBefore, streamSplitsStateAfter);
+        StreamPendingSplitsState state = new StreamPendingSplitsState(true);
 
-        SnapshotPendingSplitsState expectedSnapshotSplitsState =
-                constructSnapshotPendingSplitsState(AssignerStatus.INITIAL_ASSIGNING);
-        PendingSplitsState snapshotPendingSplitsStateAfter =
-                pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        5,
-                        PendingSplitsStateSerializerVersion5.serialize(
-                                constructSnapshotPendingSplitsStateVersion4(false)));
-        Assert.assertEquals(expectedSnapshotSplitsState, snapshotPendingSplitsStateAfter);
+        final byte[] ser1 = serializer.serialize(state);
+        state.serializedFormCache = null;
 
-        HybridPendingSplitsState expectedHybridPendingSplitsState =
-                new HybridPendingSplitsState(
-                        constructSnapshotPendingSplitsState(
-                                AssignerStatus.INITIAL_ASSIGNING_FINISHED),
-                        false);
-        PendingSplitsState hybridPendingSplitsStateAfter =
-                pendingSplitsStateSerializer.deserializePendingSplitsState(
-                        5,
-                        PendingSplitsStateSerializerVersion5.serialize(
-                                new HybridPendingSplitsStateVersion5(
-                                        constructSnapshotPendingSplitsStateVersion4(true), false)));
-        Assert.assertEquals(expectedHybridPendingSplitsState, hybridPendingSplitsStateAfter);
+        PendingSplitsState unsupportedState = new UnsupportedPendingSplitsState();
+
+        Assertions.assertThatThrownBy(() -> serializer.serialize(unsupportedState))
+                .isExactlyInstanceOf(IOException.class);
+
+        final byte[] ser2 = serializer.serialize(state);
+        assertThat(ser1).isEqualTo(ser2);
+    }
+
+    @Test
+    void testSerializeSnapshotPendingSplitsState() throws Exception {
+        PendingSplitsStateSerializer serializer =
+                new PendingSplitsStateSerializer(constructSourceSplitSerializer());
+        PendingSplitsState state =
+                new SnapshotPendingSplitsState(
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyMap(),
+                        constructTableSchema(),
+                        Collections.emptyMap(),
+                        AssignerStatus.INITIAL_ASSIGNING,
+                        Collections.emptyList(),
+                        false,
+                        true,
+                        Collections.emptyMap(),
+                        new ChunkSplitterState(
+                                constructTableId(), ChunkSplitterState.ChunkBound.middleOf(1), 2));
+
+        assertThat(serializer.deserialize(serializer.getVersion(), serializer.serialize(state)))
+                .isEqualTo(state);
     }
 
     private SourceSplitSerializer constructSourceSplitSerializer() {
@@ -151,82 +146,46 @@ public class PendingSplitsStateSerializerTest {
         };
     }
 
-    private SchemalessSnapshotSplit constuctSchemalessSnapshotSplit() {
-        return new SchemalessSnapshotSplit(
+    private SnapshotSplit constuctSnapshotSplit() {
+        TableId tableId = new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`");
+        return new SnapshotSplit(
                 tableId,
-                generateSplitId(tableId, 0),
+                "test",
                 new RowType(
                         Collections.singletonList(new RowType.RowField("id", new BigIntType()))),
+                new Object[] {1},
+                new Object[] {100},
                 null,
-                null,
-                null);
+                constructTableSchema());
     }
 
-    private SnapshotPendingSplitsState constructSnapshotPendingSplitsState(
-            AssignerStatus assignerStatus) {
-        SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
-        Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
-        assignedSplits.put(tableId.toQuotedString('`'), schemalessSnapshotSplit);
-        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
-        tableSchemas.put(
-                tableId,
-                new TableChanges.TableChange(
-                        TableChanges.TableChangeType.CREATE, createTable(tableId)));
-        return new SnapshotPendingSplitsState(
-                Arrays.asList(tableId),
-                Arrays.asList(schemalessSnapshotSplit),
-                assignedSplits,
-                tableSchemas,
-                new HashMap<>(),
-                assignerStatus,
-                Arrays.asList(TableId.parse("catalog2.schema2.table2")),
-                true,
+    private StreamSplit constuctStreamSplit() {
+        return new StreamSplit(
+                "database1.schema1.table1",
+                null,
+                null,
+                new ArrayList<>(),
+                constructTableSchema(),
+                0,
+                false,
                 true);
     }
 
-    private SnapshotPendingSplitsStateVersion5 constructSnapshotPendingSplitsStateVersion4(
-            boolean isAssignerFinished) {
-        SchemalessSnapshotSplit schemalessSnapshotSplit = constuctSchemalessSnapshotSplit();
-        Map<String, SchemalessSnapshotSplit> assignedSplits = new HashMap<>();
-        assignedSplits.put(tableId.toQuotedString('`'), schemalessSnapshotSplit);
-        Map<TableId, TableChanges.TableChange> tableSchemas = new HashMap<>();
-        tableSchemas.put(
-                tableId,
-                new TableChanges.TableChange(
-                        TableChanges.TableChangeType.CREATE, createTable(tableId)));
-        return new SnapshotPendingSplitsStateVersion5(
-                Arrays.asList(tableId),
-                Arrays.asList(schemalessSnapshotSplit),
-                assignedSplits,
-                tableSchemas,
-                new HashMap<>(),
-                isAssignerFinished,
-                Arrays.asList(TableId.parse("catalog2.schema2.table2")),
-                true,
-                true);
+    private HashMap<TableId, TableChanges.TableChange> constructTableSchema() {
+        TableId tableId = constructTableId();
+        HashMap<TableId, TableChanges.TableChange> tableSchema = new HashMap<>();
+        Tables tables = new Tables();
+        Table table = tables.editOrCreateTable(tableId).create();
+        TableChanges.TableChange tableChange =
+                new TableChanges.TableChange(TableChanges.TableChangeType.CREATE, table);
+        tableSchema.put(tableId, tableChange);
+        return tableSchema;
     }
 
-    private static Table createTable(TableId id) {
-        TableEditor editor = Table.editor().tableId(id).setDefaultCharsetName("UTF8");
-        editor.setComment("comment");
-        editor.addColumn(
-                Column.editor()
-                        .name("id")
-                        .jdbcType(1)
-                        .nativeType(2)
-                        .length(100)
-                        .scale(30)
-                        .create());
-        editor.addColumn(
-                Column.editor()
-                        .name("value")
-                        .jdbcType(2)
-                        .nativeType(3)
-                        .length(50)
-                        .scale(30)
-                        .create());
-
-        editor.setPrimaryKeyNames(Arrays.asList("id"));
-        return editor.create();
+    private TableId constructTableId() {
+        return new TableId("cata`log\"", "s\"che`ma", "ta\"ble.1`");
     }
+
+    /** An implementation for {@link PendingSplitsState} which will cause a serialization error. */
+    static class UnsupportedPendingSplitsState extends PendingSplitsState {}
 }

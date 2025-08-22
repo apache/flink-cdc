@@ -45,8 +45,8 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
         storeMultiCommitter =
                 new StoreMultiCommitter(
                         () -> FlinkCatalogFactory.createPaimonCatalog(catalogOptions),
-                        commitUser,
-                        null);
+                        org.apache.paimon.flink.sink.Committer.createContext(
+                                commitUser, null, true, false, null, 1, 1));
     }
 
     @Override
@@ -66,7 +66,7 @@ public class PaimonCommitter implements Committer<MultiTableCommittable> {
                 storeMultiCommitter.combine(checkpointId, 1L, committables);
         try {
             storeMultiCommitter.filterAndCommit(
-                    Collections.singletonList(wrappedManifestCommittable));
+                    Collections.singletonList(wrappedManifestCommittable), true, false);
             commitRequests.forEach(CommitRequest::signalAlreadyCommitted);
             LOGGER.info(
                     "Commit succeeded for {} with {} committable",

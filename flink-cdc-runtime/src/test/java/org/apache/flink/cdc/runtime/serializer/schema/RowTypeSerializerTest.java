@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /** A test for the {@link RowTypeSerializer}. */
-public class RowTypeSerializerTest extends SerializerTestBase<RowType> {
+class RowTypeSerializerTest extends SerializerTestBase<RowType> {
     @Override
     protected TypeSerializer<RowType> createSerializer() {
         return RowTypeSerializer.INSTANCE;

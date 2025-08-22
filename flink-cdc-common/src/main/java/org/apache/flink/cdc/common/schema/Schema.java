@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.common.utils.StringUtils;
 
 import javax.annotation.Nullable;
 
@@ -59,6 +60,19 @@ public class Schema implements Serializable {
 
     // Used to index column by name
     private transient volatile Map<String, Column> nameToColumns;
+
+    // Transiently cached fields that are lazily calculated
+    private transient List<String> columnNames;
+
+    private transient List<DataType> columnDataTypes;
+
+    private transient DataType columnRowType;
+
+    /**
+     * Schema might be used as a LoadingCache key frequently, and maintaining a cache of hashCode
+     * would be more efficient.
+     */
+    private transient int cachedHashCode;
 
     private Schema(
             List<Column> columns,
@@ -97,14 +111,24 @@ public class Schema implements Serializable {
 
     /** Returns all column names. It does not distinguish between different kinds of columns. */
     public List<String> getColumnNames() {
-        return columns.stream().map(Column::getName).collect(Collectors.toList());
+        if (columnNames == null) {
+            columnNames =
+                    Collections.unmodifiableList(
+                            columns.stream().map(Column::getName).collect(Collectors.toList()));
+        }
+        return columnNames;
     }
 
     /**
      * Returns all column data types. It does not distinguish between different kinds of columns.
      */
     public List<DataType> getColumnDataTypes() {
-        return columns.stream().map(Column::getType).collect(Collectors.toList());
+        if (columnDataTypes == null) {
+            columnDataTypes =
+                    Collections.unmodifiableList(
+                            columns.stream().map(Column::getType).collect(Collectors.toList()));
+        }
+        return columnDataTypes;
     }
 
     /** Returns the primary keys of the table or data collection. */
@@ -152,13 +176,16 @@ public class Schema implements Serializable {
      * @see DataTypes#ROW(DataField...)
      */
     public DataType toRowDataType() {
-        final DataField[] fields =
-                columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
-        // the row should never be null
-        return DataTypes.ROW(fields).notNull();
+        if (columnRowType == null) {
+            final DataField[] fields =
+                    columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
+            // the row should never be null
+            columnRowType = DataTypes.ROW(fields).notNull();
+        }
+        return columnRowType;
     }
 
-    /** Returns a copy of the schema with a replaced list of {@Column}. */
+    /** Returns a copy of the schema with a replaced list of {@link Column}. */
     public Schema copy(List<Column> columns) {
         return new Schema(
                 columns,
@@ -186,7 +213,10 @@ public class Schema implements Serializable {
 
     @Override
     public int hashCode() {
-        return Objects.hash(columns, primaryKeys, partitionKeys, options, comment);
+        if (cachedHashCode == 0) {
+            cachedHashCode = Objects.hash(columns, primaryKeys, partitionKeys, options, comment);
+        }
+        return cachedHashCode;
     }
 
     // -----------------------------------------------------------------------------------
@@ -229,6 +259,9 @@ public class Schema implements Serializable {
         sb.append(", primaryKeys=").append(String.join(";", primaryKeys));
         if (!partitionKeys.isEmpty()) {
             sb.append(", partitionKeys=").append(String.join(";", partitionKeys));
+        }
+        if (!StringUtils.isNullOrWhitespaceOnly(comment)) {
+            sb.append(", comment=").append(comment);
         }
         sb.append(", options=").append(describeOptions());
 

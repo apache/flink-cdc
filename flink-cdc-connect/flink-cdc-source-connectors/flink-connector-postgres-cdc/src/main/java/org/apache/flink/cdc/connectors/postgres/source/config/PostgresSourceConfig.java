@@ -66,7 +66,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             @Nullable String chunkKeyColumn,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            int lsnCommitCheckpointsDelay) {
+            int lsnCommitCheckpointsDelay,
+            boolean assignUnboundedChunkFirst) {
         super(
                 startupOptions,
                 databaseList,
@@ -92,7 +93,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 chunkKeyColumn,
                 skipSnapshotBackfill,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                assignUnboundedChunkFirst);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
     }
@@ -122,6 +124,12 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
      */
     public String getSlotNameForBackfillTask() {
         return getDbzProperties().getProperty(SLOT_NAME.name()) + "_" + getSubtaskId();
+    }
+
+    /** Returns the JDBC URL for config unique key. */
+    public String getJdbcUrl() {
+        return String.format(
+                "jdbc:postgresql://%s:%d/%s", getHostname(), getPort(), getDatabaseList().get(0));
     }
 
     @Override

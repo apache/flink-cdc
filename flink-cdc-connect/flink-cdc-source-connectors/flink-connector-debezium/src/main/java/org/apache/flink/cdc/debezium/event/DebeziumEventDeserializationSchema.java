@@ -20,15 +20,19 @@ package org.apache.flink.cdc.debezium.event;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -59,6 +63,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,10 +87,13 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     protected final DebeziumChangelogMode changelogMode;
 
+    private final Map<io.debezium.relational.TableId, CreateTableEvent> createTableEventCache;
+
     public DebeziumEventDeserializationSchema(
             SchemaDataTypeInference schemaDataTypeInference, DebeziumChangelogMode changelogMode) {
         this.schemaDataTypeInference = schemaDataTypeInference;
         this.changelogMode = changelogMode;
+        this.createTableEventCache = new HashMap<>();
     }
 
     @Override
@@ -216,8 +224,17 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         return convertToRecord((RowType) type, dbzObj, schema);
                     }
                 };
-            case ARRAY:
             case MAP:
+                return new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        return convertToMap(dbzObj, schema);
+                    }
+                };
+            case ARRAY:
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
@@ -309,10 +326,12 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     return TimestampData.fromMillis((Long) dbzObj);
                 case MicroTimestamp.SCHEMA_NAME:
                     long micro = (long) dbzObj;
-                    return TimestampData.fromMillis(micro / 1000, (int) (micro % 1000 * 1000));
+                    return TimestampData.fromMillis(
+                            Math.floorDiv(micro, 1000), (int) (Math.floorMod(micro, 1000) * 1000));
                 case NanoTimestamp.SCHEMA_NAME:
                     long nano = (long) dbzObj;
-                    return TimestampData.fromMillis(nano / 1000_000, (int) (nano % 1000_000));
+                    return TimestampData.fromMillis(
+                            Math.floorDiv(nano, 1000_000), (int) (Math.floorMod(nano, 1000_000)));
             }
         }
         throw new IllegalArgumentException(
@@ -418,6 +437,41 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
     }
 
+    protected Object convertToMap(Object dbzObj, Schema schema) throws Exception {
+        if (dbzObj == null) {
+            return null;
+        }
+
+        // Obtain the schema for the keys and values of a Map"
+        Schema keySchema = schema.keySchema();
+        Schema valueSchema = schema.valueSchema();
+
+        // Infer the data types of keys and values
+        DataType keyType =
+                keySchema != null
+                        ? schemaDataTypeInference.infer(null, keySchema)
+                        : DataTypes.STRING();
+
+        DataType valueType =
+                valueSchema != null
+                        ? schemaDataTypeInference.infer(null, valueSchema)
+                        : DataTypes.STRING();
+
+        DeserializationRuntimeConverter keyConverter = createConverter(keyType);
+        DeserializationRuntimeConverter valueConverter = createConverter(valueType);
+
+        Map<?, ?> map = (Map<?, ?>) dbzObj;
+        Map<Object, Object> convertedMap = new java.util.HashMap<>(map.size());
+
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object convertedKey = convertField(keyConverter, entry.getKey(), keySchema);
+            Object convertedValue = convertField(valueConverter, entry.getValue(), valueSchema);
+            convertedMap.put(convertedKey, convertedValue);
+        }
+
+        return new GenericMapData(convertedMap);
+    }
+
     private static DeserializationRuntimeConverter wrapIntoNullableConverter(
             DeserializationRuntimeConverter converter) {
         return new DeserializationRuntimeConverter() {
@@ -432,5 +486,21 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 return converter.convert(dbzObj, schema);
             }
         };
+    }
+
+    public Map<io.debezium.relational.TableId, CreateTableEvent> getCreateTableEventCache() {
+        return createTableEventCache;
+    }
+
+    public void applyChangeEvent(ChangeEvent changeEvent) {
+        org.apache.flink.cdc.common.event.TableId flinkTableId = changeEvent.tableId();
+
+        io.debezium.relational.TableId debeziumTableId =
+                new io.debezium.relational.TableId(
+                        flinkTableId.getNamespace(),
+                        flinkTableId.getSchemaName(),
+                        flinkTableId.getTableName());
+
+        createTableEventCache.put(debeziumTableId, (CreateTableEvent) changeEvent);
     }
 }

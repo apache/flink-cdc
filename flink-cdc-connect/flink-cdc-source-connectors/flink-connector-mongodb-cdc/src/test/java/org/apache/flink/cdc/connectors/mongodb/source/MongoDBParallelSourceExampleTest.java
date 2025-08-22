@@ -22,44 +22,24 @@ import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH;
 
 /** Example Tests for {@link MongoDBSource}. */
-@RunWith(Parameterized.class)
-public class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
-
-    @Parameterized.Parameters(name = "mongoVersion: {0} parallelismSnapshot: {1}")
-    public static Object[] parameters() {
-        List<Object[]> parameterTuples = new ArrayList<>();
-        for (String mongoVersion : getMongoVersions()) {
-            parameterTuples.add(new Object[] {mongoVersion, true});
-            parameterTuples.add(new Object[] {mongoVersion, false});
-        }
-        return parameterTuples.toArray();
-    }
-
-    public MongoDBParallelSourceExampleTest(String mongoVersion) {
-        super(mongoVersion);
-    }
+class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testMongoDBExampleSource() throws Exception {
-        String database = mongoContainer.executeCommandFileInSeparateDatabase("inventory");
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testMongoDBExampleSource() throws Exception {
+        String database = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("inventory");
 
         MongoDBSource<String> mongoSource =
                 MongoDBSource.<String>builder()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .databaseList(database)
                         .collectionList(database + ".products")
                         .username(FLINK_USER)

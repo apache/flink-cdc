@@ -22,6 +22,7 @@ import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.kafka.json.canal.CanalJsonSerializationSchema;
 import org.apache.flink.cdc.connectors.kafka.json.debezium.DebeziumJsonSerializationSchema;
+import org.apache.flink.cdc.connectors.kafka.utils.JsonRowDataSerializationSchemaUtils;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.formats.json.JsonFormatOptions;
@@ -29,6 +30,7 @@ import org.apache.flink.formats.json.JsonFormatOptionsUtil;
 
 import java.time.ZoneId;
 
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED;
 import static org.apache.flink.formats.json.JsonFormatOptions.ENCODE_DECIMAL_AS_PLAIN_NUMBER;
 import static org.apache.flink.formats.json.debezium.DebeziumJsonFormatOptions.JSON_MAP_NULL_KEY_LITERAL;
 
@@ -49,6 +51,16 @@ public class ChangeLogJsonFormatFactory {
      */
     public static SerializationSchema<Event> createSerializationSchema(
             ReadableConfig formatOptions, JsonSerializationType type, ZoneId zoneId) {
+        final String prefix = type.toString() + ".";
+        boolean isIncludedDebeziumSchema =
+                Boolean.parseBoolean(
+                        formatOptions
+                                .toMap()
+                                .get(
+                                        DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED
+                                                .key()
+                                                .substring(prefix.length())));
+
         TimestampFormat timestampFormat = JsonFormatOptionsUtil.getTimestampFormat(formatOptions);
         JsonFormatOptions.MapNullKeyMode mapNullKeyMode =
                 JsonFormatOptionsUtil.getMapNullKeyMode(formatOptions);
@@ -56,6 +68,9 @@ public class ChangeLogJsonFormatFactory {
 
         final boolean encodeDecimalAsPlainNumber =
                 formatOptions.get(ENCODE_DECIMAL_AS_PLAIN_NUMBER);
+
+        final boolean ignoreNullFields =
+                JsonRowDataSerializationSchemaUtils.enableIgnoreNullFields(formatOptions);
 
         switch (type) {
             case DEBEZIUM_JSON:
@@ -65,7 +80,9 @@ public class ChangeLogJsonFormatFactory {
                             mapNullKeyMode,
                             mapNullKeyLiteral,
                             zoneId,
-                            encodeDecimalAsPlainNumber);
+                            encodeDecimalAsPlainNumber,
+                            ignoreNullFields,
+                            isIncludedDebeziumSchema);
                 }
             case CANAL_JSON:
                 {
@@ -74,7 +91,8 @@ public class ChangeLogJsonFormatFactory {
                             mapNullKeyMode,
                             mapNullKeyLiteral,
                             zoneId,
-                            encodeDecimalAsPlainNumber);
+                            encodeDecimalAsPlainNumber,
+                            ignoreNullFields);
                 }
             default:
                 {

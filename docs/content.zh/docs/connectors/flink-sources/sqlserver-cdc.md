@@ -41,7 +41,7 @@ In order to setup the SQLServer CDC connector, the following table provides depe
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-sqlserver-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/3.1.0/flink-sql-connector-sqlserver-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-sqlserver-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-sqlserver-cdc/{{< param Version >}}/flink-sql-connector-sqlserver-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-sqlserver-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-sqlserver-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -236,7 +236,32 @@ Connector Options
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+            <br>
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to skip backfill in snapshot reading phase.<br> 
+        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
+        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
+        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
     </tr>
     </tbody>
 </table>    
@@ -326,7 +351,6 @@ The SQLServer CDC connector is a Flink Source connector which will read database
 The config option `scan.startup.mode` specifies the startup mode for SQLServer CDC consumer. The valid enumerations are:
 
 - `initial` (default): Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.
-- `initial-only`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.
 - `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
@@ -408,6 +432,62 @@ public class SqlServerIncrementalSourceExample {
     }
 }
 ```
+
+### 可用的指标
+
+指标系统能够帮助了解分片分发的进展， 下面列举出了支持的 Flink 指标 [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description    |
+|------------------------|----------------------------|-------|----------------|
+| namespace.schema.table | isSnapshotting             | Gauge | 表是否在快照读取阶段     |     
+| namespace.schema.table | isStreamReading            | Gauge | 表是否在增量读取阶段     |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | 已经被快照读取完成的表的数量 |
+| namespace.schema.table | numTablesRemaining         | Gauge | 还没有被快照读取的表的数据  |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | 正在处理的分片的数量     |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | 还没有被处理的分片的数量   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | 已经处理完成的分片的数据   |
+| namespace.schema.table | snapshotStartTime          | Gauge | 快照读取阶段开始的时间    |
+| namespace.schema.table | snapshotEndTime            | Gauge | 快照读取阶段结束的时间    |
+
+注意:
+1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+2. 对于 SQLServer，Group 的名称会类似于 `test_database.test_schema.test_table`。
+
+### Tables Without primary keys
+
+Starting from version 3.4.0, SQLServer CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+
+There are two places that need to be taken care of.
+
+1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
+2. The processing semantics of a SQLServer CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
+* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+#### Warning
+
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a SQLServer table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+
+#### Problem Scenario
+
+- **Table Structure:**
+    - **Primary Key:** `id`
+    - **Chunk Key Column:** `pid` (Not a primary key)
+
+- **Snapshot Splits:**
+    - **Split 0:** `1 < pid <= 3`
+    - **Split 1:** `3 < pid <= 5`
+
+- **Operation:**
+    - Two different subtasks are reading Split 0 and Split 1 concurrently.
+    - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+
+- **Result:**
+    - **Split 0:** Contains the record `[id=0, pid=2]`
+    - **Split 1:** Contains the record `[id=0, pid=4]`
+
+Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+
 
 Data Type Mapping
 ----------------

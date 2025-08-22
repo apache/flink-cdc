@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Class {@code DataChangeEvent} represents the data change events of external systems, such as
@@ -76,6 +77,19 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
 
     public OperationType op() {
         return op;
+    }
+
+    public String opTypeString(boolean isAfter) {
+        switch (op) {
+            case INSERT:
+                return "+I";
+            case UPDATE:
+                return isAfter ? "+U" : "-U";
+            case DELETE:
+                return "-D";
+            default:
+                throw new UnsupportedOperationException("Unknown operation type: " + op);
+        }
     }
 
     public Map<String, String> meta() {
@@ -167,6 +181,32 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
                 dataChangeEvent.meta);
     }
 
+    /**
+     * Updates the after of a {@link DataChangeEvent} instance that describes the event with meta
+     * info.
+     */
+    public static DataChangeEvent projectRecords(
+            DataChangeEvent dataChangeEvent,
+            RecordData projectedBefore,
+            RecordData projectedAfter) {
+        return new DataChangeEvent(
+                dataChangeEvent.tableId,
+                projectedBefore,
+                projectedAfter,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
+    /** Updates the {@link TableId} info of current data change event. */
+    public static DataChangeEvent route(DataChangeEvent dataChangeEvent, TableId tableId) {
+        return new DataChangeEvent(
+                tableId,
+                dataChangeEvent.before,
+                dataChangeEvent.after,
+                dataChangeEvent.op,
+                dataChangeEvent.meta);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -196,6 +236,21 @@ public class DataChangeEvent implements ChangeEvent, Serializable {
         }
         stringBuilder.append(")");
         return stringBuilder.toString();
+    }
+
+    public String toReadableString(Function<RecordData, ?> extractor) {
+        return "DataChangeEvent{"
+                + "tableId="
+                + tableId
+                + ", before="
+                + extractor.apply(before)
+                + ", after="
+                + extractor.apply(after)
+                + ", op="
+                + op
+                + ", meta="
+                + describeMeta()
+                + '}';
     }
 
     @Override

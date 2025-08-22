@@ -18,11 +18,14 @@
 package org.apache.flink.cdc.connectors.mongodb.utils;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.highavailability.nonha.embedded.EmbeddedHaServices;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
+
+import org.assertj.core.api.Assertions;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -30,8 +33,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.fail;
 
 /** MongoDB test utilities. */
 public class MongoDBTestUtils {
@@ -53,7 +54,7 @@ public class MongoDBTestUtils {
         long deadline = System.nanoTime() + timeUnit.toNanos(timeout);
         while (sinkSize(sinkName) < expectedSize) {
             if (System.nanoTime() > deadline) {
-                fail(
+                Assertions.fail(
                         "Wait for sink size timeout, raw results: \n"
                                 + String.join(
                                         "\n",
@@ -126,11 +127,24 @@ public class MongoDBTestUtils {
         }
     }
 
+    public static void ensureJmLeaderServiceExists(
+            HaLeadershipControl leadershipControl, JobID jobId) throws Exception {
+        EmbeddedHaServices control = (EmbeddedHaServices) leadershipControl;
+
+        // Make sure JM leader service has been created, or an NPE might be thrown when we're
+        // triggering JM failover later.
+        control.getJobManagerLeaderElection(jobId).close();
+    }
+
     public static void triggerJobManagerFailover(
             JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
         final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
+        ensureJmLeaderServiceExists(haLeadershipControl, jobId);
         haLeadershipControl.revokeJobMasterLeadership(jobId).get();
+
         afterFailAction.run();
+
+        ensureJmLeaderServiceExists(haLeadershipControl, jobId);
         haLeadershipControl.grantJobMasterLeadership(jobId).get();
     }
 

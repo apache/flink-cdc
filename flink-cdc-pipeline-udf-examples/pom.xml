@@ -28,8 +28,6 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-udf-examples</artifactId>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.plugin.version>4.8.0</scala.plugin.version>
         <compiler.encoding>UTF-8</compiler.encoding>
@@ -85,20 +83,6 @@ limitations under the License.
                     </execution>
                 </executions>
             </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
         </plugins>
     </build>
 </project>

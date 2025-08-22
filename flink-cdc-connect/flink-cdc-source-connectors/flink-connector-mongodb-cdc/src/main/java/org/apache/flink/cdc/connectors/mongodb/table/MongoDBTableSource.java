@@ -72,6 +72,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final String collection;
     private final StartupOptions startupOptions;
     private final Integer initialSnapshottingQueueSize;
+    private final Integer initialSnapshottingMaxThreads;
+    private final String initialSnapshottingPipeline;
     private final Integer batchSize;
     private final Integer pollMaxBatchSize;
     private final Integer pollAwaitTimeMillis;
@@ -86,6 +88,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean noCursorTimeout;
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
+    private final boolean assignUnboundedChunkFirst;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -108,6 +111,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             @Nullable String connectionOptions,
             StartupOptions startupOptions,
             @Nullable Integer initialSnapshottingQueueSize,
+            @Nullable Integer initialSnapshottingMaxThreads,
+            @Nullable String initialSnapshottingPipeline,
             @Nullable Integer batchSize,
             @Nullable Integer pollMaxBatchSize,
             @Nullable Integer pollAwaitTimeMillis,
@@ -121,7 +126,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean enableFullDocPrePostImage,
             boolean noCursorTimeout,
             boolean skipSnapshotBackfill,
-            boolean scanNewlyAddedTableEnabled) {
+            boolean scanNewlyAddedTableEnabled,
+            boolean assignUnboundedChunkFirst) {
         this.physicalSchema = physicalSchema;
         this.scheme = checkNotNull(scheme);
         this.hosts = checkNotNull(hosts);
@@ -132,6 +138,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.connectionOptions = connectionOptions;
         this.startupOptions = checkNotNull(startupOptions);
         this.initialSnapshottingQueueSize = initialSnapshottingQueueSize;
+        this.initialSnapshottingMaxThreads = initialSnapshottingMaxThreads;
+        this.initialSnapshottingPipeline = initialSnapshottingPipeline;
         this.batchSize = batchSize;
         this.pollMaxBatchSize = pollMaxBatchSize;
         this.pollAwaitTimeMillis = pollAwaitTimeMillis;
@@ -148,6 +156,7 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.noCursorTimeout = noCursorTimeout;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
     }
 
     @Override
@@ -207,7 +216,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .skipSnapshotBackfill(skipSnapshotBackfill)
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .deserializer(deserializer)
-                            .disableCursorTimeout(noCursorTimeout);
+                            .disableCursorTimeout(noCursorTimeout)
+                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst);
 
             Optional.ofNullable(databaseList).ifPresent(builder::databaseList);
             Optional.ofNullable(collectionList).ifPresent(builder::collectionList);
@@ -239,6 +249,10 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
             Optional.ofNullable(connectionOptions).ifPresent(builder::connectionOptions);
             Optional.ofNullable(initialSnapshottingQueueSize)
                     .ifPresent(builder::initialSnapshottingQueueSize);
+            Optional.ofNullable(initialSnapshottingMaxThreads)
+                    .ifPresent(builder::initialSnapshottingMaxThreads);
+            Optional.ofNullable(initialSnapshottingPipeline)
+                    .ifPresent(builder::initialSnapshottingPipeline);
             Optional.ofNullable(batchSize).ifPresent(builder::batchSize);
             Optional.ofNullable(pollMaxBatchSize).ifPresent(builder::pollMaxBatchSize);
             Optional.ofNullable(pollAwaitTimeMillis).ifPresent(builder::pollAwaitTimeMillis);
@@ -294,6 +308,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         connectionOptions,
                         startupOptions,
                         initialSnapshottingQueueSize,
+                        initialSnapshottingMaxThreads,
+                        initialSnapshottingPipeline,
                         batchSize,
                         pollMaxBatchSize,
                         pollAwaitTimeMillis,
@@ -307,7 +323,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                         enableFullDocPrePostImage,
                         noCursorTimeout,
                         skipSnapshotBackfill,
-                        scanNewlyAddedTableEnabled);
+                        scanNewlyAddedTableEnabled,
+                        assignUnboundedChunkFirst);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -332,6 +349,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(connectionOptions, that.connectionOptions)
                 && Objects.equals(startupOptions, that.startupOptions)
                 && Objects.equals(initialSnapshottingQueueSize, that.initialSnapshottingQueueSize)
+                && Objects.equals(initialSnapshottingMaxThreads, that.initialSnapshottingMaxThreads)
+                && Objects.equals(initialSnapshottingPipeline, that.initialSnapshottingPipeline)
                 && Objects.equals(batchSize, that.batchSize)
                 && Objects.equals(pollMaxBatchSize, that.pollMaxBatchSize)
                 && Objects.equals(pollAwaitTimeMillis, that.pollAwaitTimeMillis)
@@ -347,7 +366,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(enableFullDocPrePostImage, that.enableFullDocPrePostImage)
                 && Objects.equals(noCursorTimeout, that.noCursorTimeout)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
-                && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled);
+                && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
     }
 
     @Override
@@ -363,6 +383,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 connectionOptions,
                 startupOptions,
                 initialSnapshottingQueueSize,
+                initialSnapshottingMaxThreads,
+                initialSnapshottingPipeline,
                 batchSize,
                 pollMaxBatchSize,
                 pollAwaitTimeMillis,
@@ -378,7 +400,8 @@ public class MongoDBTableSource implements ScanTableSource, SupportsReadingMetad
                 enableFullDocPrePostImage,
                 noCursorTimeout,
                 skipSnapshotBackfill,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                assignUnboundedChunkFirst);
     }
 
     @Override

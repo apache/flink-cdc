@@ -78,4 +78,9 @@ public class RenameColumnEvent implements SchemaChangeEvent {
     public SchemaChangeEventType getType() {
         return SchemaChangeEventType.RENAME_COLUMN;
     }
+
+    @Override
+    public SchemaChangeEvent copy(TableId newTableId) {
+        return new RenameColumnEvent(newTableId, nameMapping);
+    }
 }

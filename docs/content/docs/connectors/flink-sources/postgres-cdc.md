@@ -40,7 +40,7 @@ In order to setup the Postgres CDC connector, the following table provides depen
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-postgres-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/3.1.0/flink-sql-connector-postgres-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-postgres-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/{{< param Version >}}/flink-sql-connector-postgres-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-postgres-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-postgres-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -128,14 +128,14 @@ SELECT * FROM shipments;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Schema name of the PostgreSQL database to monitor.</td>
+      <td>Schema name of the PostgreSQL database to monitor. The Schema name also supports regular expressions to monitor multiple schemas that satisfy the regular expressions.</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the PostgreSQL database to monitor.</td>
+      <td>Table name of the PostgreSQL database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions.</td>
     </tr>
     <tr>
       <td>port</td>
@@ -242,6 +242,41 @@ SELECT * FROM shipments;
           The checkpoint LSN offsets will be committed in rolling fashion, the earliest checkpoint identifier will be committed first from the delayed checkpoints.
       </td>
     </tr>
+    <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to skip backfill in snapshot reading phase.<br> 
+        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
+        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
+        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.read-changelog-as-append-only.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否将 changelog 数据流转换为 append-only 数据流。<br>
+        仅在需要保存上游表删除消息等特殊场景下开启使用，比如在逻辑删除场景下，用户不允许物理删除下游消息，此时使用该特性，并配合 row_kind 元数据字段，下游可以先保存所有明细数据，再通过 row_kind 字段判断是否进行逻辑删除。<br>
+        参数取值如下：<br>
+          <li>true：所有类型的消息（包括INSERT、DELETE、UPDATE_BEFORE、UPDATE_AFTER）都会转换成 INSERT 类型的消息。</li>
+          <li>false（默认）：所有类型的消息都保持原样下发。</li>
+      </td>
+    </tr>
     </tbody>
     </table>
 </div>
@@ -285,8 +320,7 @@ The following options is available only when `scan.incremental.snapshot.enabled=
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial"
-           and "latest-offset".
+      <td>Optional startup mode for Postgres CDC consumer, valid enumerations are "initial", "latest-offset", "committed-offset" and "snapshot".
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
     </tr>
     <tr>
@@ -330,7 +364,10 @@ The following options is available only when `scan.incremental.snapshot.enabled=
           <td style="word-wrap: break-word;">(none)</td>
           <td>String</td>
           <td>The chunk key of table snapshot, captured tables are split into multiple chunks by a chunk key when read the snapshot of table.
-            By default, the chunk key is the first column of the primary key. This column must be a column of the primary key.</td>
+            By default, the chunk key is the first column of the primary key. A column that is not part of the primary key can be used as a chunk key, but this may lead to slower query performance.
+          <br>
+            <b>Warning:</b> Using a non-primary key column as a chunk key may lead to data inconsistencies. Please see <a href="#warning">Warning</a> for details.
+          </td>
     </tr>
     <tr>
           <td>chunk-key.even-distribution.factor.lower-bound</td>
@@ -387,6 +424,13 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>It indicates the row kind of the changelog,Note: The downstream SQL operator may fail to compare due to this new added column when processing the row retraction if 
+the source operator chooses to output the 'row_kind' column for each record. It is recommended to use this metadata column only in simple synchronization jobs.
+<br>'+I' means INSERT message, '-D' means DELETE message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message.</td>
+    </tr>
   </tbody>
 </table>
 
@@ -438,12 +482,22 @@ Incremental snapshot reading is a new mechanism to read snapshot of a table. Com
 * (2) PostgreSQL CDC Source can perform checkpoints in the chunk granularity during snapshot reading
 * (3) PostgreSQL CDC Source doesn't need to acquire global read lock before snapshot reading
 
-During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by primary key of table,
+During the incremental snapshot reading, the PostgreSQL CDC Source firstly splits snapshot chunks (splits) by user specified chunk key of table,
 and then PostgreSQL CDC Source assigns the chunks to multiple readers to read the data of snapshot chunk.
 
 ### Exactly-Once Processing
 
 The Postgres CDC connector is a Flink Source connector which will read database snapshot first and then continues to read binlogs with **exactly-once processing** even failures happen. Please read [How the connector works](https://debezium.io/documentation/reference/1.9/connectors/postgresql.html#how-the-postgresql-connector-works).
+
+### Startup Reading Position
+
+The config option `scan.startup.mode` specifies the startup mode for PostgreSQL CDC consumer. The valid enumerations are:
+
+- `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the replication slot.
+- `latest-offset`: Never to perform snapshot on the monitored database tables upon first startup, just read from
+  the end of the replication which means only have the changes since the connector was started.
+- `committed-offset`: Skip snapshot phase and start reading events from a `confirmed_flush_lsn` offset of replication slot.
+- `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
 
 ### DataStream Source
 
@@ -532,6 +586,61 @@ public class PostgreSQLSourceExample {
 }
 ```
 
+### Available Source metrics
+
+Metrics can help understand the progress of assignments, and the following are the supported [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description                                         |
+|------------------------|----------------------------|-------|-----------------------------------------------------|
+| namespace.schema.table | isSnapshotting             | Gauge | Weather the table is snapshotting or not            |
+| namespace.schema.table | isStreamReading            | Gauge | Weather the table is stream reading or not          |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | The number of tables that have been snapshotted     |
+| namespace.schema.table | numTablesRemaining         | Gauge | The number of tables that have not been snapshotted |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | The number of splits that is being processed        |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | The number of splits that have not been processed   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | The number of splits that have been processed       |
+| namespace.schema.table | snapshotStartTime          | Gauge | The time when the snapshot started                  |
+| namespace.schema.table | snapshotEndTime            | Gauge | The time when the snapshot ended                    |
+
+Notice:
+1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
+2. For PostgreSQL, the group name will be like `test_database.test_schema.test_table`.
+
+### Tables Without primary keys
+
+Starting from version 3.4.0, Postgres CDC support tables that do not have a primary key. To use a table without primary keys, you must configure the `scan.incremental.snapshot.chunk.key-column` option and specify one non-null field.
+
+There are two places that need to be taken care of.
+
+1. If there is an index in the table, try to use a column which is contained in the index in `scan.incremental.snapshot.chunk.key-column`. This will increase the speed of select statement.
+2. The processing semantics of a Postgres CDC table without primary keys is determined based on the behavior of the column that are specified by the `scan.incremental.snapshot.chunk.key-column`.
+* If no update operation is performed on the specified column, the exactly-once semantics is ensured.
+* If the update operation is performed on the specified column, only the at-least-once semantics is ensured. However, you can specify primary keys at downstream and perform the idempotence operation to ensure data correctness.
+
+#### Warning
+
+Using a **non-primary key column** as the `scan.incremental.snapshot.chunk.key-column` for a Postgres table with primary keys may lead to data inconsistencies. Below is a scenario illustrating this issue and recommendations to mitigate potential problems.
+
+#### Problem Scenario
+
+- **Table Structure:**
+    - **Primary Key:** `id`
+    - **Chunk Key Column:** `pid` (Not a primary key)
+
+- **Snapshot Splits:**
+    - **Split 0:** `1 < pid <= 3`
+    - **Split 1:** `3 < pid <= 5`
+
+- **Operation:**
+    - Two different subtasks are reading Split 0 and Split 1 concurrently.
+    - An update operation changes `pid` from `2` to `4` for `id=0` while both splits are being read. This update occurs between the low and high watermark of both splits.
+
+- **Result:**
+    - **Split 0:** Contains the record `[id=0, pid=2]`
+    - **Split 1:** Contains the record `[id=0, pid=4]`
+
+Since the order of processing these records cannot be guaranteed, the final value of `pid` for `id=0` may end up being either `2` or `4`, leading to potential data inconsistencies.
+
 ## Data Type Mapping
 
 <div class="wy-table-responsive">
@@ -608,6 +717,10 @@ public class PostgreSQLSourceExample {
     <tr>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
       <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
+    </tr>
+    <tr>
+      <td>TIMESTAMP [ (p) ] WITH TIME ZONE</td>
+      <td>TIMESTAMP_LTZ(p)</td>
     </tr>
     <tr>
       <td>

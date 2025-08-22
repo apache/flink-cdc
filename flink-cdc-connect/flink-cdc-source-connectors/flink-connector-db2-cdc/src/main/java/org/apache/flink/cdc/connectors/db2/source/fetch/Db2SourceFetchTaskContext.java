@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.db2.source.fetch;
 
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
@@ -216,7 +217,12 @@ public class Db2SourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public JdbcSourceEventDispatcher<Db2Partition> getDispatcher() {
+    public JdbcSourceEventDispatcher getEventDispatcher() {
+        return dispatcher;
+    }
+
+    @Override
+    public WatermarkDispatcher getWaterMarkDispatcher() {
         return dispatcher;
     }
 

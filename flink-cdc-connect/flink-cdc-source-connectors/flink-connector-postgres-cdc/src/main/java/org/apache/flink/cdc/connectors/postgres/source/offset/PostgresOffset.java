@@ -106,7 +106,7 @@ public class PostgresOffset extends Offset {
                 + (getTxid() == null ? "null" : getTxid())
                 + ", lastCommitTs="
                 + (getLastCommitTs() == null ? "null" : getLastCommitTs())
-                + "]";
+                + "}";
     }
 
     @Override
@@ -119,10 +119,5 @@ public class PostgresOffset extends Offset {
         }
         PostgresOffset that = (PostgresOffset) o;
         return offset.equals(that.offset);
-    }
-
-    @Override
-    public Map<String, String> getOffset() {
-        return offset;
     }
 }

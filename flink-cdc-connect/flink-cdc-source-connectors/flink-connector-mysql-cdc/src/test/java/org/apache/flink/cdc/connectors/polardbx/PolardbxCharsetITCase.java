@@ -26,19 +26,19 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 import org.apache.flink.util.StringUtils;
 
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 /** Test supporting different column charsets for Polardbx. */
-@RunWith(Parameterized.class)
-public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
+class PolardbxCharsetITCase extends PolardbxSourceTestBase {
     private static final String DATABASE = "charset_test";
 
     private final StreamExecutionEnvironment env =
@@ -48,84 +48,68 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
 
-    private final String testName;
-    private final String[] snapshotExpected;
-    private final String[] binlogExpected;
-
-    public PolardbxCharsetITCase(
-            String testName, String[] snapshotExpected, String[] binlogExpected) {
-        this.testName = testName;
-        this.snapshotExpected = snapshotExpected;
-        this.binlogExpected = binlogExpected;
+    public static Stream<Arguments> parameters() {
+        return Stream.of(
+                Arguments.of(
+                        "utf8_test",
+                        new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
+                        new String[] {
+                            "-D[1, 测试数据]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 另一个测试数据]",
+                            "+I[11, 测试数据]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 另一个测试数据]"
+                        }),
+                Arguments.of(
+                        "ascii_test",
+                        new String[] {
+                            "+I[1, ascii test!?]", "+I[2, Craig Marshall]", "+I[3, {test}]"
+                        },
+                        new String[] {
+                            "-D[1, ascii test!?]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, {test}]",
+                            "+I[11, ascii test!?]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, {test}]"
+                        }),
+                Arguments.of(
+                        "gbk_test",
+                        new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
+                        new String[] {
+                            "-D[1, 测试数据]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 另一个测试数据]",
+                            "+I[11, 测试数据]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 另一个测试数据]"
+                        }),
+                Arguments.of(
+                        "latin1_test",
+                        new String[] {"+I[1, ÀÆÉ]", "+I[2, Craig Marshall]", "+I[3, Üæû]"},
+                        new String[] {
+                            "-D[1, ÀÆÉ]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, Üæû]",
+                            "+I[11, ÀÆÉ]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, Üæû]"
+                        }),
+                Arguments.of(
+                        "big5_test",
+                        new String[] {"+I[1, 大五]", "+I[2, Craig Marshall]", "+I[3, 丹店]"},
+                        new String[] {
+                            "-D[1, 大五]",
+                            "-D[2, Craig Marshall]",
+                            "-D[3, 丹店]",
+                            "+I[11, 大五]",
+                            "+I[12, Craig Marshall]",
+                            "+I[13, 丹店]"
+                        }));
     }
 
-    @Parameterized.Parameters(name = "Test column charset: {0}")
-    public static Object[] parameters() {
-        return new Object[][] {
-            new Object[] {
-                "utf8_test",
-                new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
-                new String[] {
-                    "-D[1, 测试数据]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 另一个测试数据]",
-                    "+I[11, 测试数据]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 另一个测试数据]"
-                }
-            },
-            new Object[] {
-                "ascii_test",
-                new String[] {"+I[1, ascii test!?]", "+I[2, Craig Marshall]", "+I[3, {test}]"},
-                new String[] {
-                    "-D[1, ascii test!?]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, {test}]",
-                    "+I[11, ascii test!?]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, {test}]"
-                }
-            },
-            new Object[] {
-                "gbk_test",
-                new String[] {"+I[1, 测试数据]", "+I[2, Craig Marshall]", "+I[3, 另一个测试数据]"},
-                new String[] {
-                    "-D[1, 测试数据]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 另一个测试数据]",
-                    "+I[11, 测试数据]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 另一个测试数据]"
-                }
-            },
-            new Object[] {
-                "latin1_test",
-                new String[] {"+I[1, ÀÆÉ]", "+I[2, Craig Marshall]", "+I[3, Üæû]"},
-                new String[] {
-                    "-D[1, ÀÆÉ]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, Üæû]",
-                    "+I[11, ÀÆÉ]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, Üæû]"
-                }
-            },
-            new Object[] {
-                "big5_test",
-                new String[] {"+I[1, 大五]", "+I[2, Craig Marshall]", "+I[3, 丹店]"},
-                new String[] {
-                    "-D[1, 大五]",
-                    "-D[2, Craig Marshall]",
-                    "-D[3, 丹店]",
-                    "+I[11, 大五]",
-                    "+I[12, Craig Marshall]",
-                    "+I[13, 丹店]"
-                }
-            }
-        };
-    }
-
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() throws InterruptedException {
         initializePolardbxTables(
                 DATABASE,
@@ -138,15 +122,17 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
                                         || s.contains("ascii_test")));
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(200);
     }
 
-    @Test
-    public void testCharset() throws Exception {
+    @ParameterizedTest
+    @MethodSource("parameters")
+    void testCharset(String testName, String[] snapshotExpected, String[] binlogExpected)
+            throws Exception {
         String sourceDDL =
                 String.format(
                         "CREATE TABLE %s (\n"
@@ -167,8 +153,8 @@ public class PolardbxCharsetITCase extends PolardbxSourceTestBase {
                                 + " 'scan.incremental.snapshot.chunk.size' = '%s'"
                                 + ")",
                         testName,
-                        HOST_NAME,
-                        PORT,
+                        getHost(),
+                        getPort(),
                         USER_NAME,
                         PASSWORD,
                         DATABASE,
