@@ -67,7 +67,8 @@ public class MockPostgreSQLTableSource extends PostgreSQLTableSource {
                 (boolean) get(postgreSQLTableSource, "scanNewlyAddedTableEnabled"),
                 (int) get(postgreSQLTableSource, "lsnCommitCheckpointsDelay"),
                 (boolean) get(postgreSQLTableSource, "assignUnboundedChunkFirst"),
-                (boolean) get(postgreSQLTableSource, "appendOnly"));
+                (boolean) get(postgreSQLTableSource, "appendOnly"),
+                (boolean) get(postgreSQLTableSource, "includePartitionedTables"));
     }
 
     @Override
