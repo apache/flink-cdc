@@ -216,6 +216,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
         }
         long targetRowNum = table.coreOptions().dynamicBucketTargetRowNum();
         Integer numAssigners = table.coreOptions().dynamicBucketInitialBuckets();
+        Integer maxBucketsNum = table.coreOptions().dynamicBucketMaxBuckets();
+
         return new Tuple4<>(
                 table.bucketMode(),
                 table.createRowKeyExtractor(),
@@ -226,7 +228,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                         totalTasksNumber,
                         MathUtils.min(numAssigners, totalTasksNumber),
                         currentTaskNumber,
-                        targetRowNum),
+                        targetRowNum,
+                        maxBucketsNum),
                 new RowPartitionKeyExtractor(table.schema()));
     }
 }

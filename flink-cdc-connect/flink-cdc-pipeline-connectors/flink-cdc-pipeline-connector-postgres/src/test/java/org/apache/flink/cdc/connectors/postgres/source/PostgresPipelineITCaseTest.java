@@ -47,6 +47,8 @@ import org.apache.flink.util.CloseableIterator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,8 +134,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
     }
 
-    @Test
-    public void testInitialStartupModeWithOpts() throws Exception {
+    @ParameterizedTest(name = "unboundedChunkFirst: {0}")
+    @ValueSource(booleans = {true, false})
+    public void testInitialStartupModeWithOpts(boolean unboundedChunkFirst) throws Exception {
         inventoryDatabase.createAndInitialize();
         Configuration sourceConfiguration = new Configuration();
         sourceConfiguration.set(PostgresDataSourceOptions.HOSTNAME, POSTGRES_CONTAINER.getHost());
@@ -151,6 +154,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 inventoryDatabase.getDatabaseName() + ".inventory.products");
         sourceConfiguration.set(PostgresDataSourceOptions.SERVER_TIME_ZONE, "UTC");
         sourceConfiguration.set(PostgresDataSourceOptions.METADATA_LIST, "op_ts");
+        sourceConfiguration.set(
+                PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED,
+                unboundedChunkFirst);
 
         Factory.Context context =
                 new FactoryHelper.DefaultContext(

@@ -75,7 +75,6 @@ public class IcebergTypeUtils {
             case DECIMAL:
                 return Types.DecimalType.of(precision, scale);
             case TINYINT:
-                return new Types.BooleanType();
             case SMALLINT:
             case INTEGER:
                 return new Types.IntegerType();
@@ -141,8 +140,6 @@ public class IcebergTypeUtils {
                         };
                 break;
             case TINYINT:
-                fieldGetter = row -> row.getBoolean(fieldPos);
-                break;
             case SMALLINT:
                 fieldGetter = row -> row.getInt(fieldPos);
                 break;
@@ -179,9 +176,9 @@ public class IcebergTypeUtils {
             case TIMESTAMP_WITH_TIME_ZONE:
                 fieldGetter =
                         (row) ->
-                                TimestampData.fromTimestamp(
+                                TimestampData.fromInstant(
                                         row.getZonedTimestamp(fieldPos, getPrecision(fieldType))
-                                                .toTimestamp());
+                                                .toInstant());
                 break;
             case ROW:
                 final int rowFieldCount = getFieldCount(fieldType);

@@ -246,6 +246,17 @@ pipeline:
         List of readable metadata from SourceRecord to be passed to downstream and could be used in transform module, split by `,`. Available readable metadata are: op_ts.
       </td>
     </tr>
+    <tr>
+     <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+     <td>optional</td>
+     <td style="word-wrap: break-word;">false</td>
+     <td>String</td>
+     <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br>
+        Experimental option, defaults to false.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -285,7 +296,6 @@ Notice:
 
 ## Data Type Mapping
 
-
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -295,6 +305,17 @@ Notice:
       </tr>
     </thead>
     <tbody>
+    <tr>
+      <td>
+        BOOLEAN <br>
+        BIT(1) <br>
+      <td>BOOLEAN</td>
+    </tr>
+    <tr>
+      <td>
+        BIT( > 1)
+      <td>BYTES</td>
+    </tr>
     <tr>
       <td>
         SMALLINT<br>
@@ -312,69 +333,284 @@ Notice:
     <tr>
       <td>
         BIGINT<br>
-        BIGSERIAL</td>
+        BIGSERIAL<br>
+        OID<br>
+      </td>
       <td>BIGINT</td>
-    </tr>
-   <tr>
-      <td>NUMERIC</td>
-      <td>DECIMAL(20, 0)</td>
     </tr>
     <tr>
       <td>
         REAL<br>
-        FLOAT4</td>
+        FLOAT4
+      </td>
       <td>FLOAT</td>
     </tr>
+   <tr>
+      <td>NUMERIC</td>
+      <td>DECIMAL(38, 0)</td>
+    </tr>
     <tr>
-      <td>
-        FLOAT8<br>
-        DOUBLE PRECISION</td>
+      <td>DOUBLE PRECISION<br>
+          FLOAT8
+      </td>
       <td>DOUBLE</td>
     </tr>
+     <tr>
+       <td> CHAR[(M)]<br>
+            VARCHAR[(M)]<br>
+            CHARACTER[(M)]<br>
+            BPCHAR[(M)]<br>
+            CHARACTER VARYING[(M)]
+       </td>
+       <td>STRING</td>
+     </tr>
     <tr>
-      <td>
-        NUMERIC(p, s)<br>
-        DECIMAL(p, s)</td>
-      <td>DECIMAL(p, s)</td>
+      <td>TIMESTAMPTZ<br>
+          TIMESTAMP WITH TIME ZONE</td>
+      <td>ZonedTimestampType</td>
     </tr>
     <tr>
-      <td>BOOLEAN</td>
-      <td>BOOLEAN</td>
+      <td>INTERVAL [P]</td>
+      <td>BIGINT</td>
     </tr>
     <tr>
-      <td>DATE</td>
-      <td>DATE</td>
-    </tr>
-    <tr>
-      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
-      <td>TIME [(p)] [WITHOUT TIMEZONE]</td>
-    </tr>
-    <tr>
-      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
-      <td>TIMESTAMP [(p)] [WITHOUT TIMEZONE]</td>
-    </tr>
-    <tr>
-      <td>
-        CHAR(n)<br>
-        CHARACTER(n)<br>
-        VARCHAR(n)<br>
-        CHARACTER VARYING(n)</td>
-      <td>CHAR(n)</td>
-    </tr>
-    <tr>
-      <td>
-        TEXT</td>
-      <td>STRING</td>
+      <td>INTERVAL [P]</td>
+      <td>STRING(when <code>debezium.interval.handling.mode</code> is set to string)</td>
     </tr>
     <tr>
       <td>BYTEA</td>
-      <td>BYTES</td>
+      <td>BYTES or STRING (when <code>debezium.binary.handling.mode</code> is set to base64 or base64-url-safe or hex)</td>
+    </tr>
+    <tr>
+      <td>
+        JSON<br>
+        JSONB<br>
+        XML<br>
+        UUID<br>
+        POINT<br>
+        LTREE<br>
+        CITEXT<br>
+        INET<br>
+        INT4RANGE<br>
+        INT8RANGE<br>
+        NUMRANGE<br>
+        TSRANGE<br>
+        DATERANGE<br>
+        ENUM
+      </td>
+      <td>STRING</td>
     </tr>
     </tbody>
 </table>
 </div>
 
-### Postgres Spatial Data Types Mapping
+### Temporal types Mapping
+Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.the time.precision.mode</code> connector configuration property. The following sections describe these mappings:
+- debezium.time.precision.mode=adaptive
+- debezium.time.precision.mode=adaptive_time_microseconds
+- debezium.time.precision.mode=connect 
+
+Note: Due to current CDC limitations in supporting time types, when <code>debezium.time.precision.mode</code> is set to "adaptive", "adaptive_time_microseconds", or when using Connect time types, all time values are converted to the Integer type with a precision of 3. This will be improved in future updates.
+
+<u>debezium.time.precision.mode=adaptive</u>
+
+When the <code>debezium.time.precision.mode</code> property is set to adaptive, the default, the connector determines the literal type and semantic type based on the column’s data type definition. This ensures that events exactly represent the values in the database.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>INTEGER</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+### Decimal types Mapping
+The setting of the PostgreSQL connector configuration property <code>debezium.decimal.handling.mode</code> determines how the connector maps decimal types.
+
+When the <code>debezium.decimal.handling.mode</code> property is set to precise, the connector uses the Kafka Connect org.apache.kafka.connect.data.Decimal logical type for all DECIMAL, NUMERIC and MONEY columns. This is the default mode.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          NUMERIC[(M[,D])]
+        <td>DECIMAL[(M[,D])]</td>
+      </tr>
+      <tr>
+        <td>
+          NUMERIC
+        <td>DECIMAL(38,0)</td>
+      </tr>
+      <tr>
+        <td>
+          DECIMAL[(M[,D])]
+        <td>DECIMAL[(M[,D])]</td>
+      </tr>
+      <tr>
+        <td>
+          DECIMAL
+        <td>DECIMAL(38,0)</td>
+      </tr>
+      <tr>
+        <td>
+          MONEY[(M[,D])]
+        <td>DECIMAL(38,digits)(The scale schema parameter contains an integer representing how many digits the decimal point was shifted. The scale schema parameter is determined by the money.fraction.digits connector configuration property.)</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+When the <code>debezium.decimal.handling.mode</code> property is set to double, the connector represents all DECIMAL, NUMERIC and MONEY values as Java double values and encodes them as shown in the following table.
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          NUMERIC[(M[,D])]
+        <td>DOUBLE</td>
+      </tr>
+      <tr>
+        <td>
+          DECIMAL[(M[,D])]
+        <td>DOUBLE</td>
+      </tr>
+      <tr>
+        <td>
+          MONEY[(M[,D])]
+        <td>DOUBLE</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+The last possible setting for the <code>debezium.decimal.handling.mode</code> configuration property is string. In this case, the connector represents DECIMAL, NUMERIC and MONEY values as their formatted string representation, and encodes them as shown in the following table.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          NUMERIC[(M[,D])]
+        <td>STRING</td>
+      </tr>
+      <tr>
+        <td>
+          DECIMAL[(M[,D])]
+        <td>STRING</td>
+      </tr>
+      <tr>
+        <td>
+          MONEY[(M[,D])]
+        <td>STRING</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+PostgreSQL supports NaN (not a number) as a special value to be stored in DECIMAL/NUMERIC values when the setting of <code>debezium.decimal.handling.mode</code> is string or double. In this case, the connector encodes NaN as either Double.NaN or the string constant NAN.
+
+### HSTORE type Mapping
+The setting of the PostgreSQL connector configuration property <code>debezium.hstore.handling.mode</code> determines how the connector maps HSTORE values.
+
+When the <code>debezium.hstore.handling.mode</code> property is set to json (the default), the connector represents HSTORE values as string representations of JSON values and encodes them as shown in the following table. When the <code>debezium.hstore.handling.mode</code> property is set to map, the connector uses the MAP schema type for HSTORE values.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+         HSTORE
+        <td>STRING(<code>`debezium.hstore.handling.mode`=`string`</code>)</td>
+      </tr>
+      <tr>
+        <td>
+         HSTORE
+        <td>MAP(<code>`debezium.hstore.handling.mode`=`map`</code>)</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+### Network address types Mapping
+PostgreSQL has data types that can store IPv4, IPv6, and MAC addresses. It is better to use these types instead of plain text types to store network addresses. Network address types offer input error checking and specialized operators and functions.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+         INET
+        <td>STRING</td>
+      </tr>
+      <tr>
+        <td>
+         CIDR
+        <td>STRING</td>
+      </tr>
+      <tr>
+        <td>
+         MACADDR
+        <td>STRING</td>
+      </tr>
+      <tr>
+        <td>
+         MACADDR8
+        <td>STRING</td>
+      </tr> 
+    </tbody>
+</table>
+</div>
+
+### PostGIS Types Mapping
 PostgreSQL supports spatial data types through the PostGIS extension:
 ```
     GEOMETRY(POINT, xx): Represents a point in a Cartesian coordinate system, with EPSG:xx defining the coordinate system. It is suitable for local planar calculations. 
@@ -392,11 +628,11 @@ The former is used for small-area planar data, while the latter is used for larg
     <tbody>
       <tr>
         <td>GEOMETRY(POINT, xx)</td>
-        <td>{"hexewkb":"0101000020730c00001c7c613255de6540787aa52c435c42c0","srid":3187}</td>
+        <td>{"coordinates":"[[174.9479, -36.7208]]","type":"Point","srid":3187}"</td>
       </tr>
       <tr>
         <td>GEOGRAPHY(MULTILINESTRING)</td>
-        <td>{"hexewkb":"0105000020e610000001000000010200000002000000a779c7293a2465400b462575025a46c0c66d3480b7fc6440c3d32b65195246c0","srid":4326}</td>
+        <td>{"coordinates":"[[169.1321, -44.7032],[167.8974, -44.6414]]","type":"MultiLineString","srid":4326}</td>
       </tr>
     </tbody>
 </table>
