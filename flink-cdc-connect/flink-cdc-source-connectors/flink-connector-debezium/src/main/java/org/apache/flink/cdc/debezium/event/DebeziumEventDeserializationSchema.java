@@ -507,7 +507,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             }
 
             return new GenericArrayData(array);
-        } else if (dbzObj.getClass().isArray()) {
+        } else if (dbzObj instanceof Object[]) {
             Object[] inputArray = (Object[]) dbzObj;
             Object[] convertedArray = new Object[inputArray.length];
 
@@ -523,13 +523,11 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
             return new GenericArrayData(convertedArray);
         } else {
-            Object[] array = new Object[1];
-            if (elementSchema.type() == Schema.Type.ARRAY) {
-                array[0] = convertToArray(dbzObj, elementSchema);
-            } else {
-                array[0] = elementConverter.convert(dbzObj, elementSchema);
-            }
-            return new GenericArrayData(array);
+            throw new IllegalArgumentException(
+                    "Unable to convert to Array from unexpected value '"
+                            + dbzObj
+                            + "' of type "
+                            + dbzObj.getClass().getName());
         }
     }
 

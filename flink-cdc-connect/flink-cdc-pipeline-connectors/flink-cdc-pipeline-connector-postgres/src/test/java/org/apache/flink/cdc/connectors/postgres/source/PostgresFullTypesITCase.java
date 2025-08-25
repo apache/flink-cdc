@@ -264,7 +264,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                                 .tableList("inventory.time_types")
                                 .startupOptions(StartupOptions.initial())
                                 .debeziumProperties(debeziumProps)
-                                .serverTimeZone("UTC+8");
+                                .serverTimeZone("UTC");
         configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
         configFactory.slotName(slotName);
         configFactory.decodingPluginName("pgoutput");
@@ -740,7 +740,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
 
         Object[] actualSnapshotObjects = recordFields(snapshotRecord, ARRAY_TYPES);
 
-        Assertions.assertThat(actualSnapshotObjects[0]).isEqualTo(1); // id字段
+        Assertions.assertThat(actualSnapshotObjects[0]).isEqualTo(1); // id column
 
         ArrayData actualTagsArray = (ArrayData) actualSnapshotObjects[1];
         Assertions.assertThat(actualTagsArray.getString(0))
@@ -750,11 +750,15 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         Assertions.assertThat(actualTagsArray.getString(2))
                 .isEqualTo(BinaryStringData.fromString("sale"));
 
-        org.apache.flink.cdc.common.data.ArrayData actualScoresArray =
+        ArrayData actualScoresArray =
                 (org.apache.flink.cdc.common.data.ArrayData) actualSnapshotObjects[2];
         Assertions.assertThat(actualScoresArray.getInt(0)).isEqualTo(85);
         Assertions.assertThat(actualScoresArray.getInt(1)).isEqualTo(90);
         Assertions.assertThat(actualScoresArray.getInt(2)).isEqualTo(78);
+
+        ArrayData actualIntArray =
+                (org.apache.flink.cdc.common.data.ArrayData) actualSnapshotObjects[3];
+        Assertions.assertThat(actualIntArray.getInt(0)).isEqualTo(42);
     }
 
     private <T> Tuple2<List<T>, List<CreateTableEvent>> fetchResultsAndCreateTableEvent(
@@ -897,5 +901,5 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.INT(),
                     DataTypes.ARRAY(DataTypes.STRING()),
                     DataTypes.ARRAY(DataTypes.INT()),
-                    DataTypes.ARRAY(DataTypes.ARRAY(DataTypes.INT())));
+                    DataTypes.ARRAY(DataTypes.INT()));
 }
