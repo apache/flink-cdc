@@ -61,6 +61,11 @@ public interface DataSourceDialect<C extends SourceConfig> extends Serializable,
      */
     Offset displayCurrentOffset(C sourceConfig);
 
+    /** Displays committed offset from the database e.g. query Postgresql confirmed_lsn */
+    default Offset displayCommittedOffset(C sourceConfig) {
+        throw new UnsupportedOperationException();
+    }
+
     /** Check if the CollectionId is case-sensitive or not. */
     boolean isDataCollectionIdCaseSensitive(C sourceConfig);
 

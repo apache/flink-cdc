@@ -188,6 +188,10 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     protected DataType inferStruct(Object value, Schema schema) {
         Struct struct = (Struct) value;
         if (VariableScaleDecimal.LOGICAL_NAME.equals(schema.name())) {
+            if (struct == null) {
+                // set the default value
+                return DataTypes.DECIMAL(DecimalType.DEFAULT_PRECISION, DecimalType.DEFAULT_SCALE);
+            }
             SpecialValueDecimal decimal = VariableScaleDecimal.toLogical(struct);
             BigDecimal bigDecimal = decimal.getDecimalValue().orElse(BigDecimal.ZERO);
             return DataTypes.DECIMAL(bigDecimal.precision(), bigDecimal.scale());
@@ -206,6 +210,12 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     }
 
     protected DataType inferMap(Object value, Schema schema) {
-        throw new UnsupportedOperationException("Unsupported type MAP");
+        Schema keySchema = schema.keySchema();
+        Schema valueSchema = schema.valueSchema();
+
+        DataType keyType = keySchema != null ? infer(null, keySchema) : DataTypes.STRING();
+        DataType valueType = valueSchema != null ? infer(null, valueSchema) : DataTypes.STRING();
+
+        return DataTypes.MAP(keyType, valueType);
     }
 }

@@ -113,7 +113,6 @@ public class CliFrontendOptions {
                 .addOption(GLOBAL_CONFIG)
                 .addOption(USE_MINI_CLUSTER)
                 .addOption(TARGET)
-                .addOption(USE_MINI_CLUSTER)
                 .addOption(SAVEPOINT_PATH_OPTION)
                 .addOption(SAVEPOINT_CLAIM_MODE)
                 .addOption(SAVEPOINT_ALLOW_NON_RESTORED_OPTION)

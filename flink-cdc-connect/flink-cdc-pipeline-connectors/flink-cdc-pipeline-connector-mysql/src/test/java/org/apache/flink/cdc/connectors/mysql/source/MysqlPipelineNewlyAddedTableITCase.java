@@ -97,7 +97,6 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_USER;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.fetchResults;
-import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.getServerId;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests to cover various newly added tables during capture process in pipeline mode. */
@@ -351,6 +350,9 @@ class MysqlPipelineNewlyAddedTableITCase extends MySqlSourceTestBase {
             initialAddressTables(getConnection(), testParam.getSecondRoundInitTables());
         }
 
+        // sleep 1s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
+        // Otherwise, the restart job won't read newly added tables, and this test will be stuck.
+        Thread.sleep(1000L);
         // step 4: trigger a savepoint and cancel the job
         finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
         jobClient.cancel().get();

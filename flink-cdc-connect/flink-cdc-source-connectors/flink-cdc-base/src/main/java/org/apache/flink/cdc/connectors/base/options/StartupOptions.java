@@ -69,6 +69,15 @@ public final class StartupOptions implements Serializable {
     }
 
     /**
+     * Never to perform snapshot on the monitored database tables upon first startup, just read from
+     * the previous committed posistion of the change log which means only have the changes since
+     * the connector last stopped.
+     */
+    public static StartupOptions committed() {
+        return new StartupOptions(StartupMode.COMMITTED_OFFSETS, null, null, null);
+    }
+
+    /**
      * Never to perform snapshot on the monitored database tables upon first startup, and directly
      * read change log from the specified offset.
      */
@@ -111,6 +120,7 @@ public final class StartupOptions implements Serializable {
             case SNAPSHOT:
             case EARLIEST_OFFSET:
             case LATEST_OFFSET:
+            case COMMITTED_OFFSETS:
                 break;
             case SPECIFIC_OFFSETS:
                 if (CollectionUtil.isNullOrEmpty(offset)) {
@@ -134,6 +144,7 @@ public final class StartupOptions implements Serializable {
         return startupMode == StartupMode.EARLIEST_OFFSET
                 || startupMode == StartupMode.LATEST_OFFSET
                 || startupMode == StartupMode.SPECIFIC_OFFSETS
+                || startupMode == StartupMode.COMMITTED_OFFSETS
                 || startupMode == StartupMode.TIMESTAMP;
     }
 

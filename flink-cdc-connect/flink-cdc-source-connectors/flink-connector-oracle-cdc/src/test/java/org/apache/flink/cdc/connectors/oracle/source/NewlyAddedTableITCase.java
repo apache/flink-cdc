@@ -492,7 +492,9 @@ class NewlyAddedTableITCase extends OracleSourceTestBase {
             waitForSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
-            // wait task to stream phase
+            // sleep 10s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
+            // Otherwise, the restart job won't read newly added tables, and this test will be
+            // stuck.
             sleepMs(10000);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
@@ -685,6 +687,8 @@ class NewlyAddedTableITCase extends OracleSourceTestBase {
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
+            // Wait 1s until snapshot phase finished, make sure the binlog data is not lost.
+            Thread.sleep(1000L);
 
             // step 3: make some redo log data for this round
             makeFirstPartRedoLogForAddressTable(newlyAddedTable);

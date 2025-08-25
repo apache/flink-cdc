@@ -636,6 +636,11 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
             waitForSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+
+            // sleep 1s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
+            // Otherwise, the restart job won't read newly added tables, and this test will be
+            // stuck.
+            Thread.sleep(1000L);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
@@ -826,6 +831,8 @@ class NewlyAddedTableITCase extends MySqlSourceTestBase {
             waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
+            // Wait 1s until snapshot phase finished, make sure the binlog data is not lost.
+            Thread.sleep(1000L);
 
             // step 3: make some binlog data for this round
             makeFirstPartBinlogForAddressTable(getConnection(), newlyAddedTable);

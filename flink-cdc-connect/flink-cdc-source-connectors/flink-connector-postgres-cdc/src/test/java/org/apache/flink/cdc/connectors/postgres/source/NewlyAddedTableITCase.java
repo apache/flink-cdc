@@ -525,6 +525,10 @@ class NewlyAddedTableITCase extends PostgresTestBase {
             waitForSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getRawResultsAsStrings("sink"));
+            // sleep 1s to wait for the assign status to INITIAL_ASSIGNING_FINISHED.
+            // Otherwise, the restart job won't read newly added tables, and this test will be
+            // stuck.
+            Thread.sleep(1000L);
             finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
             jobClient.cancel().get();
         }
@@ -721,6 +725,8 @@ class NewlyAddedTableITCase extends PostgresTestBase {
             PostgresTestUtils.waitForUpsertSinkSize("sink", fetchedDataList.size());
             assertEqualsInAnyOrder(
                     fetchedDataList, TestValuesTableFactory.getResultsAsStrings("sink"));
+            // Wait 1s until snapshot phase finished, make sure the binlog data is not lost.
+            Thread.sleep(1000L);
 
             // step 3: make some wal log data for this round
             makeFirstPartWalLogForAddressTable(getConnection(), newlyAddedTable);
@@ -938,6 +944,7 @@ class NewlyAddedTableITCase extends PostgresTestBase {
                         + " 'username' = '%s',"
                         + " 'password' = '%s',"
                         + " 'database-name' = '%s',"
+                        + " 'decoding.plugin.name' = 'pgoutput', "
                         + " 'schema-name' = '%s',"
                         + " 'table-name' = '%s',"
                         + " 'slot.name' = '%s', "

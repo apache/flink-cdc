@@ -18,8 +18,6 @@
 package org.apache.flink.cdc.pipeline.tests;
 
 import org.apache.flink.cdc.common.test.utils.TestUtils;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.connectors.oceanbase.OceanBaseTestUtils;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
@@ -56,31 +54,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OceanBaseE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseE2eITCase.class);
 
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-
     private static final String MYSQL_TEST_TABLE_NAME = "products";
 
     @Container
-    static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @Container
-    static final OceanBaseContainer OB_SERVER =
+    private static final OceanBaseContainer OB_SERVER =
             OceanBaseTestUtils.createOceanBaseContainerForJdbc()
                     .withNetwork(NETWORK)
                     .withNetworkAliases("oceanbase")
@@ -133,10 +110,8 @@ class OceanBaseE2eITCase extends PipelineTestEnvironment {
                         getJdbcUrlInContainer("test", "oceanbase"),
                         OB_SERVER.getUsername(),
                         OB_SERVER.getPassword());
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path oceanbaseCdcJar = TestUtils.getResource("oceanbase-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, oceanbaseCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, oceanbaseCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
@@ -211,6 +186,70 @@ class OceanBaseE2eITCase extends PipelineTestEnvironment {
                                 .collect(Collectors.toList()));
 
         dropDatabase(getConnection(false), uniqueDatabaseName);
+    }
+
+    @Test
+    public void testSyncWholeDatabaseInBatchMode() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.startup.mode: snapshot\n"
+                                + "sink:\n"
+                                + "  type: oceanbase\n"
+                                + "  url: %s\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  name: oceanbase IT\n"
+                                + "  parallelism: 1\n"
+                                + "  execution.runtime-mode: BATCH",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        uniqueDatabaseName,
+                        getJdbcUrlInContainer("test", "oceanbase"),
+                        OB_SERVER.getUsername(),
+                        OB_SERVER.getPassword());
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path oceanbaseCdcJar = TestUtils.getResource("oceanbase-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, oceanbaseCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        waitingAndAssertTableCount(MYSQL_TEST_TABLE_NAME, false, 9);
+        List<String> originList = queryTable(MYSQL_TEST_TABLE_NAME, false);
+        assertThat(originList)
+                .containsExactlyInAnyOrderElementsOf(
+                        Stream.of(
+                                        "101,scooter,Small 2-wheel scooter,3.14,red,{\"key1\": \"value1\"},{\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}",
+                                        "102,car battery,12V car battery,8.1,white,{\"key2\": \"value2\"},{\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}",
+                                        "103,12-pack drill bits,12-pack of drill bits with sizes ranging from #40 to #3,0.8,red,{\"key3\": \"value3\"},{\"coordinates\":[3,3],\"type\":\"Point\",\"srid\":0}",
+                                        "104,hammer,12oz carpenter's hammer,0.75,white,{\"key4\": \"value4\"},{\"coordinates\":[4,4],\"type\":\"Point\",\"srid\":0}",
+                                        "105,hammer,14oz carpenter's hammer,0.875,red,{\"k1\": \"v1\", \"k2\": \"v2\"},{\"coordinates\":[5,5],\"type\":\"Point\",\"srid\":0}",
+                                        "106,hammer,16oz carpenter's hammer,1.0,null,null,null",
+                                        "107,rocks,box of assorted rocks,5.3,null,null,null",
+                                        "108,jacket,water resistent black wind breaker,0.1,null,null,null",
+                                        "109,spare tire,24 inch spare tire,22.2,null,null,null")
+                                .map(StringEscapeUtils::unescapeJava)
+                                .collect(Collectors.toList()));
+        // validate table of customers
+        List<String> customerList = queryTable("customers", false);
+        assertThat(customerList)
+                .containsExactlyInAnyOrder(
+                        "101,user_1,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "102,user_2,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "103,user_3,Shanghai,123567891234,2023-12-12T11:00:11",
+                        "104,user_4,Shanghai,123567891234,2023-12-12T11:00:11");
     }
 
     private void waitingAndAssertTableCount(String tableName, boolean isMySQL, int expectedCount)

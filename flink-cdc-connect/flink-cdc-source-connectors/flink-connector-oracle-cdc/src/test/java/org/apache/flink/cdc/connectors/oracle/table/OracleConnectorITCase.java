@@ -638,6 +638,9 @@ class OracleConnectorITCase {
             statement.execute(
                     "INSERT INTO debezium.test_numeric_table "
                             + "VALUES (11000000001, 1, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965)");
+            statement.execute(
+                    "INSERT INTO debezium.test_numeric_table "
+                            + "VALUES (11000000002, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)");
         }
 
         String sourceDDL =
@@ -709,7 +712,8 @@ class OracleConnectorITCase {
         List<String> expected =
                 Arrays.asList(
                         "+I[11000000000, false, 98, 9998, 987654320, 20000000000000000000, 987654321.12345678, 2147483647, 1024.955, 1024.955]",
-                        "+I[11000000001, true, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965]");
+                        "+I[11000000001, true, 99, 9999, 987654321, 20000000000000000001, 987654321.87654321, 2147483648, 1024.965, 1024.965]",
+                        "+I[11000000002, null, null, null, null, null, null, null, null, null]");
 
         List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("test_numeric_sink");
         Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);

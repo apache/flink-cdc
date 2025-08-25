@@ -59,7 +59,7 @@ limitations under the License.
     </scm>
 
     <properties>
-        <revision>3.4-SNAPSHOT</revision>
+        <revision>3.5-SNAPSHOT</revision>
         <scala.binary.version>2.12</scala.binary.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
@@ -95,6 +95,9 @@ limitations under the License.
         <scala.version>2.12.16</scala.version>
         <!-- Maven shade plugin prior to 3.2.0 could not correctly shade nested classes with JDK 8+. -->
         <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
+        <iceberg.version>1.6.1</iceberg.version>
+        <hive.version>2.3.9</hive.version>
+        <hadoop.version>3.3.4</hadoop.version>
     </properties>
 
     <dependencyManagement>
