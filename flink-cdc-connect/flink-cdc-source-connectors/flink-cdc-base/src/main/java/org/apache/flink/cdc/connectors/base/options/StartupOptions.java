@@ -74,7 +74,7 @@ public final class StartupOptions implements Serializable {
      * the connector last stopped.
      */
     public static StartupOptions committed() {
-        return new StartupOptions(StartupMode.COMMITTED_OFFSETS, null, null, null);
+        return new StartupOptions(StartupMode.COMMITTED_OFFSETS, null, null, null, null);
     }
 
     /**
