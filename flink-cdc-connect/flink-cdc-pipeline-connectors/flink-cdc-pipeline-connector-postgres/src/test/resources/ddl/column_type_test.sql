@@ -165,7 +165,7 @@ CREATE TABLE array_types (
 ALTER TABLE inventory.array_types
     REPLICA IDENTITY FULL;
 
-INSERT INTO array_types (id,text_a1, int_a1, int_s1,matrix_a1)
+INSERT INTO array_types (id,text_a1, int_a1, int_s1)
 VALUES
     (1,
      ARRAY['electronics', 'gadget', 'sale'],

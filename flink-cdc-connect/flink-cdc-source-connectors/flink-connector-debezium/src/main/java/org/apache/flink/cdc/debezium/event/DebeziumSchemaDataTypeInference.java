@@ -82,9 +82,9 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
             case STRUCT:
                 return inferStruct(value, schema);
             case ARRAY:
-                return inferArray(schema);
+                return inferArray(value, schema);
             case MAP:
-                return inferMap(schema);
+                return inferMap(value, schema);
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type: " + schema.type().getName());
@@ -205,7 +205,7 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
                         .toArray(DataField[]::new));
     }
 
-    protected DataType inferArray(Schema schema) {
+    protected DataType inferArray(Object value, Schema schema) {
         Schema elementSchema = schema.valueSchema();
         if (elementSchema != null) {
             DataType elementType = infer(null, elementSchema);
@@ -215,7 +215,7 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
         }
     }
 
-    protected DataType inferMap(Schema schema) {
+    protected DataType inferMap(Object value, Schema schema) {
         Schema keySchema = schema.keySchema();
         Schema valueSchema = schema.valueSchema();
 
