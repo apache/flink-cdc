@@ -29,10 +29,15 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.util.CollectionUtil;
 
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.table.types.logical.utils.LogicalTypeChecks.getLength;
+import static org.apache.flink.table.types.logical.utils.LogicalTypeChecks.getPrecision;
+import static org.apache.flink.table.types.logical.utils.LogicalTypeChecks.getScale;
 
 /** Utilities for handling {@link DataType}s. */
 public class DataTypeUtils {
@@ -196,5 +201,102 @@ public class DataTypeUtils {
             default:
                 throw new IllegalArgumentException("Illegal type: " + type);
         }
+    }
+
+    /**
+     * Convert Flink's internal {@link org.apache.flink.table.types.DataType} to CDC's {@link
+     * DataType}.
+     */
+    public static DataType fromFlinkDataType(org.apache.flink.table.types.DataType flinkType) {
+        LogicalType logicalType = flinkType.getLogicalType();
+        List<org.apache.flink.table.types.DataType> children = flinkType.getChildren();
+        DataType dataType;
+        switch (logicalType.getTypeRoot()) {
+            case CHAR:
+                dataType = DataTypes.CHAR(getLength(logicalType));
+                break;
+            case VARCHAR:
+                dataType = DataTypes.VARCHAR(getLength(logicalType));
+                break;
+            case BOOLEAN:
+                dataType = DataTypes.BOOLEAN();
+                break;
+            case BINARY:
+                dataType = DataTypes.BINARY(getLength(logicalType));
+                break;
+            case VARBINARY:
+                dataType = DataTypes.VARBINARY(getLength(logicalType));
+                break;
+            case DECIMAL:
+                dataType = DataTypes.DECIMAL(getPrecision(logicalType), getScale(logicalType));
+                break;
+            case TINYINT:
+                dataType = DataTypes.TINYINT();
+                break;
+            case SMALLINT:
+                dataType = DataTypes.SMALLINT();
+                break;
+            case INTEGER:
+                dataType = DataTypes.INT();
+                break;
+            case BIGINT:
+                dataType = DataTypes.BIGINT();
+                break;
+            case FLOAT:
+                dataType = DataTypes.FLOAT();
+                break;
+            case DOUBLE:
+                dataType = DataTypes.DOUBLE();
+                break;
+            case DATE:
+                dataType = DataTypes.DATE();
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                dataType = DataTypes.TIME(getPrecision(logicalType));
+                break;
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                dataType = DataTypes.TIMESTAMP(getPrecision(logicalType));
+                break;
+            case TIMESTAMP_WITH_TIME_ZONE:
+                dataType = DataTypes.TIMESTAMP_TZ(getPrecision(logicalType));
+                break;
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                dataType = DataTypes.TIMESTAMP_LTZ(getPrecision(logicalType));
+                break;
+            case ARRAY:
+                Preconditions.checkState(children != null && !children.isEmpty());
+                dataType = DataTypes.ARRAY(fromFlinkDataType(children.get(0)));
+                break;
+            case MAP:
+                Preconditions.checkState(children != null && children.size() > 1);
+                dataType =
+                        DataTypes.MAP(
+                                fromFlinkDataType(children.get(0)),
+                                fromFlinkDataType(children.get(1)));
+                break;
+            case ROW:
+                Preconditions.checkState(!CollectionUtil.isNullOrEmpty(children));
+                org.apache.flink.table.types.logical.RowType rowType =
+                        (org.apache.flink.table.types.logical.RowType) flinkType.getLogicalType();
+                DataField[] fields =
+                        rowType.getFields().stream()
+                                .map(DataField::fromFlinkDataTypeField)
+                                .toArray(DataField[]::new);
+                dataType = DataTypes.ROW(fields);
+                break;
+            case INTERVAL_YEAR_MONTH:
+            case INTERVAL_DAY_TIME:
+            case NULL:
+            case MULTISET:
+            case DISTINCT_TYPE:
+            case STRUCTURED_TYPE:
+            case RAW:
+            case SYMBOL:
+            case UNRESOLVED:
+                throw new IllegalArgumentException("Unsupported type: " + flinkType);
+            default:
+                throw new IllegalArgumentException("Illegal type: " + flinkType);
+        }
+        return logicalType.isNullable() ? dataType : dataType.notNull();
     }
 }
