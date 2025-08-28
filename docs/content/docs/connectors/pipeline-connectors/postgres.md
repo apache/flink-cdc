@@ -404,6 +404,8 @@ Notice:
 </table>
 </div>
 
+Note: Since the Debezium version does not support multidimensional arrays, only PostgresSQL single-dimensional arrays are currently supported, such as :'ARRAY[1,2,3]', 'int[]'.
+
 ### Temporal types Mapping
 Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone information, how temporal types are mapped depends on the value of <code>debezium.the time.precision.mode</code> connector configuration property. The following sections describe these mappings:
 - debezium.time.precision.mode=adaptive

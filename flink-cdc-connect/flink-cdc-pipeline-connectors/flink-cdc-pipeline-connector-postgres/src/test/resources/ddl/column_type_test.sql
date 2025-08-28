@@ -154,3 +154,32 @@ VALUES
         '[{"key1":"value1","key2":{"key2_1":"value2_1","key2_2":"value2_2"},"key3":["value3"],"key4":["value4_1","value4_2"]},{"key5":"value5"}]'::jsonb,
      1
     );
+
+CREATE TABLE array_types (
+                            id        SERIAL PRIMARY KEY,
+                            text_a1  TEXT[],
+                            int_a1    INTEGER[],
+                            int_s1 INTEGER[]
+);
+
+ALTER TABLE inventory.array_types
+    REPLICA IDENTITY FULL;
+
+INSERT INTO array_types (id,text_a1, int_a1, int_s1)
+VALUES
+    (1,
+     ARRAY['electronics', 'gadget', 'sale'],
+     '{85, 90, 78}',
+     '{42}'
+    );
+
+CREATE TABLE array_types_unsupported_matrix (
+                             id        SERIAL PRIMARY KEY,
+                             matrix_a1 INTEGER[][]
+);
+
+INSERT INTO array_types_unsupported_matrix (id,matrix_a1)
+VALUES
+    (1,
+     '{{1,2},{3,4}}'
+    );
