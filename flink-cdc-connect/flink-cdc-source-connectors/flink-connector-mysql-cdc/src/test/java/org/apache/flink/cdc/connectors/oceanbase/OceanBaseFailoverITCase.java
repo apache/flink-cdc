@@ -18,12 +18,12 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
@@ -35,6 +35,7 @@ import io.debezium.jdbc.JdbcConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,6 +59,8 @@ import static org.apache.flink.api.common.JobStatus.RUNNING;
 
 /** failover IT tests for oceanbase. */
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
+@Disabled(
+        "The current version of the Oceanbase binlog service causes failover test cases to fail. Disable the test and wait for the binlog version to be updated.")
 public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
@@ -150,8 +153,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
-                1,
-                0,
+                RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
                 chunkColumnName);
     }
@@ -190,8 +192,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
-                1,
-                0,
+                RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
                 chunkColumnName);
     }
@@ -252,8 +253,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                1,
-                0,
+                RestartStrategies.fixedDelayRestart(1, 0),
                 tableName,
                 chunkColumnName);
     }
@@ -264,8 +264,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            int restartAttempts,
-            long delayBetweenAttempts,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
             String tableName,
             String chunkColumnName)
             throws Exception {
@@ -275,8 +274,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartAttempts,
-                delayBetweenAttempts,
+                restartStrategyConfiguration,
                 false,
                 tableName,
                 chunkColumnName);
@@ -288,8 +286,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            int restartAttempts,
-            long delayBetweenAttempts,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
             boolean skipSnapshotBackfill,
             String tableName,
             String chunkColumnName)
@@ -301,8 +298,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        RestartStrategyUtils.configureFixedDelayRestartStrategy(
-                env, restartAttempts, delayBetweenAttempts);
+        env.setRestartStrategy(restartStrategyConfiguration);
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("
@@ -314,7 +310,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                                         ? ""
                                         : ", primary key (id) not enforced")
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'connector' = 'mysql-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"

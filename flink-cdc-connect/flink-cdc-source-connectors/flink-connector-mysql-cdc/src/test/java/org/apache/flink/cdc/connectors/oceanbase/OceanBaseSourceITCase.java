@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.oceanbase;
 
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
@@ -62,7 +62,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
         String sourceDDL =
                 format(
                         "CREATE TABLE orders_source ("
@@ -73,7 +73,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
                                 + " create_time TIMESTAMP,"
                                 + " primary key (id) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'connector' = 'mysql-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
@@ -225,7 +225,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
                                 + "    geometrycollection_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'connector' = 'mysql-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
@@ -268,7 +268,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(1, 0));
         String sourceDDL =
                 format(
                         "CREATE TABLE orders_with_multi_pks ("
@@ -279,7 +279,7 @@ public class OceanBaseSourceITCase extends OceanBaseSourceTestBase {
                                 + " create_time TIMESTAMP,"
                                 + " primary key (id,order_id) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'connector' = 'mysql-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
