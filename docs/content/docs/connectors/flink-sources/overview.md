@@ -75,14 +75,14 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Con
 
 The following table shows the current features of the connector:
 
-| Connector                                                                             | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
-|---------------------------------------------------------------------------------------|--------------|---------------|-------------------|---------------------------|
+| Connector                                                                  | No-lock Read | Parallel Read | Exactly-once Read | Incremental Snapshot Read |
+|----------------------------------------------------------------------------|--------------|---------------|-------------------|---------------------------|
 | [mongodb-cdc]({{< ref "docs/connectors/flink-sources/mongodb-cdc" >}})     | ✅            | ✅             | ✅                 | ✅                         |
 | [mysql-cdc]({{< ref "docs/connectors/flink-sources/mysql-cdc" >}})         | ✅            | ✅             | ✅                 | ✅                         |
 | [oracle-cdc]({{< ref "docs/connectors/flink-sources/oracle-cdc" >}})       | ✅            | ✅             | ✅                 | ✅                         |
 | [postgres-cdc]({{< ref "docs/connectors/flink-sources/postgres-cdc" >}})   | ✅            | ✅             | ✅                 | ✅                         |
 | [sqlserver-cdc]({{< ref "docs/connectors/flink-sources/sqlserver-cdc" >}}) | ✅            | ✅             | ✅                 | ✅                         |
-| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ❌            | ❌             | ❌                 | ❌                         |
+| [oceanbase-cdc]({{< ref "docs/connectors/flink-sources/oceanbase-cdc" >}}) | ✅            | ✅             | ✅                 | ✅                         |
 | [tidb-cdc]({{< ref "docs/connectors/flink-sources/tidb-cdc" >}})           | ✅            | ❌             | ✅                 | ❌                         |
 | [db2-cdc]({{< ref "docs/connectors/flink-sources/db2-cdc" >}})             | ✅            | ✅             | ✅                 | ✅                         |
 | [vitess-cdc]({{< ref "docs/connectors/flink-sources/vitess-cdc" >}})       | ✅            | ❌             | ✅                 | ❌                         |
