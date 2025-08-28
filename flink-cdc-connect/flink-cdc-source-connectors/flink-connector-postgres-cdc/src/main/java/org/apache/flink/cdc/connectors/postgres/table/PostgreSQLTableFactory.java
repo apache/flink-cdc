@@ -55,6 +55,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSou
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.DECODING_PLUGIN_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.PG_PORT;
+import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -117,6 +118,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean isScanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
+        boolean includePartitionedTables = config.get(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         boolean appendOnly = config.get(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
@@ -167,7 +169,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 isScanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                includePartitionedTables);
     }
 
     @Override
@@ -212,6 +215,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
         return options;
     }
 
