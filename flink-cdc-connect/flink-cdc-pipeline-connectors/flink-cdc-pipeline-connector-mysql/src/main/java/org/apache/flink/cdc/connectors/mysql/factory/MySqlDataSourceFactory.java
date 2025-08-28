@@ -84,6 +84,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FILTERS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_MODE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_FILE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_STARTUP_SPECIFIC_OFFSET_GTID_SET;
@@ -285,6 +286,29 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
             LOG.info("Add chunkKeyColumn {}.", chunkKeyColumnMap);
             configFactory.chunkKeyColumn(chunkKeyColumnMap);
         }
+        String snapshotFilters = config.get(SCAN_SNAPSHOT_FILTERS);
+        if (snapshotFilters != null) {
+            Map<String, String> snapshotFilterMap = new HashMap<>();
+            for (String snapshotFilter : snapshotFilters.split("(?<!\\\\);")) {
+                String[] splits = snapshotFilter.trim().split("(?<!\\\\):", 2);
+                if (splits.length == 2) {
+                    // Handle escape characters
+                    String key = splits[0].replace("\\:", ":").replace("\\;", ";").trim();
+                    String value = splits[1].replace("\\:", ":").replace("\\;", ";").trim();
+                    snapshotFilterMap.put(key, value);
+                } else {
+                    throw new IllegalArgumentException(
+                            SCAN_SNAPSHOT_FILTERS.key()
+                                    + " = "
+                                    + snapshotFilters
+                                    + " failed to be parsed in this part '"
+                                    + snapshotFilter
+                                    + "'.");
+                }
+            }
+            LOG.info("Add snapshotFilters {}.", snapshotFilterMap);
+            configFactory.snapshotFilters(snapshotFilterMap);
+        }
         String metadataList = config.get(METADATA_LIST);
         List<MySqlReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
         return new MySqlDataSource(configFactory, readableMetadataList);
@@ -352,6 +376,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND);
         options.add(CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+        options.add(SCAN_SNAPSHOT_FILTERS);
         options.add(METADATA_LIST);
         options.add(INCLUDE_COMMENTS_ENABLED);
         options.add(USE_LEGACY_JSON_FORMAT);

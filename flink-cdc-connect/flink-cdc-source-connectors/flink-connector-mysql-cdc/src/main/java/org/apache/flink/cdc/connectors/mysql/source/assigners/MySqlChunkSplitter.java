@@ -26,6 +26,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ObjectUtils;
+import org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
@@ -148,12 +149,16 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             splitColumn =
                     ChunkUtils.getChunkKeyColumn(
                             currentSplittingTable, sourceConfig.getChunkKeyColumns());
+            String filter =
+                    SnapshotFilterUtils.getSnapshotFilter(
+                            sourceConfig.getSnapshotFilters(), tableId);
             splitType =
                     ChunkUtils.getChunkKeyColumnType(
                             splitColumn, sourceConfig.isTreatTinyInt1AsBoolean());
             minMaxOfSplitColumn =
-                    StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name());
-            approximateRowCnt = StatementUtils.queryApproximateRowCnt(jdbcConnection, tableId);
+                    StatementUtils.queryMinMax(jdbcConnection, tableId, splitColumn.name(), filter);
+            approximateRowCnt =
+                    StatementUtils.queryRowCnt(jdbcConnection, tableId, splitColumn.name(), filter);
         } catch (Exception e) {
             throw new RuntimeException("Fail to analyze table in chunk splitter.", e);
         }
@@ -171,6 +176,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 nextChunkStart == ChunkSplitterState.ChunkBound.START_BOUND
                         ? "null"
                         : chunkStartVal.toString());
+        String filter =
+                SnapshotFilterUtils.getSnapshotFilter(sourceConfig.getSnapshotFilters(), tableId);
         // we start from [null, min + chunk_size) and avoid [null, min)
         Object chunkEnd =
                 nextChunkEnd(
@@ -181,7 +188,8 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                         tableId,
                         splitColumn.name(),
                         minMaxOfSplitColumn[1],
-                        chunkSize);
+                        chunkSize,
+                        filter);
         // may sleep a while to avoid DDOS on MySQL server
         maySleep(nextChunkId, tableId);
         if (chunkEnd != null && ObjectUtils.compare(chunkEnd, minMaxOfSplitColumn[1]) <= 0) {
@@ -316,7 +324,6 @@ public class MySqlChunkSplitter implements ChunkSplitter {
                 break;
             }
         }
-
         // add the ending split
         splits.add(ChunkRange.of(chunkStart, null));
         return splits;
@@ -328,16 +335,17 @@ public class MySqlChunkSplitter implements ChunkSplitter {
             TableId tableId,
             String splitColumnName,
             Object max,
-            int chunkSize)
+            int chunkSize,
+            @Nullable String filter)
             throws SQLException {
         // chunk end might be null when max values are removed
         Object chunkEnd =
                 StatementUtils.queryNextChunkMax(
-                        jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+                        jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd, filter);
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
-            chunkEnd = StatementUtils.queryMin(jdbc, tableId, splitColumnName, chunkEnd);
+            chunkEnd = StatementUtils.queryMin(jdbc, tableId, splitColumnName, chunkEnd, filter);
 
             // queryMin will return null when the chunkEnd is the max value,
             // this will happen when the mysql table ignores the capitalization.
