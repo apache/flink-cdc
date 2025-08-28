@@ -496,7 +496,7 @@ public class MySqlConnection extends JdbcConnection {
         return OptionalLong.empty();
     }
 
-    public boolean isTableIdCaseSensitive() {
+    public boolean isTableIdCaseInsensitive() {
         return !"0"
                 .equals(
                         readMySqlSystemVariables()

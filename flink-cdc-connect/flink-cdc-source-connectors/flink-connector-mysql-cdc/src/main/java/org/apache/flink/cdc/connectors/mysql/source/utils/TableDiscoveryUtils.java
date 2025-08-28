@@ -153,7 +153,7 @@ public class TableDiscoveryUtils {
 
         // fetch table schemas
         try (MySqlSchema mySqlSchema =
-                new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
+                new MySqlSchema(sourceConfig, jdbc.isTableIdCaseInsensitive())) {
             Map<TableId, TableChange> tableSchemas = new HashMap<>();
             for (TableId tableId : capturedTableIds) {
                 TableChange tableSchema = mySqlSchema.getTableSchema(partition, jdbc, tableId);
