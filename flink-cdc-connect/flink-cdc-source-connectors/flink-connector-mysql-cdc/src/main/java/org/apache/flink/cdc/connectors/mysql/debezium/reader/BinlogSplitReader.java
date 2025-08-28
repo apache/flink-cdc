@@ -58,12 +58,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isEndWatermarkEvent;
 
 /**
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
@@ -114,7 +116,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.isBackfillSkipped = statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill();
     }
 
-    public void submitSplit(MySqlSplit mySqlSplit) {
+    public Future<?> submitSplit(MySqlSplit mySqlSplit) {
         this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
         configureFilter();
         statefulTaskContext.configure(currentBinlogSplit);
@@ -134,7 +136,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         currentBinlogSplit,
                         createEventFilter());
 
-        executorService.submit(
+        return executorService.submit(
                 () -> {
                     try {
                         binlogSplitReadTask.execute(
@@ -148,8 +150,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                         currentBinlogSplit),
                                 t);
                         readException = t;
-                    } finally {
-                        stopBinlogReadTask();
                     }
                 });
     }
@@ -167,6 +167,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
+                if (isEndWatermarkEvent(event.getRecord())) {
+                    LOG.info("Read split {} end watermark event", currentBinlogSplit);
+                    try {
+                        stopBinlogReadTask();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    break;
+                }
+
                 if (isParsingOnLineSchemaChanges) {
                     Optional<SourceRecord> oscRecord =
                             parseOnLineSchemaChangeEvent(event.getRecord());
@@ -397,5 +407,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     @VisibleForTesting
     MySqlBinlogSplitReadTask getBinlogSplitReadTask() {
         return binlogSplitReadTask;
+    }
+
+    @VisibleForTesting
+    public StoppableChangeEventSourceContext getChangeEventSourceContext() {
+        return changeEventSourceContext;
     }
 }

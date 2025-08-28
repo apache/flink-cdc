@@ -80,6 +80,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.Future;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -90,6 +91,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.get
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getStartingOffsetOfBinlogSplit;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MetricsUtils.getMySqlSplitEnumeratorContext;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.reader.BinlogSplitReader}. */
 class BinlogSplitReaderTest extends MySqlSourceTestBase {
@@ -1117,6 +1119,37 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         List<SourceRecord> sourceRecords =
                 pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord);
         Assertions.assertThat(sourceRecords).isEmpty();
+    }
+
+    @Test
+    void testReadBinlogWithException() throws Exception {
+        customerDatabase.createAndInitialize();
+        MySqlSourceConfig sourceConfig =
+                getConfig(StartupOptions.latest(), new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        // Create reader and submit splits
+        StatefulTaskContext statefulTaskContext =
+                new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = new BinlogSplitReader(statefulTaskContext, 0);
+
+        // Mock an exception occurring during stream split reading by setting the error handler
+        // and stopping the change event source to test exception handling
+        Future<?> future = reader.submitSplit(split);
+        statefulTaskContext
+                .getErrorHandler()
+                .setProducerThrowable(new RuntimeException("Test read with exception"));
+        reader.getChangeEventSourceContext().stopChangeEventSource();
+        // wait until executor is finished.
+        future.get();
+
+        assertThatThrownBy(() -> pollRecordsFromReader(reader, RecordUtils::isDataChangeRecord))
+                .rootCause()
+                .isExactlyInstanceOf(RuntimeException.class)
+                .hasMessage("Test read with exception");
+        reader.close();
     }
 
     private BinlogSplitReader createBinlogReader(MySqlSourceConfig sourceConfig) {
