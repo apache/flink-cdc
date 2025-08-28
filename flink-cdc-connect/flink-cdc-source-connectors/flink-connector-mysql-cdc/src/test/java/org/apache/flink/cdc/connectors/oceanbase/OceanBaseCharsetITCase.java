@@ -162,7 +162,7 @@ public class OceanBaseCharsetITCase extends OceanBaseSourceTestBase {
                                 + "  table_name STRING,\n"
                                 + "  primary key(table_id) not enforced"
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'connector' = 'mysql-cdc',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
                                 + " 'username' = '%s',"
