@@ -107,6 +107,15 @@ public class MySqlSourceOptions {
                     .withDescription(
                             "The chunk size (number of rows) of table snapshot, captured tables are split into multiple chunks when read the snapshot of table.");
 
+    public static final ConfigOption<String> DEBEZIUM_SKIPPED_OPERATIONS =
+            ConfigOptions.key("debezium.skipped.operations")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "The comma-separated list of operations to skip during streaming, "
+                                    + "defined as: 'c' for inserts/create; 'u' for updates; 'd' for deletes, "
+                                    + "'t' for truncates, By default, no operations will be skipped.");
+
     public static final ConfigOption<Integer> SCAN_SNAPSHOT_FETCH_SIZE =
             ConfigOptions.key("scan.snapshot.fetch.size")
                     .intType()
