@@ -222,6 +222,44 @@ public class DataTypes {
     }
 
     /**
+     * Data type of a time WITHOUT time zone {@code TIME(p)} where {@code p} is the number of digits
+     * of fractional seconds (=precision). {@code p} must have a value between 0 and 9 (both
+     * inclusive).
+     *
+     * <p>An instance consists of {@code hour:minute:second[.fractional]} with up to nanosecond
+     * precision and values ranging from {@code 00:00:00.000000000} to {@code 23:59:59.999999999}.
+     *
+     * <p>Compared to the SQL standard, leap seconds (23:59:60 and 23:59:61) are not supported as
+     * the semantics are closer to {@link java.time.LocalTime}. A time WITH time zone is not
+     * provided.
+     *
+     * @see #TIME()
+     * @see TimeType
+     */
+    public static ZoneTimeType TIME_TZ() {
+        return new ZoneTimeType();
+    }
+
+    /**
+     * Data type of a time WITHOUT time zone {@code TIME(p)} where {@code p} is the number of digits
+     * of fractional seconds (=precision). {@code p} must have a value between 0 and 9 (both
+     * inclusive).
+     *
+     * <p>An instance consists of {@code hour:minute:second[.fractional]} with up to nanosecond
+     * precision and values ranging from {@code 00:00:00.000000000} to {@code 23:59:59.999999999}.
+     *
+     * <p>Compared to the SQL standard, leap seconds (23:59:60 and 23:59:61) are not supported as
+     * the semantics are closer to {@link java.time.LocalTime}. A time WITH time zone is not
+     * provided.
+     *
+     * @see #TIME()
+     * @see TimeType
+     */
+    public static ZoneTimeType TIME_TZ(int precision) {
+        return new ZoneTimeType(precision);
+    }
+
+    /**
      * Data type of a timestamp WITHOUT time zone {@code TIMESTAMP} with 6 digits of fractional
      * seconds by default.
      *
@@ -445,6 +483,11 @@ public class DataTypes {
         @Override
         public OptionalInt visit(TimeType timeType) {
             return OptionalInt.of(timeType.getPrecision());
+        }
+
+        @Override
+        public OptionalInt visit(ZoneTimeType zoneTimeType) {
+            return OptionalInt.of(zoneTimeType.getPrecision());
         }
 
         @Override

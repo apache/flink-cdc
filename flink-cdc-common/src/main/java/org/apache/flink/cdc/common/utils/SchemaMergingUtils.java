@@ -57,6 +57,7 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
+import org.apache.flink.cdc.common.types.ZoneTimeType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ArrayListMultimap;
@@ -436,6 +437,8 @@ public class SchemaMergingUtils {
             return DataTypes.BINARY(BinaryType.MAX_LENGTH);
         } else if (type.is(DataTypeRoot.VARBINARY)) {
             return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
+        } else if (type.is(DataTypeRoot.TIME_WITH_TIME_ZONE)) {
+            return DataTypes.TIME_TZ(ZoneTimeType.MAX_PRECISION);
         } else if (type.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)) {
             return DataTypes.TIMESTAMP(TimestampType.MAX_PRECISION);
         } else if (type.is(DataTypeRoot.TIMESTAMP_WITH_TIME_ZONE)) {
@@ -676,6 +679,11 @@ public class SchemaMergingUtils {
                 throw new IllegalArgumentException(
                         String.format("Cannot fit \"%s\" into a DATE column.", originalField));
             }
+        }
+
+        if (destinationType.is(DataTypeRoot.TIME_WITH_TIME_ZONE)
+                && originalType.is(DataTypeRoot.TIME_WITH_TIME_ZONE)) {
+            return originalField;
         }
 
         if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
