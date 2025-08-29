@@ -313,7 +313,9 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 inventoryDatabase.getDatabaseName()
                         + ".multi_max_\\.*:id > 200;"
                         + inventoryDatabase.getDatabaseName()
-                        + ".products:1 = 0;");
+                        + ".products:1 = 0;"
+                        + inventoryDatabase.getDatabaseName()
+                        + ".customers:city != 'China:beijing';");
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
@@ -328,6 +330,9 @@ public class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                         inventoryDatabase.getDatabaseName() + ".multi_max_\\.*",
                                         "id > 200");
                                 put(inventoryDatabase.getDatabaseName() + ".products", "1 = 0");
+                                put(
+                                        inventoryDatabase.getDatabaseName() + ".customers",
+                                        "city != 'China:beijing'");
                             }
                         });
     }

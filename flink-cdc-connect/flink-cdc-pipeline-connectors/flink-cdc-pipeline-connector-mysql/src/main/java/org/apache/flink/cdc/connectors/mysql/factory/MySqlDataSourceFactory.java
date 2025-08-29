@@ -239,8 +239,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String snapshotFilters = config.get(SCAN_SNAPSHOT_FILTERS);
         if (snapshotFilters != null) {
             Map<String, String> snapshotFilterMap = new HashMap<>();
-            for (String snapshotFilter : snapshotFilters.split(";")) {
-                String[] splits = snapshotFilter.trim().split(":");
+            for (String snapshotFilter : parseSnapshotFilters(snapshotFilters)) {
+                String[] splits = parseTableAndCondition(snapshotFilter.trim());
                 if (splits.length == 2) {
                     snapshotFilterMap.put(splits[0], splits[1]);
                 } else {
@@ -492,5 +492,58 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                     SERVER_TIME_ZONE.key());
             return ZoneId.systemDefault();
         }
+    }
+
+    /**
+     * Parses snapshot filters string into individual filter entries. Handles semicolons within
+     * quoted values properly.
+     */
+    private static String[] parseSnapshotFilters(String snapshotFilters) {
+        java.util.List<String> filters = new java.util.ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuote = false;
+        char quote = 0;
+
+        for (int i = 0; i < snapshotFilters.length(); i++) {
+            char c = snapshotFilters.charAt(i);
+
+            if (!inQuote && (c == '\'' || c == '"')) {
+                inQuote = true;
+                quote = c;
+                current.append(c);
+            } else if (inQuote && c == quote) {
+                inQuote = false;
+                current.append(c);
+            } else if (!inQuote && c == ';') {
+                if (current.length() > 0) {
+                    filters.add(current.toString().trim());
+                    current = new StringBuilder();
+                }
+            } else {
+                current.append(c);
+            }
+        }
+
+        if (current.length() > 0) {
+            filters.add(current.toString().trim());
+        }
+
+        return filters.toArray(new String[0]);
+    }
+
+    /**
+     * Parses a single filter entry into table name and condition. Only splits on the first colon to
+     * handle colons in condition values.
+     */
+    private static String[] parseTableAndCondition(String filter) {
+        int colonIndex = filter.indexOf(':');
+        if (colonIndex == -1 || colonIndex == 0 || colonIndex == filter.length() - 1) {
+            return new String[] {filter};
+        }
+
+        String tableName = filter.substring(0, colonIndex);
+        String condition = filter.substring(colonIndex + 1);
+
+        return new String[] {tableName, condition};
     }
 }
