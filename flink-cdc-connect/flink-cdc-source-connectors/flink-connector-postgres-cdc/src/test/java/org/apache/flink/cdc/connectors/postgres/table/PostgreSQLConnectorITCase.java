@@ -943,8 +943,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                                 // scan.incremental.snapshot.enabled = true, use 'latest-offset'
                                 // startup mode.
                                 + (parallelismSnapshot
-                                ? " 'scan.startup.mode' = 'latest-offset',"
-                                : "")
+                                        ? " 'scan.startup.mode' = 'latest-offset',"
+                                        : "")
                                 + " 'decoding.plugin.name' = 'pgoutput', "
                                 + " 'slot.name' = '%s'"
                                 + ")",
@@ -965,7 +965,6 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
             expected.add("+I[1, testName]");
         }
         CloseableIterator<Row> iterator = tableResult.collect();
-        assertEqualsInAnyOrder(expected, fetchRows(iterator,expected.size()));
+        assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
     }
-
 }
