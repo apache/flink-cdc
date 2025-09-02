@@ -27,7 +27,7 @@ CREATE TABLE cn_column_test
 (
     "测试id"     INTEGER NOT NULL,
     "测试name"   VARCHAR NOT NULL,
-    PRIMARY KEY ("测试Id")
+    PRIMARY KEY ("测试id")
 );
 
 ALTER TABLE inventory.cn_column_test
