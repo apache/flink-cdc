@@ -961,9 +961,8 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         // async submit job
         TableResult tableResult = tEnv.executeSql("SELECT * FROM cn_column_table");
         List<String> expected = new ArrayList<>();
-        if (!parallelismSnapshot) {
-            expected.add("+I[1, testName]");
-        }
+        expected.add("+I[1, testName]");
+        Thread.sleep(5000L);
         CloseableIterator<Row> iterator = tableResult.collect();
         assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
     }
