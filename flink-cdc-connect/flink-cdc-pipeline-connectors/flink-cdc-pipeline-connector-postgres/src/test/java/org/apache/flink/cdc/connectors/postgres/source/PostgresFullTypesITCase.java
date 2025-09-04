@@ -101,7 +101,9 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                             "-c",
                             "max_replication_slots=20",
                             "-c",
-                            "wal_level=logical");
+                            "wal_level=logical",
+                            "-c",
+                            "max_wal_senders=20");
 
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
