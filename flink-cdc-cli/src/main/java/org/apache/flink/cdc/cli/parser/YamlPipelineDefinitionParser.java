@@ -179,18 +179,18 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {
-        Map<String, String> sourceMap =
-                mapper.convertValue(sourceNode, new TypeReference<Map<String, String>>() {});
+        Map<String, Object> sourceMap =
+                mapper.convertValue(sourceNode, new TypeReference<Map<String, Object>>() {});
 
         // "type" field is required
         String type =
                 checkNotNull(
-                        sourceMap.remove(TYPE_KEY),
+                        (String) sourceMap.remove(TYPE_KEY),
                         "Missing required field \"%s\" in source configuration",
                         TYPE_KEY);
 
         // "name" field is optional
-        String name = sourceMap.remove(NAME_KEY);
+        String name = (String) sourceMap.remove(NAME_KEY);
 
         return new SourceDef(type, name, Configuration.fromMap(sourceMap));
     }

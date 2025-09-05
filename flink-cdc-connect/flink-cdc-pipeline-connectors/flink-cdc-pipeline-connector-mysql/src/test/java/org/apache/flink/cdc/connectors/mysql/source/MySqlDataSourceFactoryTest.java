@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -334,20 +335,13 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
     @Test
     void testAddSnapshotFilters() {
         inventoryDatabase.createAndInitialize();
-        Map<String, String> options = new HashMap<>();
+        Map<String, Object> options = new HashMap<>();
         options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
         options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
         options.put(USERNAME.key(), TEST_USER);
         options.put(PASSWORD.key(), TEST_PASSWORD);
         options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
-        options.put(
-                SCAN_SNAPSHOT_FILTERS.key(),
-                inventoryDatabase.getDatabaseName()
-                        + ".multi_max_\\.*:id > 200;"
-                        + inventoryDatabase.getDatabaseName()
-                        + ".products:1 = 0;"
-                        + inventoryDatabase.getDatabaseName()
-                        + ".customers:city != 'China:beijing';");
+        options.put(SCAN_SNAPSHOT_FILTERS.key(), mockSnapshotFilters());
         Factory.Context context = new MockContext(Configuration.fromMap(options));
 
         MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
@@ -367,6 +361,27 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                         "city != 'China:beijing'");
                             }
                         });
+    }
+
+    private List<Map<String, String>> mockSnapshotFilters() {
+        List<Map<String, String>> snapshotFilters = new ArrayList<>();
+
+        Map<String, String> filter1 = new HashMap<>();
+        filter1.put("table", inventoryDatabase.getDatabaseName() + ".multi_max_\\.*");
+        filter1.put("filter", "id > 200");
+        snapshotFilters.add(filter1);
+
+        Map<String, String> filter2 = new HashMap<>();
+        filter2.put("table", inventoryDatabase.getDatabaseName() + ".products");
+        filter2.put("filter", "1 = 0");
+        snapshotFilters.add(filter2);
+
+        Map<String, String> filter3 = new HashMap<>();
+        filter3.put("table", inventoryDatabase.getDatabaseName() + ".customers");
+        filter3.put("filter", "city != 'China:beijing'");
+        snapshotFilters.add(filter3);
+
+        return snapshotFilters;
     }
 
     class MockContext implements Factory.Context {

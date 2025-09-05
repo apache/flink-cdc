@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.ConfigOptions;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 
 /** Configurations for {@link MySqlDataSource}. */
 @PublicEvolving
@@ -332,13 +334,19 @@ public class MySqlDataSourceOptions {
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.");
 
     @Experimental
-    public static final ConfigOption<String> SCAN_SNAPSHOT_FILTERS =
+    public static final ConfigOption<List<Map<String, String>>> SCAN_SNAPSHOT_FILTERS =
             ConfigOptions.key("scan.snapshot.filters")
-                    .stringType()
+                    .mapType()
+                    .asList()
                     .noDefaultValue()
                     .withDescription(
-                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). "
+                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expressions (AKA SQL WHERE clauses). "
                                     + "By default, no filter is applied, meaning the entire table will be synchronized. "
-                                    + "A colon (:) separates table name and filter expression, while a semicolon (;) separate multiple filters, "
-                                    + "e.g. `db1.user_table_[0-9]+:id > 100;db[1-2].[app|web]_order_\\.*:id < 0;`.");
+                                    + "This option expects a list of maps, where each map specifies a table pattern and its filter expression. "
+                                    + "The configuration format in YAML looks like:\n"
+                                    + "scan.snapshot.filters:\n"
+                                    + "  - table: db1.user_table_[0-9]+\n"
+                                    + "    filter: id > 100\n"
+                                    + "  - table: db[1-2].[app|web]_order_\\.*\n"
+                                    + "    filter: city != 'China:beijing'\n");
 }

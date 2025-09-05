@@ -61,7 +61,7 @@ public class Configuration implements java.io.Serializable, Cloneable {
     }
 
     /** Creates a new configuration that is initialized with the options of the given map. */
-    public static Configuration fromMap(Map<String, String> map) {
+    public static Configuration fromMap(Map<String, ?> map) {
         final Configuration configuration = new Configuration();
         configuration.confData.putAll(map);
         return configuration;
