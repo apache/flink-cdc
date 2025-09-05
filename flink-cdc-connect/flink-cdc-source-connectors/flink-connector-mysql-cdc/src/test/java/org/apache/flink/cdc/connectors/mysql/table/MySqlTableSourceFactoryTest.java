@@ -812,7 +812,7 @@ class MySqlTableSourceFactoryTest {
                         true,
                         true,
                         true,
-                        false);
+                        false, null);
         Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 

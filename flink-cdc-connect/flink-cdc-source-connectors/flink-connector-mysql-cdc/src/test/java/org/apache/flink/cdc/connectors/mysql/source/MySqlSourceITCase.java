@@ -482,9 +482,10 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         jobClient.cancel().get();
     }
 
-    @Test
+    @ParameterizedTest
+    @MethodSource("parameters")
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void testSnapshotFilters() throws Exception {
+    void testSnapshotFilters(String tableName, String chunkColumnName) throws Exception {
         customDatabase.createAndInitialize();
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(DEFAULT_PARALLELISM);
@@ -493,7 +494,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
         // Filter user with `id > 200`
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource("id > 200");
+        MySqlSource<RowData> sleepingSource = buildSleepingSource(tableName, chunkColumnName, "id > 200");
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -537,7 +538,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
             triggerFailover(
                     FailoverType.JM,
                     jobId,
-                    miniClusterResource.getMiniCluster(),
+                    miniClusterResource.get().getMiniCluster(),
                     () -> sleepMs(100));
         }
 
@@ -545,7 +546,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         assertEqualsInAnyOrder(
                 Arrays.asList(expectedSnapshotData),
                 fetchRowData(iterator, expectedSnapshotData.length));
-        assertTrue(!hasNextData(iterator));
+        Assertions.assertThat(hasNextData(iterator)).isFalse();
         jobClient.cancel().get();
     }
 
