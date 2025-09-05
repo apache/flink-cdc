@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSeriali
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
+import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitAckEvent;
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitEvent;
@@ -39,6 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.function.Supplier;
 
@@ -130,6 +132,17 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
         // during new table added phase.
         if (isCommitOffset()) {
             super.notifyCheckpointComplete(checkpointIdToCommit);
+        }
+    }
+
+    @Override
+    protected void onSplitFinished(Map finishedSplitIds) {
+        super.onSplitFinished(finishedSplitIds);
+
+        if (this.sourceConfig.getStartupOptions().isSnapshotOnly()) {
+            PostgresDialect dialect = (PostgresDialect) this.dialect;
+            boolean removed = dialect.removeSlot(dialect.getSlotName());
+            LOG.info("Remove slot '{}' result is {}.", dialect.getSlotName(), removed);
         }
     }
 
