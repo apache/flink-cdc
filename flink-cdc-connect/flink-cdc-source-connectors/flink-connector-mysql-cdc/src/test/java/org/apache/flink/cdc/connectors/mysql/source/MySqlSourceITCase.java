@@ -494,7 +494,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
         // Filter user with `id > 200`
         // The sleeping source will sleep awhile after send per record
-        MySqlSource<RowData> sleepingSource = buildSleepingSource(tableName, chunkColumnName, "id > 200");
+        MySqlSource<RowData> sleepingSource =
+                buildSleepingSource(tableName, chunkColumnName, "id > 200");
         DataStreamSource<RowData> source =
                 env.fromSource(sleepingSource, WatermarkStrategy.noWatermarks(), "selfSource");
 
@@ -1088,7 +1089,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         return iterator;
     }
 
-    private MySqlSource<RowData> buildSleepingSource(String tableName, String chunkColumnName, String snapshotFilter) {
+    private MySqlSource<RowData> buildSleepingSource(
+            String tableName, String chunkColumnName, String snapshotFilter) {
         ResolvedSchema physicalSchema =
                 new ResolvedSchema(
                         Arrays.asList(
