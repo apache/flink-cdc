@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.sqlserver.source.reader.fetch;
 
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.AbstractScanFetchTask;
@@ -75,7 +74,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                         sourceFetchContext.getSnapshotChangeEventSourceMetrics(),
                         sourceFetchContext.getDatabaseSchema(),
                         sourceFetchContext.getConnection(),
-                        sourceFetchContext.getDispatcher(),
+                        sourceFetchContext.getEventDispatcher(),
                         sourceFetchContext.getSnapshotReceiver(),
                         snapshotSplit);
         SqlServerSnapshotSplitChangeEventSourceContext changeEventSourceContext =
@@ -134,7 +133,8 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 new SqlServerConnectorConfig(dezConf),
                 context.getConnection(),
                 context.getMetaDataConnection(),
-                context.getDispatcher(),
+                context.getEventDispatcher(),
+                context.getWaterMarkDispatcher(),
                 context.getErrorHandler(),
                 context.getDatabaseSchema(),
                 backfillBinlogSplit);
@@ -153,7 +153,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
         private final SqlServerConnectorConfig connectorConfig;
         private final SqlServerDatabaseSchema databaseSchema;
         private final SqlServerConnection jdbcConnection;
-        private final JdbcSourceEventDispatcher<SqlServerPartition> dispatcher;
+        private final EventDispatcher<SqlServerPartition, TableId> eventDispatcher;
         private final Clock clock;
         private final SnapshotSplit snapshotSplit;
         private final SqlServerOffsetContext offsetContext;
@@ -166,7 +166,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                 SnapshotProgressListener<SqlServerPartition> snapshotProgressListener,
                 SqlServerDatabaseSchema databaseSchema,
                 SqlServerConnection jdbcConnection,
-                JdbcSourceEventDispatcher<SqlServerPartition> dispatcher,
+                EventDispatcher<SqlServerPartition, TableId> eventDispatcher,
                 EventDispatcher.SnapshotReceiver<SqlServerPartition> snapshotReceiver,
                 SnapshotSplit snapshotSplit) {
             super(connectorConfig, snapshotProgressListener);
@@ -174,7 +174,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
             this.connectorConfig = connectorConfig;
             this.databaseSchema = databaseSchema;
             this.jdbcConnection = jdbcConnection;
-            this.dispatcher = dispatcher;
+            this.eventDispatcher = eventDispatcher;
             this.clock = Clock.SYSTEM;
             this.snapshotSplit = snapshotSplit;
             this.snapshotProgressListener = snapshotProgressListener;
@@ -296,7 +296,7 @@ public class SqlServerScanFetchTask extends AbstractScanFetchTask {
                                 snapshotContext.partition, table.id(), rows);
                         logTimer = getTableScanLogTimer();
                     }
-                    dispatcher.dispatchSnapshotEvent(
+                    eventDispatcher.dispatchSnapshotEvent(
                             snapshotContext.partition,
                             table.id(),
                             getChangeRecordEmitter(snapshotContext, table.id(), row),

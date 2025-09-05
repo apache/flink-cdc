@@ -21,7 +21,10 @@ import org.apache.flink.api.common.typeutils.SimpleTypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.SchemaChangeEventType;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.runtime.serializer.EnumSerializer;
+import org.apache.flink.cdc.runtime.serializer.ListSerializer;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.TypeSerializerSingleton;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
@@ -40,8 +43,10 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
 
     private final EventSerializer eventSerializer = EventSerializer.INSTANCE;
 
-    private final TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
-
+    private final ListSerializer<TableId> tableIdListSerializer =
+            new ListSerializer<>(TableIdSerializer.INSTANCE);
+    private final EnumSerializer<SchemaChangeEventType> schemaChangeEventTypeEnumSerializer =
+            new EnumSerializer<>(SchemaChangeEventType.class);
     /** Sharable instance of the TableIdSerializer. */
     public static final BucketWrapperEventSerializer INSTANCE = new BucketWrapperEventSerializer();
 
@@ -81,7 +86,11 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
             enumSerializer.serialize(EventClass.BUCKET_WRAPPER_FLUSH_EVENT, dataOutputView);
             BucketWrapperFlushEvent bucketWrapperFlushEvent = (BucketWrapperFlushEvent) event;
             dataOutputView.writeInt(bucketWrapperFlushEvent.getBucket());
-            tableIdSerializer.serialize(bucketWrapperFlushEvent.getTableId(), dataOutputView);
+            dataOutputView.writeInt(bucketWrapperFlushEvent.getSourceSubTaskId());
+            dataOutputView.writeInt(bucketWrapperFlushEvent.getBucketAssignTaskId());
+            tableIdListSerializer.serialize(bucketWrapperFlushEvent.getTableIds(), dataOutputView);
+            schemaChangeEventTypeEnumSerializer.serialize(
+                    bucketWrapperFlushEvent.getSchemaChangeEventType(), dataOutputView);
         }
     }
 
@@ -90,7 +99,11 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
         EventClass eventClass = enumSerializer.deserialize(source);
         if (eventClass.equals(EventClass.BUCKET_WRAPPER_FLUSH_EVENT)) {
             return new BucketWrapperFlushEvent(
-                    source.readInt(), tableIdSerializer.deserialize(source));
+                    source.readInt(),
+                    source.readInt(),
+                    source.readInt(),
+                    tableIdListSerializer.deserialize(source),
+                    schemaChangeEventTypeEnumSerializer.deserialize(source));
         } else {
             return new BucketWrapperChangeEvent(
                     source.readInt(), (ChangeEvent) eventSerializer.deserialize(source));

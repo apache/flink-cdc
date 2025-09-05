@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.JdbcSourceChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerTypeUtils;
 import org.apache.flink.cdc.connectors.sqlserver.source.utils.SqlServerUtils;
 import org.apache.flink.table.types.DataType;
@@ -38,8 +39,11 @@ import java.sql.SQLException;
 @Internal
 public class SqlServerChunkSplitter extends JdbcSourceChunkSplitter {
 
-    public SqlServerChunkSplitter(JdbcSourceConfig sourceConfig, JdbcDataSourceDialect dialect) {
-        super(sourceConfig, dialect);
+    public SqlServerChunkSplitter(
+            JdbcSourceConfig sourceConfig,
+            JdbcDataSourceDialect dialect,
+            ChunkSplitterState chunkSplitterState) {
+        super(sourceConfig, dialect, chunkSplitterState);
     }
 
     @Override
@@ -65,12 +69,14 @@ public class SqlServerChunkSplitter extends JdbcSourceChunkSplitter {
         return SqlServerUtils.queryApproximateRowCnt(jdbc, tableId);
     }
 
-    protected boolean isChunkEndLeMax(Object chunkEnd, Object max, Column splitColumn) {
+    protected boolean isChunkEndLeMax(
+            JdbcConnection jdbc, Object chunkEnd, Object max, Column splitColumn) {
         return SqlServerUtils.compare(chunkEnd, max, splitColumn) <= 0;
     }
 
     /** ChunkEnd greater than or equal to max. */
-    protected boolean isChunkEndGeMax(Object chunkEnd, Object max, Column splitColumn) {
+    protected boolean isChunkEndGeMax(
+            JdbcConnection jdbc, Object chunkEnd, Object max, Column splitColumn) {
         return SqlServerUtils.compare(chunkEnd, max, splitColumn) >= 0;
     }
 }

@@ -24,7 +24,6 @@ import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.runtime.serializer.InternalSerializers;
-import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryRecordDataWriter;
 import org.apache.flink.cdc.runtime.serializer.data.writer.BinaryWriter;
 
@@ -51,7 +50,6 @@ public class BinaryRecordDataGenerator {
                 dataTypes,
                 Arrays.stream(dataTypes)
                         .map(InternalSerializers::create)
-                        .map(NullableSerializerWrapper::new)
                         .toArray(TypeSerializer[]::new));
     }
 

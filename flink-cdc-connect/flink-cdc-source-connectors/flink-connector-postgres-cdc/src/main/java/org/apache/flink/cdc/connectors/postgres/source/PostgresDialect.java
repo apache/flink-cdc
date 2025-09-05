@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionFactory;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 import org.apache.flink.cdc.connectors.base.source.assigner.splitter.ChunkSplitter;
+import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterState;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.FetchTask;
@@ -40,6 +41,7 @@ import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
 import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.connector.postgresql.connection.PostgresConnectionUtils;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
@@ -139,6 +141,17 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         }
     }
 
+    public Offset displayCommittedOffset(JdbcSourceConfig sourceConfig) {
+
+        try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+            return PostgresConnectionUtils.committedOffset(
+                    (PostgresConnection) jdbc, getSlotName(), getPluginName());
+
+        } catch (SQLException e) {
+            throw new FlinkRuntimeException(e);
+        }
+    }
+
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
         // from Postgres docs:
@@ -150,7 +163,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Override
     public ChunkSplitter createChunkSplitter(JdbcSourceConfig sourceConfig) {
-        return new PostgresChunkSplitter(sourceConfig, this);
+        return new PostgresChunkSplitter(
+                sourceConfig, this, ChunkSplitterState.NO_SPLITTING_TABLE_STATE);
+    }
+
+    @Override
+    public ChunkSplitter createChunkSplitter(
+            JdbcSourceConfig sourceConfig, ChunkSplitterState chunkSplitterState) {
+        return new PostgresChunkSplitter(sourceConfig, this, chunkSplitterState);
     }
 
     @Override

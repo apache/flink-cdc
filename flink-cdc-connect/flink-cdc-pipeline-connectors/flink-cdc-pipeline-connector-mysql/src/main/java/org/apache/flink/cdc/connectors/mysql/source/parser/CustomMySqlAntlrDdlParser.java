@@ -23,6 +23,7 @@ import io.debezium.antlr.AntlrDdlParserListener;
 import io.debezium.antlr.DataTypeResolver;
 import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParser;
+import io.debezium.relational.Tables;
 
 import java.sql.Types;
 import java.util.ArrayList;
@@ -34,10 +35,15 @@ import java.util.List;
 public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     private final LinkedList<SchemaChangeEvent> parsedEvents;
+    private final boolean tinyInt1isBit;
+    private boolean isTableIdCaseInsensitive;
 
-    public CustomMySqlAntlrDdlParser() {
-        super();
+    public CustomMySqlAntlrDdlParser(
+            boolean includeComments, boolean tinyInt1isBit, boolean isTableIdCaseInsensitive) {
+        super(true, false, includeComments, null, Tables.TableFilter.includeAll());
         this.parsedEvents = new LinkedList<>();
+        this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     // Overriding this method because the BIT type requires default length dimension of 1.
@@ -277,7 +283,8 @@ public class CustomMySqlAntlrDdlParser extends MySqlAntlrDdlParser {
 
     @Override
     protected AntlrDdlParserListener createParseTreeWalkerListener() {
-        return new CustomMySqlAntlrDdlParserListener(this, parsedEvents);
+        return new CustomMySqlAntlrDdlParserListener(
+                this, parsedEvents, tinyInt1isBit, isTableIdCaseInsensitive);
     }
 
     public List<SchemaChangeEvent> getAndClearParsedEvents() {

@@ -192,7 +192,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         final int size = tableSchemas.size();
         out.writeInt(size);
         for (Map.Entry<TableId, TableChange> entry : tableSchemas.entrySet()) {
-            out.writeUTF(entry.getKey().toString());
+            out.writeUTF(entry.getKey().toDoubleQuotedString());
             final String tableChangeStr =
                     documentWriter.write(jsonSerializer.toDocument(entry.getValue()));
             final byte[] tableChangeBytes = tableChangeStr.getBytes(StandardCharsets.UTF_8);
@@ -237,7 +237,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         final int size = finishedSplitsInfo.size();
         out.writeInt(size);
         for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo) {
-            out.writeUTF(splitInfo.getTableId().toString());
+            out.writeUTF(splitInfo.getTableId().toDoubleQuotedString());
             out.writeUTF(splitInfo.getSplitId());
             out.writeUTF(rowToSerializedString(splitInfo.getSplitStart()));
             out.writeUTF(rowToSerializedString(splitInfo.getSplitEnd()));

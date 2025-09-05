@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.elasticsearch.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -31,8 +32,10 @@ import org.apache.http.HttpHost;
 
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,6 +48,8 @@ import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDa
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.MAX_RECORD_SIZE_IN_BYTES;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.MAX_TIME_IN_BUFFER_MS;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.PASSWORD;
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_KEY;
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_SEPARATOR;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.USERNAME;
 import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.VERSION;
 
@@ -52,6 +57,7 @@ import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDa
 public class ElasticsearchDataSinkFactory implements DataSinkFactory {
 
     public static final String IDENTIFIER = "elasticsearch";
+    private static final String ES_INDEX_ILLEGAL_CHARS = "\\/*?\"<>| ,#";
 
     @Override
     public DataSink createDataSink(Context context) {
@@ -85,6 +91,25 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
         String username = cdcConfig.get(USERNAME);
         String password = cdcConfig.get(PASSWORD);
         int version = cdcConfig.get(VERSION);
+        Map<TableId, String> shardingMaps = new HashMap<>();
+        String shardingKey = cdcConfig.get(SHARDING_SUFFIX_KEY);
+        String shardingSeparator = cdcConfig.get(SHARDING_SUFFIX_SEPARATOR);
+        if (!shardingKey.isEmpty()) {
+            for (String tables : shardingKey.split(";")) {
+                String[] splits = tables.split(":");
+                if (splits.length == 2) {
+                    TableId tableId = TableId.parse(splits[0]);
+                    shardingMaps.put(tableId, splits[1].trim());
+                } else {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "%s is malformed, please refer to the documents",
+                                    SHARDING_SUFFIX_KEY.key()));
+                }
+            }
+        }
+        validateShardingSeparator(shardingSeparator);
+
         NetworkConfig networkConfig =
                 new NetworkConfig(hosts, username, password, null, null, null);
         return new ElasticsearchSinkOptions(
@@ -97,7 +122,9 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                 networkConfig,
                 version,
                 username,
-                password);
+                password,
+                shardingMaps,
+                shardingSeparator);
     }
 
     private List<HttpHost> parseHosts(String hostsStr) {
@@ -130,6 +157,8 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
         optionalOptions.add(MAX_RECORD_SIZE_IN_BYTES);
         optionalOptions.add(USERNAME);
         optionalOptions.add(PASSWORD);
+        optionalOptions.add(SHARDING_SUFFIX_KEY);
+        optionalOptions.add(SHARDING_SUFFIX_SEPARATOR);
         return optionalOptions;
     }
 
@@ -149,6 +178,24 @@ public class ElasticsearchDataSinkFactory implements DataSinkFactory {
                             missingOptions.stream()
                                     .map(ConfigOption::key)
                                     .collect(Collectors.joining("\n"))));
+        }
+    }
+
+    private void validateShardingSeparator(String separator) {
+        if (!separator.equals(separator.toLowerCase())) {
+            throw new ValidationException(
+                    String.format(
+                            "%s is malformed, elasticsearch index only support lowercase.",
+                            SHARDING_SUFFIX_SEPARATOR.key()));
+        }
+
+        for (char c : ES_INDEX_ILLEGAL_CHARS.toCharArray()) {
+            if (separator.indexOf(c) != -1) {
+                throw new ValidationException(
+                        String.format(
+                                "%s is malformed, elasticsearch index cannot include \\, /, *, ?, \", <, >, |, ` ` (space character), ,, #",
+                                SHARDING_SUFFIX_SEPARATOR.key()));
+            }
         }
     }
 }

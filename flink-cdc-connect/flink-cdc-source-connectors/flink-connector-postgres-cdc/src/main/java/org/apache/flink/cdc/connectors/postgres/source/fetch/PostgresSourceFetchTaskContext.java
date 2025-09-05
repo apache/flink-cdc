@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
+import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
-import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
@@ -26,13 +26,13 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
-import org.apache.flink.cdc.connectors.postgres.source.handler.PostgresSchemaChangeEventHandler;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
 import org.apache.flink.table.types.logical.RowType;
 
+import io.debezium.DebeziumException;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
@@ -48,6 +48,7 @@ import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.Snapshotter;
 import io.debezium.data.Envelope;
 import io.debezium.heartbeat.Heartbeat;
+import io.debezium.heartbeat.HeartbeatFactory;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.ErrorHandler;
 import io.debezium.pipeline.metrics.DefaultChangeEventSourceMetricsFactory;
@@ -60,6 +61,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.schema.TopicSelector;
 import org.apache.kafka.connect.data.Struct;
+import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,8 +92,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private PostgresPartition partition;
     private PostgresSchema schema;
     private ErrorHandler errorHandler;
-    private JdbcSourceEventDispatcher<PostgresPartition> dispatcher;
-    private PostgresEventDispatcher<TableId> postgresDispatcher;
+    private CDCPostgresDispatcher postgresDispatcher;
     private EventMetadataProvider metadataProvider;
     private SnapshotChangeEventSourceMetrics<PostgresPartition> snapshotChangeEventSourceMetrics;
     private Snapshotter snapShotter;
@@ -215,27 +216,48 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         this.errorHandler = new PostgresErrorHandler(getDbzConnectorConfig(), queue);
         this.metadataProvider = PostgresObjectUtils.newEventMetadataProvider();
-        this.dispatcher =
-                new JdbcSourceEventDispatcher<>(
-                        dbzConfig,
-                        topicSelector,
-                        schema,
-                        queue,
-                        dbzConfig.getTableFilters().dataCollectionFilter(),
-                        DataChangeEvent::new,
-                        metadataProvider,
-                        schemaNameAdjuster,
-                        new PostgresSchemaChangeEventHandler());
 
+        PostgresConnectorConfig finalDbzConfig = dbzConfig;
         this.postgresDispatcher =
-                new PostgresEventDispatcher<>(
-                        dbzConfig,
+                new CDCPostgresDispatcher(
+                        finalDbzConfig,
                         topicSelector,
                         schema,
                         queue,
-                        dbzConfig.getTableFilters().dataCollectionFilter(),
+                        finalDbzConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
+                        new HeartbeatFactory<>(
+                                dbzConfig,
+                                topicSelector,
+                                schemaNameAdjuster,
+                                () ->
+                                        new PostgresConnection(
+                                                finalDbzConfig.getJdbcConfig(),
+                                                PostgresConnection.CONNECTION_GENERAL),
+                                exception -> {
+                                    String sqlErrorId = exception.getSQLState();
+                                    switch (sqlErrorId) {
+                                        case "57P01":
+                                            // Postgres error admin_shutdown, see
+                                            // https://www.postgresql.org/docs/12/errcodes-appendix.html
+                                            throw new DebeziumException(
+                                                    "Could not execute heartbeat action query (Error: "
+                                                            + sqlErrorId
+                                                            + ")",
+                                                    exception);
+                                        case "57P03":
+                                            // Postgres error cannot_connect_now, see
+                                            // https://www.postgresql.org/docs/12/errcodes-appendix.html
+                                            throw new RetriableException(
+                                                    "Could not execute heartbeat action query (Error: "
+                                                            + sqlErrorId
+                                                            + ")",
+                                                    exception);
+                                        default:
+                                            break;
+                                    }
+                                }),
                         schemaNameAdjuster);
 
         ChangeEventSourceMetricsFactory<PostgresPartition> metricsFactory =
@@ -261,11 +283,12 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
-    public JdbcSourceEventDispatcher<PostgresPartition> getDispatcher() {
-        return dispatcher;
+    public PostgresEventDispatcher<TableId> getEventDispatcher() {
+        return postgresDispatcher;
     }
 
-    public PostgresEventDispatcher<TableId> getPostgresDispatcher() {
+    @Override
+    public WatermarkDispatcher getWaterMarkDispatcher() {
         return postgresDispatcher;
     }
 

@@ -61,8 +61,8 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
     private boolean enableFullDocPrePostImage = false;
     private boolean disableCursorTimeout = true;
     protected boolean skipSnapshotBackfill = false;
-
     protected boolean scanNewlyAddedTableEnabled = false;
+    protected boolean assignUnboundedChunkFirst = false;
 
     /** The protocol connected to MongoDB. For example mongodb or mongodb+srv. */
     public MongoDBSourceConfigFactory scheme(String scheme) {
@@ -271,6 +271,15 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
         return this;
     }
 
+    /**
+     * Whether to assign the unbounded chunks first during snapshot reading phase. Defaults to
+     * false.
+     */
+    public MongoDBSourceConfigFactory assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        return this;
+    }
+
     /** Creates a new {@link MongoDBSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public MongoDBSourceConfig create(int subtaskId) {
@@ -296,6 +305,7 @@ public class MongoDBSourceConfigFactory implements Factory<MongoDBSourceConfig> 
                 enableFullDocPrePostImage,
                 disableCursorTimeout,
                 skipSnapshotBackfill,
-                scanNewlyAddedTableEnabled);
+                scanNewlyAddedTableEnabled,
+                assignUnboundedChunkFirst);
     }
 }

@@ -38,16 +38,12 @@ import org.apache.flink.util.Preconditions;
 
 import com.jayway.jsonpath.JsonPath;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.DockerImageName;
 
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -66,59 +62,42 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertDelete;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertInsert;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertRead;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertUpdate;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
 
 /** Tests for {@link PostgreSQLSource} which also heavily tests {@link DebeziumSourceFunction}. */
-public class PostgreSQLSourceTest extends PostgresTestBase {
+class PostgreSQLSourceTest extends PostgresTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(PostgreSQLSourceTest.class);
-    private static final String SLOT_NAME = "flink";
-    // These tests only passes at the docker postgres:9.6
-    private static final PostgreSQLContainer<?> POSTGRES_CONTAINER_OLD =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("debezium/postgres:9.6")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withDatabaseName(DEFAULT_DB)
-                    .withUsername("postgres")
-                    .withPassword("postgres")
-                    .withLogConsumer(new Slf4jLogConsumer(LOG));
+    private String slotName;
 
-    @BeforeClass
-    public static void startAll() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(POSTGRES_CONTAINER_OLD)).join();
-        LOG.info("Containers are started.");
-    }
-
-    @AfterClass
-    public static void stopAll() {
-        LOG.info("Stopping containers...");
-        POSTGRES_CONTAINER_OLD.stop();
-        LOG.info("Containers are stopped.");
-    }
-
-    @Before
+    @BeforeEach
     public void before() {
-        initializePostgresTable(POSTGRES_CONTAINER_OLD, "inventory");
+        initializePostgresTable(POSTGRES_CONTAINER, "inventory");
+        slotName = getSlotName();
+    }
+
+    @AfterEach
+    public void after() throws SQLException {
+        String sql = String.format("SELECT pg_drop_replication_slot('%s')", slotName);
+        try (Connection connection =
+                        PostgresTestBase.getJdbcConnection(POSTGRES_CONTAINER, "postgres");
+                Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        }
     }
 
     @Test
-    public void testConsumingAllEvents() throws Exception {
+    void testConsumingAllEvents() throws Exception {
         DebeziumSourceFunction<SourceRecord> source = createPostgreSqlSourceWithHeartbeatDisabled();
         TestSourceContext<SourceRecord> sourceContext = new TestSourceContext<>();
 
         setupSource(source);
 
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             // start the source
             final CheckedThread runThread =
@@ -131,7 +110,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             runThread.start();
 
             List<SourceRecord> records = drain(sourceContext, 9);
-            assertEquals(9, records.size());
+            Assertions.assertThat(records).hasSize(9);
             for (int i = 0; i < records.size(); i++) {
                 assertRead(records.get(i), "id", 101 + i);
             }
@@ -181,7 +160,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
     }
 
     @Test
-    public void testCheckpointAndRestore() throws Exception {
+    void testCheckpointAndRestore() throws Exception {
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
         int prevLsn = 0;
@@ -208,22 +187,23 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
             // wait until consumer is started
             int received = drain(sourceContext, 2).size();
-            assertEquals(2, received);
+            Assertions.assertThat(received).isEqualTo(2);
 
             // we can't perform checkpoint during DB snapshot
-            assertFalse(
-                    waitForCheckpointLock(
-                            sourceContext.getCheckpointLock(), Duration.ofSeconds(3)));
+            Assertions.assertThat(
+                            waitForCheckpointLock(
+                                    sourceContext.getCheckpointLock(), Duration.ofSeconds(3)))
+                    .isFalse();
 
             // unblock the source context to continue the processing
             sourceContext.blocker.release();
             // wait until the source finishes the database snapshot
             List<SourceRecord> records = drain(sourceContext, 9 - received);
-            assertEquals(9, records.size() + received);
+            Assertions.assertThat(records.size() + received).isEqualTo(9);
 
             // state is still empty
-            assertEquals(0, offsetState.list.size());
-            assertEquals(0, historyState.list.size());
+            Assertions.assertThat(offsetState.list).isEmpty();
+            Assertions.assertThat(historyState.list).isEmpty();
 
             // ---------------------------------------------------------------------------
             // Step-2: trigger checkpoint-1 after snapshot finished
@@ -233,16 +213,20 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
             }
 
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
-            assertEquals("557", JsonPath.read(state, "$.sourceOffset.txId").toString());
-            assertEquals(
-                    "true", JsonPath.read(state, "$.sourceOffset.last_snapshot_record").toString());
-            assertEquals("true", JsonPath.read(state, "$.sourceOffset.snapshot").toString());
-            assertTrue(state.contains("ts_usec"));
+            Assertions.assertThat((JsonPath.read(state, "$.sourcePartition.server").toString()))
+                    .isEqualTo("postgres_cdc_source");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(740);
+            Assertions.assertThat(
+                            JsonPath.<Boolean>read(state, "$.sourceOffset.last_snapshot_record"))
+                    .isTrue();
+            Assertions.assertThat(JsonPath.<Boolean>read(state, "$.sourceOffset.snapshot"))
+                    .isTrue();
+            Assertions.assertThat(state).contains("ts_usec");
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
-            assertTrue(lsn > prevLsn);
+            Assertions.assertThat(lsn).isGreaterThan(prevLsn);
             prevLsn = lsn;
 
             source.close();
@@ -267,15 +251,16 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             runThread2.start();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext2))
+                    .isFalse();
 
-            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
                         "INSERT INTO inventory.products VALUES (default,'robot','Toy robot',1.304)"); // 110
                 List<SourceRecord> records = drain(sourceContext2, 1);
-                assertEquals(1, records.size());
+                Assertions.assertThat(records).hasSize(1);
                 assertInsert(records.get(0), "id", 110);
 
                 // ---------------------------------------------------------------------------
@@ -286,15 +271,15 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                     source2.snapshotState(new StateSnapshotContextSynchronousImpl(138, 138));
                 }
 
-                assertEquals(1, offsetState.list.size());
+                Assertions.assertThat(offsetState.list).hasSize(1);
                 String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-                assertEquals(
-                        "postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
-                assertEquals("558", JsonPath.read(state, "$.sourceOffset.txId").toString());
-                assertTrue(state.contains("ts_usec"));
-                assertFalse(state.contains("snapshot"));
+                Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                        .isEqualTo("postgres_cdc_source");
+                Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                        .isEqualTo(741);
+                Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
                 int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
-                assertTrue(lsn > prevLsn);
+                Assertions.assertThat(lsn).isGreaterThan(prevLsn);
                 prevLsn = lsn;
 
                 // execute 2 more DMLs to have more wal log
@@ -333,10 +318,11 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             assertUpdate(records.get(1), "id", 1001);
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext3))
+                    .isFalse();
 
             // can continue to receive new events
-            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                     Statement statement = connection.createStatement()) {
                 statement.execute("DELETE FROM inventory.products WHERE id=1001");
             }
@@ -350,14 +336,15 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 // checkpoint 3
                 source3.snapshotState(new StateSnapshotContextSynchronousImpl(233, 233));
             }
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
-            assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
-            assertTrue(state.contains("ts_usec"));
-            assertFalse(state.contains("snapshot"));
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                    .isEqualTo("postgres_cdc_source");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(744);
+            Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
-            assertTrue(lsn > prevLsn);
+            Assertions.assertThat(lsn).isGreaterThan(prevLsn);
 
             source3.close();
             runThread3.sync();
@@ -383,7 +370,8 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             runThread4.start();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(5), sourceContext4))
+                    .isFalse();
 
             // ---------------------------------------------------------------------------
             // Step-8: trigger checkpoint-2 to make sure we can continue to to further checkpoints
@@ -392,14 +380,15 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 // checkpoint 3
                 source4.snapshotState(new StateSnapshotContextSynchronousImpl(254, 254));
             }
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
-            assertEquals("561", JsonPath.read(state, "$.sourceOffset.txId").toString());
-            assertTrue(state.contains("ts_usec"));
-            assertFalse(state.contains("snapshot"));
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                    .isEqualTo("postgres_cdc_source");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(744);
+            Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
             int lsn = JsonPath.read(state, "$.sourceOffset.lsn");
-            assertTrue(lsn > prevLsn);
+            Assertions.assertThat(lsn).isGreaterThan(prevLsn);
             prevLsn = lsn;
 
             source4.close();
@@ -425,7 +414,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                     };
             runThread5.start();
 
-            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -443,14 +432,15 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 // trigger checkpoint-4
                 source5.snapshotState(new StateSnapshotContextSynchronousImpl(300, 300));
             }
-            assertEquals(1, offsetState.list.size());
+            Assertions.assertThat(offsetState.list).hasSize(1);
             String state = new String(offsetState.list.get(0), StandardCharsets.UTF_8);
-            assertEquals("postgres_cdc_source", JsonPath.read(state, "$.sourcePartition.server"));
-            assertEquals("562", JsonPath.read(state, "$.sourceOffset.txId").toString());
-            assertTrue(state.contains("ts_usec"));
-            assertFalse(state.contains("snapshot"));
+            Assertions.assertThat(JsonPath.<String>read(state, "$.sourcePartition.server"))
+                    .isEqualTo("postgres_cdc_source");
+            Assertions.assertThat(JsonPath.<Integer>read(state, "$.sourceOffset.txId"))
+                    .isEqualTo(745);
+            Assertions.assertThat(state).contains("ts_usec").doesNotContain("snapshot");
             int pos = JsonPath.read(state, "$.sourceOffset.lsn");
-            assertTrue(pos > prevLsn);
+            Assertions.assertThat(pos).isGreaterThan(prevLsn);
 
             source5.close();
             runThread5.sync();
@@ -474,7 +464,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                         }
                     };
             runThread6.start();
-            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                     Statement statement = connection.createStatement()) {
 
                 statement.execute(
@@ -489,7 +479,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
     }
 
     @Test
-    public void testFlushLsn() throws Exception {
+    void testFlushLsn() throws Exception {
         final TestingListState<byte[]> offsetState = new TestingListState<>();
         final TestingListState<String> historyState = new TestingListState<>();
         final LinkedHashSet<String> flushLsn = new LinkedHashSet<>();
@@ -514,7 +504,7 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
 
             // wait until consumer is started
             int received = drain(sourceContext, 9).size();
-            assertEquals(9, received);
+            Assertions.assertThat(received).isEqualTo(9);
 
             // ---------------------------------------------------------------------------
             // Step-2: trigger checkpoint-1 after snapshot finished
@@ -524,20 +514,21 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                 source.snapshotState(new StateSnapshotContextSynchronousImpl(101, 101));
             }
             source.notifyCheckpointComplete(101);
-            assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isTrue();
 
             batchInsertAndCheckpoint(5, source, sourceContext, 201);
-            assertEquals(1, source.getPendingOffsetsToCommit().size());
+            Assertions.assertThat(source.getPendingOffsetsToCommit()).hasSize(1);
             source.notifyCheckpointComplete(201);
-            assertEquals(0, source.getPendingOffsetsToCommit().size());
-            assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+            Assertions.assertThat(source.getPendingOffsetsToCommit()).isEmpty();
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isTrue();
 
             batchInsertAndCheckpoint(1, source, sourceContext, 301);
             // do not notify checkpoint complete to see the LSN is not advanced.
-            assertFalse(flushLsn.add(getConfirmedFlushLsn()));
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isFalse();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext))
+                    .isFalse();
 
             source.close();
             runThread.sync();
@@ -562,17 +553,17 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
                     };
             runThread.start();
 
-            assertFalse(flushLsn.add(getConfirmedFlushLsn()));
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isFalse();
 
             batchInsertAndCheckpoint(0, source2, sourceContext2, 401);
             Thread.sleep(3_000); // waiting heartbeat events, we have set 1s heartbeat interval
             // trigger checkpoint once again to make sure ChangeConsumer is initialized
             batchInsertAndCheckpoint(0, source2, sourceContext2, 402);
             source2.notifyCheckpointComplete(402);
-            assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isTrue();
 
             // verify LSN is advanced even if there is no changes on the table
-            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+            try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                     Statement statement = connection.createStatement()) {
                 // we have to do some transactions which is not related to the monitored table
                 statement.execute("CREATE TABLE dummy (a int)");
@@ -580,24 +571,25 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             Thread.sleep(3_000);
             batchInsertAndCheckpoint(0, source2, sourceContext2, 404);
             source2.notifyCheckpointComplete(404);
-            assertTrue(flushLsn.add(getConfirmedFlushLsn()));
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isTrue();
 
             batchInsertAndCheckpoint(3, source2, sourceContext2, 501);
             batchInsertAndCheckpoint(2, source2, sourceContext2, 502);
             batchInsertAndCheckpoint(1, source2, sourceContext2, 503);
-            assertEquals(3, source2.getPendingOffsetsToCommit().size());
+            Assertions.assertThat(source2.getPendingOffsetsToCommit()).hasSize(3);
             source2.notifyCheckpointComplete(503);
-            assertTrue(flushLsn.add(getConfirmedFlushLsn()));
-            assertEquals(0, source2.getPendingOffsetsToCommit().size());
+            Assertions.assertThat(flushLsn.add(getConfirmedFlushLsn())).isTrue();
+            Assertions.assertThat(source2.getPendingOffsetsToCommit()).isEmpty();
 
             // make sure there is no more events
-            assertFalse(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext2));
+            Assertions.assertThat(waitForAvailableRecords(Duration.ofSeconds(3), sourceContext2))
+                    .isFalse();
 
             source2.close();
             runThread.sync();
         }
 
-        assertEquals(5, flushLsn.size());
+        Assertions.assertThat(flushLsn).hasSize(5);
     }
 
     private void batchInsertAndCheckpoint(
@@ -606,14 +598,14 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
             TestSourceContext<SourceRecord> sourceContext,
             long checkpointId)
             throws Exception {
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             for (int i = 0; i < num; i++) {
                 statement.execute(
                         "INSERT INTO inventory.products VALUES (default,'dummy','My Dummy',1.1)");
             }
         }
-        assertEquals(num, drain(sourceContext, num).size());
+        Assertions.assertThat(drain(sourceContext, num)).hasSize(num);
         synchronized (sourceContext.getCheckpointLock()) {
             // trigger checkpoint-1
             source.snapshotState(
@@ -637,33 +629,32 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
         Properties properties = new Properties();
         properties.setProperty("heartbeat.interval.ms", String.valueOf(heartbeatInterval));
         return PostgreSQLSource.<SourceRecord>builder()
-                .hostname(POSTGRES_CONTAINER_OLD.getHost())
-                .port(POSTGRES_CONTAINER_OLD.getMappedPort(POSTGRESQL_PORT))
-                .database(POSTGRES_CONTAINER_OLD.getDatabaseName())
-                .username(POSTGRES_CONTAINER_OLD.getUsername())
-                .password(POSTGRES_CONTAINER_OLD.getPassword())
+                .hostname(POSTGRES_CONTAINER.getHost())
+                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                .database(POSTGRES_CONTAINER.getDatabaseName())
+                .username(POSTGRES_CONTAINER.getUsername())
+                .password(POSTGRES_CONTAINER.getPassword())
                 .schemaList("inventory")
                 .tableList("inventory.products")
                 .deserializer(new ForwardDeserializeSchema())
-                .slotName(SLOT_NAME)
+                .decodingPluginName("pgoutput")
+                .slotName(slotName)
                 .debeziumProperties(properties)
                 .build();
     }
 
     private String getConfirmedFlushLsn() throws SQLException {
-        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER_OLD);
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             ResultSet rs =
                     statement.executeQuery(
                             String.format(
                                     "select * from pg_replication_slots where slot_name = '%s' and database = '%s' and plugin = '%s'",
-                                    SLOT_NAME,
-                                    POSTGRES_CONTAINER_OLD.getDatabaseName(),
-                                    "decoderbufs"));
+                                    slotName, POSTGRES_CONTAINER.getDatabaseName(), "pgoutput"));
             if (rs.next()) {
                 return rs.getString("confirmed_flush_lsn");
             } else {
-                fail("No replication slot info available");
+                Assertions.fail("No replication slot info available");
             }
             return null;
         }
@@ -892,14 +883,6 @@ public class PostgreSQLSourceTest extends PostgresTestBase {
         public void add(T value) throws Exception {
             Preconditions.checkNotNull(value, "You cannot add null to a ListState.");
             list.add(value);
-        }
-
-        public List<T> getList() {
-            return list;
-        }
-
-        boolean isClearCalled() {
-            return clearCalled;
         }
 
         @Override

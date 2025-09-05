@@ -41,7 +41,7 @@ In order to setup the MongoDB CDC connector, the following table provides depend
 
 ```Download link is available only for stable releases.```
 
-Download [flink-sql-connector-mongodb-cdc-3.1.0.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/3.1.0/flink-sql-connector-mongodb-cdc-3.1.0.jar) and put it under `<FLINK_HOME>/lib/`.
+Download [flink-sql-connector-mongodb-cdc-{{< param Version >}}.jar](https://repo1.maven.org/maven2/org/apache/flink/flink-sql-connector-mongodb-cdc/{{< param Version >}}/flink-sql-connector-mongodb-cdc-{{< param Version >}}.jar) and put it under `<FLINK_HOME>/lib/`.
 
 **Note:** Refer to [flink-sql-connector-mongodb-cdc](https://mvnrepository.com/artifact/org.apache.flink/flink-sql-connector-mongodb-cdc), more released versions will be available in the Maven central warehouse.
 
@@ -241,11 +241,40 @@ Connector Options
         <td>Timestamp in millis of the start point, only used for <code>'timestamp'</code> startup mode.</td>
     </tr>
     <tr>
-      <td>copy.existing.queue.size</td>
+      <td>initial.snapshotting.queue.size</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">10240</td>
+      <td style="word-wrap: break-word;">16000</td>
       <td>Integer</td>
-      <td>The max size of the queue to use when copying data.</td>
+      <td>The max size of the queue to use when copying data. Only available when scan.startup.mode is set to 'initial'.<br>
+          Note: The deprecated option name is copy.existing.queue.size. To be compatible with old versions of jobs,
+          this parameter is still available, but it is recommended to upgrade to the new option name.
+      </td>
+    </tr>
+    <tr>
+      <td>initial.snapshotting.max.threads</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">Processors Count</td>
+      <td>Integer</td>
+      <td>The number of threads to use when performing the data copy. Only available when scan.startup.mode is set to 'initial'.<br>
+          Note: The deprecated option name is copy.existing.max.threads. To be compatible with old versions of jobs,
+          this parameter is still available, but it is recommended to upgrade to the new option name.
+      </td>
+    </tr>
+    <tr>
+      <td>initial.snapshotting.pipeline</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td> An array of JSON objects describing the pipeline operations to run when copying existing data.<br>
+           This can improve the use of indexes by the copying manager and make copying more efficient.
+           eg. <code>[{"$match": {"closed": "false"}}]</code> ensures that 
+           only documents in which the closed field is set to false are copied.<br>
+           The initial.snapshotting.pipeline config is only available when scan.startup.mode is set to 'initial',
+           and is only used in Debezium mode and cannot be used in 
+           incremental snapshot mode because the semantic is inconsistent.<br>
+           Note: The deprecated option name is copy.existing.pipeline. To be compatible with old versions of jobs,
+           this parameter is still available, but it is recommended to upgrade to the new option name.
+      </td>
     </tr>
     <tr>
       <td>batch.size</td>
@@ -321,6 +350,28 @@ Connector Options
       <td>Boolean</td>
       <td>MongoDB server normally times out idle cursors after an inactivity period (10 minutes) to prevent excess memory use. Set this option to true to prevent that. Only available when parallelism snapshot is enabled.</td>
     </tr>
+     <tr>
+      <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">true</td>
+      <td>Boolean</td>
+      <td>
+        Whether to assign the unbounded chunks first during snapshot reading phase.<br>
+        This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
+      </td>
+    </tr>
+    <tr>
+      <td>scan.incremental.snapshot.backfill.skip</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to skip backfill in snapshot reading phase.<br> 
+        If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
+        WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
+        For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
@@ -357,21 +408,29 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>TIMESTAMP_LTZ(3) NOT NULL</td>
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
     </tr>
+    <tr>
+      <td>row_kind</td>
+      <td>STRING NOT NULL</td>
+      <td>It indicates the row kind of the changelog,Note: The downstream SQL operator may fail to compare due to this new added column when processing the row retraction if 
+the source operator chooses to output the 'row_kind' column for each record. It is recommended to use this metadata column only in simple synchronization jobs.
+<br>'+I' means INSERT message, '-D' means DELETE message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message.</td>
+    </tr>
   </tbody>
 </table>
 
 The extended CREATE TABLE example demonstrates the syntax for exposing these metadata fields:
 ```sql
 CREATE TABLE products (
-    db_name STRING METADATA FROM 'database_name' VIRTUAL,
+    db_name         STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
-    operation_ts TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
-    _id STRING, // must be declared
-    name STRING,
-    weight DECIMAL(10,3),
-    tags ARRAY<STRING>, -- array
-    price ROW<amount DECIMAL(10,2), currency STRING>, -- embedded document
-    suppliers ARRAY<ROW<name STRING, address STRING>>, -- embedded documents
+    operation_ts    TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    operation       STRING METADATA FROM 'row_kind' VIRTUAL,
+    _id             STRING, // must be declared
+    name            STRING,
+    weight          DECIMAL(10,3),
+    tags            ARRAY<STRING>, -- array
+    price           ROW<amount DECIMAL(10,2), currency STRING>, -- embedded document
+    suppliers       ARRAY<ROW<name STRING, address STRING>>, -- embedded documents
     PRIMARY KEY(_id) NOT ENFORCED
 ) WITH (
     'connector' = 'mongodb-cdc',
@@ -418,6 +477,17 @@ CREATE TABLE mongodb_source (...) WITH (
     'scan.startup.timestamp-millis' = '1667232000000' -- Timestamp under timestamp startup mode
     ...
 )
+```
+
+### Snapshot Data Filters
+
+The config option `initial.snapshotting.pipeline` describing the filters when copying existing data.<br>
+This can filter only required data and improve the use of indexes by the copying manager.
+
+In the following example, the `$match` aggregation operator ensures that only documents in which the closed field is set to "false" are copied.
+
+```
+'initial.snapshotting.pipeline' = '[ { "$match": { "closed": "false" } } ]'
 ```
 
 ### Change Streams
@@ -562,6 +632,26 @@ CREATE TABLE mongodb_source (...) WITH (
     ...
 )
 ```
+
+### Available Source metrics
+
+Metrics can help understand the progress of assignments, and the following are the supported [Flink metrics](https://nightlies.apache.org/flink/flink-docs-master/docs/ops/metrics/):
+
+| Group                  | Name                       | Type  | Description                                         |
+|------------------------|----------------------------|-------|-----------------------------------------------------|
+| namespace.schema.table | isSnapshotting             | Gauge | Weather the table is snapshotting or not            |
+| namespace.schema.table | isStreamReading            | Gauge | Weather the table is stream reading or not          |
+| namespace.schema.table | numTablesSnapshotted       | Gauge | The number of tables that have been snapshotted     |
+| namespace.schema.table | numTablesRemaining         | Gauge | The number of tables that have not been snapshotted |
+| namespace.schema.table | numSnapshotSplitsProcessed | Gauge | The number of splits that is being processed        |
+| namespace.schema.table | numSnapshotSplitsRemaining | Gauge | The number of splits that have not been processed   |
+| namespace.schema.table | numSnapshotSplitsFinished  | Gauge | The number of splits that have been processed       |
+| namespace.schema.table | snapshotStartTime          | Gauge | The time when the snapshot started                  |
+| namespace.schema.table | snapshotEndTime            | Gauge | The time when the snapshot ended                    |
+
+Notice:
+1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
+2. For MongoDB, the `namespace` will be set to the default value "", and the group name will be like `test_database.test_table`.
 
 Data Type Mapping
 ----------------

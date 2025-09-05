@@ -25,15 +25,15 @@ import org.apache.flink.cdc.connectors.sqlserver.source.SqlServerSourceTestBase;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
 /** Example Tests for {@link SqlServerIncrementalSource}. */
-public class SqlServerParallelSourceExampleTest extends SqlServerSourceTestBase {
+class SqlServerParallelSourceExampleTest extends SqlServerSourceTestBase {
 
     @Test
-    @Ignore("Test ignored because it won't stop and is used for manual test")
-    public void testSqlServerExampleSource() throws Exception {
+    @Disabled("Test ignored because it won't stop and is used for manual test")
+    void testSqlServerExampleSource() throws Exception {
         initializeSqlServerTable("inventory");
 
         SqlServerIncrementalSource<String> sqlServerSource =

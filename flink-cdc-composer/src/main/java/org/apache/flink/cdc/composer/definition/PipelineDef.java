@@ -19,6 +19,7 @@ package org.apache.flink.cdc.composer.definition;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.TimeZone;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE;
 import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCAL_TIME_ZONE;
 
 /**
@@ -73,7 +75,7 @@ public class PipelineDef {
         this.transforms = transforms;
         this.udfs = udfs;
         this.models = models;
-        this.config = evaluatePipelineTimeZone(config);
+        this.config = evaluatePipelineRuntimeExecutionMode(evaluatePipelineTimeZone(config));
     }
 
     public PipelineDef(
@@ -178,6 +180,17 @@ public class PipelineDef {
             zoneId = ZoneId.of(zone);
         }
         configuration.set(PIPELINE_LOCAL_TIME_ZONE, zoneId.toString());
+        return configuration;
+    }
+
+    /**
+     * Returns Runtime execution mode of the pipeline includes STREAMING and BATCH, with the default
+     * value being STREAMING.
+     */
+    private static Configuration evaluatePipelineRuntimeExecutionMode(Configuration configuration) {
+        if (!configuration.contains(PIPELINE_EXECUTION_RUNTIME_MODE)) {
+            configuration.set(PIPELINE_EXECUTION_RUNTIME_MODE, RuntimeExecutionMode.STREAMING);
+        }
         return configuration;
     }
 

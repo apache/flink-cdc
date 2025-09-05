@@ -30,6 +30,9 @@ import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
@@ -37,7 +40,6 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -78,6 +80,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_PROJECTION_KEY = "projection";
     private static final String TRANSFORM_FILTER_KEY = "filter";
     private static final String TRANSFORM_DESCRIPTION_KEY = "description";
+    private static final String TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY =
+            "converter-after-transform";
 
     // UDF related keys
     private static final String UDF_KEY = "user-defined-function";
@@ -101,7 +105,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     @Override
     public PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig)
             throws Exception {
-        return parse(mapper.readTree(pipelineDefPath.toFile()), globalPipelineConfig);
+        FileSystem fileSystem = FileSystem.get(pipelineDefPath.toUri());
+        FSDataInputStream pipelineInStream = fileSystem.open(pipelineDefPath);
+        return parse(mapper.readTree(pipelineInStream), globalPipelineConfig);
     }
 
     @Override
@@ -316,6 +322,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 Optional.ofNullable(transformNode.get(TRANSFORM_DESCRIPTION_KEY))
                         .map(JsonNode::asText)
                         .orElse(null);
+        String postTransformConverter =
+                Optional.ofNullable(transformNode.get(TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY))
+                        .map(JsonNode::asText)
+                        .orElse(null);
 
         return new TransformDef(
                 sourceTable,
@@ -324,7 +334,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
-                description);
+                description,
+                postTransformConverter);
     }
 
     private Configuration toPipelineConfig(JsonNode pipelineConfigNode) {

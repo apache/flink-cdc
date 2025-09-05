@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.oceanbase;
 
-import org.apache.flink.cdc.connectors.oceanbase.testutils.LogProxyContainer;
 import org.apache.flink.cdc.connectors.oceanbase.testutils.OceanBaseContainer;
 
 import org.slf4j.Logger;
@@ -32,21 +31,14 @@ public class OceanBaseTestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseTestUtils.class);
 
-    private static final String LATEST_VERSION = "latest";
-    private static final String CDC_TEST_OB_VERSION = "4.2.1.6-106000012024042515";
+    private static final String OB_4_3_3_VERSION = "4.3.3.0-100000142024101215";
 
     private static final String SYS_PASSWORD = "123456";
     private static final String TEST_PASSWORD = "654321";
 
-    public static OceanBaseContainer createOceanBaseContainerForCDC() {
-        return createOceanBaseContainer(CDC_TEST_OB_VERSION, "mini")
-                .withSysPassword(SYS_PASSWORD)
-                .withStartupTimeout(Duration.ofMinutes(4));
-    }
-
     public static OceanBaseContainer createOceanBaseContainerForJdbc() {
-        return createOceanBaseContainer(LATEST_VERSION, "slim")
-                .withStartupTimeout(Duration.ofMinutes(2));
+        return createOceanBaseContainer(OB_4_3_3_VERSION, "mini")
+                .withStartupTimeout(Duration.ofMinutes(4));
     }
 
     public static OceanBaseContainer createOceanBaseContainer(String version, String mode) {
@@ -55,13 +47,6 @@ public class OceanBaseTestUtils {
                 .withTenantPassword(TEST_PASSWORD)
                 .withEnv("OB_DATAFILE_SIZE", "2G")
                 .withEnv("OB_LOG_DISK_SIZE", "4G")
-                .withLogConsumer(new Slf4jLogConsumer(LOG));
-    }
-
-    public static LogProxyContainer createLogProxyContainer() {
-        return new LogProxyContainer(LATEST_VERSION)
-                .withSysPassword(SYS_PASSWORD)
-                .withStartupTimeout(Duration.ofMinutes(1))
                 .withLogConsumer(new Slf4jLogConsumer(LOG));
     }
 }

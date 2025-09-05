@@ -30,7 +30,7 @@ public enum StartupMode {
     LATEST_OFFSET,
 
     SPECIFIC_OFFSETS,
-
+    COMMITTED_OFFSETS,
     TIMESTAMP,
     SNAPSHOT
 }

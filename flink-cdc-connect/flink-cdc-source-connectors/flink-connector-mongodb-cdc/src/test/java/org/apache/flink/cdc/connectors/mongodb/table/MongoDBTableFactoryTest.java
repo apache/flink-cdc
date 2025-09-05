@@ -35,9 +35,9 @@ import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
-import org.apache.flink.util.ExceptionUtils;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -49,6 +49,7 @@ import java.util.Map;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.CHUNK_META_GROUP_SIZE;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
+import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
 import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mongodb.internal.MongoDBEnvelope.MONGODB_SRV_SCHEME;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.BATCH_SIZE;
@@ -62,12 +63,10 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}. */
-public class MongoDBTableFactoryTest {
+class MongoDBTableFactoryTest {
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
                     Arrays.asList(
@@ -89,7 +88,8 @@ public class MongoDBTableFactoryTest {
                             Column.physical("eee", DataTypes.TIMESTAMP(3)),
                             Column.metadata("time", DataTypes.TIMESTAMP_LTZ(3), "op_ts", true),
                             Column.metadata(
-                                    "_database_name", DataTypes.STRING(), "database_name", true)),
+                                    "_database_name", DataTypes.STRING(), "database_name", true),
+                            Column.metadata("_row_kind", DataTypes.STRING(), "row_kind", true)),
                     Collections.emptyList(),
                     UniqueConstraint.primaryKey("pk", Collections.singletonList("_id")));
 
@@ -126,7 +126,7 @@ public class MongoDBTableFactoryTest {
             SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -143,6 +143,8 @@ public class MongoDBTableFactoryTest {
                         null,
                         StartupOptions.initial(),
                         null,
+                        null,
+                        null,
                         BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
@@ -156,18 +158,18 @@ public class MongoDBTableFactoryTest {
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
-                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
-        assertEquals(expectedSource, actualSource);
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> options = getAllOptions();
         options.put("scheme", MONGODB_SRV_SCHEME);
         options.put("connection.options", "replicaSet=test&connectTimeoutMS=300000");
         options.put("scan.startup.mode", "timestamp");
         options.put("scan.startup.timestamp-millis", "1667232000000");
-        options.put("initial.snapshotting.queue.size", "100");
         options.put("batch.size", "101");
         options.put("poll.max.batch.size", "102");
         options.put("poll.await.time.ms", "103");
@@ -181,6 +183,8 @@ public class MongoDBTableFactoryTest {
         options.put("scan.newly-added-table.enabled", "true");
         options.put("scan.full-changelog", "true");
         options.put("scan.cursor.no-timeout", "false");
+        options.put("scan.incremental.snapshot.unbounded-chunk-first.enabled", "true");
+
         DynamicTableSource actualSource = createTableSource(SCHEMA, options);
 
         MongoDBTableSource expectedSource =
@@ -194,7 +198,9 @@ public class MongoDBTableFactoryTest {
                         MY_TABLE,
                         "replicaSet=test&connectTimeoutMS=300000",
                         StartupOptions.timestamp(1667232000000L),
-                        100,
+                        null,
+                        null,
+                        null,
                         101,
                         102,
                         103,
@@ -208,19 +214,20 @@ public class MongoDBTableFactoryTest {
                         true,
                         false,
                         true,
+                        true,
                         true);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testMetadataColumns() {
+    void testMetadataColumns() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
         DynamicTableSource actualSource = createTableSource(SCHEMA_WITH_METADATA, properties);
         MongoDBTableSource mongoDBSource = (MongoDBTableSource) actualSource;
         mongoDBSource.applyReadableMetadata(
-                Arrays.asList("op_ts", "database_name"),
+                Arrays.asList("op_ts", "database_name", "row_kind"),
                 SCHEMA_WITH_METADATA.toSourceRowDataType());
         actualSource = mongoDBSource.copy();
 
@@ -236,6 +243,8 @@ public class MongoDBTableFactoryTest {
                         null,
                         StartupOptions.initial(),
                         null,
+                        null,
+                        null,
                         BATCH_SIZE_DEFAULT,
                         POLL_MAX_BATCH_SIZE_DEFAULT,
                         POLL_AWAIT_TIME_MILLIS_DEFAULT,
@@ -249,12 +258,13 @@ public class MongoDBTableFactoryTest {
                         FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
                         SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
                         SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
-                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT);
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
 
         expectedSource.producedDataType = SCHEMA_WITH_METADATA.toSourceRowDataType();
-        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name");
+        expectedSource.metadataKeys = Arrays.asList("op_ts", "database_name", "row_kind");
 
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
 
         ScanTableSource.ScanRuntimeProvider provider =
                 mongoDBSource.getScanRuntimeProvider(ScanRuntimeProviderContext.INSTANCE);
@@ -265,19 +275,103 @@ public class MongoDBTableFactoryTest {
     }
 
     @Test
-    public void testValidation() {
+    void testValidation() {
         // validate unsupported option
-        try {
-            Map<String, String> properties = getAllOptions();
-            properties.put("unknown", "abc");
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("unknown", "abc");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .hasStackTraceContaining("Unsupported options:\n\nunknown");
+    }
 
-            createTableSource(SCHEMA, properties);
-            fail("exception expected");
-        } catch (Throwable t) {
-            assertTrue(
-                    ExceptionUtils.findThrowableWithMessage(t, "Unsupported options:\n\nunknown")
-                            .isPresent());
-        }
+    @Test
+    public void testCopyExistingPipelineConflictWithIncrementalSnapshotMode() {
+        // test with 'initial.snapshotting.pipeline' configuration
+        assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put(
+                                    "initial.snapshotting.pipeline",
+                                    "[{\"$match\": {\"closed\": \"false\"}}]");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "The initial.snapshotting.*/copy.existing.* config only applies to "
+                                + "Debezium mode, not incremental snapshot mode");
+
+        // test with 'initial.snapshotting.max.threads' configuration
+        assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("initial.snapshotting.max.threads", "20");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "The initial.snapshotting.*/copy.existing.* config only applies to "
+                                + "Debezium mode, not incremental snapshot mode");
+
+        // test with 'initial.snapshotting.queue.size' configuration
+        assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "true");
+                            properties.put("initial.snapshotting.queue.size", "20480");
+                            createTableSource(SCHEMA, properties);
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "The initial.snapshotting.*/copy.existing.* config only applies to "
+                                + "Debezium mode, not incremental snapshot mode");
+    }
+
+    @Test
+    public void testCopyExistingPipelineInDebeziumMode() {
+        Map<String, String> properties = getAllOptions();
+        properties.put("scan.incremental.snapshot.enabled", "false");
+        properties.put("initial.snapshotting.pipeline", "[{\"$match\": {\"closed\": \"false\"}}]");
+        properties.put("initial.snapshotting.max.threads", "20");
+        properties.put("initial.snapshotting.queue.size", "20480");
+        DynamicTableSource actualSource = createTableSource(SCHEMA, properties);
+
+        MongoDBTableSource expectedSource =
+                new MongoDBTableSource(
+                        SCHEMA,
+                        SCHEME.defaultValue(),
+                        MY_HOSTS,
+                        USER,
+                        PASSWORD,
+                        MY_DATABASE,
+                        MY_TABLE,
+                        null,
+                        StartupOptions.initial(),
+                        20480,
+                        20,
+                        "[{\"$match\": {\"closed\": \"false\"}}]",
+                        BATCH_SIZE_DEFAULT,
+                        POLL_MAX_BATCH_SIZE_DEFAULT,
+                        POLL_AWAIT_TIME_MILLIS_DEFAULT,
+                        HEARTBEAT_INTERVAL_MILLIS_DEFAULT,
+                        LOCAL_TIME_ZONE,
+                        false,
+                        CHUNK_META_GROUP_SIZE_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE_MB_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SAMPLES_DEFAULT,
+                        SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED_DEFAULT,
+                        FULL_DOCUMENT_PRE_POST_IMAGE_ENABLED_DEFAULT,
+                        SCAN_NO_CURSOR_TIMEOUT_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP_DEFAULT,
+                        SCAN_NEWLY_ADDED_TABLE_ENABLED_DEFAULT,
+                        SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED.defaultValue());
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllOptions() {

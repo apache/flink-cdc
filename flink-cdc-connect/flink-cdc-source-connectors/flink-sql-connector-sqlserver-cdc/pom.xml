@@ -40,7 +40,7 @@ limitations under the License.
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.4</version>
+                <version>${maven.shade.plugin.version}</version>
                 <executions>
                     <execution>
                         <id>shade-flink</id>
@@ -58,6 +58,7 @@ limitations under the License.
                                     <include>io.debezium:debezium-connector-sqlserver</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
                                     <include>org.apache.flink:flink-cdc-base</include>
+                                    <include>org.apache.flink:flink-cdc-common</include>
                                     <include>org.apache.flink:flink-connector-sqlserver-cdc</include>
                                     <include>com.microsoft.sqlserver:*</include>
                                     <include>org.apache.kafka:*</include>

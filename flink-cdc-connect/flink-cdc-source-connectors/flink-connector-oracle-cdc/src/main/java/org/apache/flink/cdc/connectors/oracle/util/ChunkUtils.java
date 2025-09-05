@@ -49,9 +49,15 @@ public class ChunkUtils {
     public static Column getChunkKeyColumn(Table table, @Nullable String chunkKeyColumn) {
         List<Column> primaryKeys = table.primaryKeyColumns();
 
+        if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
+            throw new ValidationException(
+                    "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
+        }
+
+        List<Column> searchColumns = table.columns();
         if (chunkKeyColumn != null) {
             Optional<Column> targetPkColumn =
-                    primaryKeys.stream()
+                    searchColumns.stream()
                             .filter(col -> chunkKeyColumn.equals(col.name()))
                             .findFirst();
             if (targetPkColumn.isPresent()) {
@@ -59,9 +65,11 @@ public class ChunkUtils {
             }
             throw new ValidationException(
                     String.format(
-                            "Chunk key column '%s' doesn't exist in the primary key [%s] of the table %s.",
+                            "Chunk key column '%s' doesn't exist in the columns [%s] of the table %s.",
                             chunkKeyColumn,
-                            primaryKeys.stream().map(Column::name).collect(Collectors.joining(",")),
+                            searchColumns.stream()
+                                    .map(Column::name)
+                                    .collect(Collectors.joining(",")),
                             table.id()));
         }
 

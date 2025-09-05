@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.utils.JoinedRowData;
+import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
 
 import org.apache.kafka.connect.source.SourceRecord;
@@ -37,8 +38,15 @@ public final class AppendMetadataCollector implements Collector<RowData>, Serial
     public transient SourceRecord inputRecord;
     public transient Collector<RowData> outputCollector;
 
+    private final boolean appendOnly;
+
     public AppendMetadataCollector(MetadataConverter[] metadataConverters) {
+        this(metadataConverters, false);
+    }
+
+    public AppendMetadataCollector(MetadataConverter[] metadataConverters, boolean appendOnly) {
         this.metadataConverters = metadataConverters;
+        this.appendOnly = appendOnly;
     }
 
     @Override
@@ -55,7 +63,12 @@ public final class AppendMetadataCollector implements Collector<RowData>, Serial
 
             metaRow.setField(i, meta);
         }
-        RowData outRow = new JoinedRowData(physicalRow.getRowKind(), physicalRow, metaRow);
+        RowData outRow;
+        if (appendOnly) {
+            outRow = new JoinedRowData(RowKind.INSERT, physicalRow, metaRow);
+        } else {
+            outRow = new JoinedRowData(physicalRow.getRowKind(), physicalRow, metaRow);
+        }
         outputCollector.collect(outRow);
     }
 

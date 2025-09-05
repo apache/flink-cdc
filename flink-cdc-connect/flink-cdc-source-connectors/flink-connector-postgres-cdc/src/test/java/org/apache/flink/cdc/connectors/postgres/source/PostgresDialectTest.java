@@ -22,13 +22,13 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 
 import io.debezium.relational.TableId;
-import org.junit.Assert;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 /** Tests for {@link PostgresDialect}. */
-public class PostgresDialectTest extends PostgresTestBase {
+class PostgresDialectTest extends PostgresTestBase {
 
     private final UniqueDatabase customDatabase =
             new UniqueDatabase(
@@ -47,7 +47,7 @@ public class PostgresDialectTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getPassword());
 
     @Test
-    public void testDiscoverDataCollectionsInMultiDatabases() {
+    void testDiscoverDataCollectionsInMultiDatabases() {
 
         // initial two databases in same postgres instance
         customDatabase.createAndInitialize();
@@ -56,13 +56,13 @@ public class PostgresDialectTest extends PostgresTestBase {
         // get table named 'customer.customers' from customDatabase which is actual in
         // inventoryDatabase
         PostgresSourceConfigFactory configFactoryOfCustomDatabase =
-                getMockPostgresSourceConfigFactory(customDatabase, "customer", "customers", 10);
+                getMockPostgresSourceConfigFactory(customDatabase, "customer", "Customers", 10);
         PostgresDialect dialectOfcustomDatabase =
                 new PostgresDialect(configFactoryOfCustomDatabase.create(0));
         List<TableId> tableIdsOfcustomDatabase =
                 dialectOfcustomDatabase.discoverDataCollections(
                         configFactoryOfCustomDatabase.create(0));
-        Assert.assertEquals(tableIdsOfcustomDatabase.get(0).toString(), "customer.customers");
+        Assertions.assertThat(tableIdsOfcustomDatabase.get(0)).hasToString("customer.Customers");
 
         // get table named 'inventory.products' from customDatabase which is actual in
         // inventoryDatabase
@@ -74,7 +74,7 @@ public class PostgresDialectTest extends PostgresTestBase {
         List<TableId> tableIdsOfInventoryDatabase =
                 dialectOfInventoryDatabase.discoverDataCollections(
                         configFactoryOfInventoryDatabase.create(0));
-        Assert.assertEquals(tableIdsOfInventoryDatabase.get(0).toString(), "inventory.products");
+        Assertions.assertThat(tableIdsOfInventoryDatabase.get(0)).hasToString("inventory.products");
 
         // get table named 'customer.customers' from customDatabase which is actual not in
         // customDatabase
@@ -86,6 +86,6 @@ public class PostgresDialectTest extends PostgresTestBase {
         List<TableId> tableIdsOfInventoryDatabase2 =
                 dialectOfInventoryDatabase2.discoverDataCollections(
                         configFactoryOfInventoryDatabase2.create(0));
-        Assert.assertTrue(tableIdsOfInventoryDatabase2.isEmpty());
+        Assertions.assertThat(tableIdsOfInventoryDatabase2).isEmpty();
     }
 }

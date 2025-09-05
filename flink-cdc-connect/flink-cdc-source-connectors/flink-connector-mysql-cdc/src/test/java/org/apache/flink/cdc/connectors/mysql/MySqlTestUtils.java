@@ -40,6 +40,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.function.SupplierWithException;
 
 import org.apache.kafka.connect.source.SourceRecord;
+import org.assertj.core.api.Assertions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,8 +50,6 @@ import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import static org.junit.Assert.assertTrue;
 
 /** Utils to help test. */
 public class MySqlTestUtils {
@@ -187,7 +186,7 @@ public class MySqlTestUtils {
                 temp = temp.getCause();
             }
         }
-        assertTrue(findFixMsg);
+        Assertions.assertThat(findFixMsg).isTrue();
     }
 
     // ---------------------------------------------------------------------------------------

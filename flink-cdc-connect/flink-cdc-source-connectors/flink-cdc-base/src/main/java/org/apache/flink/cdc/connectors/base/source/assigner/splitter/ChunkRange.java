@@ -83,4 +83,9 @@ public class ChunkRange {
     public int hashCode() {
         return Objects.hash(chunkStart, chunkEnd);
     }
+
+    @Override
+    public String toString() {
+        return "ChunkRange{chunkStart=" + chunkStart + ", chunkEnd=" + chunkEnd + '}';
+    }
 }

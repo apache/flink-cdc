@@ -129,7 +129,8 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
     public byte[] serialize() {
         try {
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            final byte[] result = serialize(out);
+            serialize(out);
+            final byte[] result = out.getCopyOfBuffer();
             out.clear();
             return result;
         } catch (IOException e) {
@@ -137,7 +138,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         }
     }
 
-    public byte[] serialize(final DataOutputSerializer out) throws IOException {
+    public void serialize(final DataOutputSerializer out) throws IOException {
         out.writeUTF(this.getTableId().toString());
         out.writeUTF(this.getSplitId());
         out.writeUTF(SerializerUtils.rowToSerializedString(this.getSplitStart()));
@@ -147,7 +148,6 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         boolean useCatalogBeforeSchema =
                 SerializerUtils.shouldUseCatalogBeforeSchema(this.getTableId());
         out.writeBoolean(useCatalogBeforeSchema);
-        return out.getCopyOfBuffer();
     }
 
     @Override
