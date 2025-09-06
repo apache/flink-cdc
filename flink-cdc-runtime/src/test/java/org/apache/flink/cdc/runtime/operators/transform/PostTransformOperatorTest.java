@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -601,18 +603,18 @@ class PostTransformOperatorTest {
                         DATATYPE_TABLEID,
                         recordDataGenerator.generate(
                                 new Object[] {
-                                    new BinaryStringData("3.14"),
-                                    new Boolean(true),
-                                    new Byte("1"),
-                                    new Short("1"),
-                                    new Integer(1),
-                                    new Long(1),
-                                    new Integer(1704471599),
-                                    new Integer(1704471599),
+                                    BinaryStringData.fromString("3.14"),
+                                    true,
+                                    (byte) 1,
+                                    (short) 1,
+                                    1,
+                                    1L,
+                                    DateData.fromEpochDay(1704471599),
+                                    TimeData.fromMillisOfDay(1704471),
                                     TimestampData.fromMillis(1704471599),
-                                    new Float(3.14f),
-                                    new Double(3.14d),
-                                    DecimalData.fromBigDecimal(new BigDecimal(3.14), 6, 2),
+                                    3.14f,
+                                    3.14d,
+                                    DecimalData.fromBigDecimal(new BigDecimal("3.14"), 6, 2),
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(

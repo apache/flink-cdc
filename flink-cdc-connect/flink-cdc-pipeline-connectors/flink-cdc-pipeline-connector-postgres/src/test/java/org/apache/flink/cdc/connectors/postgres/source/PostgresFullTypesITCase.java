@@ -21,9 +21,11 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -200,8 +202,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse("2020-07-17T18:00:22.123456")),
-                    18460,
-                    64822000,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromMillisOfDay(64822000),
                     DecimalData.fromBigDecimal(new BigDecimal("500"), 10, 0),
                     BinaryStringData.fromString(
                             "{\"coordinates\":\"[[174.9479,-36.7208]]\",\"type\":\"Point\",\"srid\":3187}"),
@@ -286,7 +288,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         Object[] expectedSnapshot =
                 new Object[] {
                     2,
-                    18460,
+                    DateData.fromEpochDay(18460),
                     64822000,
                     64822123,
                     64822123,
