@@ -538,7 +538,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         // In CDC-style table matching, table names could be separated by `,` character.
         // Convert it to `|` as it's standard RegEx syntax.
-        tables = tables.replace(",", "|");
+        tables =
+                Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
         LOG.info("Expression after replacing comma with vert separator: {}", tables);
 
         // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
