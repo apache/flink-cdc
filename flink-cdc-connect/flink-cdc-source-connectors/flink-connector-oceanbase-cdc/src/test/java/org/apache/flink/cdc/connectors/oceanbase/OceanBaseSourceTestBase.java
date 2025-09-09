@@ -278,7 +278,7 @@ public abstract class OceanBaseSourceTestBase extends AbstractTestBase {
         properties.put("database.port", String.valueOf(getPort()));
         properties.put("database.user", getUserName());
         properties.put("database.password", getPassword());
-        properties.put("database.serverTimezone", ZoneId.of("UTC").toString());
+        properties.put("database.serverTimezone", ZoneId.of("Asia/Shanghai").toString());
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
         return DebeziumUtils.createMySqlConnection(configuration, new Properties());

@@ -21,7 +21,6 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
-import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
@@ -44,13 +43,16 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.String.format;
@@ -84,9 +86,9 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
 
     public static Stream<Arguments> parameters() {
         return Stream.of(
-                Arguments.of("customers", null),
-                Arguments.of("customers", "id"),
-                Arguments.of("customers_no_pk", "id"));
+                Arguments.of("customers", null, "false"),
+                Arguments.of("customers", "id", "true"),
+                Arguments.of("customers_no_pk", "id", "true"));
     }
 
     @RegisterExtension
@@ -117,33 +119,38 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
     // Failover tests
     @ParameterizedTest
     @MethodSource("parameters")
-    @Timeout(value = 120, unit = TimeUnit.SECONDS)
-    public void testTaskManagerFailoverInSnapshotPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testTaskManagerFailoverInSnapshotPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.TM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testTaskManagerFailoverInBinlogPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testTaskManagerFailoverInBinlogPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testTaskManagerFailoverFromLatestOffset(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testTaskManagerFailoverFromLatestOffset(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
@@ -153,37 +160,46 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 1,
                 0,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testJobManagerFailoverInSnapshotPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testJobManagerFailoverInSnapshotPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testJobManagerFailoverInBinlogPhase(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testJobManagerFailoverInBinlogPhase(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testJobManagerFailoverFromLatestOffset(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testJobManagerFailoverFromLatestOffset(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
@@ -193,33 +209,42 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 1,
                 0,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testTaskManagerFailoverSingleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testTaskManagerFailoverSingleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 FailoverType.TM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     @ParameterizedTest
     @MethodSource("parameters")
-    public void testJobManagerFailoverSingleParallelism(String tableName, String chunkColumnName)
-            throws Exception {
+    public void testJobManagerFailoverSingleParallelism(
+            String tableName, String chunkColumnName, String assignEndingFirst) throws Exception {
         testMySqlParallelSource(
                 1,
                 FailoverType.JM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {tableName},
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                Collections.singletonMap(
+                        "scan.incremental.snapshot.unbounded-chunk-first.enabled",
+                        assignEndingFirst));
     }
 
     private void testMySqlParallelSource(
@@ -227,7 +252,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            Map<String, String> otherOptions)
             throws Exception {
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
@@ -235,7 +261,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                otherOptions);
     }
 
     private void testMySqlParallelSource(
@@ -244,7 +271,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            Map<String, String> otherOptions)
             throws Exception {
         testMySqlParallelSource(
                 parallelism,
@@ -255,7 +283,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 1,
                 0,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                otherOptions);
     }
 
     private void testMySqlParallelSource(
@@ -267,7 +296,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             int restartAttempts,
             long delayBetweenAttempts,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            Map<String, String> otherOptions)
             throws Exception {
         testMySqlParallelSource(
                 parallelism,
@@ -279,7 +309,8 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 delayBetweenAttempts,
                 false,
                 tableName,
-                chunkColumnName);
+                chunkColumnName,
+                otherOptions);
     }
 
     private void testMySqlParallelSource(
@@ -292,11 +323,10 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             long delayBetweenAttempts,
             boolean skipSnapshotBackfill,
             String tableName,
-            String chunkColumnName)
+            String chunkColumnName,
+            Map<String, String> otherOptions)
             throws Exception {
-        captureCustomerTables = new String[] {tableName};
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.enableCheckpointing(3000L, CheckpointingMode.EXACTLY_ONCE);
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
@@ -314,7 +344,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                                         ? ""
                                         : ", primary key (id) not enforced")
                                 + ") WITH ("
-                                + " 'connector' = 'oceanbase-cdc',"
+                                + " 'connector' = 'mysql-cdc',"
                                 + " 'scan.incremental.snapshot.enabled' = 'true',"
                                 + " 'hostname' = '%s',"
                                 + " 'port' = '%s',"
@@ -327,6 +357,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                                 + " 'scan.incremental.snapshot.backfill.skip' = '%s',"
                                 + " 'server-time-zone' = 'Asia/Shanghai',"
                                 + " 'server-id' = '%s'"
+                                + " %s"
                                 + " %s"
                                 + ")",
                         getHost(),
@@ -342,7 +373,17 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                                 ? ""
                                 : String.format(
                                         ", 'scan.incremental.snapshot.chunk.key-column' = '%s'",
-                                        chunkColumnName));
+                                        chunkColumnName),
+                        otherOptions.isEmpty()
+                                ? ""
+                                : ","
+                                        + otherOptions.entrySet().stream()
+                                                .map(
+                                                        e ->
+                                                                String.format(
+                                                                        "'%s'='%s'",
+                                                                        e.getKey(), e.getValue()))
+                                                .collect(Collectors.joining(",")));
         tEnv.executeSql(sourceDDL);
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
@@ -354,7 +395,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
         // second step: check the binlog data
         checkBinlogData(tableResult, failoverType, failoverPhase, captureCustomerTables);
 
-        //        sleepMs(3000);
+        sleepMs(3000);
         tableResult.getJobClient().get().cancel().get();
     }
 
