@@ -322,7 +322,7 @@ ChangeStream 需要 MongoDB 以副本集或者分片模式运行，本地测试�
 
 ### Q3: Oracle CDC 如何切换成 XStream 的方式？
 
-添加 debezium 的配置项 'database.connection.adpter' = 'xstream'， 如果使用 SQL 的方式，则在表的 option 中添加配置项 'debezium.database.connection.adpter' = 'xstream'
+添加 debezium 的配置项 'database.connection.adapter' = 'xstream'， 如果使用 SQL 的方式，则在表的 option 中添加配置项 'debezium.database.connection.adapter' = 'xstream'
 
 ### Q4: Oracle CDC 的 database-name 和 schema-name 分别是什么?
 
