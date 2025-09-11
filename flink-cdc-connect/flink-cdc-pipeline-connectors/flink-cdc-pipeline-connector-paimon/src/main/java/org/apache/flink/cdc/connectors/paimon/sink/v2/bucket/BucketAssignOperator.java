@@ -17,19 +17,24 @@
 
 package org.apache.flink.cdc.connectors.paimon.sink.v2.bucket;
 
+import org.apache.flink.api.common.TaskInfo;
 import org.apache.flink.api.java.tuple.Tuple4;
-import org.apache.flink.cdc.common.event.ChangeEvent;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.OperatorIDGenerator;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonWriterHelper;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.TableSchemaInfo;
+import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -75,8 +80,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
     Map<TableId, Tuple4<BucketMode, RowKeyExtractor, BucketAssigner, RowPartitionKeyExtractor>>
             bucketAssignerMap;
 
-    // maintain the latest schema of tableId.
-    private Map<TableId, TableSchemaInfo> schemaMaps;
+    private Map<TableId, MixedSchemaInfo> schemaMaps;
 
     private int totalTasksNumber;
 
@@ -87,6 +91,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
     private transient SchemaEvolutionClient schemaEvolutionClient;
 
     private final ZoneId zoneId;
+
+    protected SchemaDerivator schemaDerivator;
 
     public BucketAssignOperator(
             Options catalogOptions, String schemaOperatorUid, ZoneId zoneId, String commitUser) {
@@ -100,11 +106,17 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
     @Override
     public void open() throws Exception {
         super.open();
+        open(getRuntimeContext().getTaskInfo());
+    }
+
+    @VisibleForTesting
+    public void open(TaskInfo taskInfo) {
         this.catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
         this.bucketAssignerMap = new HashMap<>();
-        this.totalTasksNumber = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
-        this.currentTaskNumber = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        this.totalTasksNumber = taskInfo.getNumberOfParallelSubtasks();
+        this.currentTaskNumber = taskInfo.getIndexOfThisSubtask();
         this.schemaMaps = new HashMap<>();
+        this.schemaDerivator = new SchemaDerivator();
     }
 
     @Override
@@ -118,6 +130,11 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
         schemaEvolutionClient =
                 new SchemaEvolutionClient(
                         toCoordinator, new OperatorIDGenerator(schemaOperatorUid).generate());
+    }
+
+    @VisibleForTesting
+    public void setSchemaEvolutionClient(SchemaEvolutionClient schemaEvolutionClient) {
+        this.schemaEvolutionClient = schemaEvolutionClient;
     }
 
     @Override
@@ -134,23 +151,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                                         ((FlushEvent) event).getTableIds(),
                                         ((FlushEvent) event).getSchemaChangeEventType())));
             }
-            return;
-        }
-
-        if (event instanceof DataChangeEvent) {
-            DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            if (!schemaMaps.containsKey(dataChangeEvent.tableId())) {
-                Optional<Schema> schema =
-                        schemaEvolutionClient.getLatestEvolvedSchema(dataChangeEvent.tableId());
-                if (schema.isPresent()) {
-                    schemaMaps.put(
-                            dataChangeEvent.tableId(), new TableSchemaInfo(schema.get(), zoneId));
-                } else {
-                    throw new RuntimeException(
-                            "Could not find schema message from SchemaRegistry for "
-                                    + dataChangeEvent.tableId());
-                }
-            }
+        } else if (event instanceof DataChangeEvent) {
+            DataChangeEvent dataChangeEvent = convertDataChangeEvent((DataChangeEvent) event);
             Tuple4<BucketMode, RowKeyExtractor, BucketAssigner, RowPartitionKeyExtractor> tuple4 =
                     bucketAssignerMap.computeIfAbsent(
                             dataChangeEvent.tableId(), this::getTableInfo);
@@ -158,7 +160,10 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             GenericRow genericRow =
                     PaimonWriterHelper.convertEventToGenericRow(
                             dataChangeEvent,
-                            schemaMaps.get(dataChangeEvent.tableId()).getFieldGetters());
+                            schemaMaps
+                                    .get(dataChangeEvent.tableId())
+                                    .getPaimonSchemaInfo()
+                                    .getFieldGetters());
             switch (tuple4.f0) {
                 case HASH_DYNAMIC:
                     {
@@ -186,23 +191,130 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                     }
             }
             output.collect(
-                    new StreamRecord<>(new BucketWrapperChangeEvent(bucket, (ChangeEvent) event)));
-        } else if (event instanceof SchemaChangeEvent) {
-            SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            Schema schema =
-                    SchemaUtils.applySchemaChangeEvent(
-                            Optional.ofNullable(schemaMaps.get(schemaChangeEvent.tableId()))
-                                    .map(TableSchemaInfo::getSchema)
-                                    .orElse(null),
-                            schemaChangeEvent);
-            schemaMaps.put(schemaChangeEvent.tableId(), new TableSchemaInfo(schema, zoneId));
+                    new StreamRecord<>(new BucketWrapperChangeEvent(bucket, dataChangeEvent)));
+        } else {
             // Broadcast SchemachangeEvent.
             for (int index = 0; index < totalTasksNumber; index++) {
                 output.collect(
                         new StreamRecord<>(
-                                new BucketWrapperChangeEvent(index, (ChangeEvent) event)));
+                                new BucketWrapperChangeEvent(
+                                        index,
+                                        convertSchemaChangeEvent((SchemaChangeEvent) event))));
             }
         }
+    }
+
+    @VisibleForTesting
+    public SchemaChangeEvent convertSchemaChangeEvent(SchemaChangeEvent schemaChangeEvent)
+            throws Exception {
+        if (schemaChangeEvent instanceof DropTableEvent
+                || schemaChangeEvent instanceof TruncateTableEvent) {
+            return schemaChangeEvent;
+        }
+        TableId tableId = schemaChangeEvent.tableId();
+        Schema upstreamSchema;
+        try {
+            upstreamSchema =
+                    schemaMaps.containsKey(tableId)
+                            ? schemaMaps.get(tableId).getUpstreamSchemaInfo().getSchema()
+                            : schemaEvolutionClient.getLatestEvolvedSchema(tableId).orElse(null);
+        } catch (Exception e) {
+            // In batch mode, we can't get schema from registry.
+            upstreamSchema = null;
+        }
+        if (!SchemaUtils.isSchemaChangeEventRedundant(upstreamSchema, schemaChangeEvent)) {
+            upstreamSchema = SchemaUtils.applySchemaChangeEvent(upstreamSchema, schemaChangeEvent);
+        }
+        Schema physicalSchema =
+                PaimonWriterHelper.deduceSchemaForPaimonTable(
+                        catalog.getTable(PaimonWriterHelper.identifierFromTableId(tableId)));
+        MixedSchemaInfo mixedSchemaInfo =
+                new MixedSchemaInfo(
+                        new TableSchemaInfo(upstreamSchema, zoneId),
+                        new TableSchemaInfo(physicalSchema, zoneId));
+        if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
+            LOGGER.warn(
+                    "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
+                    tableId,
+                    upstreamSchema,
+                    physicalSchema);
+        }
+        schemaMaps.put(tableId, mixedSchemaInfo);
+        return new CreateTableEvent(tableId, physicalSchema);
+    }
+
+    @VisibleForTesting
+    public DataChangeEvent convertDataChangeEvent(DataChangeEvent dataChangeEvent)
+            throws Exception {
+        TableId tableId = dataChangeEvent.tableId();
+        if (!schemaMaps.containsKey(dataChangeEvent.tableId())) {
+            Optional<Schema> schema;
+            try {
+                schema = schemaEvolutionClient.getLatestEvolvedSchema(dataChangeEvent.tableId());
+            } catch (Exception e) {
+                // In batch mode, we can't get schema from registry.
+                schema = Optional.empty();
+            }
+            if (schema.isPresent()) {
+                MixedSchemaInfo mixedSchemaInfo =
+                        new MixedSchemaInfo(
+                                new TableSchemaInfo(schema.get(), zoneId),
+                                new TableSchemaInfo(
+                                        PaimonWriterHelper.deduceSchemaForPaimonTable(
+                                                catalog.getTable(
+                                                        PaimonWriterHelper.identifierFromTableId(
+                                                                tableId))),
+                                        zoneId));
+                if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
+                    LOGGER.warn(
+                            "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
+                            tableId,
+                            mixedSchemaInfo.getUpstreamSchemaInfo().getSchema(),
+                            mixedSchemaInfo.getPaimonSchemaInfo().getSchema());
+                }
+                // Broadcast the CreateTableEvent with physical schema after job restarted.
+                // This is necessary because the DataSinkOperator would emit the upstream schema.
+                for (int index = 0; index < totalTasksNumber; index++) {
+                    output.collect(
+                            new StreamRecord<>(
+                                    new BucketWrapperChangeEvent(
+                                            index,
+                                            new CreateTableEvent(
+                                                    tableId,
+                                                    mixedSchemaInfo.paimonSchemaInfo
+                                                            .getSchema()))));
+                }
+                schemaMaps.put(tableId, mixedSchemaInfo);
+            } else {
+                throw new RuntimeException(
+                        "Could not find schema message from SchemaRegistry for "
+                                + tableId
+                                + ", this may because of this table was dropped.");
+            }
+        }
+        MixedSchemaInfo mixedSchemaInfo = schemaMaps.get(tableId);
+        if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
+            dataChangeEvent =
+                    schemaDerivator
+                            .coerceDataRecord(
+                                    zoneId.getId(),
+                                    dataChangeEvent,
+                                    mixedSchemaInfo.getUpstreamSchemaInfo().getSchema(),
+                                    mixedSchemaInfo.getPaimonSchemaInfo().getSchema())
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalStateException(
+                                                    String.format(
+                                                            "Unable to coerce data record of %s from (schema: %s) to (schema: %s)",
+                                                            tableId,
+                                                            mixedSchemaInfo
+                                                                    .getUpstreamSchemaInfo()
+                                                                    .getSchema(),
+                                                            mixedSchemaInfo
+                                                                    .getPaimonSchemaInfo()
+                                                                    .getSchema())));
+        }
+        return dataChangeEvent;
     }
 
     private Tuple4<BucketMode, RowKeyExtractor, BucketAssigner, RowPartitionKeyExtractor>
@@ -217,7 +329,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
         long targetRowNum = table.coreOptions().dynamicBucketTargetRowNum();
         Integer numAssigners = table.coreOptions().dynamicBucketInitialBuckets();
         Integer maxBucketsNum = table.coreOptions().dynamicBucketMaxBuckets();
-
+        LOGGER.debug("Successfully get table info {}", table);
         return new Tuple4<>(
                 table.bucketMode(),
                 table.createRowKeyExtractor(),
@@ -231,5 +343,35 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                         targetRowNum,
                         maxBucketsNum),
                 new RowPartitionKeyExtractor(table.schema()));
+    }
+
+    /** MixedSchemaInfo is used to store the mixed schema info of upstream and paimon table. */
+    private static class MixedSchemaInfo {
+        private final TableSchemaInfo upstreamSchemaInfo;
+
+        private final TableSchemaInfo paimonSchemaInfo;
+
+        private final boolean sameColumnsIgnoringCommentAndDefaultValue;
+
+        public MixedSchemaInfo(
+                TableSchemaInfo upstreamSchemaInfo, TableSchemaInfo paimonSchemaInfo) {
+            this.upstreamSchemaInfo = upstreamSchemaInfo;
+            this.paimonSchemaInfo = paimonSchemaInfo;
+            this.sameColumnsIgnoringCommentAndDefaultValue =
+                    PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
+                            upstreamSchemaInfo.getSchema(), paimonSchemaInfo.getSchema());
+        }
+
+        public TableSchemaInfo getUpstreamSchemaInfo() {
+            return upstreamSchemaInfo;
+        }
+
+        public TableSchemaInfo getPaimonSchemaInfo() {
+            return paimonSchemaInfo;
+        }
+
+        public boolean isSameColumnsIgnoringCommentAndDefaultValue() {
+            return sameColumnsIgnoringCommentAndDefaultValue;
+        }
     }
 }

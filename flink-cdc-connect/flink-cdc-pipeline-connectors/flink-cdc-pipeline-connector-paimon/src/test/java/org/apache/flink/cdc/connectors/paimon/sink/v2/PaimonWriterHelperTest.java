@@ -27,33 +27,45 @@ import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.connectors.paimon.sink.PaimonMetadataApplier;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
+import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalMap;
 import org.apache.paimon.data.NestedRow;
 import org.apache.paimon.data.Timestamp;
+import org.apache.paimon.flink.FlinkCatalogFactory;
+import org.apache.paimon.options.Options;
+import org.apache.paimon.table.Table;
 import org.apache.paimon.types.RowKind;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /** Tests for {@link PaimonWriterHelper}. */
 class PaimonWriterHelperTest {
+
+    @TempDir public static java.nio.file.Path temporaryFolder;
 
     @Test
     void testConvertEventToGenericRowOfAllDataTypes() {
@@ -241,6 +253,133 @@ class PaimonWriterHelperTest {
         Map<BinaryString, BinaryString> extractedMap = extractMap(internalMap);
 
         Assertions.assertThat(extractedMap).containsAllEntriesOf(expectedMap);
+    }
+
+    @Test
+    void testSameColumnsWithOutCommentAndDefaultValue() {
+        Schema schema1 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING(), "col1", "default")
+                        .physicalColumn("col2", DataTypes.STRING(), "col2", "default")
+                        .physicalColumn("col3", DataTypes.STRING(), "col3", "default")
+                        .primaryKey("col1")
+                        .partitionKey("col2")
+                        .comment("schema1")
+                        .option("key", "value")
+                        .build();
+        Schema schema2 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build();
+        Assertions.assertThat(
+                        PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
+                                schema1, schema2))
+                .isTrue();
+
+        // Not null.
+        schema1 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING(), "col1", "default")
+                        .physicalColumn("col2", DataTypes.STRING(), "col2", "default")
+                        .physicalColumn("col3", DataTypes.STRING().notNull(), "col3", "default")
+                        .primaryKey("col1")
+                        .partitionKey("col2")
+                        .comment("schema1")
+                        .option("key", "value")
+                        .build();
+        schema2 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build();
+        Assertions.assertThat(
+                        PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
+                                schema1, schema2))
+                .isFalse();
+
+        schema1 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .physicalColumn("col4", DataTypes.STRING())
+                        .build();
+        schema2 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build();
+        Assertions.assertThat(
+                        PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
+                                schema1, schema2))
+                .isFalse();
+
+        // Different order.
+        schema1 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .build();
+        schema2 =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .physicalColumn("col3", DataTypes.STRING())
+                        .build();
+        Assertions.assertThat(
+                        PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
+                                schema1, schema2))
+                .isFalse();
+    }
+
+    @Test
+    void testDeduceSchemaForPaimonTable() throws Catalog.TableNotExistException {
+        Options catalogOptions = new Options();
+        String warehouse =
+                new File(temporaryFolder.toFile(), UUID.randomUUID().toString()).toString();
+        catalogOptions.setString("warehouse", warehouse);
+        catalogOptions.setString("cache-enabled", "false");
+        PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
+        Schema allTypeSchema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING().notNull())
+                        .physicalColumn("boolean", DataTypes.BOOLEAN())
+                        .physicalColumn("binary", DataTypes.BINARY(3))
+                        .physicalColumn("varbinary", DataTypes.VARBINARY(10))
+                        .physicalColumn("bytes", DataTypes.BYTES())
+                        .physicalColumn("tinyint", DataTypes.TINYINT())
+                        .physicalColumn("smallint", DataTypes.SMALLINT())
+                        .physicalColumn("int", DataTypes.INT())
+                        .physicalColumn("float", DataTypes.FLOAT())
+                        .physicalColumn("double", DataTypes.DOUBLE())
+                        .physicalColumn("decimal", DataTypes.DECIMAL(6, 3))
+                        .physicalColumn("char", DataTypes.CHAR(5))
+                        .physicalColumn("varchar", DataTypes.VARCHAR(10))
+                        .physicalColumn("string", DataTypes.STRING())
+                        .physicalColumn("date", DataTypes.DATE())
+                        .physicalColumn("time", DataTypes.TIME())
+                        .physicalColumn("time_with_precision", DataTypes.TIME(6))
+                        .physicalColumn("timestamp", DataTypes.TIMESTAMP())
+                        .physicalColumn("timestamp_with_precision", DataTypes.TIMESTAMP(3))
+                        .physicalColumn("timestamp_ltz", DataTypes.TIMESTAMP_LTZ())
+                        .physicalColumn("timestamp_ltz_with_precision", DataTypes.TIMESTAMP_LTZ(3))
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(TableId.parse("test.table1"), allTypeSchema);
+        metadataApplier.applySchemaChange(createTableEvent);
+        Catalog catalog = FlinkCatalogFactory.createPaimonCatalog(catalogOptions);
+        Table table = catalog.getTable(Identifier.fromString("test.table1"));
+        Schema deducedSchema = PaimonWriterHelper.deduceSchemaForPaimonTable(table);
+        Assertions.assertThat(
+                        PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
+                                deducedSchema, allTypeSchema))
+                .isTrue();
     }
 
     private static Map<BinaryString, BinaryString> extractMap(InternalMap internalMap) {

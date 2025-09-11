@@ -25,30 +25,42 @@ import org.apache.flink.cdc.common.data.binary.BinaryArrayData;
 import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketAssignOperator;
 import org.apache.flink.core.memory.MemorySegment;
+import org.apache.flink.table.types.utils.TypeConversions;
 
+import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.data.Timestamp;
+import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.memory.MemorySegmentUtils;
+import org.apache.paimon.table.Table;
 import org.apache.paimon.types.RowKind;
+import org.apache.paimon.types.RowType;
 
 import java.nio.ByteBuffer;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getFieldCount;
 
-/** A helper class for {@link PaimonWriter} to create FieldGetter and GenericRow. */
+/**
+ * A helper class to deduce Schema of paimon table for {@link BucketAssignOperator}, and create
+ * FieldGetter and GenericRow for {@link PaimonWriter}.
+ */
 public class PaimonWriterHelper {
 
     /** create a list of {@link RecordData.FieldGetter} for {@link PaimonWriter}. */
@@ -59,6 +71,31 @@ public class PaimonWriterHelper {
             fieldGetters.add(createFieldGetter(columns.get(i).getType(), i, zoneId));
         }
         return fieldGetters;
+    }
+
+    /**
+     * Check if the columns of upstream schema is the same as the physical schema.
+     *
+     * <p>Note: Default value of column was ignored as it has no influence in {@link
+     * #createFieldGetter(DataType, int, ZoneId)}.
+     */
+    public static Boolean sameColumnsIgnoreCommentAndDefaultValue(
+            Schema upstreamSchema, Schema physicalSchema) {
+        List<Column> upstreamColumns = upstreamSchema.getColumns();
+        List<Column> physicalColumns = physicalSchema.getColumns();
+        if (upstreamColumns.size() != physicalColumns.size()) {
+            return false;
+        }
+        for (int i = 0; i < physicalColumns.size(); i++) {
+            Column upstreamColumn = upstreamColumns.get(i);
+            Column physicalColumn = physicalColumns.get(i);
+            // Case sensitive.
+            if (!upstreamColumn.getName().equals(physicalColumn.getName())
+                    || !upstreamColumn.getType().equals(physicalColumn.getType())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static RecordData.FieldGetter createFieldGetter(
@@ -219,6 +256,32 @@ public class PaimonWriterHelper {
         return fullGenericRows;
     }
 
+    /**
+     * Deduce {@link Schema} for a {@link Table}.
+     *
+     * <p>Note: default value was not included in the result.
+     */
+    public static Schema deduceSchemaForPaimonTable(Table table) {
+        RowType rowType = table.rowType();
+        Schema.Builder builder = Schema.newBuilder();
+        builder.setColumns(
+                rowType.getFields().stream()
+                        .map(
+                                column ->
+                                        Column.physicalColumn(
+                                                column.name(),
+                                                DataTypeUtils.fromFlinkDataType(
+                                                        TypeConversions.fromLogicalToDataType(
+                                                                LogicalTypeConversion.toLogicalType(
+                                                                        column.type()))),
+                                                column.description()))
+                        .collect(Collectors.toList()));
+        builder.primaryKey(table.primaryKeys());
+        table.comment().ifPresent(builder::comment);
+        builder.options(table.options());
+        return builder.build();
+    }
+
     private static GenericRow convertRecordDataToGenericRow(
             RecordData recordData, List<RecordData.FieldGetter> fieldGetters, RowKind rowKind) {
         GenericRow genericRow = new GenericRow(rowKind, recordData.getArity());
@@ -343,5 +406,9 @@ public class PaimonWriterHelper {
             row.pointTo(segments, offset + baseOffset, size);
             return row;
         }
+    }
+
+    public static Identifier identifierFromTableId(TableId tableId) {
+        return Identifier.fromString(tableId.identifier());
     }
 }
