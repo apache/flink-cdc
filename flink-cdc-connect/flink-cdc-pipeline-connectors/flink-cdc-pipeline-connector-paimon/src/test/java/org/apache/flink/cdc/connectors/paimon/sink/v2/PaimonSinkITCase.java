@@ -198,7 +198,7 @@ public class PaimonSinkITCase {
             boolean enableDeleteVectors,
             boolean appendOnly,
             boolean enabledBucketKey,
-            RandomSchemaCase randomSchemaCase)
+            SchemaChange schemaChange)
             throws SchemaEvolveException {
         List<Event> testEvents = new ArrayList<>();
         Schema.Builder builder = Schema.newBuilder();
@@ -217,9 +217,9 @@ public class PaimonSinkITCase {
         CreateTableEvent createTableEvent = new CreateTableEvent(table1, schema);
         testEvents.add(createTableEvent);
         PaimonMetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
-        if (randomSchemaCase != null) {
+        if (schemaChange != null) {
             metadataApplier.applySchemaChange(
-                    new CreateTableEvent(table1, generateRandomSchema(schema, randomSchemaCase)));
+                    new CreateTableEvent(table1, generateRandomSchema(schema, schemaChange)));
         } else {
             metadataApplier.applySchemaChange(createTableEvent);
         }
@@ -234,9 +234,9 @@ public class PaimonSinkITCase {
         return testEvents;
     }
 
-    private Schema generateRandomSchema(Schema schema, RandomSchemaCase randomSchemaCase) {
+    private Schema generateRandomSchema(Schema schema, SchemaChange schemaChange) {
         Schema.Builder builder = new Schema.Builder();
-        switch (randomSchemaCase) {
+        switch (schemaChange) {
             case ADD_COLUMN:
                 {
                     builder.physicalColumn("col1", STRING().notNull())
@@ -467,7 +467,8 @@ public class PaimonSinkITCase {
                 .hasRootCauseMessage("Object 'table1' not found within 'paimon_catalog.test'");
     }
 
-    enum RandomSchemaCase {
+    // Table structure change events that will be executed on existing tables.
+    enum SchemaChange {
         ADD_COLUMN,
         REMOVE_COLUMN,
         REORDER_COLUMN,
@@ -475,9 +476,8 @@ public class PaimonSinkITCase {
     }
 
     @ParameterizedTest
-    @EnumSource(RandomSchemaCase.class)
-    public void testSinkWithSchemaChangeForExistedTable(RandomSchemaCase randomSchemaCase)
-            throws Exception {
+    @EnumSource(SchemaChange.class)
+    void testSinkWithSchemaChangeForExistedTable(SchemaChange schemaChange) throws Exception {
         initialize("filesystem");
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
@@ -497,8 +497,8 @@ public class PaimonSinkITCase {
                 bucketAssignOperator,
                 writer,
                 committer,
-                createTestEvents(false, false, true, randomSchemaCase).toArray(new Event[0]));
-        switch (randomSchemaCase) {
+                createTestEvents(false, false, true, schemaChange).toArray(new Event[0]));
+        switch (schemaChange) {
             case ADD_COLUMN:
                 {
                     Assertions.assertThat(fetchResults(table1))
@@ -559,7 +559,7 @@ public class PaimonSinkITCase {
                                 Tuple2.of(STRING(), "4"),
                                 Tuple2.of(STRING(), "4"),
                                 Tuple2.of(STRING(), "4"))));
-        switch (randomSchemaCase) {
+        switch (schemaChange) {
             case ADD_COLUMN:
                 {
                     Assertions.assertThat(fetchResults(table1))
@@ -630,7 +630,7 @@ public class PaimonSinkITCase {
         Set<Row> deduplicated = new HashSet<>(result);
         Assertions.assertThat(result).hasSameSizeAs(deduplicated);
 
-        switch (randomSchemaCase) {
+        switch (schemaChange) {
             case ADD_COLUMN:
                 {
                     Assertions.assertThat(fetchResults(table1))

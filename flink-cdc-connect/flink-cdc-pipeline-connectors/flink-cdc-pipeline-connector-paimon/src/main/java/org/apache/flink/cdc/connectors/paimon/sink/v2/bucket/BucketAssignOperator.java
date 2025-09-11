@@ -232,9 +232,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                 new MixedSchemaInfo(
                         new TableSchemaInfo(upstreamSchema, zoneId),
                         new TableSchemaInfo(physicalSchema, zoneId));
-        if (!mixedSchemaInfo.isSameColumnsIgnoreCommentAndDefaultValue()) {
+        if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
             LOGGER.warn(
-                    "Upstream schema of {} is {}, which is different with paimon physical table schema {}.",
+                    "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
                     tableId,
                     upstreamSchema,
                     physicalSchema);
@@ -265,9 +265,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                                                         PaimonWriterHelper.identifierFromTableId(
                                                                 tableId))),
                                         zoneId));
-                if (!mixedSchemaInfo.isSameColumnsIgnoreCommentAndDefaultValue()) {
+                if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
                     LOGGER.warn(
-                            "Upstream schema of {} is {}, which is different with paimon physical table schema {}.",
+                            "Upstream schema of {} is {}, which is different with paimon physical table schema {}. Data precision loss and truncation may occur.",
                             tableId,
                             mixedSchemaInfo.getUpstreamSchemaInfo().getSchema(),
                             mixedSchemaInfo.getPaimonSchemaInfo().getSchema());
@@ -293,7 +293,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             }
         }
         MixedSchemaInfo mixedSchemaInfo = schemaMaps.get(tableId);
-        if (!mixedSchemaInfo.isSameColumnsIgnoreCommentAndDefaultValue()) {
+        if (!mixedSchemaInfo.isSameColumnsIgnoringCommentAndDefaultValue()) {
             dataChangeEvent =
                     schemaDerivator
                             .coerceDataRecord(
@@ -329,7 +329,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
         long targetRowNum = table.coreOptions().dynamicBucketTargetRowNum();
         Integer numAssigners = table.coreOptions().dynamicBucketInitialBuckets();
         Integer maxBucketsNum = table.coreOptions().dynamicBucketMaxBuckets();
-        LOGGER.debug("Succeed to get table info " + table);
+        LOGGER.debug("Successfully get table info {}", table);
         return new Tuple4<>(
                 table.bucketMode(),
                 table.createRowKeyExtractor(),
@@ -351,13 +351,13 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
 
         private final TableSchemaInfo paimonSchemaInfo;
 
-        private final boolean sameColumnsIgnoreCommentAndDefaultValue;
+        private final boolean sameColumnsIgnoringCommentAndDefaultValue;
 
         public MixedSchemaInfo(
                 TableSchemaInfo upstreamSchemaInfo, TableSchemaInfo paimonSchemaInfo) {
             this.upstreamSchemaInfo = upstreamSchemaInfo;
             this.paimonSchemaInfo = paimonSchemaInfo;
-            this.sameColumnsIgnoreCommentAndDefaultValue =
+            this.sameColumnsIgnoringCommentAndDefaultValue =
                     PaimonWriterHelper.sameColumnsIgnoreCommentAndDefaultValue(
                             upstreamSchemaInfo.getSchema(), paimonSchemaInfo.getSchema());
         }
@@ -370,8 +370,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
             return paimonSchemaInfo;
         }
 
-        public boolean isSameColumnsIgnoreCommentAndDefaultValue() {
-            return sameColumnsIgnoreCommentAndDefaultValue;
+        public boolean isSameColumnsIgnoringCommentAndDefaultValue() {
+            return sameColumnsIgnoringCommentAndDefaultValue;
         }
     }
 }
