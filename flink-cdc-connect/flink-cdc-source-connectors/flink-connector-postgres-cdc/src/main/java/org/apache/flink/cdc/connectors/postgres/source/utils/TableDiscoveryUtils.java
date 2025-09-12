@@ -34,11 +34,17 @@ public class TableDiscoveryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
     public static List<TableId> listTables(
-            String database, JdbcConnection jdbc, RelationalTableFilters tableFilters)
+            String database,
+            JdbcConnection jdbc,
+            RelationalTableFilters tableFilters,
+            boolean includePartitionedTables)
             throws SQLException {
 
-        Set<TableId> allTableIds =
-                jdbc.readTableNames(database, null, null, new String[] {"TABLE"});
+        String[] tableTypes = new String[] {"TABLE"};
+        if (includePartitionedTables) {
+            tableTypes = new String[] {"TABLE", "PARTITIONED TABLE"};
+        }
+        Set<TableId> allTableIds = jdbc.readTableNames(database, null, null, tableTypes);
 
         Set<TableId> capturedTables =
                 allTableIds.stream()
