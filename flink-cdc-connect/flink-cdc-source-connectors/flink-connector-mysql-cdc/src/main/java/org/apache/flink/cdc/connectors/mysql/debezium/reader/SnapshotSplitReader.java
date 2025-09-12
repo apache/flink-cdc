@@ -150,7 +150,7 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
                         currentSnapshotSplit,
                         hooks,
                         statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill());
-        executorService.submit(
+        executorService.execute(
                 () -> {
                     try {
                         currentTaskRunning = true;
