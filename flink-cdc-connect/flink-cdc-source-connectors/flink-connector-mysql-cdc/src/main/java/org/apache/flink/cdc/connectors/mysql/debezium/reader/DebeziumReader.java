@@ -20,7 +20,6 @@ package org.apache.flink.cdc.connectors.mysql.debezium.reader;
 import javax.annotation.Nullable;
 
 import java.util.Iterator;
-import java.util.concurrent.Future;
 
 /** Reader to read split of table, the split is either snapshot split or binlog split. */
 public interface DebeziumReader<T, Split> {
@@ -33,7 +32,7 @@ public interface DebeziumReader<T, Split> {
      *
      * @param splitToRead
      */
-    Future<?> submitSplit(Split splitToRead);
+    void submitSplit(Split splitToRead);
 
     /** Close the reader and releases all resources. */
     void close();

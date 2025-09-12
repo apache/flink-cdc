@@ -80,7 +80,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.concurrent.Future;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1137,13 +1136,13 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         // Mock an exception occurring during stream split reading by setting the error handler
         // and stopping the change event source to test exception handling
-        Future<?> future = reader.submitSplit(split);
+        reader.submitSplit(split);
         statefulTaskContext
                 .getErrorHandler()
                 .setProducerThrowable(new RuntimeException("Test read with exception"));
         reader.getChangeEventSourceContext().stopChangeEventSource();
         // wait until executor is finished.
-        future.get();
+        Thread.sleep(500L);
 
         assertThatThrownBy(() -> pollRecordsFromReader(reader, RecordUtils::isDataChangeRecord))
                 .rootCause()

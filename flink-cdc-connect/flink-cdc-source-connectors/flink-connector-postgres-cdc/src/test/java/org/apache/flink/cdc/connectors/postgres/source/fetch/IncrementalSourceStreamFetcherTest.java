@@ -40,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Future;
 import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -60,7 +59,7 @@ public class IncrementalSourceStreamFetcherTest extends PostgresTestBase {
                     POSTGRES_CONTAINER.getPassword());
 
     @Test
-    void testReadBinlogWithException() throws Exception {
+    void testReadStreamSplitWithException() throws Exception {
         customDatabase.createAndInitialize();
         PostgresSourceConfigFactory sourceConfigFactory =
                 getMockPostgresSourceConfigFactory(customDatabase, schemaName, tableName, 10, true);
@@ -78,7 +77,7 @@ public class IncrementalSourceStreamFetcherTest extends PostgresTestBase {
         StoppableChangeEventSourceContext changeEventSourceContext =
                 fetchTask.getChangeEventSourceContext();
 
-        Future<?> future = fetcher.submitTask(fetchTask);
+        fetcher.submitTask(fetchTask);
         // Mock an exception occurring during stream split reading by setting the error handler
         // and stopping the change event source to test exception handling
         taskContext
@@ -87,7 +86,7 @@ public class IncrementalSourceStreamFetcherTest extends PostgresTestBase {
         changeEventSourceContext.stopChangeEventSource();
 
         // Wait for the task to complete
-        future.get();
+        Thread.sleep(500L);
 
         assertThatThrownBy(
                         () -> pollRecordsFromReader(fetcher, SourceRecordUtils::isDataChangeRecord))

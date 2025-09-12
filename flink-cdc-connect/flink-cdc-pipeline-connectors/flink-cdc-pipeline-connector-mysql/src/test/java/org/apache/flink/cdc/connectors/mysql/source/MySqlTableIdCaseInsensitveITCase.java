@@ -196,7 +196,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE `%s`.`products` ADD COLUMN `DESC1` VARCHAR(45) NULL AFTER `WEIGHT`;",
+                        "ALTER TABLE `%s`.`products` ADD COLUMN `DESC1` VARCHAR(45) NULL AFTER `weight`;",
                         inventoryDatabase.getDatabaseName()));
         expected.add(
                 new AddColumnEvent(

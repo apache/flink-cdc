@@ -58,7 +58,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -116,7 +115,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.isBackfillSkipped = statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill();
     }
 
-    public Future<?> submitSplit(MySqlSplit mySqlSplit) {
+    public void submitSplit(MySqlSplit mySqlSplit) {
         this.currentBinlogSplit = mySqlSplit.asBinlogSplit();
         configureFilter();
         statefulTaskContext.configure(currentBinlogSplit);
@@ -136,7 +135,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                         currentBinlogSplit,
                         createEventFilter());
 
-        return executorService.submit(
+        executorService.submit(
                 () -> {
                     try {
                         binlogSplitReadTask.execute(

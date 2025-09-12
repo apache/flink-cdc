@@ -24,7 +24,6 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import javax.annotation.Nullable;
 
 import java.util.Iterator;
-import java.util.concurrent.Future;
 
 /**
  * Fetcher to fetch data of a table split, the split is either snapshot split {@link SnapshotSplit}
@@ -34,7 +33,7 @@ import java.util.concurrent.Future;
 public interface Fetcher<T, Split> {
 
     /** Add to task to fetch, this should call only when the reader is idle. */
-    Future<?> submitTask(FetchTask<Split> fetchTask);
+    void submitTask(FetchTask<Split> fetchTask);
 
     /**
      * Fetched records from data source. The method should return null when reaching the end of the

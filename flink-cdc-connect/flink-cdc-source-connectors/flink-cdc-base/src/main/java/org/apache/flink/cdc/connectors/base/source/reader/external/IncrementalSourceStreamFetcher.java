@@ -44,7 +44,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -82,13 +81,13 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     }
 
     @Override
-    public Future<?> submitTask(FetchTask<SourceSplitBase> fetchTask) {
+    public void submitTask(FetchTask<SourceSplitBase> fetchTask) {
         this.streamFetchTask = fetchTask;
         this.currentStreamSplit = fetchTask.getSplit().asStreamSplit();
         configureFilter();
         taskContext.configure(currentStreamSplit);
         this.queue = taskContext.getQueue();
-        return executorService.submit(
+        executorService.submit(
                 () -> {
                     try {
                         streamFetchTask.execute(taskContext);
