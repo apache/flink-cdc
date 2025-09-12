@@ -67,6 +67,7 @@ public class MySqlSourceConfig implements Serializable {
     private final Properties jdbcProperties;
     private final Map<ObjectPath, String> chunkKeyColumns;
     private final boolean skipSnapshotBackfill;
+    private final Map<String, String> snapshotFilters;
     private final boolean parseOnLineSchemaChanges;
     public static boolean useLegacyJsonFormat = true;
     private final boolean assignUnboundedChunkFirst;
@@ -108,7 +109,8 @@ public class MySqlSourceConfig implements Serializable {
             boolean parseOnLineSchemaChanges,
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            Map<String, String> snapshotFilters) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -148,6 +150,7 @@ public class MySqlSourceConfig implements Serializable {
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
+        this.snapshotFilters = snapshotFilters;
         this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
@@ -284,5 +287,9 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isTreatTinyInt1AsBoolean() {
         return treatTinyInt1AsBoolean;
+    }
+
+    public Map<String, String> getSnapshotFilters() {
+        return snapshotFilters;
     }
 }

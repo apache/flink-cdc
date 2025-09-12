@@ -570,7 +570,7 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                     "+I[1017, user_18, Shanghai, 123567891234]",
                     "+I[1018, user_19, Shanghai, 123567891234]",
                     "+I[1019, user_20, Shanghai, 123567891234]",
-                    "+I[2000, user_21, Shanghai, 123567891234]",
+                    "+I[2000, user_21, China:Shanghai, 123567891234]",
                     "-U[103, user_3, Shanghai, 123567891234]",
                     "+U[103, user_3, Hangzhou, 123567891234]",
                     "-D[102, user_2, Shanghai, 123567891234]",

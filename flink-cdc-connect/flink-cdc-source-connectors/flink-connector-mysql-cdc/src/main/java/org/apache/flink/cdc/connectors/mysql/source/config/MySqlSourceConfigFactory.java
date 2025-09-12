@@ -70,6 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     private boolean skipSnapshotBackfill = false;
+    private Map<String, String> snapshotFilters = new HashMap<>();
     private boolean parseOnLineSchemaChanges = false;
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
@@ -304,6 +305,24 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * When reading a table snapshot, the rows of captured tables will be filtered using the
+     * specified filter expression (AKA a SQL WHERE clause).
+     */
+    public MySqlSourceConfigFactory snapshotFilters(String table, String filter) {
+        this.snapshotFilters.put(table, filter);
+        return this;
+    }
+
+    /**
+     * When reading a table snapshot, the rows of captured tables will be filtered using the
+     * specified filter expression (AKA a SQL WHERE clause).
+     */
+    public MySqlSourceConfigFactory snapshotFilters(Map<String, String> snapshotFilters) {
+        this.snapshotFilters.putAll(snapshotFilters);
+        return this;
+    }
+
     /** Whether to parse gh-ost/pt-osc utility generated schema change events. Defaults to false. */
     public MySqlSourceConfigFactory parseOnLineSchemaChanges(boolean parseOnLineSchemaChanges) {
         this.parseOnLineSchemaChanges = parseOnLineSchemaChanges;
@@ -421,6 +440,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                snapshotFilters);
     }
 }

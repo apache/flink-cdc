@@ -271,6 +271,15 @@ public class MySqlSourceOptions {
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in binlog reading phase instead of being merged into the snapshot. WARNING: Skipping backfill might lead to data inconsistency because some binlog events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed binlog events should be handled specially.");
 
     @Experimental
+    public static final ConfigOption<String> SCAN_SNAPSHOT_FILTER =
+            ConfigOptions.key("scan.snapshot.filter")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). "
+                                    + "By default, no filter is applied, meaning the entire table will be synchronized. e.g. `id > 100`");
+
+    @Experimental
     public static final ConfigOption<Boolean> PARSE_ONLINE_SCHEMA_CHANGES =
             ConfigOptions.key("scan.parse.online.schema.changes.enabled")
                     .booleanType()
