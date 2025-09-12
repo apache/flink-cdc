@@ -89,16 +89,16 @@ public class FinishedSnapshotSplitInfo {
         FinishedSnapshotSplitInfo that = (FinishedSnapshotSplitInfo) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(splitId, that.splitId)
-                && Arrays.equals(splitStart, that.splitStart)
-                && Arrays.equals(splitEnd, that.splitEnd)
+                && Arrays.deepEquals(splitStart, that.splitStart)
+                && Arrays.deepEquals(splitEnd, that.splitEnd)
                 && Objects.equals(highWatermark, that.highWatermark);
     }
 
     @Override
     public int hashCode() {
         int result = Objects.hash(tableId, splitId, highWatermark);
-        result = 31 * result + Arrays.hashCode(splitStart);
-        result = 31 * result + Arrays.hashCode(splitEnd);
+        result = 31 * result + Arrays.deepHashCode(splitStart);
+        result = 31 * result + Arrays.deepHashCode(splitEnd);
         return result;
     }
 
@@ -111,9 +111,9 @@ public class FinishedSnapshotSplitInfo {
                 + splitId
                 + '\''
                 + ", splitStart="
-                + Arrays.toString(splitStart)
+                + Arrays.deepToString(splitStart)
                 + ", splitEnd="
-                + Arrays.toString(splitEnd)
+                + Arrays.deepToString(splitEnd)
                 + ", highWatermark="
                 + highWatermark
                 + '}';

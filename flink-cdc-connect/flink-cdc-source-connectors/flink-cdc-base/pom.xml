@@ -27,6 +27,10 @@ limitations under the License.
 
     <artifactId>flink-cdc-base</artifactId>
 
+    <properties>
+        <mockito.version>3.4.6</mockito.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -145,5 +149,14 @@ limitations under the License.
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <type>jar</type>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 </project>
