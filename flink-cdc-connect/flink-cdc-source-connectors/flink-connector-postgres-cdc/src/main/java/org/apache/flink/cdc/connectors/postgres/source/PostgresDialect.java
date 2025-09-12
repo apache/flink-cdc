@@ -153,7 +153,7 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
+    public boolean isDataCollectionIdCaseInsensitive(JdbcSourceConfig sourceConfig) {
         // from Postgres docs:
         //
         // SQL is case insensitive about key words and identifiers,
