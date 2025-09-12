@@ -17,13 +17,20 @@
 
 package io.debezium.connector.mysql;
 
-import java.util.ArrayList;
+import com.google.common.collect.Range;
+import com.google.common.collect.RangeSet;
+import com.google.common.collect.TreeRangeSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Utils for handling GTIDs. */
 public class GtidUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(GtidUtils.class);
 
     /**
      * This method corrects the GTID set that has been restored from a state or checkpoint using the
@@ -39,21 +46,61 @@ public class GtidUtils {
         for (GtidSet.UUIDSet uuidSet : restoredGtidSet.getUUIDSets()) {
             GtidSet.UUIDSet serverUuidSet = newSet.get(uuidSet.getUUID());
             if (serverUuidSet != null) {
-                long restoredIntervalEnd = getIntervalEnd(uuidSet);
-                List<com.github.shyiko.mysql.binlog.GtidSet.Interval> newIntervals =
-                        new ArrayList<>();
-                for (GtidSet.Interval serverInterval : serverUuidSet.getIntervals()) {
-                    if (serverInterval.getEnd() <= restoredIntervalEnd) {
-                        newIntervals.add(
-                                new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                        serverInterval.getStart(), serverInterval.getEnd()));
-                    } else if (serverInterval.getStart() <= restoredIntervalEnd
-                            && serverInterval.getEnd() > restoredIntervalEnd) {
-                        newIntervals.add(
-                                new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                        serverInterval.getStart(), restoredIntervalEnd));
+                long serverIntervalEnd = getIntervalEnd(serverUuidSet);
+
+                // The end of the restored interval cannot be greater than the end of the server
+                // span
+                RangeSet<Long> restoredRangeSet = TreeRangeSet.create();
+                for (GtidSet.Interval restoredInterval : uuidSet.getIntervals()) {
+                    if (restoredInterval.getStart() > serverIntervalEnd) {
+                        LOG.warn(
+                                "Discard restored interval {} because it is greater than the end of the server span {}",
+                                restoredInterval,
+                                serverIntervalEnd);
+                    } else if (restoredInterval.getEnd() > serverIntervalEnd) {
+                        Range<Long> adjustedInterval =
+                                Range.closed(restoredInterval.getStart(), serverIntervalEnd);
+                        restoredRangeSet.add(adjustedInterval);
+                        LOG.warn(
+                                "Adjust restored interval {} to {} because it is greater than the end of the server span {}",
+                                restoredInterval,
+                                adjustedInterval,
+                                serverIntervalEnd);
+                    } else {
+                        restoredRangeSet.add(
+                                Range.closed(
+                                        restoredInterval.getStart(), restoredInterval.getEnd()));
                     }
                 }
+
+                // Add the server intervals that do not overlap with the middle gap of the restored
+                // intervals
+                final Range<Long> restoredSmallestRange =
+                        restoredRangeSet.asRanges().iterator().next();
+                serverUuidSet.getIntervals().stream()
+                        .filter(
+                                interval ->
+                                        interval.getStart()
+                                                <= restoredSmallestRange.upperEndpoint())
+                        .forEach(
+                                interval ->
+                                        restoredRangeSet.add(
+                                                Range.closed(
+                                                        interval.getStart(),
+                                                        Math.min(
+                                                                interval.getEnd(),
+                                                                restoredSmallestRange
+                                                                        .upperEndpoint()))));
+
+                List<com.github.shyiko.mysql.binlog.GtidSet.Interval> newIntervals =
+                        restoredRangeSet.asRanges().stream()
+                                .map(
+                                        range ->
+                                                new com.github.shyiko.mysql.binlog.GtidSet.Interval(
+                                                        range.lowerEndpoint(),
+                                                        range.upperEndpoint()))
+                                .collect(Collectors.toList());
+
                 newSet.put(
                         uuidSet.getUUID(),
                         new GtidSet.UUIDSet(
