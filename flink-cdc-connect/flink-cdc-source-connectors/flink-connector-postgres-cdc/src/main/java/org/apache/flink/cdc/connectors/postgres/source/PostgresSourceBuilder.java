@@ -42,10 +42,14 @@ import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresSourceRead
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.relational.TableId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Constructor;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -59,6 +63,8 @@ public class PostgresSourceBuilder<T> {
 
     private final PostgresSourceConfigFactory configFactory = new PostgresSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
+
+    private static final Logger LOG = LoggerFactory.getLogger(PostgresSourceBuilder.class);
 
     private PostgresSourceBuilder() {}
 
@@ -219,8 +225,9 @@ public class PostgresSourceBuilder<T> {
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public PostgresSourceBuilder<T> chunkKeyColumn(String chunkKeyColumn) {
-        this.configFactory.chunkKeyColumn(chunkKeyColumn);
+    public PostgresSourceBuilder<T> chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
+        LOG.info("Setting chunk key column for table " + objectPath + " to " + chunkKeyColumn);
+        this.configFactory.chunkKeyColumn(objectPath, chunkKeyColumn);
         return this;
     }
 
@@ -306,9 +313,24 @@ public class PostgresSourceBuilder<T> {
      */
     public PostgresIncrementalSource<T> build() {
         PostgresOffsetFactory offsetFactory = new PostgresOffsetFactory();
+        // get params of jdbcsourceconfig
+
+        Constructor<?>[] constructors = JdbcSourceConfig.class.getDeclaredConstructors();
+        for (Constructor<?> constructor : constructors) {
+            // Get params type of constructor
+            Class<?>[] parameterTypes = constructor.getParameterTypes();
+            LOG.info("Constructor: " + constructor + ", parameter types: ");
+            for (Class<?> paramType : parameterTypes) {
+                LOG.info(" \n " + paramType.getName());
+            }
+        }
         PostgresDialect dialect = new PostgresDialect(configFactory.create(0));
-        return new PostgresIncrementalSource<>(
-                configFactory, checkNotNull(deserializer), offsetFactory, dialect);
+
+        PostgresIncrementalSource<T> source =
+                new PostgresIncrementalSource<>(
+                        configFactory, checkNotNull(deserializer), offsetFactory, dialect);
+
+        return source;
     }
 
     public PostgresSourceConfigFactory getConfigFactory() {
