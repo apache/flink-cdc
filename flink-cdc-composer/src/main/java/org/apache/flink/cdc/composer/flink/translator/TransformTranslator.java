@@ -50,30 +50,21 @@ public class TransformTranslator {
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
-            SupportedMetadataColumn[] supportedMetadataColumns,
-            boolean shouldStoreSchemasInState,
-            OperatorUidGenerator operatorUidGenerator) {
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         if (transforms.isEmpty()) {
             return input;
         }
         return input.transform(
-                        "Transform:Schema",
-                        new EventTypeInfo(),
-                        generatePreTransform(
-                                transforms,
-                                udfFunctions,
-                                models,
-                                supportedMetadataColumns,
-                                shouldStoreSchemasInState))
-                .uid(operatorUidGenerator.generateUid("pre-transform"));
+                "Transform:Schema",
+                new EventTypeInfo(),
+                generatePreTransform(transforms, udfFunctions, models, supportedMetadataColumns));
     }
 
     private PreTransformOperator generatePreTransform(
             List<TransformDef> transforms,
             List<UdfDef> udfFunctions,
             List<ModelDef> models,
-            SupportedMetadataColumn[] supportedMetadataColumns,
-            boolean shouldStoreSchemasInState) {
+            SupportedMetadataColumn[] supportedMetadataColumns) {
 
         PreTransformOperatorBuilder preTransformFunctionBuilder = PreTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
@@ -94,8 +85,7 @@ public class TransformTranslator {
                                 .map(this::udfDefToUDFTuple)
                                 .collect(Collectors.toList()))
                 .addUdfFunctions(
-                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()))
-                .shouldStoreSchemasInState(shouldStoreSchemasInState);
+                        models.stream().map(this::modelToUDFTuple).collect(Collectors.toList()));
 
         return preTransformFunctionBuilder.build();
     }

@@ -125,7 +125,11 @@ class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
+                        reOrderSnapshotSplits(snapshotSplits),
+                        sqlServerSourceFetchTaskContext,
+                        1,
+                        dataType,
+                        hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -190,7 +194,11 @@ class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
+                        reOrderSnapshotSplits(snapshotSplits),
+                        sqlServerSourceFetchTaskContext,
+                        1,
+                        dataType,
+                        hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -275,7 +283,11 @@ class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
 
         List<String> actual =
                 readTableSnapshotSplits(
-                        snapshotSplits, sqlServerSourceFetchTaskContext, 1, dataType, hooks);
+                        reOrderSnapshotSplits(snapshotSplits),
+                        sqlServerSourceFetchTaskContext,
+                        1,
+                        dataType,
+                        hooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
@@ -358,5 +370,21 @@ class SqlServerScanFetchTaskTest extends SqlServerSourceTestBase {
             return false;
         }
         return true;
+    }
+
+    // Due to the default enabling of scan.incremental.snapshot.unbounded-chunk-first.enabled,
+    // the split order becomes [end,null], [null,start], ... which is different from the original
+    // order.
+    // The first split in the list is actually the last unbounded split that should be at the end.
+    // This method adjusts the order to restore the original sequence: [null,start], ...,
+    // [end,null],
+    // ensuring the correctness of test cases.
+    private List<SnapshotSplit> reOrderSnapshotSplits(List<SnapshotSplit> snapshotSplits) {
+        if (snapshotSplits.size() > 1) {
+            SnapshotSplit firstSplit = snapshotSplits.get(0);
+            snapshotSplits.remove(0);
+            snapshotSplits.add(firstSplit);
+        }
+        return snapshotSplits;
     }
 }

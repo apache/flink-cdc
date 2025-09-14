@@ -147,8 +147,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     /**
      * The name of the Postgres logical decoding plug-in installed on the server. Supported values
-     * are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and
-     * pgoutput.
+     * are decoderbufs and pgoutput.
      */
     public void decodingPluginName(String name) {
         this.pluginName = name;

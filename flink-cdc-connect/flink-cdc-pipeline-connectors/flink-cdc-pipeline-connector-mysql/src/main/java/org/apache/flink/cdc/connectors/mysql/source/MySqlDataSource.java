@@ -29,6 +29,7 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlPipelineRecordEmitter;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
+import org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -72,7 +73,8 @@ public class MySqlDataSource implements DataSource {
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
                         includeComments,
-                        sourceConfig.isTreatTinyInt1AsBoolean());
+                        sourceConfig.isTreatTinyInt1AsBoolean(),
+                        MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig));
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
