@@ -20,15 +20,18 @@ package org.apache.flink.cdc.common.utils;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -68,6 +71,7 @@ import javax.annotation.Nullable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -212,6 +216,7 @@ public class SchemaMergingUtils {
                     oldTypeMapping.put(columnName, beforeType);
                     newTypeMapping.put(columnName, afterType);
                 }
+                beforeColumns.remove(columnName);
             } else {
                 if (afterWhichColumnPosition == null) {
                     appendedColumns.add(
@@ -238,6 +243,10 @@ public class SchemaMergingUtils {
                     new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
         }
 
+        if (!beforeColumns.isEmpty()) {
+            schemaChangeEvents.add(
+                    new DropColumnEvent(tableId, new ArrayList<>(beforeColumns.keySet())));
+        }
         return schemaChangeEvents;
     }
 
@@ -664,12 +673,11 @@ public class SchemaMergingUtils {
         }
 
         if (destinationType instanceof DateType) {
-            try {
-                return coerceToLong(originalField);
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException(
-                        String.format("Cannot fit \"%s\" into a DATE column.", originalField));
-            }
+            return coerceToDate(originalField);
+        }
+
+        if (destinationType instanceof TimeType) {
+            return coerceToTime(originalField);
         }
 
         if (destinationType.is(DataTypeRoot.TIMESTAMP_WITHOUT_TIME_ZONE)
@@ -713,13 +721,12 @@ public class SchemaMergingUtils {
             return BinaryStringData.fromString("null");
         }
 
-        if (originalType instanceof DateType) {
-            long epochOfDay = coerceToLong(originalField);
-            return BinaryStringData.fromString(LocalDate.ofEpochDay(epochOfDay).toString());
-        }
-
         if (originalField instanceof StringData) {
             return originalField;
+        }
+
+        if (originalType instanceof DateType || originalType instanceof TimeType) {
+            return BinaryStringData.fromString(originalField.toString());
         }
 
         if (originalField instanceof byte[]) {
@@ -864,6 +871,52 @@ public class SchemaMergingUtils {
         }
     }
 
+    private static DateData coerceToDate(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof DateData) {
+            return (DateData) o;
+        }
+        if (o instanceof Number) {
+            return DateData.fromEpochDay(((Number) o).intValue());
+        }
+        if (o instanceof String) {
+            return DateData.fromIsoLocalDateString((String) o);
+        }
+        if (o instanceof LocalDate) {
+            return DateData.fromLocalDate((LocalDate) o);
+        }
+        if (o instanceof LocalDateTime) {
+            return DateData.fromLocalDate(((LocalDateTime) o).toLocalDate());
+        }
+        throw new IllegalArgumentException(
+                String.format("Cannot fit type \"%s\" into a DATE column. ", o.getClass()));
+    }
+
+    private static TimeData coerceToTime(Object o) {
+        if (o == null) {
+            return null;
+        }
+        if (o instanceof TimeData) {
+            return (TimeData) o;
+        }
+        if (o instanceof Number) {
+            return TimeData.fromNanoOfDay(((Number) o).longValue());
+        }
+        if (o instanceof String) {
+            return TimeData.fromIsoLocalTimeString((String) o);
+        }
+        if (o instanceof LocalTime) {
+            return TimeData.fromLocalTime((LocalTime) o);
+        }
+        if (o instanceof LocalDateTime) {
+            return TimeData.fromLocalTime(((LocalDateTime) o).toLocalTime());
+        }
+        throw new IllegalArgumentException(
+                String.format("Cannot fit type \"%s\" into a TIME column. ", o.getClass()));
+    }
+
     private static TimestampData coerceToTimestamp(Object object, String timezone) {
         if (object == null) {
             return null;
@@ -881,6 +934,9 @@ public class SchemaMergingUtils {
                             ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
         } else if (object instanceof TimestampData) {
             return (TimestampData) object;
+        } else if (object instanceof DateData) {
+            return TimestampData.fromLocalDateTime(
+                    ((DateData) object).toLocalDate().atStartOfDay());
         } else {
             throw new IllegalArgumentException(
                     String.format(

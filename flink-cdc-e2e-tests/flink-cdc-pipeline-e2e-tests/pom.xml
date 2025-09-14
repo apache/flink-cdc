@@ -35,13 +35,14 @@ limitations under the License.
         <mysql.driver.version>8.0.27</mysql.driver.version>
         <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
         <starrocks.connector.version>1.2.10_flink-${flink-major-1.19}</starrocks.connector.version>
-        <paimon.version>1.0.1</paimon.version>
+        <paimon.version>1.2.0</paimon.version>
         <flink.release.download.skip>false</flink.release.download.skip>
         <flink.release.name>flink-${flink.version}-bin-scala_${scala.binary.version}.tgz</flink.release.name>
         <flink.release.mirror>https://dlcdn.apache.org/flink/flink-${flink.version}</flink.release.mirror>
         <maven.plugin.download.version>1.6.8</maven.plugin.download.version>
         <iceberg.version>1.6.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
+        <fluss.version>0.7.0</fluss.version>
     </properties>
 
     <dependencies>
@@ -94,6 +95,15 @@ limitations under the License.
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
@@ -167,6 +177,19 @@ limitations under the License.
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-postgres-cdc</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.google.protobuf</groupId>
+                    <artifactId>protobuf-java</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-flink-runtime-${flink-major-1.19}</artifactId>
             <version>${iceberg.version}</version>
@@ -201,6 +224,14 @@ limitations under the License.
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>mysql</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- test dependencies on TestContainers -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
@@ -370,10 +401,25 @@ limitations under the License.
                             <includes>
                                 <include>**/*.*</include>
                             </includes>
+                            <excludes>
+                                <exclude>**/MysqlE2eWithYarnApplicationITCase.java</exclude>
+                            </excludes>
                             <forkCount>1</forkCount>
                             <systemPropertyVariables>
                                 <moduleDir>${project.basedir}</moduleDir>
                             </systemPropertyVariables>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>run-last-test</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <includes>
+                                <include>**/MysqlE2eWithYarnApplicationITCase.java</include>
+                            </includes>
                         </configuration>
                     </execution>
                 </executions>
@@ -472,6 +518,16 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>postgres-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
                             <version>${project.version}</version>
                             <destFileName>doris-cdc-pipeline-connector.jar</destFileName>
@@ -543,6 +599,24 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-iceberg</artifactId>
                             <version>${project.version}</version>
                             <destFileName>iceberg-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-fluss</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>fluss-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>com.alibaba.fluss</groupId>
+                            <artifactId>fluss-flink-${flink.major.version}</artifactId>
+                            <version>${fluss.version}</version>
+                            <destFileName>fluss-sql-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

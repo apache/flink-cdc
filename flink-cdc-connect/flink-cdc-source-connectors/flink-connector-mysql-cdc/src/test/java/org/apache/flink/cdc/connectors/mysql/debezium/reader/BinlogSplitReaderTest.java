@@ -118,6 +118,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
+        LOG.info("Starting MySqlNoGtid containers...");
+        Startables.deepStart(Stream.of(MYSQL_CONTAINER_NOGTID)).join();
+        LOG.info("Container MySqlNoGtid is started.");
     }
 
     @AfterAll
@@ -125,6 +128,9 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
+        LOG.info("Stopping MySqlNoGtid containers...");
+        MYSQL_CONTAINER_NOGTID.stop();
+        LOG.info("Container MySqlNoGtid is stopped.");
     }
 
     @AfterEach
@@ -445,6 +451,53 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Create some binlog events
         makeCustomersBinlogEvents(
                 mySqlConnection, customerDatabase.qualifiedTableName("customers"), false);
+
+        final DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("id", DataTypes.BIGINT()),
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("address", DataTypes.STRING()),
+                        DataTypes.FIELD("phone_number", DataTypes.STRING()));
+        String[] expected =
+                new String[] {
+                    "-U[103, user_3, Shanghai, 123567891234]",
+                    "+U[103, user_3, Hangzhou, 123567891234]",
+                    "-D[102, user_2, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "-U[103, user_3, Hangzhou, 123567891234]",
+                    "+U[103, user_3, Shanghai, 123567891234]",
+                    "-U[1010, user_11, Shanghai, 123567891234]",
+                    "+U[1010, Hangzhou, Shanghai, 123567891234]",
+                    "+I[2001, user_22, Shanghai, 123567891234]",
+                    "+I[2002, user_23, Shanghai, 123567891234]",
+                    "+I[2003, user_24, Shanghai, 123567891234]"
+                };
+        List<String> actual = readBinlogSplits(dataType, reader, expected.length);
+        assertEqualsInOrder(Arrays.asList(expected), actual);
+
+        reader.close();
+    }
+
+    @Test
+    void testReadBinlogWithoutGtidFromLatestOffset() throws Exception {
+        customerDatabaseNoGtid.createAndInitialize();
+        MySqlSourceConfig sourceConfig =
+                getConfig(
+                        MYSQL_CONTAINER_NOGTID,
+                        customerDatabaseNoGtid,
+                        StartupOptions.latest(),
+                        new String[] {"customers"});
+        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
+        mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        // Create reader and submit splits
+        MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
+        BinlogSplitReader reader = createBinlogReader(sourceConfig);
+        reader.submitSplit(split);
+
+        // Create some binlog events
+        makeCustomersBinlogEvents(
+                mySqlConnection, customerDatabaseNoGtid.qualifiedTableName("customers"), false);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -1007,7 +1060,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
     @Test
     public void testBinlogOffsetCompareWithSnapshotAndBinlogPhase() throws Exception {
-        Startables.deepStart(Stream.of(MYSQL_CONTAINER_NOGTID)).join();
         // Preparations
         customerDatabaseNoGtid.createAndInitialize();
         MySqlSourceConfig sourceConfig =
@@ -1064,7 +1116,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
 
         List<SourceRecord> sourceRecords =
                 pollRecordsFromReader(binlogReader, RecordUtils::isDataChangeRecord);
-        MYSQL_CONTAINER_NOGTID.stop();
         Assertions.assertThat(sourceRecords).isEmpty();
     }
 

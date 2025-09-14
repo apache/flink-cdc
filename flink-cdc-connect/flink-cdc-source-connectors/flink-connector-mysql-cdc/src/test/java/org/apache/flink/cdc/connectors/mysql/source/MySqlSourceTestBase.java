@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.highavailability.nonha.embedded.EmbeddedHaServices;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
@@ -149,11 +150,22 @@ public abstract class MySqlSourceTestBase extends TestLogger {
         }
     }
 
+    protected static void ensureJmLeaderServiceExists(
+            HaLeadershipControl leadershipControl, JobID jobId) throws Exception {
+        EmbeddedHaServices control = (EmbeddedHaServices) leadershipControl;
+
+        // Make sure JM leader service has been created, or an NPE might be thrown when we're
+        // triggering JM failover later.
+        control.getJobManagerLeaderElection(jobId).close();
+    }
+
     protected static void triggerJobManagerFailover(
             JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
         final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
+        ensureJmLeaderServiceExists(haLeadershipControl, jobId);
         haLeadershipControl.revokeJobMasterLeadership(jobId).get();
         afterFailAction.run();
+        ensureJmLeaderServiceExists(haLeadershipControl, jobId);
         haLeadershipControl.grantJobMasterLeadership(jobId).get();
     }
 

@@ -244,12 +244,11 @@ Connector Options
     <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
         Whether to assign the unbounded chunks first during snapshot reading phase.<br>
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
-        Experimental option, defaults to false.
       </td>
     </tr>
     <tr>
@@ -352,7 +351,6 @@ The SQLServer CDC connector is a Flink Source connector which will read database
 The config option `scan.startup.mode` specifies the startup mode for SQLServer CDC consumer. The valid enumerations are:
 
 - `initial` (default): Takes a snapshot of structure and data of captured tables; useful if topics should be populated with a complete representation of the data from the captured tables.
-- `initial-only`: Takes a snapshot of structure and data like initial but instead does not transition into streaming changes once the snapshot has completed.
 - `latest-offset`: Takes a snapshot of the structure of captured tables only; useful if only changes happening from now onwards should be propagated to topics.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
