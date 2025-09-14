@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.flink.cdc.connectors.mongodb.source;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
@@ -39,7 +40,8 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +56,7 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.apache.flink.util.Preconditions.checkState;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** IT tests for {@link MongoDBSource}. */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
@@ -103,29 +106,25 @@ class MongoDBMetricsITCase extends MongoDBSourceTestBase {
         Map<String, Metric> metrics = metricReporter.getMetricsByGroup(group);
 
         // numRecordsOut
-        Assertions.assertEquals(
-                numSnapshotRecordsExpected,
-                group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
+        assertThat(group.getIOMetricGroup().getNumRecordsOutCounter().getCount())
+                .isEqualTo(numSnapshotRecordsExpected);
 
         // currentEmitEventTimeLag should be UNDEFINED during snapshot phase
-        Assertions.assertTrue(metrics.containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG));
+        assertThat(metrics).containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
         Gauge<Long> currentEmitEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
-        Assertions.assertEquals(
-                InternalSourceReaderMetricGroup.UNDEFINED,
-                (long) currentEmitEventTimeLag.getValue());
+        assertThat(currentEmitEventTimeLag.getValue())
+                .isEqualTo(InternalSourceReaderMetricGroup.UNDEFINED);
         // currentFetchEventTimeLag should be UNDEFINED during snapshot phase
-        Assertions.assertTrue(metrics.containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG));
+        assertThat(metrics).containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
         Gauge<Long> currentFetchEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
-        Assertions.assertEquals(
-                InternalSourceReaderMetricGroup.UNDEFINED,
-                (long) currentFetchEventTimeLag.getValue());
+        assertThat(currentFetchEventTimeLag.getValue())
+                .isEqualTo(InternalSourceReaderMetricGroup.UNDEFINED);
         // sourceIdleTime should be positive (we can't know the exact value)
-        Assertions.assertTrue(metrics.containsKey(MetricNames.SOURCE_IDLE_TIME));
+        assertThat(metrics).containsKey(MetricNames.SOURCE_IDLE_TIME);
         Gauge<Long> sourceIdleTime = (Gauge<Long>) metrics.get(MetricNames.SOURCE_IDLE_TIME);
-        Assertions.assertTrue(sourceIdleTime.getValue() > 0);
-        Assertions.assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        assertThat(sourceIdleTime.getValue()).isGreaterThan(0).isLessThan(TIMEOUT.toMillis());
 
         // --------------------------------- Binlog phase -----------------------------
         makeFirstPartChangeStreamEvents(mongodbClient.getDatabase(customerDatabase), "customers");
@@ -139,21 +138,21 @@ class MongoDBMetricsITCase extends MongoDBSourceTestBase {
 
         // Check metrics
         // numRecordsOut
-        Assertions.assertEquals(
-                numSnapshotRecordsExpected + numBinlogRecordsExpected,
-                group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
+        assertThat(group.getIOMetricGroup().getNumRecordsOutCounter().getCount())
+                .isEqualTo(numSnapshotRecordsExpected + numBinlogRecordsExpected);
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        Assertions.assertTrue(currentEmitEventTimeLag.getValue() > 0);
-        Assertions.assertTrue(currentEmitEventTimeLag.getValue() < TIMEOUT.toMillis());
+        assertThat(currentEmitEventTimeLag.getValue())
+                .isGreaterThan(0)
+                .isLessThan(TIMEOUT.toMillis());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        Assertions.assertTrue(currentFetchEventTimeLag.getValue() > 0);
-        Assertions.assertTrue(currentFetchEventTimeLag.getValue() < TIMEOUT.toMillis());
+        assertThat(currentFetchEventTimeLag.getValue())
+                .isGreaterThan(0)
+                .isLessThan(TIMEOUT.toMillis());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        Assertions.assertTrue(sourceIdleTime.getValue() > 0);
-        Assertions.assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        assertThat(sourceIdleTime.getValue()).isGreaterThan(0).isLessThan(TIMEOUT.toMillis());
 
         jobClient.cancel().get();
         iterator.close();
