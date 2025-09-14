@@ -1,19 +1,30 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.flink.cdc.connectors.mongodb.source;
 
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.connectors.mongodb.MongoDBSource;
-import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.Metric;
 import org.apache.flink.metrics.groups.OperatorMetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
 import org.apache.flink.runtime.metrics.groups.InternalSourceReaderMetricGroup;
-import org.apache.flink.runtime.minicluster.RpcServiceSharing;
-import org.apache.flink.runtime.testutils.InMemoryReporter;
-import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -22,112 +33,44 @@ import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
 import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
 import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
-import org.apache.flink.test.util.MiniClusterWithClientResource;
 
-import com.mongodb.ConnectionString;
-import com.mongodb.MongoClientSettings;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
 import static org.apache.flink.util.Preconditions.checkState;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /** IT tests for {@link MongoDBSource}. */
-@RunWith(Parameterized.class)
-public class MongoDBMetricCase {
-    protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
-    private static final Logger LOG = LoggerFactory.getLogger(MongoDBMetricCase.class);
-
-    public MongoDBMetricCase(String mongoVersion) {
-        this.mongoContainer =
-                new MongoDBContainer("mongo:" + mongoVersion)
-                        .withSharding()
-                        .withLogConsumer(new Slf4jLogConsumer(LOG));
-    }
-
-    public static String[] getMongoVersions() {
-        String specifiedMongoVersion = System.getProperty("specifiedMongoVersion");
-        if (specifiedMongoVersion != null) {
-            return new String[] {specifiedMongoVersion};
-        } else {
-            return new String[] {"6.0.16", "7.0.12"};
-        }
-    }
-
-    protected static final int DEFAULT_PARALLELISM = 4;
-
-    @Rule public final MongoDBContainer mongoContainer;
-
-    protected MongoClient mongodbClient;
-
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .setConfiguration(
-                                    metricReporter.addToConfiguration(new Configuration()))
-                            .build());
-
-    @Before
-    public void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(mongoContainer)).join();
-
-        MongoClientSettings settings =
-                MongoClientSettings.builder()
-                        .applyConnectionString(
-                                new ConnectionString(mongoContainer.getConnectionString()))
-                        .build();
-        mongodbClient = MongoClients.create(settings);
-
-        LOG.info("Containers are started.");
-    }
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
+class MongoDBMetricsITCase extends MongoDBSourceTestBase {
+    private static final Logger LOG = LoggerFactory.getLogger(MongoDBMetricsITCase.class);
 
     public static final Duration TIMEOUT = Duration.ofSeconds(300);
 
-    @Parameterized.Parameters(name = "mongoVersion: {0}")
-    public static Object[] parameters() {
-        return Stream.of(getMongoVersions()).map(e -> new Object[] {e}).toArray();
-    }
-
     @Test
-    public void testSourceMetrics() throws Exception {
-        String customerDatabase = mongoContainer.executeCommandFileInSeparateDatabase("customer");
+    void testSourceMetrics() throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
         env.setParallelism(1);
         env.enableCheckpointing(200L);
         SourceFunction<String> sourceFunction =
                 MongoDBSource.<String>builder()
-                        .hosts(mongoContainer.getHostAndPort())
+                        .hosts(MONGO_CONTAINER.getHostAndPort())
                         .username(FLINK_USER)
                         .password(FLINK_USER_PASSWORD)
                         .databaseList(customerDatabase)
@@ -160,29 +103,29 @@ public class MongoDBMetricCase {
         Map<String, Metric> metrics = metricReporter.getMetricsByGroup(group);
 
         // numRecordsOut
-        assertEquals(
+        Assertions.assertEquals(
                 numSnapshotRecordsExpected,
                 group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
 
         // currentEmitEventTimeLag should be UNDEFINED during snapshot phase
-        assertTrue(metrics.containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG));
+        Assertions.assertTrue(metrics.containsKey(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG));
         Gauge<Long> currentEmitEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_EMIT_EVENT_TIME_LAG);
-        assertEquals(
+        Assertions.assertEquals(
                 InternalSourceReaderMetricGroup.UNDEFINED,
                 (long) currentEmitEventTimeLag.getValue());
         // currentFetchEventTimeLag should be UNDEFINED during snapshot phase
-        assertTrue(metrics.containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG));
+        Assertions.assertTrue(metrics.containsKey(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG));
         Gauge<Long> currentFetchEventTimeLag =
                 (Gauge<Long>) metrics.get(MetricNames.CURRENT_FETCH_EVENT_TIME_LAG);
-        assertEquals(
+        Assertions.assertEquals(
                 InternalSourceReaderMetricGroup.UNDEFINED,
                 (long) currentFetchEventTimeLag.getValue());
         // sourceIdleTime should be positive (we can't know the exact value)
-        assertTrue(metrics.containsKey(MetricNames.SOURCE_IDLE_TIME));
+        Assertions.assertTrue(metrics.containsKey(MetricNames.SOURCE_IDLE_TIME));
         Gauge<Long> sourceIdleTime = (Gauge<Long>) metrics.get(MetricNames.SOURCE_IDLE_TIME);
-        assertTrue(sourceIdleTime.getValue() > 0);
-        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        Assertions.assertTrue(sourceIdleTime.getValue() > 0);
+        Assertions.assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
 
         // --------------------------------- Binlog phase -----------------------------
         makeFirstPartChangeStreamEvents(mongodbClient.getDatabase(customerDatabase), "customers");
@@ -196,21 +139,21 @@ public class MongoDBMetricCase {
 
         // Check metrics
         // numRecordsOut
-        assertEquals(
+        Assertions.assertEquals(
                 numSnapshotRecordsExpected + numBinlogRecordsExpected,
                 group.getIOMetricGroup().getNumRecordsOutCounter().getCount());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        assertTrue(currentEmitEventTimeLag.getValue() > 0);
-        assertTrue(currentEmitEventTimeLag.getValue() < TIMEOUT.toMillis());
+        Assertions.assertTrue(currentEmitEventTimeLag.getValue() > 0);
+        Assertions.assertTrue(currentEmitEventTimeLag.getValue() < TIMEOUT.toMillis());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        assertTrue(currentFetchEventTimeLag.getValue() > 0);
-        assertTrue(currentFetchEventTimeLag.getValue() < TIMEOUT.toMillis());
+        Assertions.assertTrue(currentFetchEventTimeLag.getValue() > 0);
+        Assertions.assertTrue(currentFetchEventTimeLag.getValue() < TIMEOUT.toMillis());
 
         // currentEmitEventTimeLag should be reasonably positive (we can't know the exact value)
-        assertTrue(sourceIdleTime.getValue() > 0);
-        assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
+        Assertions.assertTrue(sourceIdleTime.getValue() > 0);
+        Assertions.assertTrue(sourceIdleTime.getValue() < TIMEOUT.toMillis());
 
         jobClient.cancel().get();
         iterator.close();
