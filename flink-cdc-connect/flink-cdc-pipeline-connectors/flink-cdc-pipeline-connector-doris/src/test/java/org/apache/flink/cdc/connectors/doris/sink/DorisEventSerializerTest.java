@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.doris.sink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -88,7 +89,7 @@ public class DorisEventSerializerTest {
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("flink"),
-                                    (int) LocalDate.of(2025, 1, 16).toEpochDay(),
+                                    DateData.fromLocalDate(LocalDate.of(2025, 1, 16)),
                                     TimestampData.fromLocalDateTime(localDateTime),
                                 }));
 
@@ -118,7 +119,7 @@ public class DorisEventSerializerTest {
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("flink"),
-                                    (int) LocalDate.of(2025, 1, 16).toEpochDay(),
+                                    DateData.fromLocalDate(LocalDate.of(2025, 1, 16)),
                                     null,
                                 }));
 
@@ -148,7 +149,7 @@ public class DorisEventSerializerTest {
                                 new Object[] {
                                     new BinaryStringData("1"),
                                     new BinaryStringData("flink"),
-                                    (int) LocalDate.of(2025, 1, 16).toEpochDay(),
+                                    DateData.fromLocalDate(LocalDate.of(2025, 1, 16)),
                                     null,
                                 }));
 

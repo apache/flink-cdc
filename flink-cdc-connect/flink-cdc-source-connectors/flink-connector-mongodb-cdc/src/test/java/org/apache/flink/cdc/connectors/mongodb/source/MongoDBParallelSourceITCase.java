@@ -71,6 +71,9 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
     private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
+    private static final StreamExecutionEnvironment env =
+            StreamExecutionEnvironment.getExecutionEnvironment();
+
     @Test
     void testReadSingleCollectionWithSingleParallelism() throws Exception {
         testMongoDBParallelSource(
@@ -406,7 +409,6 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
             boolean skipBackFill, int fetchSize, int hookType, StartupOptions startupOptions)
             throws Exception {
         String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
         env.setParallelism(1);
 
@@ -517,7 +519,6 @@ class MongoDBParallelSourceITCase extends MongoDBSourceTestBase {
 
         String customerDatabase = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("customer");
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);

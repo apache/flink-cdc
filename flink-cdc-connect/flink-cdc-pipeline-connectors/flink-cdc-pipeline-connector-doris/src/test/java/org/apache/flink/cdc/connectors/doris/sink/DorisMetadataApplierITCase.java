@@ -46,6 +46,7 @@ import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisContainer;
 import org.apache.flink.cdc.connectors.doris.sink.utils.DorisSinkTestBase;
+import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -525,6 +526,108 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
                         String.format(
                                 "errCode = 2, detailMessage = Unknown table '%s'",
                                 tableId.getTableName()));
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMysqlDefaultTimestampValueConversionInCreateTable(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "created_time",
+                                        DataTypes.TIMESTAMP(),
+                                        null,
+                                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME))
+                        .column(
+                                new PhysicalColumn(
+                                        "updated_time",
+                                        DataTypes.TIMESTAMP_LTZ(),
+                                        null,
+                                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME))
+                        .primaryKey("id")
+                        .build();
+
+        runJobWithEvents(
+                Collections.singletonList(new CreateTableEvent(tableId, schema)), batchMode);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(150) | Yes | false | null",
+                        "created_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME,
+                        "updated_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @ParameterizedTest(name = "batchMode: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMysqlDefaultTimestampValueConversionInAddColumn(boolean batchMode) throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(tableId, initialSchema));
+
+        PhysicalColumn createdTimeCol =
+                new PhysicalColumn(
+                        "created_time",
+                        DataTypes.TIMESTAMP(),
+                        null,
+                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME);
+
+        PhysicalColumn updatedTimeCol =
+                new PhysicalColumn(
+                        "updated_time",
+                        DataTypes.TIMESTAMP_LTZ(),
+                        null,
+                        DorisSchemaUtils.INVALID_OR_MISSING_DATATIME);
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(createdTimeCol))));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(updatedTimeCol))));
+
+        runJobWithEvents(events, batchMode);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | INT | Yes | true | null",
+                        "name | VARCHAR(150) | Yes | false | null",
+                        "created_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME,
+                        "updated_time | DATETIME(6) | Yes | false | "
+                                + DorisSchemaUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
     }
 
     private void runJobWithEvents(List<Event> events, boolean batchMode) throws Exception {

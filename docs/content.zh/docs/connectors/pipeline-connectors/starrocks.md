@@ -180,7 +180,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Stream Load 的参数，控制 Stream Load 导入行为。例如 参数 `sink.properties.timeout` 用来控制导入的超时时间。
-            全部参数和解释请参考 <a href="https://docs.starrocks.io/zh/docs/sql-reference/sql-statements/data-manipulation/STREAM_LOAD">
+            全部参数和解释请参考 <a href="https://docs.starrocks.io/zh/docs/sql-reference/sql-statements/loading_unloading/STREAM_LOAD">
             STREAM LOAD</a>。</td>
     </tr>
     <tr>
@@ -189,7 +189,7 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>Integer</td>
       <td>自动创建 StarRocks 表时使用的桶数。对于 StarRocks 2.5 及之后的版本可以不设置，StarRocks 将会
-          <a href="https://docs.starrocks.io/zh/docs/table_design/Data_distribution/#%E7%A1%AE%E5%AE%9A%E5%88%86%E6%A1%B6%E6%95%B0%E9%87%8F">
+          <a href="https://docs.starrocks.io/zh/docs/3.3/table_design/data_distribution/#%E8%AE%BE%E7%BD%AE%E5%88%86%E6%A1%B6%E6%95%B0%E9%87%8F">
           自动设置分桶数量</a>；对于 StarRocks 2.5 之前的版本必须设置。</td>
     </tr>
     <tr>
@@ -229,7 +229,7 @@ pipeline:
   * 分桶键和主键相同
   * 没有分区键
   * 分桶数由 `table.create.num-buckets` 控制。如果使用的 StarRocks 2.5 及之后的版本可以不设置，StarRocks 能够
-    <a href="https://docs.starrocks.io/zh/docs/table_design/Data_distribution/#%E7%A1%AE%E5%AE%9A%E5%88%86%E6%A1%B6%E6%95%B0%E9%87%8F">
+    <a href="https://docs.starrocks.io/zh/docs/3.3/table_design/data_distribution/#%E8%AE%BE%E7%BD%AE%E5%88%86%E6%A1%B6%E6%95%B0%E9%87%8F">
     自动设置分桶数量</a>。对于 StarRocks 2.5 之前的版本必须设置，否则无法自动创建表。
 
 * 对于表结构变更同步

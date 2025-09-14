@@ -128,14 +128,14 @@ SELECT * FROM shipments;
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Schema name of the PostgreSQL database to monitor.</td>
+      <td>Schema name of the PostgreSQL database to monitor. The Schema name also supports regular expressions to monitor multiple schemas that satisfy the regular expressions.</td>
     </tr>
     <tr>
       <td>table-name</td>
       <td>required</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
-      <td>Table name of the PostgreSQL database to monitor.</td>
+      <td>Table name of the PostgreSQL database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions.</td>
     </tr>
     <tr>
       <td>port</td>
@@ -245,12 +245,11 @@ SELECT * FROM shipments;
     <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
         Whether to assign the unbounded chunks first during snapshot reading phase.<br>
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
-        Experimental option, defaults to false.
       </td>
     </tr>
     <tr>
@@ -263,6 +262,19 @@ SELECT * FROM shipments;
         If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.<br>
         WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised).
         For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.read-changelog-as-append-only.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to convert the changelog stream to an append-only stream.<br>
+        This feature is only used in special scenarios where you need to save upstream table deletion messages. For example, in a logical deletion scenario, users are not allowed to physically delete downstream messages. In this case, this feature is used in conjunction with the row_kind metadata field. Therefore, the downstream can save all detailed data at first, and then use the row_kind field to determine whether to perform logical deletion.<br>
+        The option values are as follows:<br>
+          <li>true: All types of messages (including INSERT, DELETE, UPDATE_BEFORE, and UPDATE_AFTER) will be converted into INSERT messages.</li>
+          <li>false (default): All types of messages are sent as is.</li>
       </td>
     </tr>
     </tbody>

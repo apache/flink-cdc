@@ -18,8 +18,10 @@
 package org.apache.flink.cdc.composer.flink;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -74,7 +76,9 @@ import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -2725,6 +2729,206 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2.5, ], after=[2.5, x], op=UPDATE, meta=({op_ts=5})}");
     }
 
+    private static final String[] UNICODE_STRINGS = {
+        "ascii test!?",
+        "大五",
+        "测试数据",
+        "ひびぴ",
+        "죠주쥬",
+        "ÀÆÉ",
+        "ÓÔŐÖ",
+        "αβγδε",
+        "בבקשה",
+        "твой",
+        "ภาษาไทย",
+        "piedzimst brīvi"
+    };
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformProjectionWithUnicodeCharacters(ValuesDataSink.SinkApi sinkApi)
+            throws Exception {
+        for (String unicodeString : UNICODE_STRINGS) {
+            List<String> expected =
+                    Stream.of(
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`prefix` STRING,`id` INT NOT NULL,`name` STRING,`age` INT,`suffix` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[{UNICODE_STRING} -> 1, 1, Alice, 18, 1 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[{UNICODE_STRING} -> 2, 2, Bob, 20, 2 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[{UNICODE_STRING} -> 2, 2, Bob, 20, 2 <- {UNICODE_STRING}], after=[{UNICODE_STRING} -> 2, 2, Bob, 30, 2 <- {UNICODE_STRING}], op=UPDATE, meta=()}",
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`prefix` STRING,`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`suffix` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[{UNICODE_STRING} -> 3, 3, Carol, 15, student, 3 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[{UNICODE_STRING} -> 4, 4, Derrida, 25, student, 4 <- {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[{UNICODE_STRING} -> 4, 4, Derrida, 25, student, 4 <- {UNICODE_STRING}], after=[], op=DELETE, meta=()}")
+                            .map(tpl -> tpl.replace("{UNICODE_STRING}", unicodeString))
+                            .collect(Collectors.toList());
+
+            runGenericTransformTest(
+                    sinkApi,
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "\\.*.\\.*.\\.*",
+                                    String.format(
+                                            "'%s' || ' -> ' || id AS prefix, *, id || ' <- ' || '%s' AS suffix",
+                                            unicodeString, unicodeString),
+                                    null,
+                                    null,
+                                    "id",
+                                    null,
+                                    null,
+                                    null)),
+                    expected);
+            outCaptor.reset();
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformFilterWithUnicodeCharacters(ValuesDataSink.SinkApi sinkApi) throws Exception {
+        for (String unicodeString : UNICODE_STRINGS) {
+            List<String> expected =
+                    Stream.of(
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, {UNICODE_STRING}], after=[2, Bob, 30, {UNICODE_STRING}], op=UPDATE, meta=()}",
+                                    "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, {UNICODE_STRING}], op=INSERT, meta=()}",
+                                    "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, {UNICODE_STRING}], after=[], op=DELETE, meta=()}")
+                            .map(tpl -> tpl.replace("{UNICODE_STRING}", unicodeString))
+                            .collect(Collectors.toList());
+
+            runGenericTransformTest(
+                    sinkApi,
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "\\.*.\\.*.\\.*",
+                                    String.format("*, '%s' AS extras", unicodeString),
+                                    String.format("extras = '%s'", unicodeString),
+                                    null,
+                                    "id",
+                                    null,
+                                    null,
+                                    null)),
+                    expected);
+            outCaptor.reset();
+
+            runGenericTransformTest(
+                    sinkApi,
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "\\.*.\\.*.\\.*",
+                                    String.format("*, '%s' AS extras", unicodeString),
+                                    String.format("extras <> '%s'", unicodeString),
+                                    null,
+                                    "id",
+                                    null,
+                                    null,
+                                    null)),
+                    Arrays.asList(
+                            "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                            "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`extras` STRING}, primaryKeys=id, partitionKeys=id, options=()}"));
+            outCaptor.reset();
+        }
+    }
+
+    @Test
+    void testDateAndTimeCastingFunctions() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId tableId = TableId.tableId("default_namespace", "default_schema", "my_table");
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("date_0", DataTypes.DATE())
+                        .physicalColumn("time_0", DataTypes.TIME(0))
+                        .physicalColumn("time_3", DataTypes.TIME(3))
+                        .physicalColumn("time_6", DataTypes.TIME(6))
+                        .physicalColumn("time_9", DataTypes.TIME(9))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(
+                        tableSchema.getColumnDataTypes().toArray(new DataType[0]));
+
+        List<Event> events =
+                Arrays.asList(
+                        new CreateTableEvent(tableId, tableSchema),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {
+                                            1,
+                                            DateData.fromLocalDate(LocalDate.of(1999, 12, 31)),
+                                            TimeData.fromLocalTime(LocalTime.of(21, 48, 25)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123000000)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123456000)),
+                                            TimeData.fromLocalTime(
+                                                    LocalTime.of(21, 48, 25, 123456789))
+                                        })),
+                        DataChangeEvent.insertEvent(
+                                tableId,
+                                generator.generate(
+                                        new Object[] {2, null, null, null, null, null})));
+
+        TransformDef transformDef =
+                new TransformDef(
+                        tableId.toString(),
+                        "*,"
+                                + "CAST(date_0 AS VARCHAR) AS date_0_str,"
+                                + "CAST(time_0 AS VARCHAR) AS time_0_str,"
+                                + "CAST(time_3 AS VARCHAR) AS time_3_str,"
+                                + "CAST(time_6 AS VARCHAR) AS time_6_str,"
+                                + "CAST(time_9 AS VARCHAR) AS time_9_str",
+                        null,
+                        "id",
+                        null,
+                        null,
+                        null,
+                        null);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, ValuesDataSink.SinkApi.SINK_V2);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(transformDef),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactlyInAnyOrder(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.my_table, schema=columns={`id` INT NOT NULL,`date_0` DATE,`time_0` TIME(0),`time_3` TIME(3),`time_6` TIME(6),`time_9` TIME(9),`date_0_str` STRING,`time_0_str` STRING,`time_3_str` STRING,`time_6_str` STRING,`time_9_str` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[1, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123, 1999-12-31, 21:48:25, 21:48:25.123, 21:48:25.123, 21:48:25.123], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.my_table, before=[], after=[2, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}");
+    }
+
     private List<Event> generateFloorCeilAndRoundEvents(TableId tableId) {
         List<Event> events = new ArrayList<>();
         Schema schema =
@@ -3131,14 +3335,16 @@ class FlinkPipelineTransformITCase {
                         .toInstant(ZoneOffset.UTC);
 
         long milliSecondsInOneDay = 24 * 60 * 60 * 1000;
+        assertThat(TimeData.fromIsoLocalTimeString(localTime))
+                .isEqualTo(
+                        TimeData.fromMillisOfDay(
+                                (int) (instant.toEpochMilli() % milliSecondsInOneDay)));
 
-        assertThat(instant.toEpochMilli() % milliSecondsInOneDay)
-                .isEqualTo(Long.parseLong(localTime));
-
-        String currentDate = tokens.get(5);
-
-        assertThat(instant.toEpochMilli() / milliSecondsInOneDay)
-                .isEqualTo(Long.parseLong(currentDate));
+        String localDate = tokens.get(5);
+        assertThat(DateData.fromIsoLocalDateString(localDate))
+                .isEqualTo(
+                        DateData.fromEpochDay(
+                                (int) (instant.toEpochMilli() / milliSecondsInOneDay)));
     }
 
     BinaryRecordData generate(Schema schema, Object... fields) {

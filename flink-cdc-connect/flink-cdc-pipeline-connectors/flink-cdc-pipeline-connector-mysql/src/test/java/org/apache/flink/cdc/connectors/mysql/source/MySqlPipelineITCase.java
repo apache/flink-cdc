@@ -45,6 +45,7 @@ import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
+import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
@@ -59,6 +60,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -255,7 +258,274 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    void testExcludeTables() throws Exception {
+    void testSqlInjection() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        env.setParallelism(1);
+        String sqlInjectionTable = "sqlInjection`; DROP TABLE important_data; --";
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), sqlInjectionTable);
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE %s.%s (  "
+                                    + "id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,\n"
+                                    + "  name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
+                                    + "  description VARCHAR(512),\n"
+                                    + "  weight FLOAT(6)"
+                                    + ");\n",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE %s.%s AUTO_INCREMENT = 101;",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
+            statement.execute(
+                    String.format(
+                            "INSERT INTO %s.%s\n"
+                                    + "VALUES (default,\"scooter\",\"Small 2-wheel scooter\",3.14),\n"
+                                    + "       (default,\"car battery\",\"12V car battery\",8.1),\n"
+                                    + "       (default,\"12-pack drill bits\",\"12-pack of drill bits with sizes ranging from #40 to #3\",0.8),\n"
+                                    + "       (default,\"hammer\",\"12oz carpenter's hammer\",0.75),\n"
+                                    + "       (default,\"hammer\",\"14oz carpenter's hammer\",0.875),\n"
+                                    + "       (default,\"hammer\",\"16oz carpenter's hammer\",1.0),\n"
+                                    + "       (default,\"rocks\",\"box of assorted rocks\",5.3),\n"
+                                    + "       (default,\"jacket\",\"water resistent black wind breaker\",0.1),\n"
+                                    + "       (default,\"spare tire\",\"24 inch spare tire\",22.2);",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
+        }
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\.sql.*")
+                        .startupOptions(StartupOptions.initial())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(10_000);
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        tableId,
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "name", DataTypes.VARCHAR(255).notNull(), null, "flink")
+                                .physicalColumn("description", DataTypes.VARCHAR(512))
+                                .physicalColumn("weight", DataTypes.FLOAT())
+                                .primaryKey(Collections.singletonList("id"))
+                                .build());
+
+        // generate snapshot data
+        List<Event> expectedSnapshot = getSnapshotExpected(tableId);
+
+        List<Event> expectedBinlog = new ArrayList<>();
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE %s.%s ADD COLUMN `desc1` VARCHAR(45) NULL AFTER `weight`;",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
+            expectedBinlog.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn("desc1", DataTypes.VARCHAR(45)),
+                                            AddColumnEvent.ColumnPosition.AFTER,
+                                            "weight"))));
+            statement.execute(
+                    String.format(
+                            "INSERT INTO %s.%s\n"
+                                    + "VALUES (default,\"scooter\",\"Small 2-wheel scooter\",3.14, 1.1),\n"
+                                    + "       (default,\"car battery\",\"12V car battery\",8.1, 1.1);",
+                            StatementUtils.quote(inventoryDatabase.getDatabaseName()),
+                            StatementUtils.quote(sqlInjectionTable)));
+            RowType rowType =
+                    RowType.of(
+                            DataTypes.INT().notNull(),
+                            DataTypes.VARCHAR(255).notNull(),
+                            DataTypes.VARCHAR(512),
+                            DataTypes.FLOAT(),
+                            DataTypes.VARCHAR(45));
+            BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+            expectedBinlog.add(
+                    DataChangeEvent.insertEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        110,
+                                        BinaryStringData.fromString("scooter"),
+                                        BinaryStringData.fromString("Small 2-wheel scooter"),
+                                        3.14f,
+                                        BinaryStringData.fromString("1.1")
+                                    })));
+            expectedBinlog.add(
+                    DataChangeEvent.insertEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        111,
+                                        BinaryStringData.fromString("car battery"),
+                                        BinaryStringData.fromString("12V car battery"),
+                                        8.1f,
+                                        BinaryStringData.fromString("1.1")
+                                    })));
+        }
+
+        // In this configuration, several subtasks might emit their corresponding CreateTableEvent
+        // to downstream. Since it is not possible to predict how many CreateTableEvents should we
+        // expect, we simply filter them out from expected sets, and assert there's at least one.
+        List<Event> actual =
+                fetchResultsExcept(
+                        events, expectedSnapshot.size() + expectedBinlog.size(), createTableEvent);
+        assertThat(actual.subList(0, expectedSnapshot.size()))
+                .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+        assertThat(actual.subList(expectedSnapshot.size(), actual.size()))
+                .isEqualTo(expectedBinlog);
+    }
+
+    @Test
+    void testLatestOffsetStartupMode() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\.products")
+                        .startupOptions(StartupOptions.latest())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(10_000);
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "products");
+
+        List<Event> expectedBinlog = new ArrayList<>();
+        try (Connection connection = inventoryDatabase.getJdbcConnection();
+                Statement statement = connection.createStatement()) {
+            expectedBinlog.addAll(executeAlterAndProvideExpected(tableId, statement));
+
+            RowType rowType =
+                    RowType.of(
+                            new DataType[] {
+                                DataTypes.INT().notNull(),
+                                DataTypes.VARCHAR(255).notNull(),
+                                DataTypes.FLOAT(),
+                                DataTypes.VARCHAR(45),
+                                DataTypes.VARCHAR(55)
+                            },
+                            new String[] {"id", "name", "weight", "col1", "col2"});
+            BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
+            // insert more data
+            statement.execute(
+                    String.format(
+                            "INSERT INTO `%s`.`products` VALUES (default,'scooter',5.5,'c-10','c-20');",
+                            inventoryDatabase.getDatabaseName())); // 110
+            expectedBinlog.add(
+                    DataChangeEvent.insertEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        110,
+                                        BinaryStringData.fromString("scooter"),
+                                        5.5f,
+                                        BinaryStringData.fromString("c-10"),
+                                        BinaryStringData.fromString("c-20")
+                                    })));
+            statement.execute(
+                    String.format(
+                            "INSERT INTO `%s`.`products` VALUES (default,'football',6.6,'c-11','c-21');",
+                            inventoryDatabase.getDatabaseName())); // 111
+            expectedBinlog.add(
+                    DataChangeEvent.insertEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        111,
+                                        BinaryStringData.fromString("football"),
+                                        6.6f,
+                                        BinaryStringData.fromString("c-11"),
+                                        BinaryStringData.fromString("c-21")
+                                    })));
+            statement.execute(
+                    String.format(
+                            "UPDATE `%s`.`products` SET `col1`='c-12', `col2`='c-22' WHERE id=110;",
+                            inventoryDatabase.getDatabaseName()));
+            expectedBinlog.add(
+                    DataChangeEvent.updateEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        110,
+                                        BinaryStringData.fromString("scooter"),
+                                        5.5f,
+                                        BinaryStringData.fromString("c-10"),
+                                        BinaryStringData.fromString("c-20")
+                                    }),
+                            generator.generate(
+                                    new Object[] {
+                                        110,
+                                        BinaryStringData.fromString("scooter"),
+                                        5.5f,
+                                        BinaryStringData.fromString("c-12"),
+                                        BinaryStringData.fromString("c-22")
+                                    })));
+            statement.execute(
+                    String.format(
+                            "DELETE FROM `%s`.`products` WHERE `id` = 111;",
+                            inventoryDatabase.getDatabaseName()));
+            expectedBinlog.add(
+                    DataChangeEvent.deleteEvent(
+                            tableId,
+                            generator.generate(
+                                    new Object[] {
+                                        111,
+                                        BinaryStringData.fromString("football"),
+                                        6.6f,
+                                        BinaryStringData.fromString("c-11"),
+                                        BinaryStringData.fromString("c-21")
+                                    })));
+        }
+        // In this configuration, several subtasks might emit their corresponding CreateTableEvent
+        // to downstream. Since it is not possible to predict how many CreateTableEvents should we
+        // expect, we simply filter them out from expected sets, and assert there's at least one.
+
+        Event createTableEvent = getProductsCreateTableEvent(tableId);
+        List<Event> actual = fetchResultsExcept(events, expectedBinlog.size(), createTableEvent);
+        assertThat(actual).isEqualTo(expectedBinlog);
+    }
+
+    @ParameterizedTest(name = "batchEmit: {0}")
+    @ValueSource(booleans = {true, false})
+    void testExcludeTables(boolean inBatch) throws Exception {
         inventoryDatabase.createAndInitialize();
         String databaseName = inventoryDatabase.getDatabaseName();
         MySqlSourceConfigFactory configFactory =
@@ -901,6 +1171,18 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
             expected.add(
                     new TruncateTableEvent(
                             TableId.tableId(inventoryDatabase.getDatabaseName(), "orders")));
+
+            statement.execute(
+                    String.format(
+                            "ALTER TABLE `%s`.`customers` ADD COLUMN `varchar0` VARCHAR(0) NULL;",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    new AddColumnEvent(
+                            TableId.tableId(inventoryDatabase.getDatabaseName(), "customers"),
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "varchar0", DataTypes.STRING())))));
 
             // Test drop table DDL
             statement.execute(
