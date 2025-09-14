@@ -69,22 +69,22 @@ under the License.
    ```yaml
    version: '2.1'
    services:
-    Zookeeper:
-        image: zookeeper:3.7.1
-        ports:
-            - "2181:2181"
-        environment:
-            - ALLOW_ANONYMOUS_LOGIN=yes
-    Kafka:
-        image: bitnami/kafka:2.8.1
-        ports:
-            - "9092:9092"
-            - "9093:9093"
-        environment:
-            - ALLOW_PLAINTEXT_LISTENER=yes
-            - KAFKA_LISTENERS=PLAINTEXT://:9092
-            - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://192.168.67.2:9092
-            - KAFKA_ZOOKEEPER_CONNECT=192.168.67.2:2181
+     Zookeeper:
+       image: zookeeper:3.7.1
+       ports:
+         - "2181:2181"
+       environment:
+         - ALLOW_ANONYMOUS_LOGIN=yes
+     Kafka:
+       image: bitnami/kafka:2.8.1
+       ports:
+         - "9092:9092"
+         - "9093:9093"
+       environment:
+         - ALLOW_PLAINTEXT_LISTENER=yes
+         - KAFKA_LISTENERS=PLAINTEXT://:9092
+         - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://Kafka:9092
+         - KAFKA_ZOOKEEPER_CONNECT=Zookeeper:2181
      MySQL:
        image: debezium/example-mysql:1.1
        ports:
@@ -94,7 +94,7 @@ under the License.
          - MYSQL_USER=mysqluser
          - MYSQL_PASSWORD=mysqlpw
    ```
-注意：文件里面的 192.168.67.2 为内网 IP，可通过 ifconfig 查找。  
+注意：文件里面的 192.168.67.2 为内网 IP，可通过 ifconfig 查找。
 该 Docker Compose 中包含的容器有：
 - MySQL: 包含商品信息的数据库 `app_db`
 - Kafka: 存储从 MySQL 中根据规则映射过来的结果表
@@ -199,8 +199,6 @@ under the License.
    pipeline:
      name: MySQL to Kafka Pipeline
      parallelism: 1
- 
-   
    ```
 
 其中：
@@ -228,7 +226,7 @@ under the License.
 
 可以通过kafka自带的客户端查看Topic情况，得到debezium-json格式的内容：
 ```shell
-  docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server 192.168.67.2:9092 --topic yaml-mysql-kafka --from-beginning
+  docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server 0.0.0.0:9092 --topic yaml-mysql-kafka --from-beginning
 ```
 debezium-json 格式包含了 before,after,op,source 几个元素，展示示例如下：
 ```json
@@ -369,7 +367,7 @@ Flink CDC 提供了将源表的表结构/数据路由到其他表名的配置，
 
 这样，就可以将诸如  app_db.order01、app_db.order02、app_db.order03 的表汇总到 kafka_ods_orders 中。利用kafka自带的工具，可查看对应Topic成功建立，数据详情可使用kafka-console-consumer.sh进行查询：
 ```shell
-    docker-compose exec Kafka kafka-topics.sh --bootstrap-server 192.168.67.2:9092 --list
+    docker-compose exec Kafka kafka-topics.sh --bootstrap-server 0.0.0.0:9092 --list
 ```
 新创建的 Kafka Topic 信息如下：
 
@@ -416,11 +414,11 @@ pipeline:
 ```
 同时我们利用 Kafka 的脚本新建一个12分区的 kafka Topic：
 ```shell
-docker-compose exec Kafka kafka-topics.sh --create --topic yaml-mysql-kafka-hash-by-key --bootstrap-server 192.168.67.2:9092  --partitions 1
+docker-compose exec Kafka kafka-topics.sh --create --topic yaml-mysql-kafka-hash-by-key --bootstrap-server 0.0.0.0:9092  --partitions 1
 ```
 提交yaml程序后，这个时候我们指定一下分区消费，查看一下各个分区里面所存储的数据。
 ```shell
-docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server=192.168.67.2:9092  --topic yaml-mysql-kafka-hash-by-key  --partition 0  --from-beginning
+docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server=0.0.0.0:9092  --topic yaml-mysql-kafka-hash-by-key  --partition 0  --from-beginning
 ```
 部分分区数据详情如下：
 ```json

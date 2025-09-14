@@ -26,7 +26,7 @@ under the License.
 
 # Streaming ELT from MySQL to Kafka
 
-This tutorial is to show how to quickly build a Streaming ELT job from MySQL to StarRocks using Flink CDC, including the
+This tutorial is to show how to quickly build a Streaming ELT job from MySQL to Kafka using Flink CDC, including the
 feature of sync all table of one database, schema change evolution and sync sharding tables into one table.
 All exercises in this tutorial are performed in the Flink CDC CLI, and the entire process uses standard SQL syntax,
 without a single line of Java/Scala code or IDE installation.
@@ -73,22 +73,22 @@ Create a `docker-compose.yml` file using the content provided below:
    ```yaml
    version: '2.1'
    services:
-    Zookeeper:
-        image: zookeeper:3.7.1
-        ports:
-            - "2181:2181"
-        environment:
-            - ALLOW_ANONYMOUS_LOGIN=yes
-    Kafka:
-        image: bitnami/kafka:2.8.1
-        ports:
-            - "9092:9092"
-            - "9093:9093"
-        environment:
-            - ALLOW_PLAINTEXT_LISTENER=yes
-            - KAFKA_LISTENERS=PLAINTEXT://:9092
-            - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://192.168.67.2:9092
-            - KAFKA_ZOOKEEPER_CONNECT=192.168.67.2:2181
+     Zookeeper:
+       image: zookeeper:3.7.1
+       ports:
+         - "2181:2181"
+       environment:
+         - ALLOW_ANONYMOUS_LOGIN=yes
+     Kafka:
+       image: bitnami/kafka:2.8.1
+       ports:
+         - "9092:9092"
+         - "9093:9093"
+       environment:
+         - ALLOW_PLAINTEXT_LISTENER=yes
+         - KAFKA_LISTENERS=PLAINTEXT://:9092
+         - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://Kafka:9092
+         - KAFKA_ZOOKEEPER_CONNECT=Zookeeper:2181
      MySQL:
        image: debezium/example-mysql:1.1
        ports:
@@ -98,7 +98,6 @@ Create a `docker-compose.yml` file using the content provided below:
          - MYSQL_USER=mysqluser
          - MYSQL_PASSWORD=mysqlpw
    ```
-Note: The 192.168.67.2 in the file is an internal network IP and can be found through ifconfig.
 The Docker Compose should include the following services (containers):
 - MySQL: include a database named `app_db`
 - Kafka: Store the result table mapped from MySQL according to the rules
@@ -229,7 +228,7 @@ We can find a job  named `Sync MySQL Database to Kafka` is running through Flink
 
 The Topic situation can be viewed through the built-in client of kafka to obtain the content in debezium-json format:  
 ```shell
-  docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server 192.168.67.2:9092 --topic yaml-mysql-kafka --from-beginning
+  docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server 0.0.0.0:9092 --topic yaml-mysql-kafka --from-beginning
 ```  
 The debezium-json format contains several elements such as before,after,op, and source. The demonstration example is as follows:  
 ```json
@@ -279,7 +278,7 @@ Enter MySQL container
  docker-compose exec mysql mysql -uroot -p123456
  ```
 
-Then, modify schema and record in MySQL, and the tables of StarRocks will change the same in real time：  
+Then, modify schema and record in MySQL, and the tables of Kafka will change the same in real time：
 1. insert one record in `orders` from MySQL:  
 
    ```sql
@@ -367,11 +366,11 @@ Specifically, `source-table` support regular expression matching with multiple t
           sink-table: kafka_ods_orders
    ```
 
-In this way, we can synchronize sharding tables like `app_db.order01`、`app_db.order02`、`app_db.order03` into one kafka_ods_orders tables.By using the built-in tools of kafka, you can view the successful establishment of the corresponding Topic. Data details can be queried using kafka-console-Consumer.sh:  
+In this way, we can synchronize sharding tables like `app_db.order01`、`app_db.order02`、`app_db.order03` into one kafka_ods_orders topic.By using the built-in tools of kafka, you can view the successful establishment of the corresponding Topic. Data details can be queried using kafka-console-Consumer.sh:
 
 
 ```shell
-docker-compose exec Kafka kafka-topics.sh --bootstrap-server 192.168.67.2:9092 --list
+docker-compose exec Kafka kafka-topics.sh --bootstrap-server 0.0.0.0:9092 --list
 ```
 The information of the newly created Kafka Topic is as follows:
 ```shell
@@ -417,11 +416,11 @@ pipeline:
 ```
 Meanwhile, we use the script of Kafka to create a 12-partition kafka Topic:
 ```shell
-docker-compose exec Kafka kafka-topics.sh --create --topic yaml-mysql-kafka-hash-by-key --bootstrap-server 192.168.67.2:9092  --partitions 1
+docker-compose exec Kafka kafka-topics.sh --create --topic yaml-mysql-kafka-hash-by-key --bootstrap-server 0.0.0.0:9092  --partitions 1
 ```
 After submitting the yaml program, at this point, we should specify the partition consumption and check the data stored in each partition.
 ```shell
-docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server=192.168.67.2:9092  --topic yaml-mysql-kafka-hash-by-key  --partition 0  --from-beginning
+docker-compose exec Kafka kafka-console-consumer.sh --bootstrap-server=0.0.0.0:9092  --topic yaml-mysql-kafka-hash-by-key  --partition 0  --from-beginning
 ```
 The details of some partition data are as follows:  
 ```json
