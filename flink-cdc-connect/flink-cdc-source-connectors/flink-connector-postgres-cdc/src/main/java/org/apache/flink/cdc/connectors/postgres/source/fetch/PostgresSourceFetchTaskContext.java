@@ -162,8 +162,10 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
             dbzConfig =
                     new PostgresConnectorConfig(
-                            builder
-                                    // never drop slot for stream split, which is also global split
+                            dbzConfig
+                                    .getConfig()
+                                    .edit()
+                                    // drop slot for stream split, which is also global split
                                     .with(DROP_SLOT_ON_STOP.name(), false)
                                     .build());
         }
