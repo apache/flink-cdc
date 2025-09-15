@@ -1,6 +1,6 @@
 ---
 title: "MySQL 同步到 Kafka"
-weight: 2
+weight: 4
 type: docs
 aliases:
 - /try-flink-cdc/pipeline-connectors/mysql-Kafka-pipeline-tutorial.html
