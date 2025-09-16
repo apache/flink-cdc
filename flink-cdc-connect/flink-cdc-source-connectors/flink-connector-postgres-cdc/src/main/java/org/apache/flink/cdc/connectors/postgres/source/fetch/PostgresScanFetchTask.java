@@ -32,6 +32,7 @@ import io.debezium.connector.postgresql.PostgresOffsetContext;
 import io.debezium.connector.postgresql.PostgresPartition;
 import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
+import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.connector.postgresql.connection.ReplicationConnection;
 import io.debezium.connector.postgresql.spi.SlotState;
 import io.debezium.pipeline.EventDispatcher;
@@ -86,7 +87,8 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         } finally {
             // remove slot after snapshot slit finish
             maybeDropSlotForBackFillReadTask(
-                    ctx.getConnection(), ctx.getSlotName(), sourceConfig.isSkipSnapshotBackfill());
+                    (PostgresReplicationConnection) ctx.getReplicationConnection(),
+                    sourceConfig.isSkipSnapshotBackfill());
         }
     }
 
@@ -191,14 +193,14 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
 
     /** Drop slot for backfill task and close replication connection. */
     private void maybeDropSlotForBackFillReadTask(
-            PostgresConnection connection, String slotName, boolean skipSnapshotBackfill) {
+            PostgresReplicationConnection replicationConnection, boolean skipSnapshotBackfill) {
         // if skip backfill, no need to create slot here
         if (skipSnapshotBackfill) {
             return;
         }
 
         try {
-            connection.dropReplicationSlot(slotName);
+            replicationConnection.close(true);
         } catch (Throwable t) {
             LOG.error("Unexpected error while dropping replication slot", t);
             throw new FlinkRuntimeException(t);

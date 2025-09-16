@@ -25,6 +25,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.events.LatestFinishedSpl
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitSerializer;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderWithCommit;
@@ -138,11 +139,16 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
     @Override
     protected void onSplitFinished(Map finishedSplitIds) {
         super.onSplitFinished(finishedSplitIds);
-
-        if (this.sourceConfig.getStartupOptions().isSnapshotOnly()) {
-            PostgresDialect dialect = (PostgresDialect) this.dialect;
-            boolean removed = dialect.removeSlot(dialect.getSlotName());
-            LOG.info("Remove slot '{}' result is {}.", dialect.getSlotName(), removed);
+        for (Object splitState : finishedSplitIds.values()) {
+            SourceSplitBase sourceSplit = ((SourceSplitState) splitState).toSourceSplit();
+            if (sourceSplit.isStreamSplit()) {
+                StreamSplit streamSplit = sourceSplit.asStreamSplit();
+                if (streamSplit.getStartingOffset().isAtOrAfter(streamSplit.getEndingOffset())) {
+                    PostgresDialect dialect = (PostgresDialect) this.dialect;
+                    boolean removed = dialect.removeSlot(dialect.getSlotName());
+                    LOG.info("Remove slot '{}' result is {}.", dialect.getSlotName(), removed);
+                }
+            }
         }
     }
 
