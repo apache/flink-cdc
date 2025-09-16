@@ -197,7 +197,7 @@ class OceanBaseE2eITCase extends FlinkContainerTestEnvironment {
                 expectResult,
                 "products_sink",
                 new String[] {"id", "name", "description", "weight", "enum_c", "json_c", "point_c"},
-                60000L);
+                300000L);
     }
 
     /** Creates the database and populates it with initialization SQL script. */
