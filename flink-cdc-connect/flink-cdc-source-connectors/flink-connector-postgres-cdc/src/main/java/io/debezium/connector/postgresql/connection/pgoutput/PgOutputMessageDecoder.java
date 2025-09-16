@@ -345,7 +345,7 @@ public class PgOutputMessageDecoder extends AbstractMessageDecoder {
         Set<String> columnNames = new HashSet<>();
         for (short i = 0; i < columnCount; ++i) {
             byte flags = buffer.get();
-            String columnName = Strings.unquoteIdentifierPart(readUTF8String(buffer));
+            String columnName = Strings.unquoteIdentifierPart(readString(buffer));
             int columnType = buffer.getInt();
             int attypmod = buffer.getInt();
 
