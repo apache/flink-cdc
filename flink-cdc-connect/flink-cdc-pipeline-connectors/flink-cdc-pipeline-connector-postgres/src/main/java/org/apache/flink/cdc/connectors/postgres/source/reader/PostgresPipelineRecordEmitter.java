@@ -130,7 +130,8 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                     TableDiscoveryUtils.listTables(
                             sourceConfig.getDatabaseList().get(0),
                             jdbc,
-                            sourceConfig.getTableFilters());
+                            sourceConfig.getTableFilters(),
+                            sourceConfig.includePartitionedTables());
             for (TableId tableId : capturedTableIds) {
                 Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
                 createTableEventCache.add(
