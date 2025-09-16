@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.base.config;
 
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.IncrementalSource;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.config.Configuration;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -26,6 +27,7 @@ import io.debezium.relational.RelationalTableFilters;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -46,7 +48,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     protected final Duration connectTimeout;
     protected final int connectMaxRetries;
     protected final int connectionPoolSize;
-    protected final String chunkKeyColumn;
+    protected final Map<ObjectPath, String> chunkKeyColumns;
 
     public JdbcSourceConfig(
             StartupOptions startupOptions,
@@ -71,7 +73,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
             Duration connectTimeout,
             int connectMaxRetries,
             int connectionPoolSize,
-            String chunkKeyColumn,
+            Map<ObjectPath, String> chunkKeyColumns,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
             boolean assignUnboundedChunkFirst) {
@@ -101,7 +103,7 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         this.connectTimeout = connectTimeout;
         this.connectMaxRetries = connectMaxRetries;
         this.connectionPoolSize = connectionPoolSize;
-        this.chunkKeyColumn = chunkKeyColumn;
+        this.chunkKeyColumns = chunkKeyColumns;
     }
 
     public abstract RelationalDatabaseConnectorConfig getDbzConnectorConfig();
@@ -154,8 +156,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
         return connectionPoolSize;
     }
 
-    public String getChunkKeyColumn() {
-        return chunkKeyColumn;
+    public Map<ObjectPath, String> getChunkKeyColumns() {
+        return chunkKeyColumns;
     }
 
     @Override

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.ChunkSplitterS
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.utils.JdbcChunkUtils;
 import org.apache.flink.cdc.connectors.base.utils.ObjectUtils;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
@@ -253,11 +254,13 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
      * Get the column which is seen as chunk key.
      *
      * @param table table identity.
-     * @param chunkKeyColumn column name which is seen as chunk key, if chunkKeyColumn is null, use
-     *     primary key instead. @Column the column which is seen as chunk key.
+     * @param chunkKeyColumns column name which is seen as chunk key, if chunkKeyColumns is null,
+     *     use primary key instead.
+     * @return the column which is seen as chunk key.
      */
-    protected Column getSplitColumn(Table table, @Nullable String chunkKeyColumn) {
-        return JdbcChunkUtils.getSplitColumn(table, chunkKeyColumn);
+    protected Column getSplitColumn(
+            Table table, @Nullable Map<ObjectPath, String> chunkKeyColumns) {
+        return JdbcChunkUtils.getSplitColumn(table, chunkKeyColumns);
     }
 
     /** ChunkEnd less than or equal to max. */
@@ -360,7 +363,7 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         try {
             currentSchema = dialect.queryTableSchema(jdbcConnection, tableId);
             currentSplittingTable = Objects.requireNonNull(currentSchema).getTable();
-            splitColumn = getSplitColumn(currentSplittingTable, sourceConfig.getChunkKeyColumn());
+            splitColumn = getSplitColumn(currentSplittingTable, sourceConfig.getChunkKeyColumns());
             splitType = getSplitType(splitColumn);
             minMaxOfSplitColumn = queryMinMax(jdbcConnection, tableId, splitColumn);
             approximateRowCnt = queryApproximateRowCnt(jdbcConnection, tableId);

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.source.config;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfigFactory;
 import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.PostgresConnector;
@@ -26,7 +27,9 @@ import io.debezium.connector.postgresql.PostgresConnector;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -51,6 +54,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     private List<String> schemaList;
 
     private int lsnCommitCheckpointsDelay;
+
+    private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
 
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
@@ -105,6 +110,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
         props.setProperty("snapshot.mode", "never");
 
         Configuration dbzConfiguration = Configuration.from(props);
+
         return new PostgresSourceConfig(
                 subtaskId,
                 startupOptions,
@@ -129,7 +135,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 connectTimeout,
                 connectMaxRetries,
                 connectionPoolSize,
-                chunkKeyColumn,
+                chunkKeyColumns,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
@@ -180,5 +186,20 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The lsn commit checkpoints delay for Postgres. */
     public void setLsnCommitCheckpointsDelay(int lsnCommitCheckpointsDelay) {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+    }
+
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public PostgresSourceConfigFactory chunkKeyColumn(
+            ObjectPath objectPath, String chunkKeyColumn) {
+        this.chunkKeyColumns.put(objectPath, chunkKeyColumn);
+        return this;
+    }
+
+    public PostgresSourceConfigFactory chunkKeyColumn(Map<ObjectPath, String> chunkKeyColumns) {
+        this.chunkKeyColumns.putAll(chunkKeyColumns);
+        return this;
     }
 }

@@ -27,6 +27,7 @@ import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -223,7 +224,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .connectMaxRetries(connectMaxRetries)
                             .connectionPoolSize(connectionPoolSize)
                             .startupOptions(startupOptions)
-                            .chunkKeyColumn(chunkKeyColumn)
+                            .chunkKeyColumn(new ObjectPath(schemaName, tableName), chunkKeyColumn)
                             .heartbeatInterval(heartbeatInterval)
                             .closeIdleReaders(closeIdleReaders)
                             .skipSnapshotBackfill(skipSnapshotBackfill)
