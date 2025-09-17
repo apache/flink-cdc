@@ -963,8 +963,9 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         TableResult tableResult = tEnv.executeSql("SELECT * FROM cn_column_table");
         // generate WAL
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
-             Statement statement = connection.createStatement()) {
-            statement.execute("INSERT INTO inventory.cn_column_test VALUES (2, 'testAnotherName');");
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.cn_column_test VALUES (2, 'testAnotherName');");
         }
         List<String> expected = new ArrayList<>();
         expected.add("+I[2, testAnotherName]");
