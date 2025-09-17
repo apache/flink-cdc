@@ -922,6 +922,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
     @ValueSource(booleans = {true, false})
     void testCNColumns(boolean parallelismSnapshot) throws Throwable {
         setup(parallelismSnapshot);
+        RowUtils.USE_LEGACY_TO_STRING = false;
         initializePostgresTable(POSTGRES_CONTAINER, "cn_column_test");
         String sourceDDL =
                 String.format(
@@ -960,8 +961,13 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tEnv.executeSql(sourceDDL);
         // async submit job
         TableResult tableResult = tEnv.executeSql("SELECT * FROM cn_column_table");
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+             Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO inventory.cn_column_test VALUES (2, 'testAnotherName');");
+        }
         List<String> expected = new ArrayList<>();
-        expected.add("+I[1, testName]");
+        expected.add("+I[2, testAnotherName]");
         Thread.sleep(5000L);
         CloseableIterator<Row> iterator = tableResult.collect();
         assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
