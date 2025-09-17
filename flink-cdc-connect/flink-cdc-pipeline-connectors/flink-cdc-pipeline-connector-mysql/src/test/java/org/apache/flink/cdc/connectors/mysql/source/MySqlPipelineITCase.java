@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
@@ -64,6 +65,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.lifecycle.Startables;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -1417,7 +1419,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn("notes", DataTypes.STRING())
                                     .build()));
 
-            // Database and table that does not matched the filter of regular expression.
+            // Database and table that does not match the filter of regular expression.
             statement.execute(
                     String.format(
                             "CREATE DATABASE `%s_copy`", inventoryDatabase.getDatabaseName()));
@@ -1460,6 +1462,28 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn("name", DataTypes.VARCHAR(17))
                                     .physicalColumn("notes", DataTypes.STRING())
                                     .build()));
+
+            // The CreateTableEvent is not correctly emitted.
+            statement.execute(
+                    String.format(
+                            "INSERT `%s`.`newlyAddedTable6` VALUES(1, 'Mark', 'eu')",
+                            inventoryDatabase.getDatabaseName()));
+            expected.add(
+                    DataChangeEvent.insertEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable6"),
+                            new BinaryRecordDataGenerator(
+                                            new DataType[] {
+                                                DataTypes.DECIMAL(20, 0),
+                                                DataTypes.VARCHAR(17),
+                                                DataTypes.STRING()
+                                            })
+                                    .generate(
+                                            new Object[] {
+                                                DecimalData.fromBigDecimal(BigDecimal.ONE, 20, 0),
+                                                new BinaryStringData("Mark"),
+                                                new BinaryStringData("eu")
+                                            })));
         }
         List<Event> actual = fetchResults(events, expected.size());
         assertEqualsInAnyOrder(

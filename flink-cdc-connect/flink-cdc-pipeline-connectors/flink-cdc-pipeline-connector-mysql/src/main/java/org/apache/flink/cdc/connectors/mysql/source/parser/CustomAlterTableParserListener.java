@@ -102,6 +102,12 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 builder.primaryKey(original.primaryKeyColumnNames());
             }
             changes.add(new CreateTableEvent(toCdcTableId(tableId), builder.build()));
+        } else {
+            LOG.warn(
+                    "Could not find schema of {} while parsing sql of `CREATE TABLE {} LIKE {}`",
+                    originalTableId,
+                    tableId,
+                    originalTableId);
         }
         super.exitCopyCreateTable(ctx);
     }
