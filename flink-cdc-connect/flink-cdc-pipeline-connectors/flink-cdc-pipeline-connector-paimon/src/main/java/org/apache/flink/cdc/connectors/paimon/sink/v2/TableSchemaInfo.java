@@ -30,9 +30,12 @@ public class TableSchemaInfo {
 
     private final List<RecordData.FieldGetter> fieldGetters;
 
+    private final boolean hasPrimaryKey;
+
     public TableSchemaInfo(Schema schema, ZoneId zoneId) {
         this.schema = schema;
         this.fieldGetters = PaimonWriterHelper.createFieldGetters(schema, zoneId);
+        this.hasPrimaryKey = !schema.primaryKeys().isEmpty();
     }
 
     public Schema getSchema() {
@@ -41,5 +44,9 @@ public class TableSchemaInfo {
 
     public List<RecordData.FieldGetter> getFieldGetters() {
         return fieldGetters;
+    }
+
+    public boolean hasPrimaryKey() {
+        return hasPrimaryKey;
     }
 }
