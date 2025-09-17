@@ -1469,6 +1469,16 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                             "INSERT `%s`.`newlyAddedTable6` VALUES(1, 'Mark', 'eu')",
                             inventoryDatabase.getDatabaseName()));
             expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable6"),
+                            Schema.newBuilder()
+                                    .physicalColumn("id", DataTypes.DECIMAL(20, 0).notNull(), null)
+                                    .physicalColumn("name", DataTypes.VARCHAR(17))
+                                    .physicalColumn("notes", DataTypes.STRING())
+                                    .primaryKey("id")
+                                    .build()));
+            expected.add(
                     DataChangeEvent.insertEvent(
                             TableId.tableId(
                                     inventoryDatabase.getDatabaseName(), "newlyAddedTable6"),
