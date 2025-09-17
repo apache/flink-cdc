@@ -143,7 +143,10 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
             SourceSplitBase sourceSplit = ((SourceSplitState) splitState).toSourceSplit();
             if (sourceSplit.isStreamSplit()) {
                 StreamSplit streamSplit = sourceSplit.asStreamSplit();
-                if (streamSplit.getStartingOffset().isAtOrAfter(streamSplit.getEndingOffset())) {
+                if (this.sourceConfig.getStartupOptions().isSnapshotOnly()
+                        || streamSplit
+                                .getStartingOffset()
+                                .isAtOrAfter(streamSplit.getEndingOffset())) {
                     PostgresDialect dialect = (PostgresDialect) this.dialect;
                     boolean removed = dialect.removeSlot(dialect.getSlotName());
                     LOG.info("Remove slot '{}' result is {}.", dialect.getSlotName(), removed);

@@ -351,6 +351,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         List<Event> actual = fetchResultsExcept(events, expectedSnapshot.size(), createTableEvent);
         assertThat(actual.subList(0, expectedSnapshot.size()))
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+        Thread.sleep(10000);
         assertThat(inventoryDatabase.checkSlot(slotName))
                 .isEqualTo(String.format("Replication slot \"%s\" does not exist", slotName));
     }
