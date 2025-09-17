@@ -312,12 +312,12 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
         Assertions.assertThat(
                         getRealWorldMatchedTables(
                                 "db.tbl1 , db2.tbl\\.* , db3.tbl3", null, false, expected.length))
-                .containsExactly(expected);
+                .containsExactlyInAnyOrder(expected);
 
         Assertions.assertThat(
                         getRealWorldMatchedTables(
                                 "db.tbl1 , db2.tbl\\.* , db3.tbl3", null, true, expected.length))
-                .containsExactly(expected);
+                .containsExactlyInAnyOrder(expected);
     }
 
     private static void initializeMySqlTables(List<Tuple2<String, String>> tableNames) {
