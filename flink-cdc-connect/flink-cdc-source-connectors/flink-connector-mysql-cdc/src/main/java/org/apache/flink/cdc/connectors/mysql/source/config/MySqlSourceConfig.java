@@ -71,6 +71,12 @@ public class MySqlSourceConfig implements Serializable {
     public static boolean useLegacyJsonFormat = true;
     private final boolean assignUnboundedChunkFirst;
 
+    // ---------------- Parallel deserialize options ----------------
+    private final boolean parallelDeserializeEnabled;
+    private final int parallelDeserializePkWorkers;
+    private final int parallelDeserializeThreads;
+    private final int parallelDeserializeQueueCapacity;
+
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
     // --------------------------------------------------------------------------------------------
@@ -108,7 +114,11 @@ public class MySqlSourceConfig implements Serializable {
             boolean parseOnLineSchemaChanges,
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean parallelDeserializeEnabled,
+            int parallelDeserializePkWorkers,
+            int parallelDeserializeThreads,
+            int parallelDeserializeQueueCapacity) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -152,6 +162,10 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.parallelDeserializeEnabled = parallelDeserializeEnabled;
+        this.parallelDeserializePkWorkers = parallelDeserializePkWorkers;
+        this.parallelDeserializeThreads = parallelDeserializeThreads;
+        this.parallelDeserializeQueueCapacity = parallelDeserializeQueueCapacity;
     }
 
     public String getHostname() {
@@ -241,6 +255,23 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isAssignUnboundedChunkFirst() {
         return assignUnboundedChunkFirst;
+    }
+
+    // ---------------- Parallel deserialize getters ----------------
+    public boolean isParallelDeserializeEnabled() {
+        return parallelDeserializeEnabled;
+    }
+
+    public int getParallelDeserializePkWorkers() {
+        return parallelDeserializePkWorkers;
+    }
+
+    public int getParallelDeserializeThreads() {
+        return parallelDeserializeThreads;
+    }
+
+    public int getParallelDeserializeQueueCapacity() {
+        return parallelDeserializeQueueCapacity;
     }
 
     public Properties getDbzProperties() {

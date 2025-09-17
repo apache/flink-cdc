@@ -46,6 +46,7 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlRecordEmitter;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReader;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReaderContext;
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSplitReader;
+import org.apache.flink.cdc.connectors.mysql.source.reader.async.PartitionedDeserializationScheduler;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
@@ -127,11 +128,35 @@ public class MySqlSource<T>
         this(
                 configFactory,
                 deserializationSchema,
-                (sourceReaderMetrics, sourceConfig) ->
-                        new MySqlRecordEmitter<>(
+                (sourceReaderMetrics, sourceConfig) -> {
+                    if (!sourceConfig.isParallelDeserializeEnabled()) {
+                        return new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
-                                sourceConfig.isIncludeSchemaChanges()));
+                                sourceConfig.isIncludeSchemaChanges());
+                    }
+                    final int cores = Math.max(1, Runtime.getRuntime().availableProcessors());
+                    int pkWorkers =
+                            sourceConfig.getParallelDeserializePkWorkers() > 0
+                                    ? sourceConfig.getParallelDeserializePkWorkers()
+                                    : Math.max(1, cores - 1);
+                    int deserThreads =
+                            sourceConfig.getParallelDeserializeThreads() > 0
+                                    ? sourceConfig.getParallelDeserializeThreads()
+                                    : Math.max(0, pkWorkers / 2);
+                    int queueCapacity =
+                            Math.max(1, sourceConfig.getParallelDeserializeQueueCapacity());
+                    return new MySqlRecordEmitter<>(
+                            deserializationSchema,
+                            sourceReaderMetrics,
+                            sourceConfig.isIncludeSchemaChanges(),
+                            new PartitionedDeserializationScheduler<>(
+                                    deserializationSchema,
+                                    deserThreads,
+                                    pkWorkers,
+                                    0,
+                                    queueCapacity));
+                });
     }
 
     MySqlSource(
