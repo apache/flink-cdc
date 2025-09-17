@@ -59,11 +59,9 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
                 "database name cannot be null or empty.");
         String querySql =
-                String.format(
-                        "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA` WHERE SCHEMA_NAME = '%s';",
-                        databaseName);
+                "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA` WHERE SCHEMA_NAME = ?;";
         try {
-            List<String> dbList = executeSingleColumnStatement(querySql);
+            List<String> dbList = executeSingleColumnStatement(querySql, quote(databaseName));
             return !dbList.isEmpty();
         } catch (Exception e) {
             LOG.error(
@@ -74,6 +72,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
             throw new OceanBaseCatalogException(
                     String.format("Failed to check database exist, database: %s", databaseName), e);
         }
+    }
+
+    public static String quote(String dbOrTableName) {
+        return "`" + dbOrTableName.replace("`", "``") + "`";
     }
 
     /**
@@ -114,16 +116,22 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 !StringUtils.isNullOrWhitespaceOnly(tableName),
                 "table name cannot be null or empty.");
         String querySql =
-                String.format(
-                        "SELECT `TABLE_NAME` FROM `INFORMATION_SCHEMA`.`TABLES` WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s';",
-                        databaseName, tableName);
+                "SELECT `TABLE_NAME` FROM `INFORMATION_SCHEMA`.`TABLES` WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;";
         try {
-            List<String> dbList = executeSingleColumnStatement(querySql);
+            List<String> dbList =
+                    executeSingleColumnStatement(querySql, quote(databaseName), quote(tableName));
             return !dbList.isEmpty();
         } catch (Exception e) {
-            LOG.error("Failed to check table exist, table: {}, sql: {}", tableName, querySql, e);
+            LOG.error(
+                    "Failed to check table exist, table: {}.{}, sql: {}",
+                    databaseName,
+                    tableName,
+                    querySql,
+                    e);
             throw new OceanBaseCatalogException(
-                    String.format("Failed to check table exist, table: %s", tableName), e);
+                    String.format(
+                            "Failed to check table exist, table: %s.%s", databaseName, tableName),
+                    e);
         }
     }
 
