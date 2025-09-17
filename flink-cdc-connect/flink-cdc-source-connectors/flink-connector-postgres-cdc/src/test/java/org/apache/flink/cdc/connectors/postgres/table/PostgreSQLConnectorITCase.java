@@ -965,5 +965,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         Thread.sleep(5000L);
         CloseableIterator<Row> iterator = tableResult.collect();
         assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
+        tableResult.getJobClient().get().cancel().get();
+        RowUtils.USE_LEGACY_TO_STRING = true;
     }
 }
