@@ -1418,19 +1418,24 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .build()));
 
             // Database and table that does not matched the filter of regular expression.
-            statement.execute("CREATE DATABASE `another_database`");
             statement.execute(
-                    "CREATE TABLE `another_database`.`newlyAddedTable`("
-                            + "id SERIAL,"
-                            + "name VARCHAR(17),"
-                            + "notes TEXT,"
-                            + "PRIMARY KEY (id));");
+                    String.format(
+                            "CREATE DATABASE `%s_copy`", inventoryDatabase.getDatabaseName()));
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s_copy`.`newlyAddedTable`("
+                                    + "id SERIAL,"
+                                    + "name VARCHAR(17),"
+                                    + "notes TEXT,"
+                                    + "PRIMARY KEY (id));",
+                            inventoryDatabase.getDatabaseName()));
 
             // This should be ignored as another_database is not included in the captured regular
             // expression.
             statement.execute(
                     String.format(
-                            "CREATE TABLE `%s`.`newlyAddedTable6` LIKE `another_database`.`newlyAddedTable`",
+                            "CREATE TABLE `%s`.`newlyAddedTable6` LIKE `%s_copy`.`newlyAddedTable`",
+                            inventoryDatabase.getDatabaseName(),
                             inventoryDatabase.getDatabaseName()));
 
             // This should not be ignored as MySQL will build and emit a new sql like:
@@ -1441,7 +1446,8 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
             // ) START TRANSACTION.
             statement.execute(
                     String.format(
-                            "CREATE TABLE `%s`.`newlyAddedTable7` AS SELECT * FROM `another_database`.`newlyAddedTable`",
+                            "CREATE TABLE `%s`.`newlyAddedTable7` AS SELECT * FROM `%s_copy`.`newlyAddedTable`",
+                            inventoryDatabase.getDatabaseName(),
                             inventoryDatabase.getDatabaseName()));
             // Primary key information will not be retained.
             expected.add(
