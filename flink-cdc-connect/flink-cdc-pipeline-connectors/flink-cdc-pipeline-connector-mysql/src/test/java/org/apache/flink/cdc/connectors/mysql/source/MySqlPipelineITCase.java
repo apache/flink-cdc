@@ -1400,7 +1400,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .primaryKey("id", "name")
                                     .build()));
 
-            // Test create table DDL with as syntax, Primary key information will not be retained
+            // Test create table DDL with as syntax, Primary key information will not be retained.
             statement.execute(
                     String.format(
                             "CREATE TABLE `%s`.`newlyAddedTable5` AS SELECT * FROM `%s`.`newlyAddedTable3`",
@@ -1414,6 +1414,44 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     .physicalColumn(
                                             "id", DataTypes.DECIMAL(20, 0).notNull(), null, "0")
                                     .physicalColumn("name", DataTypes.VARCHAR(17).notNull())
+                                    .physicalColumn("notes", DataTypes.STRING())
+                                    .build()));
+
+            // Database and table that does not matched the filter of regular expression.
+            statement.execute("CREATE DATABASE `another_database`");
+            statement.execute(
+                    "CREATE TABLE `another_database`.`newlyAddedTable`("
+                            + "id SERIAL,"
+                            + "name VARCHAR(17),"
+                            + "notes TEXT,"
+                            + "PRIMARY KEY (id));");
+
+            // This should be ignored as another_database is not included in the captured regular
+            // expression.
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable6` LIKE `another_database`.`newlyAddedTable`",
+                            inventoryDatabase.getDatabaseName()));
+
+            // This should not be ignored as MySQL will build and emit a new sql like:
+            // CREATE TABLE `newlyAddedTable7` (
+            //  `id` bigint unsigned NOT NULL DEFAULT '0',
+            //  `name` varchar(17) DEFAULT NULL,
+            //  `notes` text
+            // ) START TRANSACTION.
+            statement.execute(
+                    String.format(
+                            "CREATE TABLE `%s`.`newlyAddedTable7` AS SELECT * FROM `another_database`.`newlyAddedTable`",
+                            inventoryDatabase.getDatabaseName()));
+            // Primary key information will not be retained.
+            expected.add(
+                    new CreateTableEvent(
+                            TableId.tableId(
+                                    inventoryDatabase.getDatabaseName(), "newlyAddedTable7"),
+                            Schema.newBuilder()
+                                    .physicalColumn(
+                                            "id", DataTypes.DECIMAL(20, 0).notNull(), null, "0")
+                                    .physicalColumn("name", DataTypes.VARCHAR(17))
                                     .physicalColumn("notes", DataTypes.STRING())
                                     .build()));
         }
