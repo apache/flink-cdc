@@ -974,6 +974,9 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         }
 
         List<String> expected = new ArrayList<>();
+        if (parallelismSnapshot) {
+            expected.add("+I[1, a]");
+        }
         expected.add("+I[2, testAnotherName]");
 
         CloseableIterator<Row> iterator = tableResult.collect();
