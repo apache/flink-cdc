@@ -39,7 +39,6 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
 
 import com.oceanbase.connector.flink.OceanBaseConnectorOptions;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +50,6 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.SQLException;
-import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -148,25 +146,17 @@ class OceanBaseMetadataApplierTest {
 
         assertThat(actualTable).isEqualTo(expectTable);
 
-        Assertions.assertThatThrownBy(
-                        () -> {
-                            metadataApplier.applySchemaChange(
-                                    new CreateTableEvent(
-                                            TableId.tableId("nonexistent` OR `1`=`1", "tabl1"),
-                                            schema));
-                        })
-                .hasRootCauseInstanceOf(SQLSyntaxErrorException.class)
-                .hasMessageContaining("Failed to create database");
+        tableId = TableId.tableId("nonexistent' OR '1'='1", "tabl1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
 
-        Assertions.assertThatThrownBy(
-                        () -> {
-                            metadataApplier.applySchemaChange(
-                                    new CreateTableEvent(
-                                            TableId.tableId("test", "nonexistent` OR `1`=`1"),
-                                            schema));
-                        })
-                .hasRootCauseInstanceOf(SQLSyntaxErrorException.class)
-                .hasMessageContaining("Failed to create table");
+        tableId = TableId.tableId("test", "nonexistent' OR '1'='1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
     }
 
     @Test

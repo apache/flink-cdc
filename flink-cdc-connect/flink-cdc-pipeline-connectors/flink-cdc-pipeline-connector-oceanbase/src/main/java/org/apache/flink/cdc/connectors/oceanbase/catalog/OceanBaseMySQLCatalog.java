@@ -61,7 +61,8 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         String querySql =
                 "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA` WHERE SCHEMA_NAME = ?;";
         try {
-            List<String> dbList = executeSingleColumnStatement(querySql, quote(databaseName));
+            List<String> dbList =
+                    executeSingleColumnStatement(querySql, escapeSingleQuote(databaseName));
             return !dbList.isEmpty();
         } catch (Exception e) {
             LOG.error(
@@ -72,6 +73,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
             throw new OceanBaseCatalogException(
                     String.format("Failed to check database exist, database: %s", databaseName), e);
         }
+    }
+
+    public static String escapeSingleQuote(String dbOrTableName) {
+        return dbOrTableName.replace("'", "\\'");
     }
 
     public static String quote(String dbOrTableName) {
@@ -92,7 +97,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
                 "database name cannot be null or empty.");
-        String sql = buildCreateDatabaseSql(databaseName, ignoreIfExists);
+        String sql = buildCreateDatabaseSql(quote(databaseName), ignoreIfExists);
         try {
             executeUpdateStatement(sql);
             LOG.info("Successful to create database {}, sql: {}", databaseName, sql);
@@ -119,7 +124,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 "SELECT `TABLE_NAME` FROM `INFORMATION_SCHEMA`.`TABLES` WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;";
         try {
             List<String> dbList =
-                    executeSingleColumnStatement(querySql, quote(databaseName), quote(tableName));
+                    executeSingleColumnStatement(
+                            querySql,
+                            escapeSingleQuote(databaseName),
+                            escapeSingleQuote(tableName));
             return !dbList.isEmpty();
         } catch (Exception e) {
             LOG.error(
