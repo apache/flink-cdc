@@ -959,17 +959,23 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                         parallelismSnapshot,
                         getSlotName());
         tEnv.executeSql(sourceDDL);
+        LOG.info("test cn column, sourceDDL:{}", sourceDDL);
+
         // async submit job
         TableResult tableResult = tEnv.executeSql("SELECT * FROM cn_column_table");
+
+        Thread.sleep(5000L);
         // generate WAL
         try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "INSERT INTO inventory.cn_column_test VALUES (2, 'testAnotherName');");
+            statement.executeQuery("select * from  inventory.cn_column_test");
         }
+
         List<String> expected = new ArrayList<>();
         expected.add("+I[2, testAnotherName]");
-        Thread.sleep(5000L);
+
         CloseableIterator<Row> iterator = tableResult.collect();
         assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
         tableResult.getJobClient().get().cancel().get();
