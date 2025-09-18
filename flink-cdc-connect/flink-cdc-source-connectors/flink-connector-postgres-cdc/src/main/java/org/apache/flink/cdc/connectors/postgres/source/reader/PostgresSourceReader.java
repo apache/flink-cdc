@@ -144,7 +144,7 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
             if (sourceSplit.isStreamSplit()) {
                 StreamSplit streamSplit = sourceSplit.asStreamSplit();
                 if (this.sourceConfig.getStartupOptions().isSnapshotOnly()
-                        || streamSplit
+                        && streamSplit
                                 .getStartingOffset()
                                 .isAtOrAfter(streamSplit.getEndingOffset())) {
                     PostgresDialect dialect = (PostgresDialect) this.dialect;
