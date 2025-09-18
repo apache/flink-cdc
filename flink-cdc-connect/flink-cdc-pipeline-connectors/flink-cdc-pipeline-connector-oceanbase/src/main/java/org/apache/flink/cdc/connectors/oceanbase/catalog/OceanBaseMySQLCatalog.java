@@ -36,9 +36,8 @@ import java.util.stream.Collectors;
  */
 public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
-    private static final String RENAME_DDL = "ALTER TABLE `%s`.`%s` RENAME COLUMN `%s` TO `%s`";
-    private static final String ALTER_COLUMN_TYPE_DDL =
-            "ALTER TABLE `%s`.`%s` MODIFY COLUMN `%s` %s;";
+    private static final String RENAME_DDL = "ALTER TABLE %s.%s RENAME COLUMN %s TO %s";
+    private static final String ALTER_COLUMN_TYPE_DDL = "ALTER TABLE %s.%s MODIFY COLUMN %s %s;";
 
     private static final Logger LOG = LoggerFactory.getLogger(OceanBaseMySQLCatalog.class);
 
@@ -258,9 +257,9 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         String alterTypeSql =
                 String.format(
                         ALTER_COLUMN_TYPE_DDL,
-                        databaseName,
-                        tableName,
-                        columnName,
+                        quote(databaseName),
+                        quote(tableName),
+                        quote(columnName),
                         oceanBaseColumn.getDataType());
 
         try {
@@ -332,7 +331,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 "table name cannot be null or empty.");
 
         String dropTableDDL =
-                String.format("DROP TABLE IF EXISTS `%s`.`%s`", databaseName, tableName);
+                String.format("DROP TABLE IF EXISTS %s.%s", quote(databaseName), quote(tableName));
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(dropTableDDL);
@@ -363,7 +362,8 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 !StringUtils.isNullOrWhitespaceOnly(tableName),
                 "table name cannot be null or empty.");
 
-        String dropTableDDL = String.format("TRUNCATE TABLE `%s`.`%s`", databaseName, tableName);
+        String dropTableDDL =
+                String.format("TRUNCATE TABLE %s.%s", quote(databaseName), quote(tableName));
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(dropTableDDL);
@@ -398,10 +398,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
         StringBuilder builder = new StringBuilder();
         builder.append(
                 String.format(
-                        "CREATE TABLE %s`%s`.`%s`",
+                        "CREATE TABLE %s%s.%s",
                         ignoreIfExists ? "IF NOT EXISTS " : "",
-                        table.getDatabaseName(),
-                        table.getTableName()));
+                        quote(table.getDatabaseName()),
+                        quote(table.getTableName())));
         builder.append(" (\n");
         String columnsStmt =
                 table.getColumns().stream()
@@ -437,7 +437,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
     private String buildAlterDropColumnsSql(
             String databaseName, String tableName, List<String> dropColumns) {
         StringBuilder builder = new StringBuilder();
-        builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
+        builder.append(String.format("ALTER TABLE %s.%s ", quote(databaseName), quote(tableName)));
         String columnsStmt =
                 dropColumns.stream()
                         .map(col -> String.format("DROP COLUMN `%s`", col))
@@ -496,7 +496,7 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
     protected String buildAlterAddColumnsSql(
             String databaseName, String tableName, List<OceanBaseColumn> addColumns) {
         StringBuilder builder = new StringBuilder();
-        builder.append(String.format("ALTER TABLE `%s`.`%s` ", databaseName, tableName));
+        builder.append(String.format("ALTER TABLE %s.%s ", quote(databaseName), quote(tableName)));
         String columnsStmt =
                 addColumns.stream()
                         .map(col -> "ADD COLUMN " + buildColumnStmt(col))
@@ -508,6 +508,11 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
 
     private static String buildRenameColumnSql(
             String schemaName, String tableName, String oldColumnName, String newColumnName) {
-        return String.format(RENAME_DDL, schemaName, tableName, oldColumnName, newColumnName);
+        return String.format(
+                RENAME_DDL,
+                quote(schemaName),
+                quote(tableName),
+                quote(oldColumnName),
+                quote(newColumnName));
     }
 }
