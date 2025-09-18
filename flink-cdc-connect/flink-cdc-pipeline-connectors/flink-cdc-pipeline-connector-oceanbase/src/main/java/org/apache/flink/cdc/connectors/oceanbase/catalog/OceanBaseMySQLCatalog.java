@@ -59,11 +59,9 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 !StringUtils.isNullOrWhitespaceOnly(databaseName),
                 "database name cannot be null or empty.");
         String querySql =
-                String.format(
-                        "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA` WHERE SCHEMA_NAME = '%s';",
-                        databaseName);
+                "SELECT `SCHEMA_NAME` FROM `INFORMATION_SCHEMA`.`SCHEMATA` WHERE SCHEMA_NAME = ?;";
         try {
-            List<String> dbList = executeSingleColumnStatement(querySql);
+            List<String> dbList = executeSingleColumnStatement(querySql, databaseName);
             return !dbList.isEmpty();
         } catch (Exception e) {
             LOG.error(
@@ -114,11 +112,9 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                 !StringUtils.isNullOrWhitespaceOnly(tableName),
                 "table name cannot be null or empty.");
         String querySql =
-                String.format(
-                        "SELECT `TABLE_NAME` FROM `INFORMATION_SCHEMA`.`TABLES` WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s';",
-                        databaseName, tableName);
+                "SELECT `TABLE_NAME` FROM `INFORMATION_SCHEMA`.`TABLES` WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?;";
         try {
-            List<String> dbList = executeSingleColumnStatement(querySql);
+            List<String> dbList = executeSingleColumnStatement(querySql, databaseName, tableName);
             return !dbList.isEmpty();
         } catch (Exception e) {
             LOG.error("Failed to check table exist, table: {}, sql: {}", tableName, querySql, e);
@@ -146,16 +142,10 @@ public class OceanBaseMySQLCatalog extends OceanBaseCatalog {
                     table.getDatabaseName(),
                     createTableSql);
         } catch (Exception e) {
-            LOG.error(
-                    "Failed to create table {}.{}, sql: {}",
-                    table.getDatabaseName(),
-                    table.getDatabaseName(),
-                    createTableSql,
-                    e);
             throw new OceanBaseCatalogException(
                     String.format(
                             "Failed to create table %s.%s",
-                            table.getDatabaseName(), table.getDatabaseName()),
+                            table.getDatabaseName(), table.getTableName()),
                     e);
         }
     }

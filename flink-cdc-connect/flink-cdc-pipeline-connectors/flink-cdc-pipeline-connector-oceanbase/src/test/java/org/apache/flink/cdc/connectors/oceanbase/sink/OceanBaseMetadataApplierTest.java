@@ -461,4 +461,18 @@ class OceanBaseMetadataApplierTest {
         assertThat(changeTable.getColumn("col2").getDataType())
                 .isNotEqualTo(actualTable.getColumn("col2").getDataType());
     }
+
+    @Test
+    void testSqlInjectionPrevention() {
+        // Test SQL injection prevention in both databaseExists and tableExists methods
+        // The parameterized queries treat malicious input as literal strings, so they return false
+
+        // Test SQL injection in database name
+        boolean dbResult = catalog.databaseExists("test` OR `1`=`1");
+        assertThat(dbResult).isFalse();
+
+        // Test SQL injection in table name
+        boolean tableResult = catalog.tableExists("test", "nonexistent` OR `1`=`1");
+        assertThat(tableResult).isFalse();
+    }
 }
