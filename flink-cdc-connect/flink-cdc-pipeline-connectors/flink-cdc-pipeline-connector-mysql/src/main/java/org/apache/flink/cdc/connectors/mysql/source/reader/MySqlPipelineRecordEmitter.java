@@ -141,7 +141,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 }
             }
         } else {
-            if (isDataChangeRecord(element) || isSchemaChangeEvent(element)) {
+            boolean isDataChangeRecord = isDataChangeRecord(element);
+            if (isDataChangeRecord || isSchemaChangeEvent(element)) {
                 TableId tableId = getTableId(element);
                 if (!alreadySendCreateTableTables.contains(tableId)) {
                     CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
@@ -150,6 +151,20 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                         output.collect(createTableEvent);
                     }
                     alreadySendCreateTableTables.add(tableId);
+                }
+                // In rare case, we may miss some CreateTableEvents before DataChangeEvents.
+                // Don't send CreateTableEvent for SchemaChangeEvents as it's the latest schema.
+                if (isDataChangeRecord && !createTableEventCache.containsKey(tableId)) {
+                    try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
+                        Schema schema = getSchema(jdbc, tableId);
+                        CreateTableEvent createTableEvent =
+                                new CreateTableEvent(
+                                        org.apache.flink.cdc.common.event.TableId.tableId(
+                                                tableId.catalog(), tableId.table()),
+                                        schema);
+                        output.collect(createTableEvent);
+                        createTableEventCache.put(tableId, createTableEvent);
+                    }
                 }
             }
         }
