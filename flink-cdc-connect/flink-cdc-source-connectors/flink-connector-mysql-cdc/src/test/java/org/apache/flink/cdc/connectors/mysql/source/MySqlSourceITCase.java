@@ -62,6 +62,7 @@ import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
+import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
@@ -1445,6 +1446,97 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
         } finally {
             executor.shutdown();
         }
+    }
+
+    @Test
+    void testUnsignedBigintPrimaryKeyChunking() throws Exception {
+        customDatabase.createAndInitialize();
+
+        String db = customDatabase.getDatabaseName();
+        String table = "unsigned_bigint_pk";
+        try (MySqlConnection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            String createSql =
+                    String.format(
+                            "CREATE TABLE %s.%s (\n"
+                                    + "  `order_id` BIGINT UNSIGNED NOT NULL,\n"
+                                    + "  `desc` VARCHAR(512) NOT NULL,\n"
+                                    + "  PRIMARY KEY (`order_id`)\n"
+                                    + ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+                            StatementUtils.quote(db), StatementUtils.quote(table));
+            // Insert sample data including values near UNSIGNED BIGINT max
+            String insertSql =
+                    String.format(
+                            "INSERT INTO %s.%s (`order_id`, `desc`) VALUES "
+                                    + "(1, 'flink'),(2, 'flink'),(3, 'flink'),(4, 'flink'),(5, 'flink'),"
+                                    + "(6, 'flink'),(7, 'flink'),(8, 'flink'),(9, 'flink'),(10, 'flink'),"
+                                    + "(11, 'flink'),(12, 'flink'),"
+                                    + "(18446744073709551604, 'flink'),(18446744073709551605, 'flink'),"
+                                    + "(18446744073709551606, 'flink'),(18446744073709551607, 'flink'),"
+                                    + "(18446744073709551608, 'flink'),(18446744073709551609, 'flink'),"
+                                    + "(18446744073709551610, 'flink'),(18446744073709551611, 'flink'),"
+                                    + "(18446744073709551612, 'flink'),(18446744073709551613, 'flink'),"
+                                    + "(18446744073709551614, 'flink'),(18446744073709551615, 'flink');",
+                            StatementUtils.quote(db), StatementUtils.quote(table));
+            // Drop if exists to be idempotent across runs, then create and insert
+            connection.execute(
+                    String.format(
+                            "DROP TABLE IF EXISTS %s.%s;",
+                            StatementUtils.quote(db), StatementUtils.quote(table)),
+                    createSql,
+                    insertSql);
+            connection.commit();
+        }
+
+        // Build a source reading only the unsigned_bigint_pk table
+        DataType dataType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("order_id", DataTypes.DECIMAL(20, 0)),
+                        DataTypes.FIELD("desc", DataTypes.STRING()));
+        LogicalType logicalType = TypeConversions.fromDataToLogicalType(dataType);
+        InternalTypeInfo<RowData> typeInfo = InternalTypeInfo.of(logicalType);
+        RowDataDebeziumDeserializeSchema deserializer =
+                RowDataDebeziumDeserializeSchema.newBuilder()
+                        .setPhysicalRowType((RowType) dataType.getLogicalType())
+                        .setResultTypeInfo(typeInfo)
+                        .build();
+
+        MySqlSource<RowData> source =
+                MySqlSource.<RowData>builder()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .username(customDatabase.getUsername())
+                        .password(customDatabase.getPassword())
+                        .serverTimeZone("UTC")
+                        .databaseList(db)
+                        .tableList(db + "." + table)
+                        .deserializer(deserializer)
+                        .startupOptions(StartupOptions.initial())
+                        .chunkKeyColumn(new ObjectPath(db, table), "order_id")
+                        .build();
+
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        env.setParallelism(1);
+        try (CloseableIterator<RowData> it =
+                env.fromSource(source, WatermarkStrategy.noWatermarks(), "MySQL CDC Source")
+                        .executeAndCollect()) {
+            // Expect 24 records as inserted above
+            List<String> result = fetchRowData(it, 24, this::stringifyUnsignedPkRow);
+            // Validate a couple of boundary values exist to ensure chunking across unsigned range works
+            assertThat(result)
+                    .contains(
+                            "+I[1, flink]",
+                            "+I[12, flink]",
+                            "+I[18446744073709551604, flink]",
+                            "+I[18446744073709551615, flink]");
+        }
+    }
+
+    private String stringifyUnsignedPkRow(RowData row) {
+        DecimalData decimal = row.getDecimal(0, 20, 0);
+        String order_id = decimal.toBigDecimal().toPlainString();
+        String desc = row.getString(1).toString();
+        return "+I[" + order_id + ", " + desc + "]";
     }
 
     /**
