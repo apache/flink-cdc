@@ -970,12 +970,11 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "INSERT INTO inventory.cn_column_test VALUES (2, 'testAnotherName');");
-            statement.executeQuery("select * from  inventory.cn_column_test");
         }
 
         List<String> expected = new ArrayList<>();
-        if (parallelismSnapshot) {
-            expected.add("+I[1, a]");
+        if (!parallelismSnapshot) {
+            expected.add("+I[1, testName]");
         }
         expected.add("+I[2, testAnotherName]");
 
