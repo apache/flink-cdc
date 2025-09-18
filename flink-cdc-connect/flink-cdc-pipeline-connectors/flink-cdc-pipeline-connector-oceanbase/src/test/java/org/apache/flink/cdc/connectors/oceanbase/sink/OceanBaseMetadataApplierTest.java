@@ -157,6 +157,18 @@ class OceanBaseMetadataApplierTest {
         actualTable =
                 catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
         assertThat(actualTable).isNotNull();
+
+        tableId = TableId.tableId("nonexistent` OR `1`=`1", "tabl1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
+
+        tableId = TableId.tableId("test", "nonexistent` OR `1`=`1");
+        metadataApplier.applySchemaChange(new CreateTableEvent(tableId, schema));
+        actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        assertThat(actualTable).isNotNull();
     }
 
     @Test
