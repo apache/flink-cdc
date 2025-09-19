@@ -1137,6 +1137,74 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
+    @ParameterizedTest
+    @EnumSource
+    void testTransformMergingIncompatibleRules(ValuesDataSink.SinkApi apiVersion) {
+        Assertions.assertThatThrownBy(
+                        () ->
+                                runGenericTransformTest(
+                                        apiVersion,
+                                        Arrays.asList(
+                                                new TransformDef(
+                                                        "\\.*.\\.*.mytable1",
+                                                        "*, 'rule_1_matched' AS rule_1_matched",
+                                                        "id > 0",
+                                                        null,
+                                                        "id",
+                                                        null,
+                                                        null,
+                                                        null),
+                                                new TransformDef(
+                                                        "\\.*.\\.*.\\.*",
+                                                        "*, 'rule_fallback' AS rule_fallback",
+                                                        null,
+                                                        null,
+                                                        "id",
+                                                        null,
+                                                        null,
+                                                        null)),
+                                        Collections.emptyList()))
+                .rootCause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessage(
+                        "Trying to merge transformed schemas [columns={`id` INT,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=(), columns={`id` INT,`name` STRING,`age` INT,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()], but got more than one column name views: [[id, name, age, rule_1_matched], [id, name, age, rule_fallback]]");
+    }
+
+    @ParameterizedTest
+    @EnumSource
+    void testTransformWithFallbackRules(ValuesDataSink.SinkApi apiVersion) throws Exception {
+        runGenericTransformTest(
+                apiVersion,
+                Arrays.asList(
+                        new TransformDef(
+                                "\\.*.\\.*.mytable1",
+                                "*, 'rule_1_matched' AS rule_1_matched",
+                                null,
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null),
+                        new TransformDef(
+                                "\\.*.\\.*.\\.*",
+                                "*, 'rule_fallback' AS rule_fallback",
+                                null,
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null)),
+                Arrays.asList(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, rule_1_matched], after=[2, Bob, 30, rule_1_matched], op=UPDATE, meta=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, rule_fallback], after=[], op=DELETE, meta=()}"));
+    }
+
     void runGenericTransformTest(
             ValuesDataSink.SinkApi sinkApi,
             List<TransformDef> transformDefs,
