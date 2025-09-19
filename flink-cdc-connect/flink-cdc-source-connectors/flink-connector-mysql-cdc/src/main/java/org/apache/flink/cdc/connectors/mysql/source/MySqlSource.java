@@ -36,6 +36,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSnapshotSplit
 import org.apache.flink.cdc.connectors.mysql.source.assigners.MySqlSplitAssigner;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
@@ -251,6 +252,13 @@ public class MySqlSource<T>
                             enumContext.currentParallelism(),
                             (HybridPendingSplitsState) checkpoint,
                             enumContext);
+        } else if (checkpoint instanceof SnapshotPendingSplitsState) {
+            splitAssigner =
+                    new MySqlSnapshotSplitAssigner(
+                            sourceConfig,
+                            enumContext.currentParallelism(),
+                            (SnapshotPendingSplitsState) checkpoint,
+                            enumContext);                
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(
