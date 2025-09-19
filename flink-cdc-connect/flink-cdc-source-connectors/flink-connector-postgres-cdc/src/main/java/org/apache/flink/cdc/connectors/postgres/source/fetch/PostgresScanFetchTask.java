@@ -202,7 +202,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         try {
             replicationConnection.close(true);
         } catch (Throwable t) {
-            LOG.info("here exception occurs");
+            LOG.error("Unexpected error while dropping replication slot", t);
             throw new FlinkRuntimeException(t);
         }
     }

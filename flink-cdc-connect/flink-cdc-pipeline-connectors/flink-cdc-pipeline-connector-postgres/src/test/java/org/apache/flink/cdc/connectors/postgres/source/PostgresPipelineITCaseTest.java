@@ -132,6 +132,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         List<Event> actual = fetchResultsExcept(events, expectedSnapshot.size(), createTableEvent);
         assertThat(actual.subList(0, expectedSnapshot.size()))
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+        assertThat(inventoryDatabase.checkSlot(slotName)).isEqualTo(slotName);
     }
 
     @ParameterizedTest(name = "unboundedChunkFirst: {0}")
@@ -306,6 +307,53 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                 assertThat(actualEvent.meta().get("op_ts")).isGreaterThanOrEqualTo(startTime);
             }
         }
+    }
+
+    @Test
+    public void testSnapshotOnlyMode() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGRES_CONTAINER.getHost())
+                                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(inventoryDatabase.getDatabaseName())
+                                .tableList("inventory.products")
+                                .startupOptions(StartupOptions.snapshot())
+                                .skipSnapshotBackfill(false)
+                                .serverTimeZone("UTC");
+        configFactory.database(inventoryDatabase.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        TableId tableId = TableId.tableId("inventory", "products");
+        CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
+
+        // generate snapshot data
+        List<Event> expectedSnapshot = getSnapshotExpected(tableId);
+
+        // In this configuration, several subtasks might emit their corresponding CreateTableEvent
+        // to downstream. Since it is not possible to predict how many CreateTableEvents should we
+        // expect, we simply filter them out from expected sets, and assert there's at least one.
+        List<Event> actual = fetchResultsExcept(events, expectedSnapshot.size(), createTableEvent);
+        assertThat(actual.subList(0, expectedSnapshot.size()))
+                .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
+        Thread.sleep(10000);
+        assertThat(inventoryDatabase.checkSlot(slotName))
+                .isEqualTo(String.format("Replication slot \"%s\" does not exist", slotName));
     }
 
     private static <T> List<T> fetchResultsExcept(Iterator<T> iter, int size, T sideEvent) {
