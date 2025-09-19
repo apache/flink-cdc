@@ -56,13 +56,13 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
+import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.runtime.typeutils.InternalTypeInfo;
 import org.apache.flink.table.types.DataType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.utils.TypeConversions;
-import org.apache.flink.table.data.DecimalData;
 import org.apache.flink.types.Row;
 import org.apache.flink.types.RowUtils;
 import org.apache.flink.util.CloseableIterator;
@@ -1522,7 +1522,8 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                         .executeAndCollect()) {
             // Expect 24 records as inserted above
             List<String> result = fetchRowData(it, 24, this::stringifyUnsignedPkRow);
-            // Validate a couple of boundary values exist to ensure chunking across unsigned range works
+            // Validate a couple of boundary values exist to ensure chunking across unsigned range
+            // works
             assertThat(result)
                     .contains(
                             "+I[1, flink]",

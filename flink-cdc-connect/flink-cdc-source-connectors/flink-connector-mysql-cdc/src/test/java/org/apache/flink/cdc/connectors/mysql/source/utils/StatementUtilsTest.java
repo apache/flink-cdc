@@ -20,7 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.utils;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
-import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
@@ -37,14 +37,15 @@ class StatementUtilsTest {
         PreparedStatement psProxy = createPreparedStatementProxy(invocationDetails);
 
         long overflowValue = Long.MAX_VALUE + 1L;
-        BigDecimal expectedBigDecimal = new BigDecimal(Long.toUnsignedString(overflowValue));
+        BigInteger expectedBigInteger = new BigInteger(Long.toUnsignedString(overflowValue));
 
         // Use the safe method
         StatementUtils.setSafeObject(psProxy, 1, overflowValue);
 
-        // Assert that it correctly used setBigDecimal with the converted value
-        assertThat(invocationDetails.get("methodName")).isEqualTo("setBigDecimal");
-        assertThat(invocationDetails.get("value")).isEqualTo(expectedBigDecimal);
+        // Assert that it correctly used setObject with the converted BigInteger value
+        assertThat(invocationDetails.get("methodName")).isEqualTo("setObject");
+        assertThat(invocationDetails.get("value")).isInstanceOf(BigInteger.class);
+        assertThat(invocationDetails.get("value")).isEqualTo(expectedBigInteger);
     }
 
     @Test
@@ -94,8 +95,7 @@ class StatementUtilsTest {
                         new Class<?>[] {PreparedStatement.class},
                         (proxy, method, args) -> {
                             String methodName = method.getName();
-                            if (methodName.equals("setObject")
-                                    || methodName.equals("setBigDecimal")) {
+                            if (methodName.equals("setObject")) {
                                 invocationDetails.put("methodName", methodName);
                                 invocationDetails.put("parameterIndex", args[0]);
                                 invocationDetails.put("value", args[1]);

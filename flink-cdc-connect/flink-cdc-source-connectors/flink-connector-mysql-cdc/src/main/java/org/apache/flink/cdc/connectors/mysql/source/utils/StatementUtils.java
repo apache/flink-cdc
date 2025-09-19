@@ -77,13 +77,13 @@ public class StatementUtils {
                 });
     }
 
-    // PreparedStatement#setObject method will be converted to long type when handling bigint unsigned, which poses a data overflow issue.
+    // PreparedStatement#setObject method will be converted to long type when handling bigint
+    // unsigned, which poses a data overflow issue.
     // Therefore, we need to handle the overflow issue by converting the long value to BigInteger.
     public static void setSafeObject(PreparedStatement ps, int parameterIndex, Object value)
             throws SQLException {
         if (value instanceof Long && (Long) value < 0L) {
-            ps.setObject(
-                    parameterIndex, new BigInteger(Long.toUnsignedString((Long) value)));
+            ps.setObject(parameterIndex, new BigInteger(Long.toUnsignedString((Long) value)));
             return;
         }
         ps.setObject(parameterIndex, value);
