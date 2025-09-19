@@ -76,7 +76,7 @@ public class Db2Dialect implements JdbcDataSourceDialect {
     }
 
     @Override
-    public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
+    public boolean isDataCollectionIdCaseInsensitive(JdbcSourceConfig sourceConfig) {
         return true;
     }
 
