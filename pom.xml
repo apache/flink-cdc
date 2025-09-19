@@ -29,7 +29,7 @@ limitations under the License.
 
     <groupId>org.apache.flink</groupId>
     <artifactId>flink-cdc-parent</artifactId>
-    <version>${revision}</version>
+    <version>3.5.0</version>
     <packaging>pom</packaging>
 
     <modules>
