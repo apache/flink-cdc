@@ -331,7 +331,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             }
         }
 
-        // Return original event if no transform predicate is satisfied/.
+        // Events with no matching filters satisfied won't be emitted to downstream.
         return Optional.empty();
     }
 
@@ -397,9 +397,20 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
     /** Obtain effective transformers based on given {@link TableId}. */
     private List<PostTransformer> getEffectiveTransformers(TableId tableId) {
-        return transformers.stream()
-                .filter(trans -> trans.getSelectors().isMatch(tableId))
-                .collect(Collectors.toList());
+        List<PostTransformer> effectiveTransformers = new ArrayList<>();
+        for (PostTransformer transformer : transformers) {
+            if (transformer.getSelectors().isMatch(tableId)) {
+                effectiveTransformers.add(transformer);
+
+                // Transform module works with "First-match" rule. If we have met an uncondition
+                // transform rule (without any filtering expression), then any following transform
+                // rule will not be effective.
+                if (!transformer.getFilter().isPresent()) {
+                    break;
+                }
+            }
+        }
+        return effectiveTransformers;
     }
 
     /**
