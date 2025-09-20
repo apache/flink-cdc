@@ -1535,9 +1535,9 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
 
     private String stringifyUnsignedPkRow(RowData row) {
         DecimalData decimal = row.getDecimal(0, 20, 0);
-        String order_id = decimal.toBigDecimal().toPlainString();
+        String orderId = decimal.toBigDecimal().toPlainString();
         String desc = row.getString(1).toString();
-        return "+I[" + order_id + ", " + desc + "]";
+        return "+I[" + orderId + ", " + desc + "]";
     }
 
     /**
