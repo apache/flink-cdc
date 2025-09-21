@@ -19,11 +19,13 @@ package org.apache.flink.cdc.debezium.event;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
@@ -311,22 +313,22 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     protected Object convertToDate(Object dbzObj, Schema schema) {
-        return (int) TemporalConversions.toLocalDate(dbzObj).toEpochDay();
+        return DateData.fromLocalDate(TemporalConversions.toLocalDate(dbzObj));
     }
 
     protected Object convertToTime(Object dbzObj, Schema schema) {
         if (dbzObj instanceof Long) {
             switch (schema.name()) {
                 case MicroTime.SCHEMA_NAME:
-                    return (int) ((long) dbzObj / 1000);
+                    return TimeData.fromMicroOfDay((long) dbzObj);
                 case NanoTime.SCHEMA_NAME:
-                    return (int) ((long) dbzObj / 1000_000);
+                    return TimeData.fromNanoOfDay((long) dbzObj);
             }
         } else if (dbzObj instanceof Integer) {
-            return dbzObj;
+            return TimeData.fromMillisOfDay((int) dbzObj);
         }
         // get number of milliseconds of the day
-        return TemporalConversions.toLocalTime(dbzObj).toSecondOfDay() * 1000;
+        return TimeData.fromLocalTime(TemporalConversions.toLocalTime(dbzObj));
     }
 
     protected Object convertToTimestamp(Object dbzObj, Schema schema) {

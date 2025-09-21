@@ -64,6 +64,7 @@ import java.util.function.Predicate;
 
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createBinaryClient;
 import static org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils.createMySqlConnection;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.isEndWatermarkEvent;
 
 /**
  * A Debezium binlog reader implementation that also support reads binlog and filter overlapping
@@ -148,8 +149,6 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                         currentBinlogSplit),
                                 t);
                         readException = t;
-                    } finally {
-                        stopBinlogReadTask();
                     }
                 });
     }
@@ -167,6 +166,16 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
+                if (isEndWatermarkEvent(event.getRecord())) {
+                    LOG.info("Read split {} end watermark event", currentBinlogSplit);
+                    try {
+                        stopBinlogReadTask();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    break;
+                }
+
                 if (isParsingOnLineSchemaChanges) {
                     Optional<SourceRecord> oscRecord =
                             parseOnLineSchemaChangeEvent(event.getRecord());
@@ -397,5 +406,10 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     @VisibleForTesting
     MySqlBinlogSplitReadTask getBinlogSplitReadTask() {
         return binlogSplitReadTask;
+    }
+
+    @VisibleForTesting
+    public StoppableChangeEventSourceContext getChangeEventSourceContext() {
+        return changeEventSourceContext;
     }
 }

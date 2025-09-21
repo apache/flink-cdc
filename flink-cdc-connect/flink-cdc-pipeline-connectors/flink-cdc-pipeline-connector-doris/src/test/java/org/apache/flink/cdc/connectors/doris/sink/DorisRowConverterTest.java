@@ -17,7 +17,9 @@
 
 package org.apache.flink.cdc.connectors.doris.sink;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -98,7 +100,7 @@ class DorisRowConverterTest {
                             64,
                             128L,
                             TimestampData.fromLocalDateTime(time1),
-                            (int) date1.toEpochDay(),
+                            DateData.fromLocalDate(date1),
                             BinaryStringData.fromString("a"),
                             BinaryStringData.fromString("doris"),
                             TimestampData.fromLocalDateTime(f17),
@@ -107,9 +109,9 @@ class DorisRowConverterTest {
                             LocalZonedTimestampData.fromInstant(f20),
                             LocalZonedTimestampData.fromInstant(f21),
                             LocalZonedTimestampData.fromInstant(f22),
-                            3661000,
-                            3661123,
-                            3661123
+                            TimeData.fromNanoOfDay(3661000_000000L),
+                            TimeData.fromNanoOfDay(3661123_000000L),
+                            TimeData.fromNanoOfDay(3661123_000000L)
                         });
         List<Object> row = new ArrayList<>();
         for (int i = 0; i < recordData.getArity(); i++) {

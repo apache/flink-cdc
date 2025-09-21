@@ -441,7 +441,7 @@ limitations under the License.
                         <goals>
                             <goal>wget</goal>
                         </goals>
-                        <phase>compile</phase>
+                        <phase>test</phase>
                         <configuration>
                             <skip>${flink.release.download.skip}</skip>
                             <url>${flink.release.mirror}/${flink.release.name}</url>
@@ -456,7 +456,7 @@ limitations under the License.
                 <executions>
                     <execution>
                         <id>copy-jars</id>
-                        <phase>package</phase>
+                        <phase>test</phase>
                         <goals>
                             <goal>copy</goal>
                         </goals>
