@@ -917,4 +917,70 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         tableResult.getJobClient().get().cancel().get();
         RowUtils.USE_LEGACY_TO_STRING = true;
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void testCNColumns(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
+        RowUtils.USE_LEGACY_TO_STRING = false;
+        initializePostgresTable(POSTGRES_CONTAINER, "cn_column_test");
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE cn_column_table ("
+                                + "    测试id INTEGER NOT NULL,"
+                                + "    测试name STRING"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                // In the snapshot phase of increment snapshot mode, table without
+                                // primary key is not allowed now.Thus, when
+                                // scan.incremental.snapshot.enabled = true, use 'latest-offset'
+                                // startup mode.
+                                + (parallelismSnapshot
+                                        ? " 'scan.startup.mode' = 'latest-offset',"
+                                        : "")
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGRES_CONTAINER.getHost(),
+                        POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGRES_CONTAINER.getUsername(),
+                        POSTGRES_CONTAINER.getPassword(),
+                        POSTGRES_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "cn_column_test",
+                        parallelismSnapshot,
+                        getSlotName());
+        tEnv.executeSql(sourceDDL);
+        LOG.info("test cn column, sourceDDL:{}", sourceDDL);
+
+        // async submit job
+        TableResult tableResult = tEnv.executeSql("SELECT * FROM cn_column_table");
+
+        Thread.sleep(5000L);
+        // generate WAL
+        try (Connection connection = getJdbcConnection(POSTGRES_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "INSERT INTO inventory.cn_column_test VALUES (2, 'testAnotherName');");
+        }
+
+        List<String> expected = new ArrayList<>();
+        if (!parallelismSnapshot) {
+            expected.add("+I[1, testName]");
+        }
+        expected.add("+I[2, testAnotherName]");
+
+        CloseableIterator<Row> iterator = tableResult.collect();
+        assertEqualsInAnyOrder(expected, fetchRows(iterator, expected.size()));
+        tableResult.getJobClient().get().cancel().get();
+        RowUtils.USE_LEGACY_TO_STRING = true;
+    }
 }
