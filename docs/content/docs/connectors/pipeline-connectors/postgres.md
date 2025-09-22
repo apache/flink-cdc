@@ -412,11 +412,11 @@ Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone inform
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect 
 
-Note: Due to current CDC limitations in supporting time types, when <code>debezium.time.precision.mode</code> is set to "adaptive", "adaptive_time_microseconds", or when using Connect time types, all time values are converted to the Integer type with a precision of 3. This will be improved in future updates.
+Note: Due to the current CDC limitation, the precision for the TIME type is fixed at 3. Regardless of whether <code>debezium.time.precision.mode<code> is set to adaptive, adaptive_time_microseconds, or connect, the TIME type will be converted to TIME(3).
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-When the <code>debezium.time.precision.mode</code> property is set to adaptive, the default, the connector determines the literal type and semantic type based on the column’s data type definition. This ensures that events exactly represent the values in the database.
+When the <code>debezium.time.precision.mode</code> property is set to the default value `adaptive_time_microseconds`, the precision of `TIME` is 3, and the precision of `TIMESTAMP` is 6.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -435,13 +435,79 @@ When the <code>debezium.time.precision.mode</code> property is set to adaptive, 
         <td>
           TIME([P])
         </td>
-        <td>INTEGER</td>
+        <td>TIME(3)</td>
       </tr>
       <tr>
         <td>
           TIMESTAMP([P])
         </td>
         <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=adaptive_time_microseconds</u>
+
+When the `debezium.time.precision.mode` property is set to the value `adaptive_time_microseconds`, the precision of `TIME` is 3, and the precision of `TIMESTAMP` is 6.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=connect</u>
+
+When the <code>debezium.time.precision.mode</code> property is set to the default value connect, both TIME and TIMESTAMP have a precision of 3.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP(3)</td>
       </tr>
     </tbody>
 </table>
