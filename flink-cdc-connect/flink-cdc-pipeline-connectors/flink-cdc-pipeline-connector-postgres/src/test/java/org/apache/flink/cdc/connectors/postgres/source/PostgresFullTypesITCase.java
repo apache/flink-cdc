@@ -67,6 +67,7 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -289,13 +290,124 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                 new Object[] {
                     2,
                     DateData.fromEpochDay(18460),
-                    64822000,
-                    64822123,
-                    64822123,
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123456")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse("2020-07-17T18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                };
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Assertions.assertThat(recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE))
+                .isEqualTo(expectedSnapshot);
+    }
+
+    @Test
+    public void testTimeTypesWithTemporalModeMicroSeconds() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty("time.precision.mode", "adaptive_time_microseconds");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.time_types")
+                                .startupOptions(StartupOptions.initial())
+                                .debeziumProperties(debeziumProps)
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    2,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
+                    TimestampData.fromLocalDateTime(
+                            LocalDateTime.parse("2020-07-17T18:00:22.123456")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                };
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+        Assertions.assertThat(recordFields(snapshotRecord, TIME_TYPES_WITH_ADAPTIVE))
+                .isEqualTo(expectedSnapshot);
+    }
+
+    @Test
+    public void testTimeTypesWithTemporalModeConnect() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty("time.precision.mode", "connect");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.time_types")
+                                .startupOptions(StartupOptions.initial())
+                                .debeziumProperties(debeziumProps)
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        Object[] expectedSnapshot =
+                new Object[] {
+                    2,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimeData.fromLocalTime(LocalTime.parse("18:00:22.123")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
+                    TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
                     LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
                 };
@@ -923,9 +1035,9 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
             RowType.of(
                     DataTypes.INT(),
                     DataTypes.DATE(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
-                    DataTypes.INT(),
+                    DataTypes.TIME(0),
+                    DataTypes.TIME(3),
+                    DataTypes.TIME(6),
                     DataTypes.TIMESTAMP(0),
                     DataTypes.TIMESTAMP(3),
                     DataTypes.TIMESTAMP(6),
