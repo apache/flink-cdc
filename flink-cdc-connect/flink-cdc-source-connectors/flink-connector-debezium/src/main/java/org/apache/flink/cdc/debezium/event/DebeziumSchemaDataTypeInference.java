@@ -104,10 +104,14 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
     }
 
     protected DataType inferInt32(Object value, Schema schema) {
-        if (Date.SCHEMA_NAME.equals(schema.name())) {
+        if (Date.SCHEMA_NAME.equals(schema.name())
+                || org.apache.kafka.connect.data.Date.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.DATE();
         }
         if (Time.SCHEMA_NAME.equals(schema.name())) {
+            return DataTypes.TIME(3);
+        }
+        if (org.apache.kafka.connect.data.Time.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.TIME(3);
         }
         return DataTypes.INT();
@@ -120,7 +124,8 @@ public class DebeziumSchemaDataTypeInference implements SchemaDataTypeInference,
         if (NanoTime.SCHEMA_NAME.equals(schema.name())) {
             return DataTypes.TIME(9);
         }
-        if (Timestamp.SCHEMA_NAME.equals(schema.name())) {
+        if (Timestamp.SCHEMA_NAME.equals(schema.name())
+                || org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME.equals(schema.name())) {
             return DataTypes.TIMESTAMP(3);
         }
         if (MicroTimestamp.SCHEMA_NAME.equals(schema.name())) {
