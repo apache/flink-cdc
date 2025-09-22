@@ -417,11 +417,11 @@ pipeline:
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect
 
-注意： 受限当前CDC对时间类型的支持，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Integer类型，并精度为3，后续将进行完善。
+注意： 受限当前CDC对时间类型Time的精度为3，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Time(3)类型。
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，连接器会根据列的数据类型定义来确定字面类型和语义类型。这可以确保事件能够精确地表示数据库中的值。
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，TIME的精度为3，TIMESTAMP的精度为6。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -440,13 +440,79 @@ pipeline:
         <td>
           TIME([P])
         </td>
-        <td>INTEGER</td>
+        <td>TIME(3)</td>
       </tr>
       <tr>
         <td>
           TIMESTAMP([P])
         </td>
         <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=adaptive_time_microseconds</u>
+
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive_time_microseconds时，TIME的精度为3，TIMESTAMP的精度为6。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=connect</u>
+
+当<code>debezium.time.precision.mode</code>属性设置为默认的 connect时，TIME和TIMESTAMP的精度都为3。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP(3)</td>
       </tr>
     </tbody>
 </table>

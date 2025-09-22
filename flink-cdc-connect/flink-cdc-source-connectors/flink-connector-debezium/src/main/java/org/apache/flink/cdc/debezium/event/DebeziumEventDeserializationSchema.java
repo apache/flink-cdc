@@ -66,6 +66,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -326,6 +327,9 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             }
         } else if (dbzObj instanceof Integer) {
             return TimeData.fromMillisOfDay((int) dbzObj);
+        } else if (dbzObj instanceof Date) {
+            long millisOfDay = ((Date) dbzObj).getTime() % (24 * 60 * 60 * 1000);
+            return TimeData.fromMillisOfDay((int) millisOfDay);
         }
         // get number of milliseconds of the day
         return TimeData.fromLocalTime(TemporalConversions.toLocalTime(dbzObj));
@@ -344,6 +348,12 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     long nano = (long) dbzObj;
                     return TimestampData.fromMillis(
                             Math.floorDiv(nano, 1000_000), (int) (Math.floorMod(nano, 1000_000)));
+            }
+        }
+        if (dbzObj instanceof Date) {
+            if (schema.name().equals(org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME)) {
+                Instant instant = ((Date) dbzObj).toInstant();
+                return TimestampData.fromMillis(instant.toEpochMilli());
             }
         }
         throw new IllegalArgumentException(
