@@ -314,6 +314,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     protected Object convertToDate(Object dbzObj, Schema schema) {
+        if (dbzObj instanceof Date) {
+            Instant instant = ((Date) dbzObj).toInstant();
+            return DateData.fromLocalDate(instant.atZone(java.time.ZoneOffset.UTC).toLocalDate());
+        }
         return DateData.fromLocalDate(TemporalConversions.toLocalDate(dbzObj));
     }
 
