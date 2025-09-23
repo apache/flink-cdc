@@ -144,6 +144,8 @@ Usage Notes
 
 * Exactly-once semantics are not supported. The connector uses at-least-once + the table's primary key for idempotent writing.
 
+* Either `catalog.properties.type` or  `catalog.properties.catalog-impl` must be declared.
+
 Data Type Mapping
 ----------------
 <div class="wy-table-responsive">
