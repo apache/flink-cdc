@@ -36,7 +36,7 @@ An example of the pipeline for reading data from Postgres and sink to Doris can 
 
 ```yaml
 source:
-   type: posgtres
+   type: postgres
    name: Postgres Source
    hostname: 127.0.0.1
    port: 5432
