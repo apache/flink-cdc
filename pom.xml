@@ -421,6 +421,8 @@ limitations under the License.
                     </licenseFamilies>
                     <excludes>
                         <!-- Additional files like .gitignore etc.-->
+                        <!-- Release files -->
+                        <exclude>**/release/**</exclude>
                         <exclude>**/README.md</exclude>
                         <exclude>**/.*/**</exclude>
                         <!-- Generated content -->
@@ -674,6 +676,16 @@ limitations under the License.
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+
+            <!-- Allow modification of pom.xml properties using Maven commands. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.5</version>
+                <configuration>
+                    <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
             </plugin>
         </plugins>
