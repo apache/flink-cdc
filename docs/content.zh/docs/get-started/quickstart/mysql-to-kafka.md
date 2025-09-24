@@ -46,7 +46,9 @@ under the License.
 2. 在 `conf/config.yaml` 配置文件追加下列参数开启检查点，每隔 3 秒进行一次 checkpoint。
 
    ```yaml
-   execution.checkpointing.interval: 3s
+   execution:
+     checkpointing:
+       interval: 3s
    ```
 
 3. 使用下面的命令启动 Flink 集群。
