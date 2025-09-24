@@ -31,7 +31,7 @@ Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和
 
 ## 示例
 
-从 Postgres 读取数据同步到 Doris 的 Pipeline 可以定义如下：
+从 Postgres 读取数据同步到 Fluss 的 Pipeline 可以定义如下：
 
 ```yaml
 source:
@@ -41,19 +41,23 @@ source:
    port: 5432
    username: admin
    password: pass
-   tables: adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*
+   # 需要确保所有的表来自同一个database
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
 
 sink:
-  type: doris
-  name: Doris Sink
-  fenodes: 127.0.0.1:8030
-  username: root
-  password: pass
+  type: fluss
+  name: Fluss Sink
+  bootstrap.servers: localhost:9123
+  # Security-related properties for the Fluss client
+  properties.client.security.protocol: sasl
+  properties.client.security.sasl.mechanism: PLAIN
+  properties.client.security.sasl.username: developer
+  properties.client.security.sasl.password: developer-pass
 
 pipeline:
-   name: Postgres to Doris Pipeline
+   name: Postgres to Fluss Pipeline
    parallelism: 4
 ```
 
@@ -105,8 +109,9 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要监视的 Postgres 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
-          需要注意的是，点号（.）被视为数据库和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
-          例如，adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*</td>
+          需要确保所有的表来自同一个数据库。<br>
+          需要注意的是，点号（.）被视为数据库、模式和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          例如，bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
       <td>slot.name</td>
