@@ -32,29 +32,33 @@ Note: Since the Postgres WAL log cannot parse table structure change records, Po
 
 ## Example
 
-An example of the pipeline for reading data from Postgres and sink to Doris can be defined as follows:
+An example of the pipeline for reading data from Postgres and sink to Fluss can be defined as follows:
 
 ```yaml
 source:
-   type: posgtres
+   type: postgres
    name: Postgres Source
    hostname: 127.0.0.1
    port: 5432
    username: admin
    password: pass
-   tables: adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*
+   # make sure all the tables share same database.
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
 
 sink:
-  type: doris
-  name: Doris Sink
-  fenodes: 127.0.0.1:8030
-  username: root
-  password: pass
+  type: fluss
+  name: Fluss Sink
+  bootstrap.servers: localhost:9123
+  # Security-related properties for the Fluss client
+  properties.client.security.protocol: sasl
+  properties.client.security.sasl.mechanism: PLAIN
+  properties.client.security.sasl.username: developer
+  properties.client.security.sasl.password: developer-pass
 
 pipeline:
-   name: Postgres to Doris Pipeline
+   name: Postgres to Fluss Pipeline
    parallelism: 4
 ```
 
@@ -106,9 +110,10 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Table name of the Postgres database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. <br>
-          It is important to note that the dot (.) is treated as a delimiter for database and table names. 
+          All the tables are required to share same database.  <br>
+          It is important to note that the dot (.) is treated as a delimiter for database, schema and table names.
           If there is a need to use a dot (.) in a regular expression to match any character, it is necessary to escape the dot with a backslash.<br>
-          例如，adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*</td>
+          for example:  bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
       <td>slot.name</td>
