@@ -18,13 +18,18 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
 import org.apache.flink.cdc.connectors.mysql.table.MySqlReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
+import org.apache.flink.cdc.debezium.event.SourceRecordEventDeserializer;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
+import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverter;
 import org.apache.flink.table.data.TimestampData;
 
 import com.esri.core.geometry.ogc.OGCGeometry;
@@ -38,6 +43,8 @@ import io.debezium.relational.history.HistoryRecord;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -56,6 +63,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.get
 @Internal
 public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlEventDeserializer.class);
     private static final long serialVersionUID = 1L;
 
     public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
@@ -72,6 +80,7 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private List<MySqlReadableMetadata> readableMetadataList;
     private boolean isTableIdCaseInsensitive;
+    private final boolean appendOnly;
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
@@ -84,7 +93,8 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                 new ArrayList<>(),
                 includeSchemaChanges,
                 tinyInt1isBit,
-                isTableIdCaseInsensitive);
+                isTableIdCaseInsensitive,
+                false);
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
@@ -95,12 +105,31 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             boolean includeComments,
             boolean tinyInt1isBit,
             boolean isTableIdCaseInsensitive) {
+        this(
+                changelogMode,
+                includeSchemaChanges,
+                readableMetadataList,
+                includeComments,
+                tinyInt1isBit,
+                isTableIdCaseInsensitive,
+                false);
+    }
+
+    public MySqlEventDeserializer(
+            DebeziumChangelogMode changelogMode,
+            boolean includeSchemaChanges,
+            List<MySqlReadableMetadata> readableMetadataList,
+            boolean includeComments,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive,
+            boolean appendOnly) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
         this.includeComments = includeComments;
         this.tinyInt1isBit = tinyInt1isBit;
         this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+        this.appendOnly = appendOnly;
     }
 
     @Override
@@ -170,6 +199,78 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                     }
                 }));
         return metadataMap;
+    }
+
+    @Override
+    public List<DataChangeEvent> deserializeDataChangeRecord(SourceRecord record) throws Exception {
+        if (!appendOnly) {
+            // Use default behavior when append-only is not enabled
+            return super.deserializeDataChangeRecord(record);
+        }
+
+        // Append-only mode: convert all operations to INSERT events
+        Envelope.Operation op = Envelope.operationFor(record);
+        TableId tableId = getTableId(record);
+
+        Struct value = (Struct) record.value();
+        Schema valueSchema = record.valueSchema();
+        Map<String, String> meta = getMetadata(record);
+
+        if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            RecordData after = extractAfterData(value, valueSchema);
+            return Collections.singletonList(DataChangeEvent.insertEvent(tableId, after, meta));
+        } else if (op == Envelope.Operation.DELETE) {
+            // For DELETE: convert to INSERT with before data
+            RecordData before = extractBeforeData(value, valueSchema);
+            return Collections.singletonList(DataChangeEvent.insertEvent(tableId, before, meta));
+        } else if (op == Envelope.Operation.UPDATE) {
+            // For UPDATE: convert to INSERT with after data (and optionally before data if ALL
+            // mode)
+            RecordData after = extractAfterData(value, valueSchema);
+            List<DataChangeEvent> events = new ArrayList<>();
+
+            if (changelogMode == DebeziumChangelogMode.ALL) {
+                // Generate INSERT event for before data (UPDATE_BEFORE -> INSERT)
+                RecordData before = extractBeforeData(value, valueSchema);
+                events.add(DataChangeEvent.insertEvent(tableId, before, meta));
+            }
+
+            // Generate INSERT event for after data (UPDATE_AFTER -> INSERT)
+            events.add(DataChangeEvent.insertEvent(tableId, after, meta));
+            return events;
+        } else {
+            LOG.trace("Received {} operation, skip", op);
+            return Collections.emptyList();
+        }
+    }
+
+    private RecordData extractBeforeData(Struct value, Schema valueSchema) throws Exception {
+        Schema beforeSchema =
+                SourceRecordEventDeserializer.fieldSchema(valueSchema, Envelope.FieldName.BEFORE);
+        Struct beforeValue =
+                SourceRecordEventDeserializer.fieldStruct(value, Envelope.FieldName.BEFORE);
+        return extractData(beforeValue, beforeSchema);
+    }
+
+    private RecordData extractAfterData(Struct value, Schema valueSchema) throws Exception {
+        Schema afterSchema =
+                SourceRecordEventDeserializer.fieldSchema(valueSchema, Envelope.FieldName.AFTER);
+        Struct afterValue =
+                SourceRecordEventDeserializer.fieldStruct(value, Envelope.FieldName.AFTER);
+        return extractData(afterValue, afterSchema);
+    }
+
+    private RecordData extractData(Struct value, Schema valueSchema) throws Exception {
+        if (value == null) {
+            return null;
+        }
+        DataType dataType = schemaDataTypeInference.infer(value, valueSchema);
+        DeserializationRuntimeConverter converter = createNotNullConverter(dataType);
+        // Null-safe wrapper
+        if (value == null) {
+            return null;
+        }
+        return (RecordData) converter.convert(value, valueSchema);
     }
 
     @Override
