@@ -18,15 +18,21 @@
 package org.apache.flink.cdc.connectors.base.source.utils;
 
 import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.Table;
+import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -34,6 +40,8 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.rowTo
 
 /** Utilities to split chunks of table. */
 public class JdbcChunkUtils {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcChunkUtils.class);
 
     /**
      * Query the maximum and minimum value of the column in the table. e.g. query string <code>
@@ -100,15 +108,55 @@ public class JdbcChunkUtils {
                 });
     }
 
+    // Write createTableFilter method here to avoid the dependency on DebeziumUtils
+    private static Tables.TableFilter createTableFilter(String schemaName, String tableName) {
+        return new Tables.TableFilter() {
+            @Override
+            public boolean isIncluded(TableId tableId) {
+                final String catalog = tableId.catalog();
+                final String schema = tableId.schema();
+                final String table = tableId.table();
+
+                if (schemaName != null && !schemaName.equalsIgnoreCase(schema)) {
+                    return false;
+                }
+
+                if (tableName != null && !tableName.equalsIgnoreCase(table)) {
+                    return false;
+                }
+
+                return true;
+            }
+        };
+    }
+
+    @Nullable
+    private static String findChunkKeyColumn(
+            TableId tableId, Map<ObjectPath, String> chunkKeyColumns) {
+        String schemaName = tableId.schema();
+
+        for (ObjectPath table : chunkKeyColumns.keySet()) {
+            Tables.TableFilter filter = createTableFilter(schemaName, table.getObjectName());
+            if (filter.isIncluded(tableId)) {
+                String chunkKeyColumn = chunkKeyColumns.get(table);
+                return chunkKeyColumn;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Get the column which is seen as chunk key.
      *
      * @param table table identity.
-     * @param chunkKeyColumn column name which is seen as chunk key, if chunkKeyColumn is null, use
+     * @param chunkKeyColumns column name which is seen as chunk key, if chunkKeyColumn is null, use
      *     primary key instead. @Column the column which is seen as chunk key.
      */
-    public static Column getSplitColumn(Table table, @Nullable String chunkKeyColumn) {
+    public static Column getSplitColumn(
+            Table table, @Nullable Map<ObjectPath, String> chunkKeyColumns) {
         List<Column> primaryKeys = table.primaryKeyColumns();
+        String chunkKeyColumn = findChunkKeyColumn(table.id(), chunkKeyColumns);
         if (primaryKeys.isEmpty() && chunkKeyColumn == null) {
             throw new ValidationException(
                     "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");

@@ -28,6 +28,8 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -43,6 +45,7 @@ import static org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDis
 
 /** Utility class to deal record. */
 public class SourceRecordUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(SourceRecordUtils.class);
 
     private SourceRecordUtils() {}
 
@@ -131,15 +134,86 @@ public class SourceRecordUtils {
 
     public static Object[] getSplitKey(
             RowType splitBoundaryType, SourceRecord dataRecord, SchemaNameAdjuster nameAdjuster) {
-        // the split key field contains single field now
         String splitFieldName = nameAdjuster.adjust(splitBoundaryType.getFieldNames().get(0));
-        Struct key = (Struct) dataRecord.key();
-        return new Object[] {key.get(splitFieldName)};
+
+        // Try primary key struct first (for backward compatibility)
+        Struct keyStruct = (Struct) dataRecord.key();
+        if (keyStruct != null && keyStruct.schema().field(splitFieldName) != null) {
+            return new Object[] {keyStruct.get(splitFieldName)};
+        }
+
+        // For non-primary key chunk keys, use value-based approach
+        return getSplitKeyFromValue(dataRecord, splitFieldName);
+    }
+
+    /** Extract chunk key from value struct (AFTER/BEFORE) for non-primary key chunk keys. */
+    private static Object[] getSplitKeyFromValue(SourceRecord dataRecord, String splitFieldName) {
+        Struct value = (Struct) dataRecord.value();
+        if (value == null) {
+            return null; // No value struct available
+        }
+
+        String op = value.getString(Envelope.FieldName.OPERATION);
+        Struct targetStruct = null;
+
+        if (op == null) {
+            // READ operation (snapshot)
+            targetStruct = value.getStruct(Envelope.FieldName.AFTER);
+        } else {
+            switch (op) {
+                case "c": // CREATE
+                case "r": // READ
+                    targetStruct = value.getStruct(Envelope.FieldName.AFTER);
+                    break;
+                case "u": // UPDATE - prefer AFTER for current state
+                    targetStruct = value.getStruct(Envelope.FieldName.AFTER);
+                    if (targetStruct == null
+                            || targetStruct.schema().field(splitFieldName) == null) {
+                        // Fallback to BEFORE if AFTER doesn't have the field
+                        targetStruct = value.getStruct(Envelope.FieldName.BEFORE);
+                    }
+                    break;
+                case "d": // DELETE - use BEFORE, but fallback if missing
+                    targetStruct = value.getStruct(Envelope.FieldName.BEFORE);
+                    if (targetStruct == null
+                            || targetStruct.schema().field(splitFieldName) == null) {
+                        // For DELETE with missing chunk key, return null to indicate "emit without
+                        // filtering"
+                        return null;
+                    }
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown operation: " + op);
+            }
+        }
+
+        if (targetStruct == null || targetStruct.schema().field(splitFieldName) == null) {
+            // Chunk key field not found in value struct
+            // This could happen with schema changes or configuration issues
+            LOG.debug(
+                    "Chunk key field '{}' not found in record, emitting without filtering. Table: {}, Operation: {}",
+                    splitFieldName,
+                    getTableId(dataRecord),
+                    dataRecord.value() != null
+                            ? ((Struct) dataRecord.value()).getString(Envelope.FieldName.OPERATION)
+                            : "unknown");
+            return null;
+        }
+
+        return new Object[] {targetStruct.get(splitFieldName)};
     }
 
     /** Returns the specific key contains in the split key range or not. */
     public static boolean splitKeyRangeContains(
             Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
+        // If key is null, chunk key field was not found (e.g., DELETE with non-primary key chunk
+        // key)
+        // Emit the record without filtering to prevent data loss
+        if (key == null) {
+            LOG.debug("Chunk key is null, emitting record without filtering");
+            return true;
+        }
+
         // for all range
         if (splitKeyStart == null && splitKeyEnd == null) {
             return true;
