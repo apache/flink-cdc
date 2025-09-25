@@ -68,14 +68,17 @@ public class MySqlDataSource implements DataSource {
                                 false);
         boolean isTableIdCaseInsensitive = MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig);
 
+        DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
+
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        DebeziumChangelogMode.ALL,
+                        changelogMode,
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
                         includeComments,
                         sourceConfig.isTreatTinyInt1AsBoolean(),
-                        isTableIdCaseInsensitive);
+                        isTableIdCaseInsensitive,
+                        sourceConfig.isScanReadChangelogAsAppendOnly());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
