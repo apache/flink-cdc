@@ -3,7 +3,7 @@ title: "Iceberg"
 weight: 9
 type: docs
 aliases:
-- /connectors/pipeline-connectors/iceberg
+  - /connectors/pipeline-connectors/iceberg
 ---
 <!--
 Licensed to the Apache Software Foundation (ASF) under one
@@ -30,11 +30,11 @@ The Iceberg Pipeline Connector functions as a *Data Sink* for data pipelines, en
 
 ## Key Capabilities
 * **Automatic Table Creation:**
-creates Iceberg tables dynamically when they do not exist
+  creates Iceberg tables dynamically when they do not exist
 * **Schema Synchronization:**
-propagates schema changes (e.g., column additions) from source systems to Iceberg
+  propagates schema changes (e.g., column additions) from source systems to Iceberg
 * **Data Replication:**
-supports both batch and streaming data synchronization
+  supports both batch and streaming data synchronization
 
 How to create Pipeline
 ----------------
@@ -143,6 +143,8 @@ Usage Notes
 * The source table must have a primary key. Tables with no primary key are not supported.
 
 * Exactly-once semantics are not supported. The connector uses at-least-once + the table's primary key for idempotent writing.
+
+* Either `catalog.properties.type` or `catalog.properties.catalog-impl` must be declared.
 
 Data Type Mapping
 ----------------
