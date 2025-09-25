@@ -126,7 +126,7 @@ public class MySqlSchemaUtils {
             MySqlConnection jdbc) {
         // fetch table schemas
         try (MySqlSchema mySqlSchema =
-                new MySqlSchema(sourceConfig, jdbc.isTableIdCaseSensitive())) {
+                new MySqlSchema(sourceConfig, jdbc.isTableIdCaseInsensitive())) {
             TableChanges.TableChange tableSchema =
                     mySqlSchema.getTableSchema(partition, jdbc, toDbzTableId(tableId));
             return toSchema(tableSchema.getTable(), sourceConfig.isTreatTinyInt1AsBoolean());
@@ -160,7 +160,7 @@ public class MySqlSchemaUtils {
 
     public static boolean isTableIdCaseInsensitive(MySqlSourceConfig sourceConfig) {
         try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
-            return jdbc.isTableIdCaseSensitive();
+            return jdbc.isTableIdCaseInsensitive();
         } catch (Exception e) {
             throw new RuntimeException("Error to get table id caseSensitive: " + e.getMessage(), e);
         }
