@@ -291,7 +291,9 @@ public class IcebergWriterTest {
                                 .physicalColumn("varbinary(10)", DataTypes.BINARY(10))
                                 .physicalColumn("decimal(10, 2)", DataTypes.DECIMAL(10, 2))
                                 .physicalColumn("tinyint", DataTypes.TINYINT())
+                                .physicalColumn("negative_tinyint", DataTypes.TINYINT())
                                 .physicalColumn("smallint", DataTypes.SMALLINT())
+                                .physicalColumn("negative_smallint", DataTypes.SMALLINT())
                                 .physicalColumn("int", DataTypes.INT())
                                 .physicalColumn("bigint", DataTypes.BIGINT())
                                 .physicalColumn("float", DataTypes.FLOAT())
@@ -319,7 +321,9 @@ public class IcebergWriterTest {
                             new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
                             DecimalData.zero(10, 2),
                             (byte) 1,
+                            (byte) -1,
                             (short) 2,
+                            (short) -2,
                             12345,
                             12345L,
                             123.456f,
@@ -342,7 +346,7 @@ public class IcebergWriterTest {
         List<String> result = fetchTableContent(catalog, tableId);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
-                        "char, varchar, string, false, [1,2,3,4,5,], [1,2,3,4,5,6,7,8,9,10,], 0.00, 1, 2, 12345, 12345, 123.456, 123456.789, 00:00:12.345, 2003-10-20, 1970-01-01T00:00, 1970-01-01T00:00Z, 1970-01-01T00:00Z");
+                        "char, varchar, string, false, [1,2,3,4,5,], [1,2,3,4,5,6,7,8,9,10,], 0.00, 1, -1, 2, -2, 12345, 12345, 123.456, 123456.789, 00:00:12.345, 2003-10-20, 1970-01-01T00:00, 1970-01-01T00:00Z, 1970-01-01T00:00Z");
     }
 
     /** Mock CommitRequestImpl. */

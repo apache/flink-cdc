@@ -140,8 +140,10 @@ public class IcebergTypeUtils {
                         };
                 break;
             case TINYINT:
+                fieldGetter = row -> (int) row.getByte(fieldPos);
+                break;
             case SMALLINT:
-                fieldGetter = row -> row.getInt(fieldPos);
+                fieldGetter = row -> ((Short) row.getShort(fieldPos)).intValue();
                 break;
             case BIGINT:
                 fieldGetter = row -> row.getLong(fieldPos);
