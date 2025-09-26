@@ -78,13 +78,27 @@ public class CustomMySqlAntlrDdlParserListener extends MySqlParserBaseListener
             LinkedList<SchemaChangeEvent> parsedEvents,
             boolean tinyInt1isBit,
             boolean isTableIdCaseInsensitive) {
+        this(parser, parsedEvents, tinyInt1isBit, isTableIdCaseInsensitive, false);
+    }
+
+    public CustomMySqlAntlrDdlParserListener(
+            MySqlAntlrDdlParser parser,
+            LinkedList<SchemaChangeEvent> parsedEvents,
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive,
+            boolean appendOnly) {
         // initialize listeners
         listeners.add(new CreateAndAlterDatabaseParserListener(parser));
         listeners.add(new DropDatabaseParserListener(parser));
         listeners.add(new CreateTableParserListener(parser, listeners));
         listeners.add(
                 new CustomAlterTableParserListener(
-                        parser, listeners, parsedEvents, tinyInt1isBit, isTableIdCaseInsensitive));
+                        parser,
+                        listeners,
+                        parsedEvents,
+                        tinyInt1isBit,
+                        isTableIdCaseInsensitive,
+                        appendOnly));
         listeners.add(new DropTableParserListener(parser));
         listeners.add(new RenameTableParserListener(parser));
         listeners.add(new TruncateTableParserListener(parser));
