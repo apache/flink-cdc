@@ -137,7 +137,10 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             if (customParser == null) {
                 customParser =
                         new CustomMySqlAntlrDdlParser(
-                                includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
+                                includeComments,
+                                tinyInt1isBit,
+                                isTableIdCaseInsensitive,
+                                appendOnly);
                 tables = new Tables();
             }
 
