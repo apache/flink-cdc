@@ -202,6 +202,7 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                                 + "  server-id: 5400-5404\n"
                                 + "  server-time-zone: UTC\n"
                                 + "  scan.read-changelog-as-append-only.enabled: true\n"
+                                + "  use.legacy.json.format: false\n"
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: paimon\n"
@@ -303,20 +304,20 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
                         "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null", // Original
                         "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null", // Original
                         "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null", // Original
-                        // (will also
-                        // have delete
-                        // record)
                         "4, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null", // Original
                         "5, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null", // Original
                         "6, Six, Ferris, 9.813, null, null, null", // Insert
                         "7, Seven, Grace, 2.117, null, null, null", // Insert
+                        "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null", // Update id=1
+                        // (before)
                         "1, One, Alice Updated, 3.202, red, {\"key1\": \"value1\"}, null", // Update
-                        // (new
-                        // version)
-                        "2, Two, Bob, 2.0, white, {\"key2\": \"value2\"}, null" // Update (new
-                        // version)
-                        // Note: Delete operation creates a delete record but the exact
-                        // representation may vary
+                        // id=1
+                        // (after)
+                        "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null", // Update id=2
+                        // (before)
+                        "2, Two, Bob, 2.0, white, {\"key2\": \"value2\"}, null", // Update id=2
+                        // (after)
+                        "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null" // Delete id=3
                         );
 
         validateSinkResult(
