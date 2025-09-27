@@ -26,7 +26,6 @@ import org.apache.flink.cdc.connectors.mysql.schema.MySqlFieldDefinition;
 import org.apache.flink.cdc.connectors.mysql.schema.MySqlTableDefinition;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
-import org.apache.flink.cdc.connectors.mysql.source.parser.CustomMySqlAntlrDdlParser;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
@@ -37,6 +36,7 @@ import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
+import io.debezium.connector.mysql.antlr.MySqlAntlrDdlParser;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
@@ -72,7 +72,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlPipelineRecordEmitter.class);
 
     private final MySqlSourceConfig sourceConfig;
-    private CustomMySqlAntlrDdlParser mySqlAntlrDdlParser;
+    private MySqlAntlrDdlParser mySqlAntlrDdlParser;
 
     // Used when startup mode is initial
     private Set<TableId> alreadySendCreateTableTables;
@@ -283,14 +283,14 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
     }
 
     private synchronized Table parseDdl(String ddlStatement, TableId tableId) {
-        CustomMySqlAntlrDdlParser mySqlAntlrDdlParser = getParser();
+        MySqlAntlrDdlParser mySqlAntlrDdlParser = getParser();
         mySqlAntlrDdlParser.setCurrentDatabase(tableId.catalog());
         Tables tables = new Tables();
         mySqlAntlrDdlParser.parse(ddlStatement, tables);
         return tables.forTable(tableId);
     }
 
-    private synchronized CustomMySqlAntlrDdlParser getParser() {
+    private synchronized MySqlAntlrDdlParser getParser() {
         if (mySqlAntlrDdlParser == null) {
             boolean includeComments =
                     sourceConfig
@@ -301,11 +301,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                                     false);
             boolean appendOnly = sourceConfig.isScanReadChangelogAsAppendOnly();
             mySqlAntlrDdlParser =
-                    new CustomMySqlAntlrDdlParser(
-                            includeComments,
-                            sourceConfig.isTreatTinyInt1AsBoolean(),
-                            false, // isTableIdCaseInsensitive - using false as default
-                            appendOnly);
+                    new MySqlAntlrDdlParser(
+                            true, false, includeComments, null, Tables.TableFilter.includeAll());
         }
         return mySqlAntlrDdlParser;
     }

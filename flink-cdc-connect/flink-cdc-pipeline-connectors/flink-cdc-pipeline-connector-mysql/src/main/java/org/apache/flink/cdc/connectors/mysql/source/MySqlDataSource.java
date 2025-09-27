@@ -67,11 +67,9 @@ public class MySqlDataSource implements DataSource {
                                 RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
                                 false);
 
-        DebeziumChangelogMode changelogMode = DebeziumChangelogMode.ALL;
-
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
-                        changelogMode,
+                        DebeziumChangelogMode.ALL,
                         sourceConfig.isIncludeSchemaChanges(),
                         readableMetadataList,
                         includeComments,
