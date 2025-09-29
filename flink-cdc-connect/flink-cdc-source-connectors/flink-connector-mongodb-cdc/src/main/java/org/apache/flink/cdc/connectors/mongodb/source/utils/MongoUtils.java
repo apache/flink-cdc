@@ -101,6 +101,31 @@ public class MongoUtils {
 
     private MongoUtils() {}
 
+    /**
+     * MongoDB allows dots to be presented in collection names, but not in database names (see <a
+     * href="https://www.mongodb.com/docs/manual/reference/limits/">docs</a> for more details). <br>
+     * So, for a canonical TableId with multiple dots in it (like {@code foo.bar.baz}, it is
+     * guaranteed that the first part ({@code foo}) is the database name and the latter part ({@code
+     * bar.baz}) is the table name.
+     */
+    public static TableId parseTableId(String str) {
+        return parseTableId(str, true);
+    }
+
+    public static TableId parseTableId(String str, boolean useCatalogBeforeSchema) {
+        String[] parts = str.split("[.]", 2);
+        int numParts = parts.length;
+        if (numParts == 1) {
+            return new TableId(null, null, parts[0]);
+        } else if (numParts == 2) {
+            return useCatalogBeforeSchema
+                    ? new TableId(parts[0], null, parts[1])
+                    : new TableId(null, parts[0], parts[1]);
+        } else {
+            return null;
+        }
+    }
+
     public static ChangeStreamDescriptor getChangeStreamDescriptor(
             MongoDBSourceConfig sourceConfig,
             List<String> discoveredDatabases,
@@ -115,7 +140,7 @@ public class MongoUtils {
                     collectionList, discoveredCollections)) {
                 changeStreamFilter =
                         ChangeStreamDescriptor.collection(
-                                TableId.parse(discoveredCollections.get(0)));
+                                parseTableId(discoveredCollections.get(0)));
             } else {
                 Pattern namespaceRegex =
                         CollectionDiscoveryUtils.includeListAsFlatPattern(collectionList);
