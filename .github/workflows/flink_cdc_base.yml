@@ -214,10 +214,10 @@ jobs:
               ("oracle")
                modules=${{ env.MODULES_ORACLE }}
               ;;
-              ("mongodb6")
+              ("mongodb7")
                modules=${{ env.MODULES_MONGODB }}
               ;;
-              ("mongodb7")
+              ("mongodb8")
                modules=${{ env.MODULES_MONGODB }}
               ;;
               ("sqlserver")
@@ -278,10 +278,10 @@ jobs:
           
           build_maven_parameter=""
 
-          if [ ${{ matrix.module }} == "mongodb6" ]; then
-            build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
-          elif [ ${{ matrix.module }} == "mongodb7" ]; then
-            build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
+          if [ ${{ matrix.module }} == "mongodb7" ]; then
+            build_maven_parameter="-DspecifiedMongoVersion=7.0.24"
+          elif [ ${{ matrix.module }} == "mongodb8" ]; then
+            build_maven_parameter="-DspecifiedMongoVersion=8.0.14"
           fi
           
           if [ ! -z "${{ matrix.flink-version }}" ]; then
