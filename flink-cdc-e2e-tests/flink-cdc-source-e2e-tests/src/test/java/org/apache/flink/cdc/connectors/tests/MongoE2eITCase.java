@@ -112,14 +112,14 @@ class MongoE2eITCase extends FlinkContainerTestEnvironment {
     @ParameterizedTest(
             name = "MongoDB Version: {0}, boolean parallelismSnapshot: {1}, scanFullChangelog: {2}")
     @CsvSource({
-        "6.0.16, true, true",
-        "6.0.16, true, false",
-        "6.0.16, false, true",
-        "6.0.16, false, false",
-        "7.0.12, true, true",
-        "7.0.12, true, false",
-        "7.0.12, false, true",
-        "7.0.12, false, false"
+        "7.0.24, true, true",
+        "7.0.24, true, false",
+        "7.0.24, false, true",
+        "7.0.24, false, false",
+        "8.0.14, true, true",
+        "8.0.14, true, false",
+        "8.0.14, false, true",
+        "8.0.14, false, false"
     })
     void testMongoDbCDC(String mongoVersion, boolean parallelismSnapshot, boolean scanFullChangelog)
             throws Exception {

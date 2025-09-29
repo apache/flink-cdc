@@ -67,7 +67,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[11]"
-      modules: "['mysql-source', 'postgres-source', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
+      modules: "['mysql-source', 'postgres-source', 'oracle', 'mongodb7', 'mongodb8', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
     if: github.repository == 'apache/flink-cdc'
     strategy:
