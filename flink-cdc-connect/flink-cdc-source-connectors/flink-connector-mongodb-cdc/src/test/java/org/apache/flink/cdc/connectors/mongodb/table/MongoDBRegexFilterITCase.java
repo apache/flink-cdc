@@ -30,6 +30,7 @@ import org.bson.Document;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
@@ -264,27 +265,56 @@ class MongoDBRegexFilterITCase extends MongoDBSourceTestBase {
 
     @ParameterizedTest(name = "parallelismSnapshot: {0}")
     @ValueSource(booleans = {true, false})
-    void testMatchCollectionWithDots(boolean parallelismSnapshot) throws Exception {
+    void testMatchCollectionWithQuotedDots(boolean parallelismSnapshot) throws Exception {
+        testMatchCollectionWithDots(parallelismSnapshot, "[.]coll[.]name");
+    }
+
+    @ParameterizedTest(name = "parallelismSnapshot: {0}")
+    @ValueSource(booleans = {true, false})
+    void testMatchCollectionWithUnquotedDots(boolean parallelismSnapshot) throws Exception {
+        testMatchCollectionWithDots(parallelismSnapshot, ".coll.name");
+    }
+
+    private void testMatchCollectionWithDots(boolean parallelismSnapshot, String matchExpr)
+            throws Exception {
         setup(parallelismSnapshot);
-        // 1. Given colllections:
+
+        // 1. Given collections:
         // db: [coll.name]
         String db = MONGO_CONTAINER.executeCommandFileInSeparateDatabase("ns-dotted");
 
-        TableResult result = submitTestCase(db, db + "[.]coll[.]name", parallelismSnapshot);
+        TableResult result = submitTestCase(db, db + matchExpr, parallelismSnapshot);
 
         // 2. Wait change stream records come
         waitForSinkSize("mongodb_sink", 3);
 
         // 3. Check results
-        String[] expected =
-                new String[] {
-                    String.format("+I[%s, coll.name, A101]", db),
-                    String.format("+I[%s, coll.name, A102]", db),
-                    String.format("+I[%s, coll.name, A103]", db)
-                };
+        Assertions.assertThat(TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink"))
+                .containsExactlyInAnyOrder(
+                        String.format("+I[%s, coll.name, A101]", db),
+                        String.format("+I[%s, coll.name, A102]", db),
+                        String.format("+I[%s, coll.name, A103]", db));
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink");
-        Assertions.assertThat(actual).containsExactlyInAnyOrder(expected);
+        // 4. Prepare some incremental data
+        mongodbClient
+                .getDatabase(db)
+                .getCollection("coll.name")
+                .insertMany(
+                        Arrays.asList(
+                                Document.parse("{\"seq\": \"A104\"}"),
+                                Document.parse("{\"seq\": \"A105\"}"),
+                                Document.parse("{\"seq\": \"A106\"}")));
+
+        // 5. Check incremental records
+        waitForSinkSize("mongodb_sink", 6);
+        Assertions.assertThat(TestValuesTableFactory.getRawResultsAsStrings("mongodb_sink"))
+                .containsExactlyInAnyOrder(
+                        String.format("+I[%s, coll.name, A101]", db),
+                        String.format("+I[%s, coll.name, A102]", db),
+                        String.format("+I[%s, coll.name, A103]", db),
+                        String.format("+I[%s, coll.name, A104]", db),
+                        String.format("+I[%s, coll.name, A105]", db),
+                        String.format("+I[%s, coll.name, A106]", db));
 
         result.getJobClient().get().cancel().get();
     }
