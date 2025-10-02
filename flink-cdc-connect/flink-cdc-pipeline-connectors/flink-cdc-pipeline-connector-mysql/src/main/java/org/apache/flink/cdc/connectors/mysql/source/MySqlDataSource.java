@@ -100,7 +100,9 @@ public class MySqlDataSource implements DataSource {
 
     @Override
     public SupportedMetadataColumn[] supportedMetadataColumns() {
-        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
+        return new SupportedMetadataColumn[] {
+            new OpTsMetadataColumn(), new RowKindMetadataColumn()
+        };
     }
 
     @Override

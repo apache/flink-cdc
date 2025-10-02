@@ -189,15 +189,27 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected Map<String, String> getMetadata(SourceRecord record) {
+        return getMetadata(record, null);
+    }
+
+    protected Map<String, String> getMetadata(SourceRecord record, String opType) {
         Map<String, String> metadataMap = new HashMap<>();
         readableMetadataList.forEach(
                 (mySqlReadableMetadata -> {
-                    Object metadata = mySqlReadableMetadata.getConverter().read(record);
-                    if (mySqlReadableMetadata.equals(MySqlReadableMetadata.OP_TS)) {
+                    if (mySqlReadableMetadata.equals(MySqlReadableMetadata.ROW_KIND)) {
+                        if (appendOnly) {
+                            // In append-only mode, map row_kind to the original operation type
+                            metadataMap.put(mySqlReadableMetadata.getKey(), opType);
+                        }
+                        // Skip ROW_KIND in non-append-only mode since it throws
+                        // UnsupportedOperationException
+                    } else if (mySqlReadableMetadata.equals(MySqlReadableMetadata.OP_TS)) {
+                        Object metadata = mySqlReadableMetadata.getConverter().read(record);
                         metadataMap.put(
                                 mySqlReadableMetadata.getKey(),
                                 String.valueOf(((TimestampData) metadata).getMillisecond()));
                     } else {
+                        Object metadata = mySqlReadableMetadata.getConverter().read(record);
                         metadataMap.put(mySqlReadableMetadata.getKey(), String.valueOf(metadata));
                     }
                 }));
@@ -211,18 +223,20 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             return super.deserializeDataChangeRecord(record);
         }
 
-        // Append-only mode: convert all operations to INSERT events
+        // Append-only mode: convert all operations to INSERT events, but preserve original
+        // operation type
         Envelope.Operation op = Envelope.operationFor(record);
         TableId tableId = getTableId(record);
 
         Struct value = (Struct) record.value();
         Schema valueSchema = record.valueSchema();
-        Map<String, String> meta = getMetadata(record);
 
         if (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ) {
+            Map<String, String> meta = getMetadata(record, "+I");
             RecordData after = extractAfterData(value, valueSchema);
             return Collections.singletonList(DataChangeEvent.insertEvent(tableId, after, meta));
         } else if (op == Envelope.Operation.DELETE) {
+            Map<String, String> meta = getMetadata(record, "-D");
             // For DELETE: convert to INSERT with before data
             RecordData before = extractBeforeData(value, valueSchema);
             return Collections.singletonList(DataChangeEvent.insertEvent(tableId, before, meta));
@@ -233,13 +247,15 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             List<DataChangeEvent> events = new ArrayList<>();
 
             if (changelogMode == DebeziumChangelogMode.ALL) {
+                Map<String, String> beforeMeta = getMetadata(record, "-U");
                 // Generate INSERT event for before data (UPDATE_BEFORE -> INSERT)
                 RecordData before = extractBeforeData(value, valueSchema);
-                events.add(DataChangeEvent.insertEvent(tableId, before, meta));
+                events.add(DataChangeEvent.insertEvent(tableId, before, beforeMeta));
             }
 
+            Map<String, String> afterMeta = getMetadata(record, "+U");
             // Generate INSERT event for after data (UPDATE_AFTER -> INSERT)
-            events.add(DataChangeEvent.insertEvent(tableId, after, meta));
+            events.add(DataChangeEvent.insertEvent(tableId, after, afterMeta));
             return events;
         } else {
             LOG.trace("Received {} operation, skip", op);
