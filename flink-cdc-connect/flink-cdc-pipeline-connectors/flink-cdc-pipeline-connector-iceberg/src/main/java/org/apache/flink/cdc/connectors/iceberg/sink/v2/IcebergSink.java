@@ -121,6 +121,10 @@ public class IcebergSink
         return new WriteResultWrapperSerializer();
     }
 
+    public int partitionCustom(int bucket, int numPartitions) {
+        return Math.floorMod(bucket, numPartitions);
+    }
+
     @Override
     public void addPostCommitTopology(
             DataStream<CommittableMessage<WriteResultWrapper>> committableMessageDataStream) {
@@ -136,7 +140,7 @@ public class IcebergSink
             // Shuffle by different table id.
             DataStream<CommittableMessage<WriteResultWrapper>> keyedStream =
                     committableMessageDataStream.partitionCustom(
-                            (bucket, numPartitions) -> bucket % numPartitions,
+                            this::partitionCustom,
                             (committableMessage) -> {
                                 if (committableMessage instanceof CommittableWithLineage) {
                                     WriteResultWrapper multiTableCommittable =
