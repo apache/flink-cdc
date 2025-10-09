@@ -58,7 +58,7 @@ The following table shows the version mapping between Flink<sup>®</sup> CDC Pip
 | <font color="DarkCyan">3.2.x</font> | <font color="MediumVioletRed">1.17.\*</font>, <font color="MediumVioletRed">1.18.\*</font>, <font color="MediumVioletRed">1.19.\*</font> |      Mysql      |           StarRocks,Doris,Paimon,Kafka,ElasticSearch            |                                           |
 | <font color="DarkCyan">3.3.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        |      Mysql      | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute |                                           |
 | <font color="DarkCyan">3.4.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        |   Mysql   | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg |                                           |
-| <font color="DarkCyan">3.5.x</font> |                                               <font color="MediumVioletRed">1.20.\*</font>                                               | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss |                                           |
+| <font color="DarkCyan">3.5.x</font> |                        <font color="MediumVioletRed">1.19.\*</font>, <font color="MediumVioletRed">1.20.\*</font>                        | Mysql, Postgres | StarRocks,Doris,Paimon,Kafka,ElasticSearch,OceanBase,MaxCompute,Iceberg,Fluss |                                           |
 
 
 ## Develop Your Own Connector
