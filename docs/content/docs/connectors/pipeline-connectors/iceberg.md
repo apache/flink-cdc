@@ -63,6 +63,25 @@ pipeline:
   parallelism: 2
 ```
 
+***Note:***
+If `catalog.properties.type` is hadoop, you need to configure the following dependencies manually, and pass it with `--jar` argument of Flink CDC CLI when submitting YAML pipeline jobs.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">Dependency Item</th>
+        <th class="text-left">Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="https://mvnrepository.com/artifact/org.apache.flink/flink-shaded-hadoop-2-uber/2.8.3-10.0 ">  org.apache.flink:flink-shaded-hadoop-2-uber:2.8.3-10.0</a></td>
+        <td>Used for Hadoop dependencies.</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
 Pipeline Connector Options
 ----------------
 <div class="highlight">
