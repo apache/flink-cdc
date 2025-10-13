@@ -35,14 +35,8 @@ import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.types.DataType;
-
 import org.apache.hudi.common.config.HoodieMetadataConfig;
-import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.configuration.FlinkOptions;
-import org.apache.hudi.storage.HoodieStorage;
-import org.apache.hudi.storage.StorageConfiguration;
-import org.apache.hudi.storage.StoragePath;
-import org.apache.hudi.storage.hadoop.HadoopStorageConfiguration;
 import org.apache.hudi.table.catalog.CatalogOptions;
 import org.apache.hudi.table.catalog.HoodieCatalog;
 import org.slf4j.Logger;
@@ -492,79 +486,6 @@ public class HudiMetadataApplier implements MetadataApplier {
         return new ResolvedCatalogTable(catalogTable, newSchema);
     }
 
-    /**
-     * Updates the actual Hudi table schema stored in hoodie.properties. This is necessary because
-     * catalog.alterTable() only updates table_option.properties, not the actual Hudi table schema.
-     */
-    private void updateHudiTableSchema(ObjectPath objectPath, ResolvedSchema newSchema)
-            throws Exception {
-        // Get table path
-        String basePath = catalogConfig.getString(CatalogOptions.CATALOG_PATH.key(), null);
-        String tablePath =
-                String.format(
-                        "%s/%s/%s",
-                        basePath, objectPath.getDatabaseName(), objectPath.getObjectName());
-
-        LOG.info("Updating Hudi table schema at path: {}", tablePath);
-
-        // Convert Flink schema to Avro schema
-        org.apache.avro.Schema avroSchema = convertFlinkSchemaToAvro(newSchema);
-
-        // Update the table schema using HoodieTableMetaClient
-        org.apache.hadoop.conf.Configuration hadoopConf =
-                new org.apache.hadoop.conf.Configuration();
-        StorageConfiguration<?> storageConf = new HadoopStorageConfiguration(hadoopConf);
-
-        org.apache.hudi.common.table.HoodieTableMetaClient metaClient =
-                org.apache.hudi.common.table.HoodieTableMetaClient.builder()
-                        .setConf(storageConf)
-                        .setBasePath(tablePath)
-                        .build();
-
-        // Commit the schema change by updating table config
-        HoodieTableConfig tableConfig = metaClient.getTableConfig();
-        HoodieStorage storage = metaClient.getStorage();
-
-        // Write the updated schema to hoodie.properties
-        // Hudi stores the schema under "hoodie.table.schema" which is what HoodieCatalog reads
-        Properties props = new Properties();
-        props.putAll(tableConfig.getProps());
-
-        String schemaStr = avroSchema.toString();
-        // Update the create schema (historical record)
-        props.setProperty(HoodieTableConfig.CREATE_SCHEMA.key(), schemaStr);
-        // Also update the current schema property that the catalog reads
-        props.setProperty("hoodie.table.schema", schemaStr);
-
-        StoragePath propsPath =
-                new StoragePath(metaClient.getMetaPath(), HoodieTableConfig.HOODIE_PROPERTIES_FILE);
-
-        try (java.io.OutputStream outputStream = storage.create(propsPath, true)) {
-            props.store(outputStream, "Updated by Flink CDC HudiMetadataApplier");
-        }
-
-        LOG.info("Successfully updated Hudi table schema");
-    }
-
-    /** Converts Flink ResolvedSchema to Avro Schema for Hudi. */
-    private org.apache.avro.Schema convertFlinkSchemaToAvro(ResolvedSchema flinkSchema) {
-        List<org.apache.avro.Schema.Field> avroFields = new ArrayList<>();
-
-        for (org.apache.flink.table.catalog.Column column : flinkSchema.getColumns()) {
-            org.apache.avro.Schema fieldSchema = convertFlinkTypeToAvro(column.getDataType());
-            org.apache.avro.Schema.Field field =
-                    new org.apache.avro.Schema.Field(
-                            column.getName(), fieldSchema, null, (Object) null);
-            avroFields.add(field);
-        }
-
-        org.apache.avro.Schema avroSchema =
-                org.apache.avro.Schema.createRecord(
-                        "HudiSchema", null, "org.apache.hudi", false, avroFields);
-
-        return avroSchema;
-    }
-
     /** Converts a Flink DataType to an Avro Schema. */
     private org.apache.avro.Schema convertFlinkTypeToAvro(DataType flinkType) {
         org.apache.flink.table.types.logical.LogicalType logicalType = flinkType.getLogicalType();
@@ -612,10 +533,6 @@ public class HudiMetadataApplier implements MetadataApplier {
 
     private void updateAndVerifyTableChange(
             TableId tableId, ObjectPath objectPath, ResolvedSchema newSchema) throws Exception {
-        // TODO: Check if this is necessary
-        //        updateHudiTableSchema(objectPath, newSchema);
-        LOG.info("Successfully modified schema for table: {}", tableId);
-
         ResolvedCatalogTable verifyTable = getResolvedCatalogTable(objectPath);
         LOG.info(
                 "Verified - Table {} now has columns: {}",
