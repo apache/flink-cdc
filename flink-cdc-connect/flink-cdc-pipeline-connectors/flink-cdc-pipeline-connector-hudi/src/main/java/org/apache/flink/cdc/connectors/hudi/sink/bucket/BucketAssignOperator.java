@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.hudi.sink.bucket;
 
 import org.apache.flink.cdc.common.data.RecordData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -55,8 +54,10 @@ import java.util.Optional;
  * Operator that assigns bucket indices to events and wraps them for downstream partitioning.
  *
  * <p>This operator:
+ *
  * <ul>
- *   <li>Broadcasts schema events (CreateTableEvent, SchemaChangeEvent, FlushEvent) to all downstream tasks
+ *   <li>Broadcasts schema events (CreateTableEvent, SchemaChangeEvent, FlushEvent) to all
+ *       downstream tasks
  *   <li>Calculates bucket for DataChangeEvents and routes to specific task
  *   <li>Wraps events in BucketWrapper for downstream partitioning
  * </ul>
@@ -108,7 +109,10 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         super.open();
         this.totalTasksNumber = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
         this.currentTaskNumber = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
-        LOG.info("BucketAssignOperator opened with {} buckets and {} tasks", numBuckets, totalTasksNumber);
+        LOG.info(
+                "BucketAssignOperator opened with {} buckets and {} tasks",
+                numBuckets,
+                totalTasksNumber);
     }
 
     @Override
@@ -178,12 +182,15 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
                     schemaCache.put(tableId, schema);
                 } else {
                     throw new IllegalStateException(
-                            "No schema available for table " + tableId + " in bucket assignment. " +
-                            "Could not find schema from SchemaOperator coordinator.");
+                            "No schema available for table "
+                                    + tableId
+                                    + " in bucket assignment. "
+                                    + "Could not find schema from SchemaOperator coordinator.");
                 }
             } catch (Exception e) {
                 throw new IllegalStateException(
-                        "Failed to retrieve schema for table " + tableId + " from SchemaOperator", e);
+                        "Failed to retrieve schema for table " + tableId + " from SchemaOperator",
+                        e);
             }
         }
 
@@ -191,7 +198,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         final Schema finalSchema = schema;
 
         // Get or cache primary keys
-        List<String> primaryKeys = primaryKeyCache.computeIfAbsent(tableId, k -> finalSchema.primaryKeys());
+        List<String> primaryKeys =
+                primaryKeyCache.computeIfAbsent(tableId, k -> finalSchema.primaryKeys());
 
         if (primaryKeys.isEmpty()) {
             throw new IllegalStateException(
@@ -202,20 +210,28 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         final List<String> finalPrimaryKeys = primaryKeys;
 
         // Get or cache field getters
-        List<RecordData.FieldGetter> fieldGetters = fieldGetterCache.computeIfAbsent(tableId, k -> {
-            List<RecordData.FieldGetter> getters = new ArrayList<>(finalPrimaryKeys.size());
-            for (String primaryKeyField : finalPrimaryKeys) {
-                int fieldIndex = finalSchema.getColumnNames().indexOf(primaryKeyField);
-                if (fieldIndex == -1) {
-                    throw new IllegalStateException(
-                            "Primary key field '" + primaryKeyField +
-                            "' not found in schema for table " + tableId);
-                }
-                DataType fieldType = finalSchema.getColumns().get(fieldIndex).getType();
-                getters.add(RecordData.createFieldGetter(fieldType, fieldIndex));
-            }
-            return getters;
-        });
+        List<RecordData.FieldGetter> fieldGetters =
+                fieldGetterCache.computeIfAbsent(
+                        tableId,
+                        k -> {
+                            List<RecordData.FieldGetter> getters =
+                                    new ArrayList<>(finalPrimaryKeys.size());
+                            for (String primaryKeyField : finalPrimaryKeys) {
+                                int fieldIndex =
+                                        finalSchema.getColumnNames().indexOf(primaryKeyField);
+                                if (fieldIndex == -1) {
+                                    throw new IllegalStateException(
+                                            "Primary key field '"
+                                                    + primaryKeyField
+                                                    + "' not found in schema for table "
+                                                    + tableId);
+                                }
+                                DataType fieldType =
+                                        finalSchema.getColumns().get(fieldIndex).getType();
+                                getters.add(RecordData.createFieldGetter(fieldType, fieldIndex));
+                            }
+                            return getters;
+                        });
 
         // Extract record key
         String recordKey = extractRecordKey(event, primaryKeys, fieldGetters);
@@ -225,12 +241,12 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         return BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
     }
 
-    private String extractRecordKey(DataChangeEvent event, List<String> primaryKeys,
-                                    List<RecordData.FieldGetter> fieldGetters) {
+    private String extractRecordKey(
+            DataChangeEvent event,
+            List<String> primaryKeys,
+            List<RecordData.FieldGetter> fieldGetters) {
         // For DELETE, use 'before' data; for INSERT/UPDATE, use 'after' data
-        RecordData recordData = event.op() == OperationType.DELETE
-                ? event.before()
-                : event.after();
+        RecordData recordData = event.op() == OperationType.DELETE ? event.before() : event.after();
 
         if (recordData == null) {
             throw new IllegalStateException(

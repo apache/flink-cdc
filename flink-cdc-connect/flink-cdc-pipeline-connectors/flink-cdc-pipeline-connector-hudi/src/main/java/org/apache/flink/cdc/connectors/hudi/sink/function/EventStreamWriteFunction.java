@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.function;
 
-import org.apache.avro.Schema;
 import org.apache.flink.cdc.common.event.*;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.MetricGroup;
@@ -28,6 +27,8 @@ import org.apache.flink.table.runtime.util.MemorySegmentPool;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.types.RowKind;
 import org.apache.flink.util.Collector;
+
+import org.apache.avro.Schema;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
 import org.apache.hudi.common.engine.HoodieReaderContext;
@@ -36,6 +37,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.read.BufferedRecordMerger;
 import org.apache.hudi.common.table.read.BufferedRecordMergerFactory;
+import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.common.util.VisibleForTesting;
 import org.apache.hudi.common.util.collection.MappingIterator;
@@ -623,7 +625,7 @@ public abstract class EventStreamWriteFunction extends AbstractStreamWriteFuncti
         try {
             if (metaClient != null) {
                 metaClient.reloadActiveTimeline();
-                var activeTimeline = metaClient.getActiveTimeline();
+                HoodieActiveTimeline activeTimeline = metaClient.getActiveTimeline();
 
                 LOG.info("Active timeline state for table {}:", tableId);
                 LOG.info(

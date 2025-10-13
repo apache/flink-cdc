@@ -22,8 +22,8 @@ import org.apache.flink.cdc.common.event.Event;
 import java.io.Serializable;
 
 /**
- * Wrapper class that implements Event and associates an event with a target bucket/task index.
- * Used to enable bucket-based partitioning while allowing schema events to be broadcast.
+ * Wrapper class that implements Event and associates an event with a target bucket/task index. Used
+ * to enable bucket-based partitioning while allowing schema events to be broadcast.
  *
  * <p>By implementing Event, this wrapper can be transparently passed through the operator chain
  * while maintaining bidirectional communication for FlushSuccessEvent.

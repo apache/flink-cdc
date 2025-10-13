@@ -30,8 +30,8 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
  *
  * <ul>
  *   <li>{@link #processDataChange(DataChangeEvent)} - Handles INSERT/UPDATE/DELETE operations
- *   <li>{@link #processSchemaChange(SchemaChangeEvent)} - Handles DDL operations (CREATE TABLE,
- *       ADD COLUMN, etc.)
+ *   <li>{@link #processSchemaChange(SchemaChangeEvent)} - Handles DDL operations (CREATE TABLE, ADD
+ *       COLUMN, etc.)
  *   <li>{@link #processFlush(FlushEvent)} - Handles coordinated flushing of buffered data
  * </ul>
  */
