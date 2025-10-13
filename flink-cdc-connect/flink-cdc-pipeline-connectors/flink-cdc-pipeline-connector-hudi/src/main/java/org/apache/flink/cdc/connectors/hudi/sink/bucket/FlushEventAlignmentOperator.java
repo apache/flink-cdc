@@ -79,7 +79,8 @@ public class FlushEventAlignmentOperator extends AbstractStreamOperator<BucketWr
                                         new FlushEvent(
                                                 sourceSubTaskId,
                                                 bucketWrapperFlushEvent.getTableIds(),
-                                                bucketWrapperFlushEvent.getSchemaChangeEventType()))));
+                                                bucketWrapperFlushEvent
+                                                        .getSchemaChangeEventType()))));
                 sourceTaskIdToAssignBucketSubTaskIds.remove(sourceSubTaskId);
             } else {
                 LOG.info(

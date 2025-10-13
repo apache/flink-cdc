@@ -17,10 +17,11 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.v2;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import org.apache.flink.runtime.jobgraph.OperatorID;
+
 import org.apache.flink.shaded.guava31.com.google.common.hash.Hashing;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /** Generator for creating deterministic OperatorIDs from UIDs. */
 public class OperatorIDGenerator {
