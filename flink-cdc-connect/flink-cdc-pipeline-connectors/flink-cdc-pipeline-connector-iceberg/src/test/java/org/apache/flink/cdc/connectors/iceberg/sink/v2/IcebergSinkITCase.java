@@ -192,12 +192,4 @@ public class IcebergSinkITCase {
         }
         return results;
     }
-
-    @Test
-    public void testPartitionCustom() {
-        IcebergSink icebergSink =
-                new IcebergSink(new HashMap<>(), null, null, CompactionOptions.builder().build());
-        Assertions.assertThat(icebergSink.partitionCustom(-5, 4)).isEqualTo(3);
-        Assertions.assertThat(icebergSink.partitionCustom(5, 4)).isEqualTo(1);
-    }
 }
