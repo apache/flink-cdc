@@ -127,7 +127,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         return chunkKeyColumns;
     }
 
-  /**
+    /**
      * Returns {@code includePartitionedTables} value.
      *
      * @return include partitioned table

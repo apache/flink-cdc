@@ -141,7 +141,7 @@ public class SourceRecordUtils {
         if (keyStruct != null && keyStruct.schema().field(splitFieldName) != null) {
             return new Object[] {keyStruct.get(splitFieldName)};
         }
-        LOG.info("Get Split Key From Value {} {}",dataRecord, splitFieldName);
+        LOG.info("Get Split Key From Value {} {}", dataRecord, splitFieldName);
         // For non-primary key chunk keys, use value-based approach
         return getSplitKeyFromValue(dataRecord, splitFieldName);
     }

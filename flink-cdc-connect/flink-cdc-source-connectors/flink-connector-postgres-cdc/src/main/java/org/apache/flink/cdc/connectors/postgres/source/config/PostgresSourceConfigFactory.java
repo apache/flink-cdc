@@ -57,7 +57,6 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
 
-
     private boolean includePartitionedTables;
 
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
