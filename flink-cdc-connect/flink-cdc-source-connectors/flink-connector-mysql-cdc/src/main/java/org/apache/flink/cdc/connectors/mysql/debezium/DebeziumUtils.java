@@ -244,17 +244,10 @@ public class DebeziumUtils {
     }
 
     static SSLMode sslModeFor(MySqlConnectorConfig.SecureConnectionMode mode) {
-        switch (mode) {
-            case DISABLED:
-                return SSLMode.DISABLED;
-            case PREFERRED:
-                return SSLMode.PREFERRED;
-            case REQUIRED:
-                return SSLMode.REQUIRED;
-            case VERIFY_CA:
-                return SSLMode.VERIFY_CA;
-            case VERIFY_IDENTITY:
-                return SSLMode.VERIFY_IDENTITY;
+        try {
+            return mode == null ? null : SSLMode.valueOf(mode.name());
+        } catch (IllegalArgumentException e) {
+            LOG.error("Invalid SecureConnectionMode provided %s", mode.name(), e);
         }
         return null;
     }
