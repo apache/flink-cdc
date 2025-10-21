@@ -27,6 +27,7 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.ExpressionEvaluator;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,8 +56,8 @@ public class TransformExpressionCompiler {
                     () -> {
                         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
 
-                        List<String> argumentNames = key.getArgumentNames();
-                        List<Class<?>> argumentClasses = key.getArgumentClasses();
+                        List<String> argumentNames = new ArrayList<>(key.getArgumentNames());
+                        List<Class<?>> argumentClasses = new ArrayList<>(key.getArgumentClasses());
 
                         for (UserDefinedFunctionDescriptor udfFunction : udfDescriptors) {
                             argumentNames.add("__instanceOf" + udfFunction.getClassName());
