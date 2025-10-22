@@ -72,16 +72,16 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     private int totalTasksNumber;
     private int currentTaskNumber;
 
-    /** Schema evolution client to query schemas from SchemaOperator coordinator */
+    /** Schema evolution client to query schemas from SchemaOperator coordinator. */
     private transient SchemaEvolutionClient schemaEvolutionClient;
 
-    /** Cache of schemas per table for bucket calculation */
+    /** Cache of schemas per table for bucket calculation. */
     private final Map<TableId, Schema> schemaCache = new HashMap<>();
 
-    /** Cache of primary key fields per table */
+    /** Cache of primary key fields per table. */
     private final Map<TableId, List<String>> primaryKeyCache = new HashMap<>();
 
-    /** Cache of field getters per table */
+    /** Cache of field getters per table. */
     private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache = new HashMap<>();
 
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {

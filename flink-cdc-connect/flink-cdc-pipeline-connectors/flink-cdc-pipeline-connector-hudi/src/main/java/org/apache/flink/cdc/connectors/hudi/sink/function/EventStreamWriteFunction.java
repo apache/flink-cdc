@@ -17,7 +17,11 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.function;
 
-import org.apache.flink.cdc.common.event.*;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
@@ -74,6 +78,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+/** Base infrastructures for streaming writer function to handle Events. */
 public abstract class EventStreamWriteFunction extends AbstractStreamWriteFunction<Event>
         implements EventProcessorFunction {
 

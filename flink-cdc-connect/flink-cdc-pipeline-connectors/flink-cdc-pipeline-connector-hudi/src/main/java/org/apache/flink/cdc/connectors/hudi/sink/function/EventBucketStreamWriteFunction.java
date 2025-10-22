@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/** Extension of EventStreamWriteFunction to handle bucketing. */
 public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventBucketStreamWriteFunction.class);
@@ -69,7 +70,7 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
      */
     private Set<String> incBucketIndexes;
 
-    /** Serializer for converting Events to HoodieFlinkInternalRow for single table */
+    /** Serializer for converting Events to HoodieFlinkInternalRow for single table. */
     private HudiRecordEventSerializer recordSerializer;
 
     /** Function for calculating the task partition to dispatch. */
@@ -78,16 +79,16 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
     /** Function to calculate num buckets per partition. */
     private NumBucketsFunction numBucketsFunction;
 
-    /** Cached primary key fields for this table */
+    /** Cached primary key fields for this table. */
     private transient List<String> primaryKeyFields;
 
-    /** Cached field getters for primary key fields */
+    /** Cached field getters for primary key fields. */
     private transient List<RecordData.FieldGetter> primaryKeyFieldGetters;
 
-    /** Cached schema for this table */
+    /** Cached schema for this table. */
     private transient Schema cachedSchema;
 
-    /** Number of buckets for this function */
+    /** Number of buckets for this function. */
     private int numBuckets;
 
     /**

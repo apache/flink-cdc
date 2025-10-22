@@ -32,7 +32,7 @@ public class BucketAssignmentIndex implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** Index mapping partition paths to bucket-to-fileId mappings for a single table */
+    /** Index mapping partition paths to bucket-to-fileId mappings for a single table. */
     private final Map<String, Map<Integer, String>> index;
 
     public BucketAssignmentIndex() {

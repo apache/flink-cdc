@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.sink.EventSinkProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.connectors.hudi.sink.v2.HudiSink;
-import org.apache.flink.table.types.logical.RowType;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,14 +66,7 @@ public class HudiDataSink implements DataSink, Serializable {
 
         // Create the HudiSink with multi-table support via wrapper pattern
         // Use empty RowType since tables are created dynamically
-        HudiSink hudiSink =
-                new HudiSink(
-                        flinkConfig,
-                        RowType.of(), // Empty row type for dynamic multi-table support
-                        overwrite,
-                        isBounded,
-                        schemaOperatorUid,
-                        ZoneId.systemDefault());
+        HudiSink hudiSink = new HudiSink(flinkConfig, schemaOperatorUid, ZoneId.systemDefault());
 
         return FlinkSinkProvider.of(hudiSink);
     }
