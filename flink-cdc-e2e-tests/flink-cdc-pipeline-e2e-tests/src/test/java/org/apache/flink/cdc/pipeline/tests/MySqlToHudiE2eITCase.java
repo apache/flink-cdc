@@ -72,6 +72,17 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
 
     private static final String PEEK_SQL_FILE = "peek-hudi.sql";
 
+    // Custom Flink properties for Hudi tests with increased metaspace and heap for heavy
+    // dependencies
+    private static final String HUDI_FLINK_PROPERTIES =
+            FLINK_PROPERTIES
+                    + "\n"
+                    + "taskmanager.memory.jvm-metaspace.size: 1024m"
+                    + "\n"
+                    + "taskmanager.memory.task.heap.size: 1024m"
+                    + "\n"
+                    + "taskmanager.memory.process.size: 4GB";
+
     protected final UniqueDatabase inventoryDatabase =
             new UniqueDatabase(MYSQL, "hudi_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
@@ -143,7 +154,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 .withCommand("taskmanager")
                 .withNetwork(NETWORK)
                 .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                .withEnv("FLINK_PROPERTIES", HUDI_FLINK_PROPERTIES)
                 .dependsOn(jobManager)
                 .withVolumesFrom(jobManager, BindMode.READ_WRITE)
                 .withLogConsumer(taskManagerConsumer);
@@ -515,60 +526,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         Assertions.assertThat(results).containsExactlyInAnyOrderElementsOf(expected);
     }
 
-    private static List<String> getProductsExpectedSinkResults() {
-        return Arrays.asList(
-                "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
-                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
-                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
-                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
-                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
-                "106, Six, Ferris, 9.813, null, null, null",
-                "107, Seven, Grace, 2.117, null, null, null",
-                "108, Eight, Hesse, 6.819, null, null, null",
-                "109, Nine, IINA, 5.223, null, null, null");
-    }
-
-    private static List<String> getProductsExpectedAfterDropSinkResults() {
-        return Arrays.asList(
-                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}",
-                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}",
-                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}",
-                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}",
-                "106, Six, Fay, 9.813, null, null",
-                "107, Seven, Grace, 5.125, null, null",
-                "108, Eight, Hesse, 6.819, null, null",
-                "109, Nine, IINA, 5.223, null, null",
-                "110, Ten, Jukebox, 0.2, null, null",
-                "111, Eleven, Kryo, 5.18, null, null",
-                "112, Twelve, Lily, 2.14, null, null");
-    }
-
-    private static List<String> getProductsExpectedAfterAddModSinkResults() {
-        // We need this list to be mutable, i.e. not fixed sized
-        // Arrays.asList returns a fixed size list which is not mutable
-        return new ArrayList<>(
-                Arrays.asList(
-                        "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null",
-                        "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null",
-                        "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null",
-                        "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null",
-                        "106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "108, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "109, Nine, IINA, 5.223, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "110, Ten, Jukebox, 0.2, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "111, Eleven, Kryo, 5.18, null, null, null, null, null, null, null, null, null, null, null, null",
-                        "112, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null"));
-    }
-
-    private static List<String> getCustomersExpectedSinkResults() {
-        return Arrays.asList(
-                "101, user_1, Shanghai, 123567891234",
-                "102, user_2, Shanghai, 123567891234",
-                "103, user_3, Shanghai, 123567891234",
-                "104, user_4, Shanghai, 123567891234");
-    }
-
     @Test
     public void testStopAndRestartFromSavepoint() throws Exception {
         warehouse = sharedVolume.toString() + "/hudi_warehouse_savepoint_" + UUID.randomUUID();
@@ -752,6 +709,60 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         validateSinkResult(warehouse, database, "customers", expectedCustomersFinal);
         LOG.info(
                 "Phase 6: Final validation successful - stop/restart with savepoint working correctly for multiple tables");
+    }
+
+    private static List<String> getProductsExpectedSinkResults() {
+        return Arrays.asList(
+                "101, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null",
+                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null",
+                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null",
+                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null",
+                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null",
+                "106, Six, Ferris, 9.813, null, null, null",
+                "107, Seven, Grace, 2.117, null, null, null",
+                "108, Eight, Hesse, 6.819, null, null, null",
+                "109, Nine, IINA, 5.223, null, null, null");
+    }
+
+    private static List<String> getProductsExpectedAfterDropSinkResults() {
+        return Arrays.asList(
+                "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}",
+                "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}",
+                "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}",
+                "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}",
+                "106, Six, Fay, 9.813, null, null",
+                "107, Seven, Grace, 5.125, null, null",
+                "108, Eight, Hesse, 6.819, null, null",
+                "109, Nine, IINA, 5.223, null, null",
+                "110, Ten, Jukebox, 0.2, null, null",
+                "111, Eleven, Kryo, 5.18, null, null",
+                "112, Twelve, Lily, 2.14, null, null");
+    }
+
+    private static List<String> getProductsExpectedAfterAddModSinkResults() {
+        // We need this list to be mutable, i.e. not fixed sized
+        // Arrays.asList returns a fixed size list which is not mutable
+        return new ArrayList<>(
+                Arrays.asList(
+                        "102, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, null, null, null, null, null, null, null, null, null",
+                        "103, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, null, null, null, null, null, null, null, null, null",
+                        "104, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, null, null, null, null, null, null, null, null, null",
+                        "105, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, null, null, null, null, null, null, null, null, null",
+                        "106, Six, Fay, 9.813, null, null, null, null, null, null, null, null, null, null, null, null",
+                        "107, Seven, Grace, 5.125, null, null, null, null, null, null, null, null, null, null, null, null",
+                        "108, Eight, Hesse, 6.819, null, null, null, null, null, null, null, null, null, null, null, null",
+                        "109, Nine, IINA, 5.223, null, null, null, null, null, null, null, null, null, null, null, null",
+                        "110, Ten, Jukebox, 0.2, null, null, null, null, null, null, null, null, null, null, null, null",
+                        "111, Eleven, Kryo, 5.18, null, null, null, null, null, null, null, null, null, null, null, null",
+                        "112, Twelve, Lily, 2.14, null, null, null, null, null, null, null, null, null, null, null, null"));
+    }
+
+    private static List<String> getCustomersExpectedSinkResults() {
+        return Arrays.asList(
+                "101, user_1, Shanghai, 123567891234",
+                "102, user_2, Shanghai, 123567891234",
+                "103, user_3, Shanghai, 123567891234",
+                "104, user_4, Shanghai, 123567891234");
     }
 
     public void waitUntilJobRunning(JobID jobId, Duration timeout) {
