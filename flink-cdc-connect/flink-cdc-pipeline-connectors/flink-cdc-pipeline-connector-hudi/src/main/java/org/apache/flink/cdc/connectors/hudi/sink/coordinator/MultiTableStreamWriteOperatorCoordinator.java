@@ -474,11 +474,16 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                                             tableContext.eventBuffers.getAllCompletedEvents());
                                 });
 
-                        byte[] serializedState =
-                                SerializationUtils.serialize((Serializable) allStates);
+                        // Create a wrapper that includes both event buffers AND schemas
+                        Map<String, Object> checkpointState = new HashMap<>();
+                        checkpointState.put("eventBuffers", allStates);
+                        checkpointState.put("schemas", new HashMap<>(tableSchemas));
+
+                        byte[] serializedState = SerializationUtils.serialize(checkpointState);
                         result.complete(serializedState);
                         LOG.info(
-                                "Successfully checkpointed coordinator state for checkpoint {}",
+                                "Successfully checkpointed coordinator state with {} schemas for checkpoint {}",
+                                tableSchemas.size(),
                                 checkpointId);
                     } catch (Throwable t) {
                         LOG.error(
@@ -500,8 +505,23 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             return;
         }
         try {
+            Map<String, Object> checkpointState = SerializationUtils.deserialize(checkpointData);
             Map<TableId, Map<Long, Pair<String, WriteMetadataEvent[]>>> allStates =
-                    SerializationUtils.deserialize(checkpointData);
+                    (Map<TableId, Map<Long, Pair<String, WriteMetadataEvent[]>>>)
+                            checkpointState.get("eventBuffers");
+            Map<TableId, Schema> restoredSchemas =
+                    (Map<TableId, Schema>) checkpointState.get("schemas");
+
+            // Restore schemas
+            if (restoredSchemas != null && !restoredSchemas.isEmpty()) {
+                tableSchemas.clear();
+                tableSchemas.putAll(restoredSchemas);
+                LOG.info(
+                        "Restored {} schemas from checkpoint: {}",
+                        tableSchemas.size(),
+                        tableSchemas.keySet());
+            }
+
             allStates.forEach(
                     (tableId, completedEvents) -> {
                         // Lazily create table context if it doesn't exist.
