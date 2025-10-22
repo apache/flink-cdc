@@ -17,7 +17,16 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.function;
 
-import org.apache.flink.cdc.common.event.*;
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.typeutils.runtime.TupleSerializer;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.common.event.SchemaChangeEvent;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.hudi.sink.event.CreateTableOperatorEvent;
@@ -26,6 +35,8 @@ import org.apache.flink.cdc.connectors.hudi.sink.event.HudiRecordEventSerializer
 import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
+import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
+import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
@@ -64,21 +75,24 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
     private static final Logger LOG =
             LoggerFactory.getLogger(MultiTableEventStreamWriteFunction.class);
 
-    /** Table-specific write functions created dynamically when new tables are encountered */
+    /** Table-specific write functions created dynamically when new tables are encountered. */
     private transient Map<TableId, EventBucketStreamWriteFunction> tableFunctions;
 
-    /** Track tables that have been initialized to avoid duplicate initialization */
+    /** Track tables that have been initialized to avoid duplicate initialization. */
     private transient Map<TableId, Boolean> initializedTables;
 
-    /** Cache of schemas per table for RowType generation */
+    /** Cache of schemas per table for RowType generation. */
     private transient Map<TableId, Schema> schemaMaps;
+
+    /** Persistent state for schemas to survive checkpoints/savepoints. */
+    private transient ListState<Tuple2<TableId, Schema>> schemaState;
 
     private transient Map<TableId, Configuration> tableConfigurations;
 
-    /** Schema evolution client to communicate with SchemaOperator */
+    /** Schema evolution client to communicate with SchemaOperator. */
     private transient SchemaEvolutionClient schemaEvolutionClient;
 
-    /** Store the function initialization context for table functions */
+    /** Store the function initialization context for table functions. */
     private transient FunctionInitializationContext functionInitializationContext;
 
     public MultiTableEventStreamWriteFunction(Configuration config) {
@@ -89,6 +103,35 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
     public void initializeState(FunctionInitializationContext context) throws Exception {
         super.initializeState(context);
         this.functionInitializationContext = context;
+
+        // Initialize schema map before restoring state
+        if (this.schemaMaps == null) {
+            this.schemaMaps = new HashMap<>();
+        }
+
+        // Initialize schema state for persistence across checkpoints/savepoints
+        // Using operator state since this is not a keyed stream
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        TupleSerializer<Tuple2<TableId, Schema>> tupleSerializer =
+                new TupleSerializer(
+                        Tuple2.class,
+                        new org.apache.flink.api.common.typeutils.TypeSerializer[] {
+                            TableIdSerializer.INSTANCE, SchemaSerializer.INSTANCE
+                        });
+        ListStateDescriptor<Tuple2<TableId, Schema>> schemaStateDescriptor =
+                new ListStateDescriptor<>("schemaState", tupleSerializer);
+        this.schemaState = context.getOperatorStateStore().getUnionListState(schemaStateDescriptor);
+
+        // Restore schemas from state if this is a restore operation
+        if (context.isRestored()) {
+            LOG.info("Restoring schemas from state");
+            for (Tuple2<TableId, Schema> entry : schemaState.get()) {
+                schemaMaps.put(entry.f0, entry.f1);
+                LOG.info("Restored schema for table: {}", entry.f0);
+            }
+            LOG.info("Restored {} schemas from state", schemaMaps.size());
+        }
+
         LOG.info("MultiTableEventStreamWriteFunction state initialized");
     }
 
@@ -106,7 +149,10 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         super.open(parameters);
         this.tableFunctions = new HashMap<>();
         this.initializedTables = new HashMap<>();
-        this.schemaMaps = new HashMap<>();
+        // Don't reinitialize schemaMaps if it already has restored schemas from state
+        if (this.schemaMaps == null) {
+            this.schemaMaps = new HashMap<>();
+        }
         this.tableConfigurations = new HashMap<>();
     }
 
@@ -510,6 +556,17 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     @Override
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
+        // Persist schemas to state for recovery
+        if (schemaState != null && schemaMaps != null) {
+            schemaState.clear();
+            for (Map.Entry<TableId, Schema> entry : schemaMaps.entrySet()) {
+                schemaState.add(new Tuple2<>(entry.getKey(), entry.getValue()));
+                LOG.debug("Persisted schema for table: {}", entry.getKey());
+            }
+            LOG.info("Persisted {} schemas to state", schemaMaps.size());
+        }
+
+        // Delegate snapshot to table functions
         snapshotState();
     }
 

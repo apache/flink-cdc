@@ -51,13 +51,13 @@ import java.util.Map;
  */
 public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
 
-    /** Schema cache per table - populated from CreateTableEvent and SchemaChangeEvent */
+    /** Schema cache per table - populated from CreateTableEvent and SchemaChangeEvent. */
     private final Map<TableId, Schema> schemaMaps;
 
-    /** Field getter cache per table for efficient conversion */
+    /** Field getter cache per table for efficient conversion. */
     private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache;
 
-    /** Zone ID for timestamp conversion */
+    /** Zone ID for timestamp conversion. */
     private final ZoneId zoneId;
 
     public HudiRecordEventSerializer(ZoneId zoneId) {

@@ -31,7 +31,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.data.RowData;
-import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
 
 import org.slf4j.Logger;
@@ -40,30 +39,18 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.ZoneId;
 
+/** A {@link Sink} implementation for Apache Hudi. */
 public class HudiSink implements Sink<Event>, WithPreWriteTopology<Event> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HudiSink.class);
 
     private final Configuration conf;
-    // TODO: Check if these are used, remove them if unused
-    private final RowType rowType;
-    private final boolean overwrite;
-    private final boolean isBounded;
 
     private final String schemaOperatorUid;
 
-    public HudiSink(
-            Configuration conf,
-            RowType rowType,
-            boolean overwrite,
-            boolean isBounded,
-            String schemaOperatorUid,
-            ZoneId zoneId) {
+    public HudiSink(Configuration conf, String schemaOperatorUid, ZoneId zoneId) {
         LOG.info("Creating Hoodie sink with conf: {}", conf);
         this.conf = conf;
-        this.rowType = rowType;
-        this.overwrite = overwrite;
-        this.isBounded = isBounded;
         this.schemaOperatorUid = schemaOperatorUid;
     }
 

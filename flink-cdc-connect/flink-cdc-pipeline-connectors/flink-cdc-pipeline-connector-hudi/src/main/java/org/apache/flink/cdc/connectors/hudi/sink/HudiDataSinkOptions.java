@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink;
 
+/** HudiDataSink Options reference {@link HudiConfig}. */
 public class HudiDataSinkOptions {
     // prefix for passing properties for table creation.
     public static final String PREFIX_TABLE_PROPERTIES = "table.properties.";
