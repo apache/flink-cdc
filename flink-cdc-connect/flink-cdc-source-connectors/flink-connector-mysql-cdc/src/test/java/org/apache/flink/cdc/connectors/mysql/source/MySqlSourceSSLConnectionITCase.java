@@ -23,7 +23,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.table.data.RowData;
 import org.apache.flink.util.CloseableIterator;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -33,10 +32,15 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** IT Tests for {@link MySqlSource}. */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
+@Timeout(value = 20, unit = TimeUnit.SECONDS)
 class MySqlSourceSSLConnectionITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase inventoryDatabase =
@@ -96,17 +100,39 @@ class MySqlSourceSSLConnectionITCase extends MySqlSourceTestBase {
         DataStreamSource<String> source = env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySqlParallelSource")
                 .setParallelism(4);
 
+        ExecutorService executor = Executors.newSingleThreadExecutor();
         try (CloseableIterator<String> iterator = source.executeAndCollect()) {
             List<String> rows = new ArrayList<>();
-            int size = initialData.size();
-            while (size > 0 && iterator.hasNext()) {
-                String next = iterator.next();
-                rows.add(next);
-                size--;
+            int expectedSize = initialData.size();
+            long timeoutSeconds = 30;
+
+            while (rows.size() < expectedSize) {
+                // Wrap the blocking hasNext() call in a CompletableFuture with timeout
+                CompletableFuture<Boolean> hasNextFuture = CompletableFuture.supplyAsync(
+                        iterator::hasNext, executor);
+
+                try {
+                    Boolean hasNext = hasNextFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+                    if (hasNext) {
+                        String next = iterator.next();
+                        rows.add(next);
+                    } else {
+                        // No more data available
+                        break;
+                    }
+                } catch (java.util.concurrent.TimeoutException e) {
+                    throw new TimeoutException(("Timeout while waiting for records, application" +
+                            " is likely unable to process data from MySQL over SSL"));
+                } catch (ExecutionException e) {
+                    throw new RuntimeException("Error while checking for next element", e.getCause());
+                }
             }
+
             Assertions.assertThat(rows)
                     .withFailMessage("should read all initial records")
-                    .hasSize(initialData.size());
+                    .hasSize(expectedSize);
+        } finally {
+            executor.shutdownNow();
             env.close();
         }
 
