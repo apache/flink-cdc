@@ -35,6 +35,7 @@ import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.types.DataType;
+
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.table.catalog.CatalogOptions;
