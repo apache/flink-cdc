@@ -17,11 +17,12 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
+import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
-
+import org.apache.flink.runtime.client.JobStatusMessage;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.ToStringConsumer;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.lifecycle.Startables;
@@ -44,6 +46,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -62,6 +65,8 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             new UniqueDatabase(MYSQL, "hudi_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
     private String warehouse;
+
+    private final boolean DEBUG = false;
 
     @BeforeAll
     public static void initializeContainers() {
@@ -84,40 +89,52 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
     @Override
     public void before() throws Exception {
         LOG.info("Starting containers...");
+
+        // 2. Instantiate the correct class and apply class-specific methods
+        if (DEBUG) {
+            // Use FixedHost instead of GenericContainer to ensure that ports are fixed for easier
+            // debugging during dev
+            jobManager =
+                    new FixedHostPortGenericContainer<>(getFlinkDockerImageTag())
+                            .withFixedExposedPort(8081, JOB_MANAGER_REST_PORT)
+                            .withFixedExposedPort(9005, 9005)
+                            .withEnv(
+                                    "FLINK_ENV_JAVA_OPTS",
+                                    "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9005");
+            taskManager =
+                    new FixedHostPortGenericContainer<>(getFlinkDockerImageTag())
+                            .withFixedExposedPort(9006, 9006)
+                            .withEnv(
+                                    "FLINK_ENV_JAVA_OPTS",
+                                    "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9006");
+        } else {
+            jobManager =
+                    new GenericContainer<>(getFlinkDockerImageTag())
+                            // Expose ports for random mapping by Docker
+                            .withExposedPorts(JOB_MANAGER_REST_PORT);
+            taskManager = new FixedHostPortGenericContainer<>(getFlinkDockerImageTag());
+        }
+
         jobManagerConsumer = new ToStringConsumer();
-        // Using FixedHost instead of GenericContainer to ensure that ports are fixed for easier
-        // debugging during dev
-        jobManager =
-                new FixedHostPortGenericContainer<>(getFlinkDockerImageTag())
-                        .withCommand("jobmanager")
-                        .withNetwork(NETWORK)
-                        .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
-                        .withExposedPorts(JOB_MANAGER_REST_PORT)
-                        .withFixedExposedPort(8081, 8081)
-                        .withFixedExposedPort(9005, 9005)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
-                        .withEnv(
-                                "FLINK_ENV_JAVA_OPTS",
-                                "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9005")
-                        .withCreateContainerCmdModifier(cmd -> cmd.withVolumes(sharedVolume))
-                        .withLogConsumer(jobManagerConsumer);
+        jobManager
+                .withCommand("jobmanager")
+                .withNetwork(NETWORK)
+                .withNetworkAliases(INTER_CONTAINER_JM_ALIAS)
+                .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                .withCreateContainerCmdModifier(cmd -> cmd.withVolumes(sharedVolume))
+                .withLogConsumer(jobManagerConsumer);
         Startables.deepStart(Stream.of(jobManager)).join();
         runInContainerAsRoot(jobManager, "chmod", "0777", "-R", sharedVolume.toString());
 
         taskManagerConsumer = new ToStringConsumer();
-        taskManager =
-                new FixedHostPortGenericContainer<>(getFlinkDockerImageTag())
-                        .withCommand("taskmanager")
-                        .withNetwork(NETWORK)
-                        .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
-                        .withFixedExposedPort(9006, 9006)
-                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
-                        .withEnv(
-                                "FLINK_ENV_JAVA_OPTS",
-                                "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9006")
-                        .dependsOn(jobManager)
-                        .withVolumesFrom(jobManager, BindMode.READ_WRITE)
-                        .withLogConsumer(taskManagerConsumer);
+        taskManager
+                .withCommand("taskmanager")
+                .withNetwork(NETWORK)
+                .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
+                .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+                .dependsOn(jobManager)
+                .withVolumesFrom(jobManager, BindMode.READ_WRITE)
+                .withLogConsumer(taskManagerConsumer);
         Startables.deepStart(Stream.of(taskManager)).join();
         runInContainerAsRoot(taskManager, "chmod", "0777", "-R", sharedVolume.toString());
 
@@ -271,11 +288,10 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
      * represents the expected data for each inserted row in a comma-separated format, which can be
      * used for validation.
      *
-     * @param stat The JDBC {@link java.sql.Statement} object used to execute the SQL commands.
-     * @return A {@link java.util.List} of strings, where each string is a CSV representation of an
-     *     inserted row, reflecting the expected state in the database.
-     * @throws java.sql.SQLException if a database access error occurs or the executed SQL is
-     *     invalid.
+     * @param stat The JDBC {@link Statement} object used to execute the SQL commands.
+     * @return A {@link List} of strings, where each string is a CSV representation of an inserted
+     *     row, reflecting the expected state in the database.
+     * @throws SQLException if a database access error occurs or the executed SQL is invalid.
      */
     private List<String> createChangesAndValidate(Statement stat) throws SQLException {
         List<String> result = new ArrayList<>();
@@ -414,6 +430,30 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         return "hudi-sql-connector.jar";
     }
 
+    @Override
+    public String stopJobWithSavepoint(org.apache.flink.api.common.JobID jobID) {
+        String savepointPath = "/opt/flink/";
+        try {
+            // Use REST API to stop with savepoint to avoid CLI classpath conflicts
+            // (Hadoop/Hudi JARs in FLINK_LIB_DIR conflict with Flink's commons-cli)
+            LOG.info("Stopping job {} with savepoint to {}", jobID, savepointPath);
+
+            String savepointLocation =
+                    getRestClusterClient()
+                            .stopWithSavepoint(
+                                    jobID,
+                                    false,
+                                    savepointPath,
+                                    org.apache.flink.core.execution.SavepointFormatType.CANONICAL)
+                            .get(60, java.util.concurrent.TimeUnit.SECONDS);
+
+            LOG.info("Savepoint completed at: {}", savepointLocation);
+            return savepointLocation;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to stop job with savepoint", e);
+        }
+    }
+
     private void validateSinkResult(
             String warehouse, String database, String table, List<String> expected)
             throws InterruptedException {
@@ -515,4 +555,368 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 "103, user_3, Shanghai, 123567891234",
                 "104, user_4, Shanghai, 123567891234");
     }
+
+    @Test
+    public void testStopAndRestartFromSavepoint() throws Exception {
+        warehouse = sharedVolume.toString() + "/hudi_warehouse_savepoint_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+
+        LOG.info("Preparing Hudi warehouse directory: {}", warehouse);
+        runInContainerAsRoot(jobManager, "mkdir", "-p", warehouse);
+        runInContainerAsRoot(jobManager, "chmod", "-R", "0777", warehouse);
+
+        // Configure pipeline with checkpointing
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5600-5604\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: hudi\n"
+                                + "  path: %s\n"
+                                + "  hoodie.datasource.write.recordkey.field: id\n"
+                                + "  hoodie.table.type: MERGE_ON_READ\n"
+                                + "  hoodie.schema.on.read.enable: true\n"
+                                + "  write.bucket_assign.tasks: 2\n"
+                                + "  write.tasks: 2\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: %s\n"
+                                + "\n"
+                                + "# Enable checkpointing for savepoint support\n"
+                                + "execution:\n"
+                                + "  checkpointing:\n"
+                                + "    interval: 3000\n"
+                                + "    timeout: 60000\n"
+                                + "    min-pause: 1000",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+
+        Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
+        Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+        Path hadoopCompatibilityJar = TestUtils.getResource("flink-hadoop-compatibility.jar");
+        Path dropMetricsJar = TestUtils.getResource("flink-metrics-dropwizard.jar");
+        Path flinkParquet = TestUtils.getResource("flink-parquet.jar");
+
+        // Start the pipeline job
+        LOG.info("Phase 1: Starting initial pipeline job");
+        submitPipelineJob(
+                pipelineJob,
+                hudiCdcConnector,
+                hudiHadoopCommonJar,
+                hadoopJar,
+                hadoopCompatibilityJar,
+                dropMetricsJar,
+                flinkParquet);
+        waitUntilJobRunning(Duration.ofSeconds(60));
+
+        // Store the jobID of the submitted job, we will need it for stopping the job later
+        Collection<JobStatusMessage> jobs =
+                getRestClusterClient().listJobs().get(10, TimeUnit.SECONDS);
+        Assertions.assertThat(jobs).hasSize(1);
+        JobStatusMessage pipelineJobMessage = jobs.iterator().next();
+        LOG.info(
+                "Pipeline job: ID={}, Name={}, Status={}",
+                pipelineJobMessage.getJobId(),
+                pipelineJobMessage.getJobName(),
+                pipelineJobMessage.getJobState());
+
+        // Validate initial snapshot data for both tables
+        validateSinkResult(warehouse, database, "products", getProductsExpectedSinkResults());
+        validateSinkResult(warehouse, database, "customers", getCustomersExpectedSinkResults());
+        LOG.info("Phase 1: Initial snapshot validated successfully");
+
+        // Phase 2: Insert incremental data before stopping
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(), MYSQL.getDatabasePort(), database);
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Pre-Stop Product','Description',1.23, null, null, null);");
+            stat.execute(
+                    "INSERT INTO customers VALUES (105, 'user_pre_stop', 'Beijing', '987654321');");
+            LOG.info("Phase 2: Incremental data inserted before stop");
+
+            // Wait for data to be checkpointed
+            Thread.sleep(5000);
+        }
+
+        // Validate data before stopping
+        List<String> expectedProductsBeforeStop = new ArrayList<>(getProductsExpectedSinkResults());
+        expectedProductsBeforeStop.add(
+                "110, Pre-Stop Product, Description, 1.23, null, null, null");
+
+        List<String> expectedCustomersBeforeStop =
+                new ArrayList<>(getCustomersExpectedSinkResults());
+        expectedCustomersBeforeStop.add("105, user_pre_stop, Beijing, 987654321");
+
+        validateSinkResult(warehouse, database, "products", expectedProductsBeforeStop);
+        validateSinkResult(warehouse, database, "customers", expectedCustomersBeforeStop);
+        LOG.info("Phase 2: Data validated before stop");
+
+        // Phase 3: Stop job with savepoint
+        LOG.info("Phase 3: Stopping job with savepoint");
+        Collection<JobStatusMessage> runningJobs =
+                getRestClusterClient().listJobs().get(10, TimeUnit.SECONDS).stream()
+                        .filter(j -> j.getJobState().equals(JobStatus.RUNNING))
+                        .collect(Collectors.toList());
+
+        if (runningJobs.isEmpty()) {
+            throw new RuntimeException("No running jobs found!");
+        }
+
+        String savepointPath = stopJobWithSavepoint(pipelineJobMessage.getJobId());
+        LOG.info("Job stopped with savepoint at: {}", savepointPath);
+
+        // Phase 4: Restart from savepoint
+        LOG.info("Phase 4: Restarting job from savepoint");
+        submitPipelineJob(
+                pipelineJob,
+                savepointPath,
+                false,
+                hudiCdcConnector,
+                hudiHadoopCommonJar,
+                hadoopJar,
+                hadoopCompatibilityJar,
+                dropMetricsJar,
+                flinkParquet);
+        waitUntilJobRunning(Duration.ofSeconds(60));
+        LOG.info("Job restarted from savepoint");
+
+        // Wait for Hudi to stabilize after restart
+        Thread.sleep(5000);
+
+        // Validate data after restart - should be the same as before stop
+        validateSinkResult(warehouse, database, "products", expectedProductsBeforeStop);
+        validateSinkResult(warehouse, database, "customers", expectedCustomersBeforeStop);
+        LOG.info("Phase 4: Data consistency validated after restart from savepoint");
+
+        // Phase 5: Continue with post-restart data to ensure pipeline still works
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'Post-Restart Product','New Description',4.56, null, null, null);");
+            stat.execute("UPDATE products SET description='Updated Description' WHERE id=110;");
+            stat.execute(
+                    "INSERT INTO customers VALUES (106, 'user_post_restart', 'Guangzhou', '111222333');");
+            stat.execute("DELETE FROM customers WHERE id=101;");
+            LOG.info("Phase 5: Post-restart data changes applied");
+        }
+
+        // Phase 6: Final validation
+        List<String> expectedProductsFinal = new ArrayList<>(expectedProductsBeforeStop);
+        // Update the pre-stop product description
+        expectedProductsFinal.removeIf(row -> row.startsWith("110,"));
+        expectedProductsFinal.add(
+                "110, Pre-Stop Product, Updated Description, 1.23, null, null, null");
+        expectedProductsFinal.add(
+                "111, Post-Restart Product, New Description, 4.56, null, null, null");
+
+        List<String> expectedCustomersFinal = new ArrayList<>(expectedCustomersBeforeStop);
+        // Remove deleted customer
+        expectedCustomersFinal.removeIf(row -> row.startsWith("101,"));
+        expectedCustomersFinal.add("106, user_post_restart, Guangzhou, 111222333");
+
+        validateSinkResult(warehouse, database, "products", expectedProductsFinal);
+        validateSinkResult(warehouse, database, "customers", expectedCustomersFinal);
+        LOG.info(
+                "Phase 6: Final validation successful - stop/restart with savepoint working correctly for multiple tables");
+    }
+
+    //    @Test
+    //    public void testFailoverWithMultipleTables() throws Exception {
+    //        warehouse = sharedVolume.toString() + "/hudi_warehouse_failover_" + UUID.randomUUID();
+    //        String database = inventoryDatabase.getDatabaseName();
+    //
+    //        LOG.info("Preparing Hudi warehouse directory: {}", warehouse);
+    //        runInContainerAsRoot(jobManager, "mkdir", "-p", warehouse);
+    //        runInContainerAsRoot(jobManager, "chmod", "-R", "0777", warehouse);
+    //
+    //        // Configure pipeline with checkpointing for failover recovery
+    //        String pipelineJob =
+    //                String.format(
+    //                        "source:\n"
+    //                                + "  type: mysql\n"
+    //                                + "  hostname: mysql\n"
+    //                                + "  port: 3306\n"
+    //                                + "  username: %s\n"
+    //                                + "  password: %s\n"
+    //                                + "  tables: %s.\\.*\n"
+    //                                + "  server-id: 5500-5504\n"
+    //                                + "  server-time-zone: UTC\n"
+    //                                + "\n"
+    //                                + "sink:\n"
+    //                                + "  type: hudi\n"
+    //                                + "  path: %s\n"
+    //                                + "  hoodie.datasource.write.recordkey.field: id\n"
+    //                                + "  hoodie.table.type: MERGE_ON_READ\n"
+    //                                + "  hoodie.schema.on.read.enable: true\n"
+    //                                + "  write.bucket_assign.tasks: 2\n"
+    //                                + "  write.tasks: 2\n"
+    //                                + "\n"
+    //                                + "pipeline:\n"
+    //                                + "  schema.change.behavior: evolve\n"
+    //                                + "  parallelism: %s\n"
+    //                                + "\n"
+    //                                + "# Enable checkpointing for failover recovery\n"
+    //                                + "execution:\n"
+    //                                + "  checkpointing:\n"
+    //                                + "    interval: 3000\n"
+    //                                + "    timeout: 60000\n"
+    //                                + "    min-pause: 1000",
+    //                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse,
+    // parallelism);
+    //
+    //        Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
+    //        Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
+    //        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+    //        Path hadoopCompatibilityJar = TestUtils.getResource("flink-hadoop-compatibility.jar");
+    //        Path dropMetricsJar = TestUtils.getResource("flink-metrics-dropwizard.jar");
+    //        Path flinkParquet = TestUtils.getResource("flink-parquet.jar");
+    //
+    //        submitPipelineJob(
+    //                pipelineJob,
+    //                hudiCdcConnector,
+    //                hudiHadoopCommonJar,
+    //                hadoopJar,
+    //                hadoopCompatibilityJar,
+    //                dropMetricsJar,
+    //                flinkParquet);
+    //        waitUntilJobRunning(Duration.ofSeconds(60));
+    //        LOG.info("Pipeline job is running");
+    //
+    //        // Phase 1: Validate initial snapshot data for both tables
+    //        validateSinkResult(warehouse, database, "products", getProductsExpectedSinkResults());
+    //        validateSinkResult(warehouse, database, "customers",
+    // getCustomersExpectedSinkResults());
+    //        LOG.info("Phase 1: Initial snapshot validated successfully");
+    //
+    //        // Phase 2: Insert incremental data before failover
+    //        String mysqlJdbcUrl =
+    //                String.format(
+    //                        "jdbc:mysql://%s:%s/%s",
+    //                        MYSQL.getHost(), MYSQL.getDatabasePort(), database);
+    //        try (Connection conn =
+    //                        DriverManager.getConnection(
+    //                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+    //                Statement stat = conn.createStatement()) {
+    //
+    //            stat.execute(
+    //                    "INSERT INTO products VALUES (default,'Pre-Failover
+    // Product','Description',1.23, null, null, null);");
+    //            stat.execute(
+    //                    "INSERT INTO customers VALUES (105, 'user_pre_failover', 'Beijing',
+    // '987654321');");
+    //            LOG.info("Phase 2: Incremental data inserted before failover");
+    //
+    //            // Wait for data to be checkpointed
+    //            Thread.sleep(5000);
+    //        }
+    //
+    //        // Phase 3: Trigger failover by killing and restarting TaskManager
+    //        LOG.info("Phase 3: Triggering failover by restarting TaskManager");
+    //        taskManager.stop();
+    //        LOG.info("TaskManager stopped");
+    //
+    //        // Wait a bit to ensure failure is detected
+    //        Thread.sleep(5000);
+    //
+    //        // Restart TaskManager
+    //        taskManager =
+    //                new FixedHostPortGenericContainer<>(getFlinkDockerImageTag())
+    //                        .withCommand("taskmanager")
+    //                        .withNetwork(NETWORK)
+    //                        .withNetworkAliases(INTER_CONTAINER_TM_ALIAS)
+    //                        //                        .withFixedExposedPort(9006, 9006)
+    //                        .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
+    //                        .withEnv(
+    //                                "FLINK_ENV_JAVA_OPTS",
+    //
+    // "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9006")
+    //                        .dependsOn(jobManager)
+    //                        .withVolumesFrom(jobManager, BindMode.READ_WRITE)
+    //                        .withLogConsumer(taskManagerConsumer);
+    //        Startables.deepStart(Stream.of(taskManager)).join();
+    //        runInContainerAsRoot(taskManager, "chmod", "0777", "-R", sharedVolume.toString());
+    //        LOG.info("TaskManager restarted");
+    //
+    //        // Wait for job to recover from checkpoint
+    //        waitUntilJobRunning(Duration.ofSeconds(120));
+    //        LOG.info("Job recovered from checkpoint after failover");
+    //
+    //        // Wait additional time for Hudi to stabilize after recovery
+    //        // This ensures that any in-flight transactions are committed and tables are queryable
+    //        Thread.sleep(10000);
+    //        LOG.info("Waited for Hudi tables to stabilize after recovery");
+    //
+    //        // Phase 4: Validate data consistency after recovery
+    //        // The pre-failover data should be present (checkpoint-based recovery ensures this)
+    //        List<String> expectedProductsAfterFailover =
+    //                new ArrayList<>(getProductsExpectedSinkResults());
+    //        expectedProductsAfterFailover.add(
+    //                "110, Pre-Failover Product, Description, 1.23, null, null, null");
+    //
+    //        List<String> expectedCustomersAfterFailover =
+    //                new ArrayList<>(getCustomersExpectedSinkResults());
+    //        expectedCustomersAfterFailover.add("105, user_pre_failover, Beijing, 987654321");
+    //
+    //        validateSinkResult(warehouse, database, "products", expectedProductsAfterFailover);
+    //        validateSinkResult(warehouse, database, "customers", expectedCustomersAfterFailover);
+    //        LOG.info("Phase 4: Data consistency validated after failover - rollback mechanism
+    // worked");
+    //
+    //        // Phase 5: Continue with post-failover data to ensure pipeline still works
+    //        try (Connection conn =
+    //                        DriverManager.getConnection(
+    //                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+    //                Statement stat = conn.createStatement()) {
+    //
+    //            stat.execute(
+    //                    "INSERT INTO products VALUES (default,'Post-Failover Product','New
+    // Description',4.56, null, null, null);");
+    //            stat.execute("UPDATE products SET description='Updated Description' WHERE
+    // id=110;");
+    //            stat.execute(
+    //                    "INSERT INTO customers VALUES (106, 'user_post_failover', 'Guangzhou',
+    // '111222333');");
+    //            stat.execute("DELETE FROM customers WHERE id=101;");
+    //            LOG.info("Phase 5: Post-failover data changes applied");
+    //        }
+    //
+    //        // Phase 6: Final validation
+    //        List<String> expectedProductsFinal = new ArrayList<>(expectedProductsAfterFailover);
+    //        // Update the pre-failover product description
+    //        expectedProductsFinal.removeIf(row -> row.startsWith("110,"));
+    //        expectedProductsFinal.add(
+    //                "110, Pre-Failover Product, Updated Description, 1.23, null, null, null");
+    //        expectedProductsFinal.add(
+    //                "111, Post-Failover Product, New Description, 4.56, null, null, null");
+    //
+    //        List<String> expectedCustomersFinal = new ArrayList<>(expectedCustomersAfterFailover);
+    //        // Remove deleted customer
+    //        expectedCustomersFinal.removeIf(row -> row.startsWith("101,"));
+    //        expectedCustomersFinal.add("106, user_post_failover, Guangzhou, 111222333");
+    //
+    //        validateSinkResult(warehouse, database, "products", expectedProductsFinal);
+    //        validateSinkResult(warehouse, database, "customers", expectedCustomersFinal);
+    //        LOG.info(
+    //                "Phase 6: Final validation successful - failover and rollback mechanism
+    // working correctly for multiple tables");
+    //    }
 }
