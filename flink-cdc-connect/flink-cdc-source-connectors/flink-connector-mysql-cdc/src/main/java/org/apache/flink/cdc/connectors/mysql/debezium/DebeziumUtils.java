@@ -247,7 +247,7 @@ public class DebeziumUtils {
         try {
             return mode == null ? null : SSLMode.valueOf(mode.name());
         } catch (IllegalArgumentException e) {
-            LOG.error("Invalid SecureConnectionMode provided %s", mode.name(), e);
+            LOG.error("Invalid SecureConnectionMode provided {}", mode.name(), e);
         }
         return null;
     }
@@ -258,7 +258,10 @@ public class DebeziumUtils {
         BinaryLogClient client =
                 new BinaryLogClient(
                         config.hostname(), config.port(), config.username(), config.password());
-        client.setSSLMode(sslModeFor(config.sslMode()));
+        SSLMode sslMode = sslModeFor(config.sslMode());
+        if (sslMode != null) {
+            client.setSSLMode(sslMode);
+        }
 
         if (mySqlSourceConfig.getServerIdRange() != null) {
             client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
