@@ -141,7 +141,7 @@ class MySqlToPaimonMigrationITCase extends PipelineTestEnvironment {
     }
 
     @ParameterizedTest(name = "{0} -> SNAPSHOT")
-    @EnumSource(names = {"V3_2_1", "V3_3_0", "V3_4_0", "SNAPSHOT"})
+    @EnumSource(names = {"V3_2_1", "V3_3_0", "V3_4_0", "V3_5_0", "SNAPSHOT"})
     void testStartingJobFromSavepoint(TarballFetcher.CdcVersion migrateFromVersion)
             throws Exception {
         TarballFetcher.fetch(jobManager, migrateFromVersion);
