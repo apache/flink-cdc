@@ -724,7 +724,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         // The central coordinator manages the only timeline server.
         tableConfig.setBoolean(HoodieWriteConfig.EMBEDDED_TIMELINE_SERVER_ENABLE.key(), false);
         // For simplicity, let's keep it consistent.
-        tableConfig.setBoolean(HoodieMetadataConfig.ENABLE.key(), false);
+        tableConfig.setBoolean(HoodieMetadataConfig.ENABLE.key(), true);
 
         // Use memory-based file system view since each client is lightweight.
         tableConfig.setString(FileSystemViewStorageConfig.VIEW_TYPE.key(), "MEMORY");

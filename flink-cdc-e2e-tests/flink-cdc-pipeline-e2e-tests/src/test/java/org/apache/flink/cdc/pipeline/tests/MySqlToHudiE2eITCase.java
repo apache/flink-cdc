@@ -228,7 +228,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + "  parallelism: %s",
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
         Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
-        Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
+        // Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
         Path hadoopCompatibilityJar = TestUtils.getResource("flink-hadoop-compatibility.jar");
         Path dropMetricsJar = TestUtils.getResource("flink-metrics-dropwizard.jar");
@@ -237,7 +237,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                 submitPipelineJob(
                         pipelineJob,
                         hudiCdcConnector,
-                        hudiHadoopCommonJar,
                         hadoopJar,
                         hadoopCompatibilityJar,
                         dropMetricsJar,
@@ -455,7 +454,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
     }
 
     @Override
-    public String stopJobWithSavepoint(org.apache.flink.api.common.JobID jobID) {
+    public String stopJobWithSavepoint(JobID jobID) {
         String savepointPath = "/opt/flink/";
         try {
             // Use REST API to stop with savepoint to avoid CLI classpath conflicts
