@@ -44,7 +44,6 @@ import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.TableAlreadyExistException;
 import org.apache.flink.table.types.DataType;
 
-import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.table.catalog.CatalogOptions;
 import org.apache.hudi.table.catalog.HoodieCatalog;
@@ -564,10 +563,6 @@ public class HudiMetadataApplier implements MetadataApplier {
         // Set catalog path (base path for all tables)
         String basePath = cdcConfig.get(HudiConfig.PATH);
         flinkConfig.setString(CatalogOptions.CATALOG_PATH.key(), basePath);
-
-        // TODO: enable this in the future
-        // Disable metadata table usage in catalog commit
-        flinkConfig.setString(HoodieMetadataConfig.ENABLE.key(), "true");
 
         // Set mode to DFS (filesystem-based)
         // TODO: make this configurable

@@ -33,7 +33,6 @@ import org.apache.flink.table.types.logical.RowType;
 
 import org.apache.hudi.client.HoodieFlinkWriteClient;
 import org.apache.hudi.client.WriteStatus;
-import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -723,8 +722,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         // Disable both embedded timeline server and metadata table for per-table clients.
         // The central coordinator manages the only timeline server.
         tableConfig.setBoolean(HoodieWriteConfig.EMBEDDED_TIMELINE_SERVER_ENABLE.key(), false);
-        // For simplicity, let's keep it consistent.
-        tableConfig.setBoolean(HoodieMetadataConfig.ENABLE.key(), true);
 
         // Use memory-based file system view since each client is lightweight.
         tableConfig.setString(FileSystemViewStorageConfig.VIEW_TYPE.key(), "MEMORY");
