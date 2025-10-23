@@ -136,7 +136,7 @@ public class IcebergSink
             // Shuffle by different table id.
             DataStream<CommittableMessage<WriteResultWrapper>> keyedStream =
                     committableMessageDataStream.partitionCustom(
-                            (bucket, numPartitions) -> bucket % numPartitions,
+                            Math::floorMod,
                             (committableMessage) -> {
                                 if (committableMessage instanceof CommittableWithLineage) {
                                     WriteResultWrapper multiTableCommittable =
