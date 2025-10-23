@@ -56,6 +56,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -542,16 +543,10 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         // snapshotting. The direct call to flushRemaining() is removed to prevent sending
         // an invalid, generic instant request to the coordinator.
         //        flushRemaining(false);
-        for (Map.Entry<TableId, EventBucketStreamWriteFunction> entry : tableFunctions.entrySet()) {
-            try {
-                LOG.debug("Delegating snapshotState for table: {}", entry.getKey());
-                entry.getValue().snapshotState();
-            } catch (Exception e) {
-                LOG.error("Failed to snapshot state for table: {}", entry.getKey(), e);
-                throw new RuntimeException(
-                        "Failed to snapshot state for table: " + entry.getKey(), e);
-            }
-        }
+
+        // NOTE: This abstract method is intentionally empty for multi-table function.
+        // The actual delegation happens in snapshotState(FunctionSnapshotContext)
+        // to ensure child functions receive the correct checkpointId.
     }
 
     @Override
@@ -567,7 +562,52 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         }
 
         // Delegate snapshot to table functions
-        snapshotState();
+        // Child functions are composition objects, not Flink operators, so they shouldn't
+        // go through the full snapshotState(FunctionSnapshotContext) lifecycle which
+        // includes state reloading. Instead, we:
+        // 1. Call their abstract snapshotState() to flush buffers
+        // 2. Manually update their checkpointId for instant requests
+        long checkpointId = context.getCheckpointId();
+        for (Map.Entry<TableId, EventBucketStreamWriteFunction> entry : tableFunctions.entrySet()) {
+            try {
+                EventBucketStreamWriteFunction tableFunction = entry.getValue();
+                LOG.debug(
+                        "Delegating snapshotState for table: {} with checkpointId: {}",
+                        entry.getKey(),
+                        checkpointId);
+
+                // Call abstract snapshotState() to flush buffers
+                tableFunction.snapshotState();
+
+                // Update the child function's checkpointId using reflection
+                // This is necessary because child functions need the current checkpointId
+                // when requesting instants from the coordinator
+                setCheckpointId(tableFunction, checkpointId);
+
+                LOG.debug("Successfully snapshotted state for table: {}", entry.getKey());
+            } catch (Exception e) {
+                LOG.error("Failed to snapshot state for table: {}", entry.getKey(), e);
+                throw new RuntimeException(
+                        "Failed to snapshot state for table: " + entry.getKey(), e);
+            }
+        }
+    }
+
+    /**
+     * Sets the checkpointId field on a child AbstractStreamWriteFunction using reflection. This is
+     * necessary because checkpointId is protected and child functions are composition objects that
+     * need the current checkpoint ID for coordinator communication.
+     */
+    private void setCheckpointId(AbstractStreamWriteFunction<?> function, long checkpointId) {
+        try {
+            Field checkpointIdField =
+                    AbstractStreamWriteFunction.class.getDeclaredField("checkpointId");
+            checkpointIdField.setAccessible(true);
+            checkpointIdField.setLong(function, checkpointId);
+        } catch (Exception e) {
+            LOG.error("Failed to set checkpointId on child function using reflection", e);
+            throw new RuntimeException("Failed to set checkpointId on child function", e);
+        }
     }
 
     protected void flushRemaining(boolean endInput) {

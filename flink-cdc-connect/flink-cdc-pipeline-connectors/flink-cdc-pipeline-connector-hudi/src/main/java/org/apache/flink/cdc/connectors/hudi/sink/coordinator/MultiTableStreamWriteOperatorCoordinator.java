@@ -437,6 +437,11 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             context.failJob(new IllegalStateException("No TableContext for table " + tableId));
             return;
         }
+
+        LOG.info(
+                "Fetching instant, but got null pair for : {}",
+                tableContext.eventBuffers.getInstantAndEventBuffer(event.getCheckpointId()));
+
         // The instant should have been created by handleCoordinationRequest
         if (tableContext.eventBuffers.getInstantAndEventBuffer(event.getCheckpointId()) == null) {
             LOG.error(
