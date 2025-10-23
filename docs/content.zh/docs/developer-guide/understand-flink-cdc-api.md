@@ -25,99 +25,83 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Understand Flink CDC API
+# 理解 Flink CDC API
 
-If you are planning to build your own Flink CDC connectors, or considering
-contributing to Flink CDC, you might want to hava a deeper look at the APIs of
-Flink CDC. This document will go through some important concepts and interfaces
-in order to help you with your development.
+如果你计划构建自己的 Flink CDC 连接器，或打算为 Flink CDC 项目做出贡献，我们建议
+你深入了解 Flink CDC 涉及的 API。这里将介绍其中一些关键概念与接口，以帮助你进行开发工作。
 
-## Event
+## 事件 Event
 
-An event under the context of Flink CDC is a special kind of record in Flink's
-data stream. It describes the captured changes in the external system on source
-side, gets processed and transformed by internal operators built by Flink CDC,
-and finally passed to data sink then write or applied to the external system on
-sink side.
+在 Flink CDC 的上下文中，事件（event）是 Flink 数据流中的一种特殊记录。
+它描述了外部系统数据源端（[source](../core-concept/data-source.md) side）捕获到的变更，
+经由 Flink CDC 内部构建的算子处理与转换后，
+再传递给下游的数据终端（[sink](../core-concept/data-sink.md) side），最终写入或应用到外部系统中。
 
-Each change event contains the table ID it belongs to, and the payload that the
-event carries. Based on the type of payload, we categorize events into these
-kinds:
+每个事件都包含两个核心部分：表 ID（table ID），标识事件所属的表；以及负载（payload），即事件携带的数据内容。
+根据负载类型的不同，事件可以分为以下几类：
 
-### DataChangeEvent
+### 数据变更事件 DataChangeEvent
 
-DataChangeEvent describes data changes in the source. It consists of 5 fields
+数据变更事件（DataChangeEvent）描述了源端的数据变化，包含五个字段：
 
-- `Table ID`: table ID it belongs to
-- `Before`: pre-image of the data
-- `After`: post-image of the data
-- `Operation type`: type of the change operation
-- `Meta`: metadata of the change
+- `Table ID`：所属表的 ID
+- `Before`：变更前的数据快照
+- `After`：变更后的数据快照
+- `Operation type`：此变更操作的类型
+- `Meta`：此变更的元信息
 
-For the operation type field, we pre-define 4 operation types:
+对于操作类型（operation type）字段，我们预定义了 4 种类型：
 
-- Insert: new data entry, with `before = null` and `after = new data`
-- Delete: removal of data, with `before = removed` data and `after = null`
-- Update: update of existed data, with `before = data before change`
-  and `after = data after change`
-- Replace:
+- Insert：新数据插入，`before = null`，`after = 新数据`
+- Delete：数据删除，`before = 被删除的数据`，`after = null`
+- Update：已有数据更新，`before = 更新前的数据`，`after = 更新后的数据`
+- Replace：
 
-### SchemaChangeEvent
+### 模式变更事件（SchemaChangeEvent）
 
-SchemaChangeEvent describes schema changes in the source. Compared to
-DataChangeEvent, the payload of SchemaChangeEvent describes changes in the table
-structure in the external system, including:
+模式变更事件（SchemaChangeEvent）描述了源端的模式变化。与数据变更事件相比，
+模式变更事件的负载描述了外部系统中表结构的变化，包括以下几种：
 
-- `AddColumnEvent`: new column in the table
-- `AlterColumnTypeEvent`: type change of a column
-- `CreateTableEvent`: creation of a new table. Also used to describe the schema
-  of
-  a pre-emitted DataChangeEvent
-- `DropColumnEvent`: removal of a column
-- `RenameColumnEvent`: name change of a column
+- `AddColumnEvent`：新增列
+- `AlterColumnTypeEvent`：列类型修改
+- `CreateTableEvent`：新表的创建。
+  也用于描述预先发送的数据变更事件（DataChangeEvent）的模式
+- `DropColumnEvent`：删除列
+- `RenameColumnEvent`：重命名列
 
-### Flow of Events
+### 事件流（Flow of Events）
 
-As you may have noticed, data change event doesn't have its schema bound with
-it. This reduces the size of data change event and the overhead of
-serialization, but makes it not self-descriptive Then how does the framework
-know how to interpret the data change event?
+你可能注意到，数据变更事件（DataChangeEvent）并不携带其表结构信息（schema）。
+这种设计减少数据变更事件体积和序列化的开销，但也意味着事件不能自解释。
+那么，框架如何解释数据变更事件呢？
 
-To resolve the problem, the framework adds a requirement to the flow of events:
-a `CreateTableEvent` must be emitted before any `DataChangeEvent` if a table is
-new to the framework, and `SchemaChangeEvent` must be emitted before any
-`DataChangeEvent` if the schema of a table is changed. This requirement makes
-sure that the framework has been aware of the schema before processing any data
-changes.
+为了解决这个问题，框架对事件流（flow of events）增加了一个要求：
+若某张表对框架而言是新表，则必须在发送任何 `DataChangeEvent` 前发送
+一个 `CreateTableEvent`；若表的模式发生了变化，则必须在任何
+新的 `DataChangeEvent` 前发送一个 `SchemaChangeEvent`。
+这种事件顺序确保框架在处理数据变更前已经了解模式定义。
 
 {{< img src="/fig/flow-of-events.png" alt="Flow of Events" >}}
 
-## Data Source
+## 数据源（Data Source）
 
-Data source works as a factory of `EventSource` and `MetadataAccessor`,
-constructing runtime implementations of source that captures changes from
-external system and provides metadata.
+数据源可视为 `EventSource` 和 `MetadataAccessor` 的工厂，
+用于构建从外部系统捕获变更并提供元数据的运行时实现。
 
-`EventSource` is a Flink source that reads changes, converts them to events
-, then emits to downstream Flink operators. You can refer
-to [Flink documentation](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/sources/)
-to learn internals and how to implement a Flink source.
+`EventSource` 是一个 Flink 源，它读取外部系统的变更，将其转换为事件，
+然后发送到下游的 Flink 算子。你可以参考 [Flink 文档](https://nightlies.apache.org/flink/flink-docs-stable/docs/dev/datastream/sources/)
+来了解其内部机制以及如何实现一个 Flink 源。
 
-`MetadataAccessor` serves as the metadata reader of the external system, by
-listing namespaces, schemas and tables, and provide the table schema (table
-structure) of the given table ID.
+`MetadataAccessor` 作为外部系统的元数据读取器，例如列出命名空间（namespace）、
+模式（schema）与表（table），并提供给定表 ID 的模式（表结构）定义。
 
-## Data Sink
+## 数据汇（Data Sink)
 
-Symmetrical with data source, data sink consists of `EventSink`
-and `MetadataApplier`, which writes data change events and apply schema
-changes (metadata changes) to external system.
+与数据源（data source）对称，数据汇（data Sink）由 `EventSink` 和 `MetadataApplier` 组成，
+用于写入数据变更事件并将模式变更（元数据变更）应用至外部系统。
 
-`EventSink` is a Flink sink that receives change event from upstream operator,
-and apply them to the external system. Currently we only support Flink's Sink V2
-API.
+`EventSink` 是一个 Flink Sink，它接收来自上游算子的变更事件，并将其应用到外部系统中。
+目前我们仅支持 Flink 的 Sink V2 API。
 
-`MetadataApplier` will be used to handle schema changes. When the framework
-receives schema change event from source, after making some internal
-synchronizations and flushes, it will apply the schema change to
-external system via this applier. 
+`MetadataApplier` 则负责处理模式变更。框架从源端接收到模式变更事件，经内部同步和刷新操作，
+该应用器将这些结构变更应用至外部系统。
