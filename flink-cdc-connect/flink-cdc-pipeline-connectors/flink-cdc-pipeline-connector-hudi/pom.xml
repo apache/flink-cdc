@@ -102,7 +102,6 @@ limitations under the License.
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-hadoop-common</artifactId>
             <version>${hudi.version}</version>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>

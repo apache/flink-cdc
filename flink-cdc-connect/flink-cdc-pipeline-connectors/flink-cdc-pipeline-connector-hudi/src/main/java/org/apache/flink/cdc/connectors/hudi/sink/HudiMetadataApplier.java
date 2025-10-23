@@ -567,7 +567,7 @@ public class HudiMetadataApplier implements MetadataApplier {
 
         // TODO: enable this in the future
         // Disable metadata table usage in catalog commit
-        flinkConfig.setString(HoodieMetadataConfig.ENABLE.key(), "false");
+        flinkConfig.setString(HoodieMetadataConfig.ENABLE.key(), "true");
 
         // Set mode to DFS (filesystem-based)
         // TODO: make this configurable
