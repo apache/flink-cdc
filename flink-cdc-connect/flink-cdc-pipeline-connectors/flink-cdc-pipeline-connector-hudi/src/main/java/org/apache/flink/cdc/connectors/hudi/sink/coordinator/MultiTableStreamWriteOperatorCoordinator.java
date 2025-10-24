@@ -53,6 +53,8 @@ import org.apache.hudi.sink.utils.EventBuffers;
 import org.apache.hudi.sink.utils.ExplicitClassloaderThreadFactory;
 import org.apache.hudi.sink.utils.NonThrownExecutor;
 import org.apache.hudi.util.AvroSchemaConverter;
+import org.apache.hudi.util.ClusteringUtil;
+import org.apache.hudi.util.CompactionUtil;
 import org.apache.hudi.util.FlinkWriteClients;
 import org.apache.hudi.util.StreamerUtil;
 import org.slf4j.Logger;
@@ -150,6 +152,9 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         final String commitAction;
         final boolean isOverwrite;
         final WriteOperationType operationType;
+        final boolean scheduleCompaction;
+        final boolean scheduleClustering;
+        final boolean isDeltaTimeCompaction;
 
         TableState(Configuration conf) {
             this.operationType =
@@ -160,6 +165,9 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                             HoodieTableType.valueOf(
                                     conf.getString(FlinkOptions.TABLE_TYPE).toUpperCase()));
             this.isOverwrite = WriteOperationType.isOverwrite(this.operationType);
+            this.scheduleCompaction = OptionsResolver.needsScheduleCompaction(conf);
+            this.scheduleClustering = OptionsResolver.needsScheduleClustering(conf);
+            this.isDeltaTimeCompaction = OptionsResolver.isDeltaTimeCompaction(conf);
         }
     }
 
@@ -662,12 +670,53 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         if (success) {
             tableContext.eventBuffers.reset(checkpointId);
             LOG.info("Successfully committed instant [{}] for table [{}]", instant, tableId);
+
+            // Schedule table services (compaction, clustering) after successful commit
+            scheduleTableServices(tableId, tableContext, true);
         } else {
             LOG.error("Failed to commit instant [{}] for table [{}]", instant, tableId);
             MultiTableStreamWriteOperatorCoordinator.this.context.failJob(
                     new HoodieException(
                             String.format(
                                     "Commit failed for instant %s, table %s", instant, tableId)));
+        }
+    }
+
+    /**
+     * Schedules table services (compaction and clustering) for a specific table if enabled. This
+     * mirrors the logic in StreamWriteOperatorCoordinator.scheduleTableServices().
+     *
+     * @param tableId The table identifier
+     * @param tableContext The table's context containing write client and state
+     * @param committed Whether a commit was just successfully completed
+     */
+    private void scheduleTableServices(
+            TableId tableId, TableContext tableContext, boolean committed) {
+        TableState state = tableContext.tableState;
+
+        // Schedule compaction if enabled for this table
+        if (state.scheduleCompaction) {
+            try {
+                CompactionUtil.scheduleCompaction(
+                        tableContext.writeClient, state.isDeltaTimeCompaction, committed);
+                LOG.info("Scheduled compaction for table [{}]", tableId);
+            } catch (Exception e) {
+                LOG.error("Failed to schedule compaction for table [{}]", tableId, e);
+                // Don't fail the job, just log the error
+            }
+        }
+
+        // Schedule clustering if enabled for this table
+        if (state.scheduleClustering) {
+            try {
+                // Create table-specific config for clustering
+                Configuration tableConfig = createTableSpecificConfig(tableId);
+                ClusteringUtil.scheduleClustering(tableConfig, tableContext.writeClient, committed);
+                LOG.info("Scheduled clustering for table [{}]", tableId);
+            } catch (Exception e) {
+                LOG.error("Failed to schedule clustering for table [{}]", tableId, e);
+                // Don't fail the job, just log the error
+            }
         }
     }
 
