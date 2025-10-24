@@ -252,9 +252,9 @@ class MysqlDebeziumTimeConverterITCase {
 
     protected MySqlContainer createMySqlContainer(String timezone) {
         return (MySqlContainer)
-                new MySqlContainer(MySqlVersion.V5_7)
-                        .withConfigurationOverride(buildMySqlConfigWithTimezone(timezone))
-                        .withSetupSQL("docker/setup.sql")
+                new MySqlContainer(MySqlVersion.CURRENT)
+                        .withRawConfigurationOverride(buildMySqlConfigWithTimezone(timezone))
+                        .withSetupSQL("setup.sql")
                         .withDatabaseName("flink-test")
                         .withUsername("flinkuser")
                         .withPassword("flinkpw")
@@ -294,7 +294,7 @@ class MysqlDebeziumTimeConverterITCase {
                             + "log_bin = mysql-bin\n"
                             + "server-id = 223344\n"
                             + "binlog_row_image = FULL\n"
-                            + "sql_mode = ALLOW_INVALID_DATES,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION\n";
+                            + "sql_mode = ALLOW_INVALID_DATES,NO_ENGINE_SUBSTITUTION\n";
             String timezoneConf = "default-time_zone = '" + timezone + "'\n";
             Files.write(
                     cnf,

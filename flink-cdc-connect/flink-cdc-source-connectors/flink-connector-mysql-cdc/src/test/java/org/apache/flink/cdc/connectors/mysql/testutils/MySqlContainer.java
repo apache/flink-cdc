@@ -39,16 +39,18 @@ public class MySqlContainer extends JdbcDatabaseContainer {
     private static final String SETUP_SQL_PARAM_NAME = "SETUP_SQL";
     private static final String MYSQL_ROOT_USER = "root";
 
+    private final MySqlVersion version;
     private String databaseName = "test";
     private String username = "test";
     private String password = "test";
 
     public MySqlContainer() {
-        this(MySqlVersion.V5_7);
+        this(MySqlVersion.CURRENT);
     }
 
     public MySqlContainer(MySqlVersion version) {
         super(DockerImageName.parse(IMAGE + ":" + version.getVersion()));
+        this.version = version;
         addExposedPort(MYSQL_PORT);
     }
 
@@ -148,14 +150,30 @@ public class MySqlContainer extends JdbcDatabaseContainer {
     }
 
     @SuppressWarnings("unchecked")
-    public MySqlContainer withConfigurationOverride(String s) {
+    public MySqlContainer withRawConfigurationOverride(String s) {
         parameters.put(MY_CNF_CONFIG_OVERRIDE_PARAM_NAME, s);
         return this;
     }
 
     @SuppressWarnings("unchecked")
-    public MySqlContainer withSetupSQL(String sqlPath) {
+    public MySqlContainer withRawSetupSQL(String sqlPath) {
         parameters.put(SETUP_SQL_PARAM_NAME, sqlPath);
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public MySqlContainer withConfigurationOverride(String s) {
+        parameters.put(
+                MY_CNF_CONFIG_OVERRIDE_PARAM_NAME,
+                String.format("docker/mysql/%s/%s", version.getMajorVersion(), s));
+        return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public MySqlContainer withSetupSQL(String sqlPath) {
+        parameters.put(
+                SETUP_SQL_PARAM_NAME,
+                String.format("docker/mysql/%s/%s", version.getMajorVersion(), sqlPath));
         return this;
     }
 
