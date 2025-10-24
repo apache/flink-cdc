@@ -25,9 +25,11 @@ import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
 import org.apache.flink.client.program.rest.RestClusterClient;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.client.JobStatusMessage;
 import org.apache.flink.table.api.ValidationException;
 
+import org.apache.hudi.common.model.HoodieTableType;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -71,6 +73,8 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
     private static final String FLINK_LIB_DIR = "/opt/flink/lib";
 
     private static final String PEEK_SQL_FILE = "peek-hudi.sql";
+
+    private static final String TABLE_TYPE = HoodieTableType.MERGE_ON_READ.name();
 
     // Custom Flink properties for Hudi tests with increased metaspace and heap for heavy
     // dependencies
@@ -218,7 +222,9 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + "  type: hudi\n"
                                 + "  path: %s\n"
                                 + "  hoodie.datasource.write.recordkey.field: id\n"
-                                + "  hoodie.table.type: MERGE_ON_READ\n"
+                                + "  hoodie.table.type: "
+                                + TABLE_TYPE
+                                + " \n"
                                 + "  hoodie.schema.on.read.enable: true\n"
                                 + "  write.bucket_assign.tasks: 2\n"
                                 + "  write.tasks: 2\n"
@@ -226,7 +232,11 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: %s",
-                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        database,
+                        warehouse,
+                        parallelism);
         Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
         // Path hudiHadoopCommonJar = TestUtils.getResource("hudi-hadoop-common.jar");
         Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
@@ -288,6 +298,13 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         recordsInSnapshotPhase.addAll(recordsInIncrementalPhase);
 
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
+
+        // Verify that compaction was scheduled for at least one table (only for MOR tables)
+        LOG.info("Verifying compaction scheduling for MOR tables...");
+        if (TABLE_TYPE.equals(HoodieTableType.MERGE_ON_READ.name())) {
+            assertCompactionScheduled(warehouse, database, Arrays.asList("products", "customers"));
+        }
+        LOG.info("Compaction scheduling verified successfully");
     }
 
     /**
@@ -464,10 +481,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             String savepointLocation =
                     getRestClusterClient()
                             .stopWithSavepoint(
-                                    jobID,
-                                    false,
-                                    savepointPath,
-                                    org.apache.flink.core.execution.SavepointFormatType.CANONICAL)
+                                    jobID, false, savepointPath, SavepointFormatType.CANONICAL)
                             .get(60, java.util.concurrent.TimeUnit.SECONDS);
 
             LOG.info("Savepoint completed at: {}", savepointLocation);
@@ -811,6 +825,82 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             } else if (jobStatus == expectedStatus) {
                 return;
             }
+        }
+    }
+
+    /**
+     * Asserts that compaction was scheduled for the given tables by checking for
+     * .compaction.requested files in the Hudi timeline directory inside the container.
+     *
+     * <p>Should only be invoked for MERGE_ON_READ tables.
+     *
+     * @param warehouse The warehouse directory path
+     * @param database The database name
+     * @param tables List of table names to check
+     */
+    private void assertCompactionScheduled(String warehouse, String database, List<String> tables)
+            throws Exception {
+        boolean compactionFound = false;
+        StringBuilder debugInfo = new StringBuilder();
+
+        for (String table : tables) {
+            // This will exclude metadata table timeline results
+            String timelinePath =
+                    String.format("%s/%s/%s/.hoodie/timeline", warehouse, database, table);
+            debugInfo.append(
+                    String.format(
+                            "\nChecking timeline for %s.%s at: %s", database, table, timelinePath));
+
+            // Check if timeline directory exists in container
+            Container.ExecResult lsResult = jobManager.execInContainer("ls", "-la", timelinePath);
+            if (lsResult.getExitCode() != 0) {
+                debugInfo.append(
+                        String.format(
+                                " - Timeline directory does not exist or cannot be accessed: %s",
+                                lsResult.getStderr()));
+                continue;
+            }
+
+            // Find .compaction.requested files
+            Container.ExecResult findResult =
+                    jobManager.execInContainer(
+                            "find", timelinePath, "-name", "*.compaction.requested");
+
+            if (findResult.getExitCode() == 0 && !findResult.getStdout().trim().isEmpty()) {
+                compactionFound = true;
+                String[] compactionFiles = findResult.getStdout().trim().split("\n");
+                debugInfo.append(
+                        String.format(
+                                " - Found %d compaction file(s): %s",
+                                compactionFiles.length, Arrays.toString(compactionFiles)));
+                LOG.info(
+                        "Compaction scheduled for table {}.{}: {}",
+                        database,
+                        table,
+                        Arrays.toString(compactionFiles));
+            } else {
+                debugInfo.append(" - No compaction.requested files found");
+
+                // List all timeline files for debugging
+                Container.ExecResult allFilesResult =
+                        jobManager.execInContainer("ls", "-1", timelinePath);
+                if (allFilesResult.getExitCode() == 0) {
+                    debugInfo.append(
+                            String.format(
+                                    "\n    All timeline files: %s",
+                                    allFilesResult.getStdout().replace("\n", ", ")));
+                }
+            }
+        }
+
+        if (!compactionFound) {
+            LOG.error("Compaction verification failed. Debug info:{}", debugInfo);
+            Assertions.fail(
+                    "No compaction.requested files found in any table timeline. "
+                            + "Expected at least one compaction to be scheduled."
+                            + debugInfo);
+        } else {
+            LOG.info("Compaction verification successful!");
         }
     }
 }
