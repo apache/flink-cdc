@@ -142,7 +142,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "restart-strategy.type: off",
                     // Set off-heap memory explicitly to avoid "java.lang.OutOfMemoryError: Direct
                     // buffer memory" error.
-                    "taskmanager.memory.task.off-heap.size: 128mb");
+                    "taskmanager.memory.task.off-heap.size: 128mb",
+                    // Fix `java.lang.OutOfMemoryError: Metaspace. The metaspace out-of-memory error
+                    // has occurred` error.
+                    "taskmanager.memory.jvm-metaspace.size: 512mb");
     public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
 
     @Nullable protected RestClusterClient<StandaloneClusterId> restClusterClient;

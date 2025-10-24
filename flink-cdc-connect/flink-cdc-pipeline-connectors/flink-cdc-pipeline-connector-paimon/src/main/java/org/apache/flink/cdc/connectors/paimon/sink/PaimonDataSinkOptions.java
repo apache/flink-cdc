@@ -33,9 +33,10 @@ public class PaimonDataSinkOptions {
     public static final String PREFIX_CATALOG_PROPERTIES = "catalog.properties.";
 
     public static final ConfigOption<String> COMMIT_USER =
-            key("commit.user")
+            key("commit.user-prefix")
                     .stringType()
                     .defaultValue("admin")
+                    .withFallbackKeys("commit.user")
                     .withDescription("User name for committing data files.");
 
     public static final ConfigOption<String> WAREHOUSE =
