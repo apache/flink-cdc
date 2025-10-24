@@ -463,8 +463,8 @@ public class MongoUtils {
         }
         String errorMessage = e.getErrorMessage().toLowerCase(Locale.ROOT);
         return errorMessage.contains(RESUME_TOKEN)
-                    || errorMessage.contains(NOT_FOUND)
-                    || errorMessage.contains(DOES_NOT_EXIST)
-                    || errorMessage.contains(NO_LONGER_IN_THE_OPLOG);
+                || errorMessage.contains(NOT_FOUND)
+                || errorMessage.contains(DOES_NOT_EXIST)
+                || errorMessage.contains(NO_LONGER_IN_THE_OPLOG);
     }
 }
