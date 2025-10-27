@@ -584,6 +584,14 @@ public class RecordUtils {
     }
 
     private static int compareSplit(Object[] leftSplit, Object[] rightSplit) {
+        // Ensure both splits have the same length
+        if (leftSplit.length != rightSplit.length) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Split key arrays must have the same length. Left: %d, Right: %d",
+                            leftSplit.length, rightSplit.length));
+        }
+
         int compareResult = 0;
         for (int i = 0; i < leftSplit.length; i++) {
             compareResult = compareObjects(leftSplit[i], rightSplit[i]);
