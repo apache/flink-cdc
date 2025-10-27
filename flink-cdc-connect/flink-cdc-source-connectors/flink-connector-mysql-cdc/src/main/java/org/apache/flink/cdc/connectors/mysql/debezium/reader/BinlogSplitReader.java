@@ -282,13 +282,11 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                 Object[] chunkKey =
                         RecordUtils.getSplitKey(
                                 splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
-                    if (RecordUtils.splitKeyRangeContains(
-                                    chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
-                            && position.isAfter(splitInfo.getHighWatermark())) {
-                        return true;
-                    }
-                }
+
+                FinishedSnapshotSplitInfo matchedSplit =
+                        RecordUtils.findSplitByKeyBinary(finishedSplitsInfo.get(tableId), chunkKey);
+
+                return matchedSplit != null && position.isAfter(matchedSplit.getHighWatermark());
             }
             // not in the monitored splits scope, do not emit
             return false;
@@ -349,6 +347,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     tableIdBinlogPositionMap.put(tableId, highWatermark);
                 }
             }
+            // Sort splits by splitStart for binary search optimization
+            // Binary search requires sorted data to work correctly
+            splitsInfoMap.values().forEach(RecordUtils::sortFinishedSplitInfos);
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;
