@@ -465,7 +465,8 @@ public class RecordUtils {
      *
      * <p>NOTE: Current implementation assumes single-field split keys (as indicated by
      * getSplitKey()). If multi-field split keys are supported in the future, the comparison logic
-     * should be reviewed to ensure consistency with {@link #splitKeyRangeContains(Object[],Object[],Object[])}.
+     * should be reviewed to ensure consistency with {@link
+     * #splitKeyRangeContains(Object[],Object[],Object[])}.
      *
      * @param splits List of splits to be sorted (sorted in-place)
      */
