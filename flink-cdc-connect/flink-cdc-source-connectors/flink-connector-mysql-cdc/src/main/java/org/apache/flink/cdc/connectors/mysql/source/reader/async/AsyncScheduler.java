@@ -40,9 +40,6 @@ public interface AsyncScheduler<T> {
      */
     void schedulePartitioned(SourceRecord record, AtomicInteger pendingTasks);
 
-    /** Schedule global async work (e.g., control or non-DML events). */
-    void scheduleGlobalAsync(SourceRecord record);
-
     /** Perform one replay round on the source thread; advance offset via onAfterEmit. */
     void drainRound(SourceOutput<T> output, Consumer<BinlogOffset> onAfterEmit);
 

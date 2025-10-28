@@ -104,26 +104,23 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
                 reportMetrics(next);
                 scheduler.schedulePartitioned(next, pendingPartitionTasks);
             } else {
-                // Control / non-DML events: keep inline processing (or switch to global-async if
-                // needed)
+                // Control / non-DML events: flush all enqueued DML first to preserve
+                // original ordering, then emit the control event inline.
+                scheduler.waitAndDrainAll(
+                        output,
+                        pendingPartitionTasks,
+                        (offset) -> updateOffsetAfterEmit(splitState, offset));
                 processElement(next, output, splitState);
             }
             scheduler.drainRound(
                     output,
-                    (offset) -> {
-                        if (offset != null && splitState.isBinlogSplitState()) {
-                            splitState.asBinlogSplitState().setStartingOffset(offset);
-                        }
-                    });
+                    (offset) -> updateOffsetAfterEmit(splitState, offset));
         }
+        // wait until all scheduled work for this batch has been emitted
         scheduler.waitAndDrainAll(
                 output,
                 pendingPartitionTasks,
-                (offset) -> {
-                    if (offset != null && splitState.isBinlogSplitState()) {
-                        splitState.asBinlogSplitState().setStartingOffset(offset);
-                    }
-                });
+                (offset) -> updateOffsetAfterEmit(splitState, offset));
     }
 
     protected void processElement(
@@ -164,6 +161,13 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             BinlogOffset position = RecordUtils.getBinlogPosition(element);
             splitState.asBinlogSplitState().setStartingOffset(position);
         }
+    }
+
+    private static void updateOffsetAfterEmit(MySqlSplitState splitState, BinlogOffset offset) {
+        if (offset == null || !splitState.isBinlogSplitState()) {
+            return;
+        }
+        splitState.asBinlogSplitState().setStartingOffset(offset);
     }
 
     private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {

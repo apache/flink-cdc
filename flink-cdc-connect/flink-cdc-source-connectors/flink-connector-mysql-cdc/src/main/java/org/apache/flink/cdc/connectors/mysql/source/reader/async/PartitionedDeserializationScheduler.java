@@ -19,6 +19,8 @@ package org.apache.flink.cdc.connectors.mysql.source.reader.async;
 
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
+import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.util.Collector;
 
 import org.apache.kafka.connect.source.SourceRecord;
@@ -42,7 +44,7 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
 
     private static final int MAX_DRAIN_PER_PARTITION_PER_ROUND = 64;
 
-    private final org.apache.flink.cdc.debezium.DebeziumDeserializationSchema<T> deserializer;
+    private final DebeziumDeserializationSchema<T> deserializer;
     private final int deserPoolSize;
     private final int partitionWorkers;
     private final int emitPoolSize; // reserved, currently unused
@@ -59,7 +61,7 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
     private final Object globalEmissionLock = new Object();
 
     public PartitionedDeserializationScheduler(
-            org.apache.flink.cdc.debezium.DebeziumDeserializationSchema<T> deserializer,
+            DebeziumDeserializationSchema<T> deserializer,
             int deserPoolSize,
             int partitionWorkers,
             int emitPoolSize,
@@ -91,14 +93,6 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
     }
 
     @Override
-    public void scheduleGlobalAsync(SourceRecord record) {
-        ensureDeserExecutor();
-        final int seq = globalSequence.getAndIncrement();
-        CompletableFuture.supplyAsync(() -> deserializeToBatch(record), deserExecutor)
-                .thenAccept(batch -> globalReadyBatches.put(seq, batch));
-    }
-
-    @Override
     public void drainRound(
             SourceOutput<T> output, java.util.function.Consumer<BinlogOffset> onAfterEmit) {
         // Replay global batches in strict submission order
@@ -106,7 +100,7 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
             while (true) {
                 Batch<T> batch = globalReadyBatches.remove(nextGlobalToEmit);
                 if (batch == null) break;
-                emitList(batch.records, output);
+                emitBatch(batch, output);
                 if (onAfterEmit != null && batch.lastOffset != null)
                     onAfterEmit.accept(batch.lastOffset);
                 nextGlobalToEmit++;
@@ -114,12 +108,11 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
         }
         // Round-robin drain per-partition queues
         if (partitionQueues != null) {
-            for (int i = 0; i < partitionQueues.length; i++) {
-                BlockingQueue<Batch<T>> q = partitionQueues[i];
+            for (BlockingQueue<Batch<T>> q : partitionQueues) {
                 Batch<T> batch;
                 int polled = 0;
                 while ((batch = q.poll()) != null && polled < MAX_DRAIN_PER_PARTITION_PER_ROUND) {
-                    emitList(batch.records, output);
+                    emitBatch(batch, output);
                     if (onAfterEmit != null && batch.lastOffset != null)
                         onAfterEmit.accept(batch.lastOffset);
                     polled++;
@@ -144,6 +137,7 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
     // ---------------- helpers ----------------
     private Batch<T> deserializeToBatch(SourceRecord element) {
         try {
+            // One sourceRecord may contain multiple records, need to deserialize it into a list.
             final List<T> list = new ArrayList<>(1);
             Collector<T> c =
                     new Collector<T>() {
@@ -156,17 +150,28 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
                         public void close() {}
                     };
             deserializer.deserialize(element, c);
-            BinlogOffset offset =
-                    org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils
-                            .getBinlogPosition(element);
-            return new Batch<>(list, offset);
+            BinlogOffset offset = RecordUtils.getBinlogPosition(element);
+            if (list.isEmpty()) {
+                return Batch.empty(offset);
+            } else if (list.size() == 1) {
+                return Batch.single(list.get(0), offset);
+            } else {
+                return Batch.multiple(list, offset);
+            }
         } catch (Exception e) {
             throw new RuntimeException("Async deserialization failed", e);
         }
     }
 
-    private void emitList(List<T> list, SourceOutput<T> output) {
-        Object[] snapshot = list.toArray();
+    private void emitBatch(Batch<T> batch, SourceOutput<T> output) {
+        if (batch.singleRecord != null) {
+            output.collect(batch.singleRecord);
+            return;
+        }
+        if (batch.records == null || batch.records.isEmpty()) {
+            return;
+        }
+        Object[] snapshot = batch.records.toArray();
         for (Object o : snapshot) {
             @SuppressWarnings("unchecked")
             T t = (T) o;
@@ -228,12 +233,26 @@ public class PartitionedDeserializationScheduler<T> implements AsyncScheduler<T>
     }
 
     private static final class Batch<X> {
-        final List<X> records;
+        final X singleRecord; // fast-path for single element
+        final List<X> records; // used for multi-element batches
         final BinlogOffset lastOffset;
 
-        Batch(List<X> records, BinlogOffset lastOffset) {
+        private Batch(X singleRecord, List<X> records, BinlogOffset lastOffset) {
+            this.singleRecord = singleRecord;
             this.records = records;
             this.lastOffset = lastOffset;
+        }
+
+        static <X> Batch<X> single(X one, BinlogOffset offset) {
+            return new Batch<>(one, null, offset);
+        }
+
+        static <X> Batch<X> multiple(List<X> many, BinlogOffset offset) {
+            return new Batch<>(null, many, offset);
+        }
+
+        static <X> Batch<X> empty(BinlogOffset offset) {
+            return new Batch<>(null, java.util.Collections.emptyList(), offset);
         }
     }
 
