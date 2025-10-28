@@ -155,4 +155,11 @@ public class HudiConfig {
                     HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE.key(),
                     false,
                     Description.builder().build());
+
+    public static final ConfigOption<Integer> COMPACTION_DELTA_COMMITS =
+            ConfigOptions.key("compaction.delta_commits")
+                    .intType()
+                    .defaultValue(5)
+                    .withDescription(
+                            "Max delta commits needed to trigger compaction, default 5 commits");
 }

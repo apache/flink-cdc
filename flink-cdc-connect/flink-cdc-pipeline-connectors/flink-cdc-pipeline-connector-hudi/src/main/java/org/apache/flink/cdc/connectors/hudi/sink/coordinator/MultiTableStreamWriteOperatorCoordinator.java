@@ -34,8 +34,10 @@ import org.apache.flink.table.types.logical.RowType;
 import org.apache.hudi.client.HoodieFlinkWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.model.HoodieTableType;
+import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
@@ -71,6 +73,8 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
+import static org.apache.hudi.configuration.FlinkOptions.COMPACTION_DELTA_COMMITS;
 
 /**
  * A custom OperatorCoordinator that manages Hudi writes for multiple tables.
@@ -156,6 +160,13 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         final boolean scheduleClustering;
         final boolean isDeltaTimeCompaction;
 
+        // Event-driven compaction tracking - tracks actual write activity
+        long commitsSinceLastCompaction = 0;
+        // For MOR tables, track log file growth
+        long totalLogBytesWritten = 0;
+
+        final int commitsThreshold;
+
         TableState(Configuration conf) {
             this.operationType =
                     WriteOperationType.fromValue(conf.getString(FlinkOptions.OPERATION));
@@ -168,6 +179,73 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             this.scheduleCompaction = OptionsResolver.needsScheduleCompaction(conf);
             this.scheduleClustering = OptionsResolver.needsScheduleClustering(conf);
             this.isDeltaTimeCompaction = OptionsResolver.isDeltaTimeCompaction(conf);
+            this.commitsThreshold = conf.get(COMPACTION_DELTA_COMMITS);
+        }
+
+        /**
+         * Updates compaction metrics based on write statuses. Skips empty commits where no actual
+         * data was written.
+         *
+         * @param writeStatuses The write statuses from the latest commit
+         * @return true if this commit had actual writes, false if it was empty
+         */
+        boolean updateCompactionMetrics(List<WriteStatus> writeStatuses) {
+            if (writeStatuses == null || writeStatuses.isEmpty()) {
+                LOG.debug("No write statuses - skipping compaction metric update");
+                return false;
+            }
+
+            // Check if any actual writes occurred (skip empty commits)
+            long totalWrites =
+                    writeStatuses.stream()
+                            .map(WriteStatus::getStat)
+                            .filter(stat -> stat != null)
+                            .mapToLong(HoodieWriteStat::getNumWrites)
+                            .sum();
+
+            if (totalWrites == 0) {
+                LOG.debug(
+                        "Empty commit detected (numWrites=0) - skipping compaction metric update");
+                return false;
+            }
+
+            // Track log file bytes written (for MOR tables)
+            long bytesWritten =
+                    writeStatuses.stream()
+                            .map(WriteStatus::getStat)
+                            .filter(stat -> stat != null)
+                            .mapToLong(HoodieWriteStat::getTotalWriteBytes)
+                            .sum();
+
+            commitsSinceLastCompaction++;
+            totalLogBytesWritten += bytesWritten;
+
+            LOG.debug(
+                    "Updated compaction metrics: commits={}, bytes={}",
+                    commitsSinceLastCompaction,
+                    totalLogBytesWritten);
+            return true;
+        }
+
+        /** Resets compaction metrics after compaction is scheduled. */
+        void resetCompactionMetrics() {
+            commitsSinceLastCompaction = 0;
+            totalLogBytesWritten = 0;
+        }
+
+        /**
+         * Determines if compaction should be triggered based on write activity. Only triggers for
+         * MOR tables with actual data writes.
+         *
+         * @return true if compaction should be scheduled
+         */
+        boolean shouldTriggerCompaction() {
+            // Only trigger for MOR tables (DELTA_COMMIT means log files)
+            if (!commitAction.equals(HoodieTimeline.DELTA_COMMIT_ACTION)) {
+                return false;
+            }
+
+            return commitsSinceLastCompaction >= commitsThreshold;
         }
     }
 
@@ -671,8 +749,17 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             tableContext.eventBuffers.reset(checkpointId);
             LOG.info("Successfully committed instant [{}] for table [{}]", instant, tableId);
 
-            // Schedule table services (compaction, clustering) after successful commit
-            scheduleTableServices(tableId, tableContext, true);
+            // Update compaction metrics based on actual write activity
+            boolean hasWrites = tableContext.tableState.updateCompactionMetrics(writeStatuses);
+
+            // Event-driven table services scheduling - only if there were actual writes
+            if (hasWrites) {
+                scheduleTableServicesIfNeeded(tableId, tableContext);
+            } else {
+                LOG.debug(
+                        "Skipping table services scheduling for table [{}] - empty commit",
+                        tableId);
+            }
         } else {
             LOG.error("Failed to commit instant [{}] for table [{}]", instant, tableId);
             MultiTableStreamWriteOperatorCoordinator.this.context.failJob(
@@ -683,35 +770,55 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
     }
 
     /**
-     * Schedules table services (compaction and clustering) for a specific table if enabled. This
-     * mirrors the logic in StreamWriteOperatorCoordinator.scheduleTableServices().
+     * Event-driven table services scheduling. Only schedules compaction/clustering when certain
+     * thresholds are met based on write metrics.
      *
      * @param tableId The table identifier
      * @param tableContext The table's context containing write client and state
-     * @param committed Whether a commit was just successfully completed
      */
-    private void scheduleTableServices(
-            TableId tableId, TableContext tableContext, boolean committed) {
+    private void scheduleTableServicesIfNeeded(TableId tableId, TableContext tableContext) {
         TableState state = tableContext.tableState;
 
-        // Schedule compaction if enabled for this table
-        if (state.scheduleCompaction) {
+        // Event-driven compaction scheduling
+        if (state.scheduleCompaction && state.shouldTriggerCompaction()) {
             try {
+                LOG.info(
+                        "Triggering compaction for table [{}] - threshold met: commits={}/{}, bytes={} MB",
+                        tableId,
+                        state.commitsSinceLastCompaction,
+                        state.commitsThreshold,
+                        state.totalLogBytesWritten / (1024 * 1024));
+
                 CompactionUtil.scheduleCompaction(
-                        tableContext.writeClient, state.isDeltaTimeCompaction, committed);
-                LOG.info("Scheduled compaction for table [{}]", tableId);
+                        tableContext.writeClient,
+                        state.isDeltaTimeCompaction,
+                        true); // committed = true since we just committed
+
+                // Reset metrics after scheduling
+                state.resetCompactionMetrics();
+
+                LOG.info("Successfully scheduled compaction for table [{}]", tableId);
             } catch (Exception e) {
                 LOG.error("Failed to schedule compaction for table [{}]", tableId, e);
                 // Don't fail the job, just log the error
             }
+        } else if (state.scheduleCompaction) {
+            LOG.debug(
+                    "Compaction not triggered for table [{}] - commits={}/{}, bytes={} MB",
+                    tableId,
+                    state.commitsSinceLastCompaction,
+                    state.commitsThreshold,
+                    state.totalLogBytesWritten / (1024 * 1024));
         }
 
-        // Schedule clustering if enabled for this table
+        // Clustering can remain on every commit or use similar metrics
         if (state.scheduleClustering) {
             try {
-                // Create table-specific config for clustering
                 Configuration tableConfig = createTableSpecificConfig(tableId);
-                ClusteringUtil.scheduleClustering(tableConfig, tableContext.writeClient, committed);
+                ClusteringUtil.scheduleClustering(
+                        tableConfig,
+                        tableContext.writeClient,
+                        true); // committed = true since we just committed
                 LOG.info("Scheduled clustering for table [{}]", tableId);
             } catch (Exception e) {
                 LOG.error("Failed to schedule clustering for table [{}]", tableId, e);

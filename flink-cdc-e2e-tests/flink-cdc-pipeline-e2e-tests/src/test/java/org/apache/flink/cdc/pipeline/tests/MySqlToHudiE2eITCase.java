@@ -228,6 +228,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + "  hoodie.schema.on.read.enable: true\n"
                                 + "  write.bucket_assign.tasks: 2\n"
                                 + "  write.tasks: 2\n"
+                                + "  compaction.delta_commits: 2\n"
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
@@ -304,7 +305,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
         if (TABLE_TYPE.equals(HoodieTableType.MERGE_ON_READ.name())) {
             assertCompactionScheduled(warehouse, database, Arrays.asList("products", "customers"));
         }
-        LOG.info("Compaction scheduling verified successfully");
     }
 
     /**
