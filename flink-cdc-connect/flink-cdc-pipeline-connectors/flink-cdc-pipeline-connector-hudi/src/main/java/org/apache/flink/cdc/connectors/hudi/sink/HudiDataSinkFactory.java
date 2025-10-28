@@ -89,6 +89,9 @@ public class HudiDataSinkFactory implements DataSinkFactory {
         options.add(HudiConfig.WRITE_TASKS);
         options.add(HudiConfig.BUCKET_ASSIGN_TASKS);
         options.add(HudiConfig.SCHEMA_ON_READ_ENABLE);
+
+        // Compaction settings
+        options.add(HudiConfig.COMPACTION_DELTA_COMMITS);
         return options;
     }
 }
