@@ -58,6 +58,14 @@ limitations under the License.
         <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/flink-cdc.git</developerConnection>
     </scm>
 
+    <repositories>
+        <repository>
+            <id>local-repo</id>
+            <url>${user.home}/.m2/repository</url>
+        </repository>
+    </repositories>
+
+
     <properties>
         <revision>3.6-SNAPSHOT</revision>
         <scala.binary.version>2.12</scala.binary.version>
