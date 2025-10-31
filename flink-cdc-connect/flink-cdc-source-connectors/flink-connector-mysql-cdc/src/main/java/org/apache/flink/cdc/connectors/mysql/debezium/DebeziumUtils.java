@@ -27,6 +27,7 @@ import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
+import com.github.shyiko.mysql.binlog.network.SSLMode;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -242,12 +243,26 @@ public class DebeziumUtils {
         return variables;
     }
 
+    static SSLMode sslModeFor(MySqlConnectorConfig.SecureConnectionMode mode) {
+        try {
+            return mode == null ? null : SSLMode.valueOf(mode.name());
+        } catch (IllegalArgumentException e) {
+            LOG.error("Invalid SecureConnectionMode provided {}", mode.name(), e);
+        }
+        return null;
+    }
+
     public static BinlogOffset findBinlogOffset(
             long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
         MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
         BinaryLogClient client =
                 new BinaryLogClient(
                         config.hostname(), config.port(), config.username(), config.password());
+        SSLMode sslMode = sslModeFor(config.sslMode());
+        if (sslMode != null) {
+            client.setSSLMode(sslMode);
+        }
+
         if (mySqlSourceConfig.getServerIdRange() != null) {
             client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
         }

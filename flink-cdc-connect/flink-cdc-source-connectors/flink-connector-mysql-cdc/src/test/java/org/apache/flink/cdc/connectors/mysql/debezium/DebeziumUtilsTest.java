@@ -21,13 +21,19 @@ import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 
+import com.github.shyiko.mysql.binlog.network.SSLMode;
 import io.debezium.connector.mysql.MySqlConnection;
+import io.debezium.connector.mysql.MySqlConnectorConfig;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.Properties;
+import java.util.stream.Stream;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils}. */
 class DebeziumUtilsTest {
@@ -81,6 +87,26 @@ class DebeziumUtilsTest {
                 .serverTimeZone(ZoneId.of("UTC").toString())
                 .jdbcProperties(jdbcProperties)
                 .createConfig(0);
+    }
+
+    @ParameterizedTest
+    @MethodSource("sslModeProvider")
+    void testSslModeConversion(MySqlConnectorConfig.SecureConnectionMode input, SSLMode expected) {
+        SSLMode actual = DebeziumUtils.sslModeFor(input);
+        Assertions.assertThat(actual).isEqualTo(expected);
+    }
+
+    static Stream<Arguments> sslModeProvider() {
+        return Stream.of(
+                Arguments.of(MySqlConnectorConfig.SecureConnectionMode.DISABLED, SSLMode.DISABLED),
+                Arguments.of(
+                        MySqlConnectorConfig.SecureConnectionMode.PREFERRED, SSLMode.PREFERRED),
+                Arguments.of(MySqlConnectorConfig.SecureConnectionMode.REQUIRED, SSLMode.REQUIRED),
+                Arguments.of(
+                        MySqlConnectorConfig.SecureConnectionMode.VERIFY_CA, SSLMode.VERIFY_CA),
+                Arguments.of(
+                        MySqlConnectorConfig.SecureConnectionMode.VERIFY_IDENTITY,
+                        SSLMode.VERIFY_IDENTITY));
     }
 
     private void assertJdbcUrl(String expected, String actual) {
