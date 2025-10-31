@@ -166,4 +166,8 @@ public abstract class JdbcSourceConfig extends BaseSourceConfig {
     public RelationalTableFilters getTableFilters() {
         return getDbzConnectorConfig().getTableFilters();
     }
+
+    public List<String> getSchemaList() {
+        return schemaList;
+    }
 }

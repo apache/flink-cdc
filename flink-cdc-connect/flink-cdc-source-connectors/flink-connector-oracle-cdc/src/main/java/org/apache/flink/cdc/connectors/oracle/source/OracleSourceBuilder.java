@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffsetFactory;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import javax.annotation.Nullable;
 
@@ -44,6 +45,7 @@ public class OracleSourceBuilder<T> {
     private RedoLogOffsetFactory offsetFactory;
     private OracleDialect dialect;
     private DebeziumDeserializationSchema<T> deserializer;
+    private static RecordEmitter recordEmitter;
 
     public OracleSourceBuilder<T> hostname(String hostname) {
         this.configFactory.hostname(hostname);

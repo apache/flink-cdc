@@ -75,6 +75,7 @@ public class IncrementalSource<T, C extends SourceConfig>
     protected final OffsetFactory offsetFactory;
     protected final DebeziumDeserializationSchema<T> deserializationSchema;
     protected final SourceSplitSerializer sourceSplitSerializer;
+    private RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter;
 
     // Actions to perform during the snapshot phase.
     // This field is introduced for testing purpose, for example testing if changes made in the
@@ -226,11 +227,18 @@ public class IncrementalSource<T, C extends SourceConfig>
 
     protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
             SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
-        return new IncrementalSourceRecordEmitter<>(
-                deserializationSchema,
-                sourceReaderMetrics,
-                sourceConfig.isIncludeSchemaChanges(),
-                offsetFactory);
+        if (recordEmitter != null) {
+            IncrementalSourceRecordEmitter incrementalSourceRecordEmitter =
+                    (IncrementalSourceRecordEmitter) recordEmitter;
+            incrementalSourceRecordEmitter.setSourceReaderMetrics(sourceReaderMetrics);
+            return incrementalSourceRecordEmitter;
+        } else {
+            return new IncrementalSourceRecordEmitter<>(
+                    deserializationSchema,
+                    sourceReaderMetrics,
+                    sourceConfig.isIncludeSchemaChanges(),
+                    offsetFactory);
+        }
     }
 
     /**
