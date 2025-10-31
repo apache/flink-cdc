@@ -22,10 +22,13 @@ import org.apache.flink.cdc.connectors.base.config.SourceConfig.Factory;
 import org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions;
 import org.apache.flink.cdc.connectors.base.options.SourceOptions;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
+import org.apache.flink.table.catalog.ObjectPath;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 /** A {@link Factory} to provide {@link SourceConfig} of JDBC data source. */
@@ -55,7 +58,7 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
     protected int connectMaxRetries = JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue();
     protected int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
     protected Properties dbzProperties;
-    protected String chunkKeyColumn;
+    protected Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
     protected boolean skipSnapshotBackfill =
             JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
     protected boolean scanNewlyAddedTableEnabled =
@@ -198,8 +201,17 @@ public abstract class JdbcSourceConfigFactory implements Factory<JdbcSourceConfi
      * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
      * key column when read the snapshot of table.
      */
-    public JdbcSourceConfigFactory chunkKeyColumn(String chunkKeyColumn) {
-        this.chunkKeyColumn = chunkKeyColumn;
+    public JdbcSourceConfigFactory chunkKeyColumn(ObjectPath objectPath, String chunkKeyColumn) {
+        this.chunkKeyColumns.put(objectPath, chunkKeyColumn);
+        return this;
+    }
+
+    /**
+     * The chunk key of table snapshot, captured tables are split into multiple chunks by the chunk
+     * key column when read the snapshot of table.
+     */
+    public JdbcSourceConfigFactory chunkKeyColumn(Map<ObjectPath, String> chunkKeyColumns) {
+        this.chunkKeyColumns.putAll(chunkKeyColumns);
         return this;
     }
 
