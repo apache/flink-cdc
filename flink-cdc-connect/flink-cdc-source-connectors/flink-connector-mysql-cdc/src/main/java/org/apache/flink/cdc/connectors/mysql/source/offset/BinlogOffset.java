@@ -186,33 +186,40 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         String targetGtidSetStr = that.getGtidSet();
         if (StringUtils.isNotEmpty(targetGtidSetStr)) {
             // The target offset uses GTIDs, so we ideally compare using GTIDs ...
-            if (StringUtils.isNotEmpty(gtidSetStr)) {
-                // Both have GTIDs, so base the comparison entirely on the GTID sets.
-                GtidSet gtidSet = new GtidSet(gtidSetStr);
-                GtidSet targetGtidSet = new GtidSet(targetGtidSetStr);
-                if (gtidSet.equals(targetGtidSet)) {
-                    long restartSkipEvents = this.getRestartSkipEvents();
-                    long targetRestartSkipEvents = that.getRestartSkipEvents();
-                    return Long.compare(restartSkipEvents, targetRestartSkipEvents);
-                }
+            if (StringUtils.isEmpty(gtidSetStr)) {
+                // The target offset did use GTIDs while this did not use GTIDs. So, we assume
+                // that this offset is older since GTIDs are often enabled but rarely disabled.
+                // And if they are disabled,
+                // it is likely that this offset would not include GTIDs as we would be trying
+                // to read the binlog of a
+                // server that no longer has GTIDs. And if they are enabled, disabled, and
+                // re-enabled, per
+                // https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-failover.html
+                // all properly configured slaves that
+                // use GTIDs should always have the complete set of GTIDs copied from the master, in
+                // which case
+                // again we know that this offset not having GTIDs is before the target offset ...
+                return -1;
+            }
+            // Both have GTIDs, so base the comparison entirely on the GTID sets.
+            GtidSet gtidSet = new GtidSet(gtidSetStr);
+            GtidSet targetGtidSet = new GtidSet(targetGtidSetStr);
+            if (!gtidSet.equals(targetGtidSet)) {
                 // The GTIDs are not an exact match, so figure out if this is a subset of the target
                 // offset
                 // ...
                 return gtidSet.isContainedWithin(targetGtidSet) ? -1 : 1;
             }
-            // The target offset did use GTIDs while this did not use GTIDs. So, we assume
-            // that this offset is older since GTIDs are often enabled but rarely disabled.
-            // And if they are disabled,
-            // it is likely that this offset would not include GTIDs as we would be trying
-            // to read the binlog of a
-            // server that no longer has GTIDs. And if they are enabled, disabled, and re-enabled,
-            // per
-            // https://dev.mysql.com/doc/refman/5.7/en/replication-gtids-failover.html all properly
-            // configured slaves that
-            // use GTIDs should always have the complete set of GTIDs copied from the master, in
-            // which case
-            // again we know that this offset not having GTIDs is before the target offset ...
-            return -1;
+
+            // The GTIDs are the same, so compare the completed events in the transaction ...
+            long restartSkipEvents = this.getRestartSkipEvents();
+            long targetRestartSkipEvents = that.getRestartSkipEvents();
+            if (restartSkipEvents != targetRestartSkipEvents) {
+                return Long.compare(restartSkipEvents, targetRestartSkipEvents);
+            }
+
+            // The completed events are the same, so compare the row number ...
+            return Long.compare(this.getRestartSkipRows(), that.getRestartSkipRows());
         } else if (StringUtils.isNotEmpty(gtidSetStr)) {
             // This offset has a GTID but the target offset does not, so per the previous paragraph
             // we
