@@ -6,6 +6,9 @@
 
 package io.debezium.connector.mysql;
 
+import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
+import org.apache.flink.util.FlinkRuntimeException;
+
 import com.mysql.cj.CharsetMapping;
 import io.debezium.DebeziumException;
 import io.debezium.config.CommonConnectorConfig;
@@ -274,12 +277,16 @@ public class MySqlConnection extends JdbcConnection {
      */
     public String knownGtidSet() {
         try {
-            return queryAndMap(
-                    "SHOW MASTER STATUS",
+            return DebeziumUtils.queryBinlogStatus(
+                    this,
                     rs -> {
-                        if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
-                            return rs.getString(
-                                    5); // GTID set, may be null, blank, or contain a GTID set
+                        try {
+                            if (rs.next()) {
+                                return rs.getString(
+                                        5); // GTID set, may be null, blank, or contain a GTID set
+                            }
+                        } catch (SQLException e) {
+                            throw new FlinkRuntimeException(e);
                         }
                         return "";
                     });
