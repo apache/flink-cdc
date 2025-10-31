@@ -13,24 +13,18 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- ----------------------------------------------------------------------------------------------------------------
--- DATABASE:  metrics
--- ----------------------------------------------------------------------------------------------------------------
+-- In production you would almost certainly limit the replication user must be on the follower (slave) machine,
+-- to prevent other clients accessing the log from other machines. For example, 'replicator'@'follower.acme.com'.
+-- However, in this database we'll grant 2 users different privileges:
+--
+-- 1) 'flinkuser' - all privileges required by the snapshot reader AND binlog reader (used for testing)
+-- 2) 'mysqluser' - all privileges
+--
+GRANT SELECT, RELOAD, SHOW DATABASES, REPLICATION SLAVE, REPLICATION CLIENT, LOCK TABLES  ON *.* TO 'flinkuser'@'%';
+CREATE USER 'mysqluser' IDENTIFIED BY 'mysqlpw';
+GRANT ALL PRIVILEGES ON *.* TO 'mysqluser'@'%';
 
-CREATE TABLE users (
-  id INTEGER NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255),
-  age integer
-);
-ALTER TABLE users AUTO_INCREMENT = 101;
-
-INSERT INTO users
-VALUES (default,"Tom",3),
-       (default,"Jack",5),
-       (default,"Allen",10),
-       (default,"Andrew",13),
-       (default,"Arnold",15),
-       (default,"Claud",19),
-       (default,"Howard",37),
-       (default,"Jacob",46),
-       (default,"Lionel",58);
+-- ----------------------------------------------------------------------------------------------------------------
+-- DATABASE:  emptydb
+-- ----------------------------------------------------------------------------------------------------------------
+CREATE DATABASE emptydb;

@@ -34,6 +34,17 @@ class ErrorMessageUtilsTest {
                                 + "1. The server id has been used by other mysql cdc table in the current job.\n"
                                 + "2. The server id has been used by the mysql cdc table in other jobs.\n"
                                 + "3. The server id has been used by other sync tools like canal, debezium and so on.\n");
+
+        Assertions.assertThat(
+                        ErrorMessageUtils.optimizeErrorMessage(
+                                "A replica with the same server_uuid/server_id as this replica has connected to the source; the first event '' at 4, the last event read from './mysql-bin.000003' at 16718, the last byte read from './mysql-bin.000003' at 16718."))
+                .isEqualTo(
+                        "A replica with the same server_uuid/server_id as this replica has connected to the source; the first event '' at 4, the last event read from './mysql-bin.000003' at 16718, the last byte read from './mysql-bin.000003' at 16718."
+                                + "\nThe 'server-id' in the mysql cdc connector should be globally unique, but conflicts happen now.\n"
+                                + "The server id conflict may happen in the following situations: \n"
+                                + "1. The server id has been used by other mysql cdc table in the current job.\n"
+                                + "2. The server id has been used by the mysql cdc table in other jobs.\n"
+                                + "3. The server id has been used by other sync tools like canal, debezium and so on.\n");
     }
 
     @Test
