@@ -203,13 +203,13 @@ public class MySqlSource<T>
         // In snapshot-only startup option, only split snapshots.
         if (sourceConfig.getStartupOptions().isSnapshotOnly()) {
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
-                boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                boolean isTableIdCaseInsensitive = DebeziumUtils.isTableIdCaseInsensitive(jdbc);
                 splitAssigner =
                         new MySqlSnapshotSplitAssigner(
                                 sourceConfig,
                                 enumContext.currentParallelism(),
                                 new ArrayList<>(),
-                                isTableIdCaseSensitive,
+                                isTableIdCaseInsensitive,
                                 enumContext);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
@@ -217,13 +217,13 @@ public class MySqlSource<T>
             }
         } else if (!sourceConfig.getStartupOptions().isStreamOnly()) {
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
-                boolean isTableIdCaseSensitive = DebeziumUtils.isTableIdCaseSensitive(jdbc);
+                boolean isTableIdCaseInsensitive = DebeziumUtils.isTableIdCaseInsensitive(jdbc);
                 splitAssigner =
                         new MySqlHybridSplitAssigner(
                                 sourceConfig,
                                 enumContext.currentParallelism(),
                                 new ArrayList<>(),
-                                isTableIdCaseSensitive,
+                                isTableIdCaseInsensitive,
                                 enumContext);
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
