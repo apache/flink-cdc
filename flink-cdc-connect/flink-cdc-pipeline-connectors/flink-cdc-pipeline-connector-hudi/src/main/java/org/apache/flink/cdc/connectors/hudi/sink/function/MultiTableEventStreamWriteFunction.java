@@ -45,7 +45,6 @@ import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
-
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.sink.common.AbstractStreamWriteFunction;
@@ -57,7 +56,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -335,30 +333,6 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
     }
 
     /**
-     * Processes a flush event for a specific table function. This simulates the FlushEvent
-     * processing that would normally happen in EventStreamWriteFunction.processElement.
-     */
-    private void processFlushForTableFunction(
-            EventBucketStreamWriteFunction tableFunction, Event flushEvent) {
-        try {
-            // Use reflection to access the protected flushRemaining method
-            // This is the same logic as in EventStreamWriteFunction when it processes FlushEvent
-            Method flushMethod =
-                    tableFunction
-                            .getClass()
-                            .getSuperclass()
-                            .getDeclaredMethod("flushRemaining", boolean.class);
-            flushMethod.setAccessible(true);
-            flushMethod.invoke(tableFunction, false);
-        } catch (Exception e) {
-            LOG.error(
-                    "Failed to flush table function using reflection, falling back to endInput", e);
-            // Fallback: use endInput() which is public and also triggers flushing
-            tableFunction.endInput();
-        }
-    }
-
-    /**
      * Processes flush events for coordinated flushing across table functions. This handles both
      * table-specific and global flush operations.
      *
@@ -374,7 +348,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                         tableFunctions.size());
                 for (Map.Entry<TableId, EventBucketStreamWriteFunction> entry :
                         tableFunctions.entrySet()) {
-                    processFlushForTableFunction(entry.getValue(), event);
+                    entry.getValue().flushRemaining(false);
                     LOG.debug("Flushed table function for: {}", entry.getKey());
                 }
             } else {
@@ -382,7 +356,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 for (TableId tableId : tableIds) {
                     EventBucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
                     if (tableFunction != null) {
-                        processFlushForTableFunction(tableFunction, event);
+                        tableFunction.flushRemaining(false);
                         LOG.debug("Flushed table function for: {}", tableId);
                     }
                 }
