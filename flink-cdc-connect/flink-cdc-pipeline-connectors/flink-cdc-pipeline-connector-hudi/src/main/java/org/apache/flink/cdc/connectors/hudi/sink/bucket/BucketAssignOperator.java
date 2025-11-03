@@ -38,7 +38,8 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
-
+import org.apache.hudi.common.util.Functions;
+import org.apache.hudi.common.util.hash.BucketIndexUtil;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.index.bucket.BucketIdentifier;
 import org.slf4j.Logger;
@@ -72,6 +73,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     private int totalTasksNumber;
     private int currentTaskNumber;
 
+    /** Function for calculating the task partition to dispatch based on bucket. */
+    private transient Functions.Function3<Integer, String, Integer, Integer> partitionIndexFunc;
+
     /** Schema evolution client to query schemas from SchemaOperator coordinator. */
     private transient SchemaEvolutionClient schemaEvolutionClient;
 
@@ -87,7 +91,6 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {
         this.numBuckets = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
         this.schemaOperatorUid = schemaOperatorUid;
-        // Use ALWAYS like Paimon does - allows chaining with both upstream and downstream
         this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
@@ -109,6 +112,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         super.open();
         this.totalTasksNumber = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
         this.currentTaskNumber = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        this.partitionIndexFunc = BucketIndexUtil.getPartitionIndexFunc(totalTasksNumber);
         LOG.info(
                 "BucketAssignOperator opened with {} buckets and {} tasks",
                 numBuckets,
@@ -158,8 +162,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         // Calculate bucket for DataChangeEvent and route to specific task
         if (event instanceof DataChangeEvent) {
             DataChangeEvent dataEvent = (DataChangeEvent) event;
-            int bucket = calculateBucket(dataEvent);
-            output.collect(new StreamRecord<>(new BucketWrapper(bucket, event)));
+            int taskIndex = calculateTaskIndex(dataEvent);
+            output.collect(new StreamRecord<>(new BucketWrapper(taskIndex, event)));
             return;
         }
 
@@ -169,10 +173,18 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         }
     }
 
-    private int calculateBucket(DataChangeEvent event) {
+    /**
+     * Calculate which task index should handle this event by:
+     * 1. Calculating the bucket number (0 to numBuckets-1) based on record key
+     * 2. Using partitionIndexFunc to map bucket -> task index for balanced distribution
+     *
+     * @param event The DataChangeEvent to calculate task index for
+     * @return The task index (0 to parallelism-1) that should handle this event
+     */
+    private int calculateTaskIndex(DataChangeEvent event) {
         TableId tableId = event.tableId();
 
-        // Get or cache schema - query from SchemaOperator coordinator if not cached
+        // Get or cache schema, query from SchemaOperator coordinator if not cached
         Schema schema = schemaCache.get(tableId);
         if (schema == null) {
             try {
@@ -236,9 +248,16 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         // Extract record key
         String recordKey = extractRecordKey(event, primaryKeys, fieldGetters);
 
-        // Calculate bucket using Hudi's logic
+        // Calculate bucket using Hudi's logic (0 to numBuckets-1)
         String tableIndexKeyFields = String.join(",", primaryKeys);
-        return BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
+        int bucketNumber = BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
+
+        // Use partition function to map bucket to task index for balanced distribution
+        // partition is "default" since we're not using Hudi partition fields in this context
+        String partition = "default";
+        int taskIndex = partitionIndexFunc.apply(numBuckets, partition, bucketNumber);
+
+        return taskIndex;
     }
 
     private String extractRecordKey(
