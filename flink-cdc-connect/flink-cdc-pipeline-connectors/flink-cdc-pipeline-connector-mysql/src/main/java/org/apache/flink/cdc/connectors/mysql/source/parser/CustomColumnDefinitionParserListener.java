@@ -54,28 +54,17 @@ public class CustomColumnDefinitionParserListener extends MySqlParserBaseListene
     private final TableEditor tableEditor;
 
     private final List<ParseTreeListener> listeners;
-    private final boolean appendOnly;
 
     public CustomColumnDefinitionParserListener(
             TableEditor tableEditor,
             ColumnEditor columnEditor,
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners) {
-        this(tableEditor, columnEditor, parser, listeners, false);
-    }
-
-    public CustomColumnDefinitionParserListener(
-            TableEditor tableEditor,
-            ColumnEditor columnEditor,
-            MySqlAntlrDdlParser parser,
-            List<ParseTreeListener> listeners,
-            boolean appendOnly) {
         this.tableEditor = tableEditor;
         this.columnEditor = columnEditor;
         this.parser = parser;
         this.dataTypeResolver = parser.dataTypeResolver();
         this.listeners = listeners;
-        this.appendOnly = appendOnly;
     }
 
     public void setColumnEditor(ColumnEditor columnEditor) {
@@ -122,9 +111,7 @@ public class CustomColumnDefinitionParserListener extends MySqlParserBaseListene
         // otherwise the statement can't be executed due to multiple primary key error
         optionalColumn.set(Boolean.FALSE);
         tableEditor.addColumn(columnEditor.create());
-        if (!appendOnly) {
-            tableEditor.setPrimaryKeyNames(columnEditor.name());
-        }
+        tableEditor.setPrimaryKeyNames(columnEditor.name());
         super.enterPrimaryKeyColumnConstraint(ctx);
     }
 
