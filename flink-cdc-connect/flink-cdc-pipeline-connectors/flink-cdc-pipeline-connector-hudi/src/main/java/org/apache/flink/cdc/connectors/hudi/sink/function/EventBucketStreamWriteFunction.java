@@ -30,7 +30,6 @@ import org.apache.flink.cdc.connectors.hudi.sink.model.BucketAssignmentIndex;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.table.types.logical.RowType;
-
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
 import org.apache.hudi.common.util.Functions;
 import org.apache.hudi.common.util.hash.BucketIndexUtil;
@@ -73,8 +72,8 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
     /** Serializer for converting Events to HoodieFlinkInternalRow for single table. */
     private HudiRecordEventSerializer recordSerializer;
 
-    /** Function for calculating the task partition to dispatch. */
-    private Functions.Function3<Integer, String, Integer, Integer> partitionIndexFunc;
+    /** Function for calculating which task should handle a given bucket. */
+    private Functions.Function3<Integer, String, Integer, Integer> taskAssignmentFunc;
 
     /** Function to calculate num buckets per partition. */
     private NumBucketsFunction numBucketsFunction;
@@ -109,7 +108,7 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
         this.parallelism = RuntimeContextUtils.getNumberOfParallelSubtasks(getRuntimeContext());
         this.bucketAssignmentIndex = new BucketAssignmentIndex();
         this.incBucketIndexes = new HashSet<>();
-        this.partitionIndexFunc = BucketIndexUtil.getPartitionIndexFunc(parallelism);
+        this.taskAssignmentFunc = BucketIndexUtil.getPartitionIndexFunc(parallelism);
         this.numBucketsFunction =
                 new NumBucketsFunction(
                         config.get(FlinkOptions.BUCKET_INDEX_PARTITION_EXPRESSIONS),
@@ -175,47 +174,47 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
         recordSerializer.serialize(event);
     }
 
-    private void defineRecordLocation(int bucketNum, HoodieFlinkInternalRow record) {
+    private void defineRecordLocation(int bucketId, HoodieFlinkInternalRow record) {
         final String partition = record.getPartitionPath();
 
         // Check if this task should handle this bucket
-        if (!isBucketToLoad(bucketNum, partition)) {
+        if (!shouldTaskHandleBucket(bucketId, partition)) {
             throw new IllegalStateException(
                     String.format(
                             "Task %d received record for bucket %d which should not be handled by this task. "
                                     + "This indicates a partitioning problem - records must be routed to the correct task.",
-                            taskID, bucketNum));
+                            taskID, bucketId));
         }
 
         bootstrapIndexIfNeed(partition);
         Map<Integer, String> bucketToFileId = bucketAssignmentIndex.getBucketToFileIdMap(partition);
-        final String bucketId = partition + "/" + bucketNum;
+        final String bucketKey = partition + "/" + bucketId;
 
-        if (incBucketIndexes.contains(bucketId)) {
+        if (incBucketIndexes.contains(bucketKey)) {
             record.setInstantTime("I");
-            record.setFileId(bucketToFileId.get(bucketNum));
-        } else if (bucketToFileId.containsKey(bucketNum)) {
+            record.setFileId(bucketToFileId.get(bucketId));
+        } else if (bucketToFileId.containsKey(bucketId)) {
             record.setInstantTime("U");
-            record.setFileId(bucketToFileId.get(bucketNum));
+            record.setFileId(bucketToFileId.get(bucketId));
         } else {
             String newFileId =
                     isNonBlockingConcurrencyControl
-                            ? BucketIdentifier.newBucketFileIdForNBCC(bucketNum)
-                            : BucketIdentifier.newBucketFileIdPrefix(bucketNum);
+                            ? BucketIdentifier.newBucketFileIdForNBCC(bucketId)
+                            : BucketIdentifier.newBucketFileIdPrefix(bucketId);
             record.setInstantTime("I");
             record.setFileId(newFileId);
-            bucketToFileId.put(bucketNum, newFileId);
-            incBucketIndexes.add(bucketId);
+            bucketToFileId.put(bucketId, newFileId);
+            incBucketIndexes.add(bucketKey);
         }
     }
 
     /**
-     * Determine whether the current fileID belongs to the current task. partitionIndex == this
-     * taskID belongs to this task.
+     * Determine whether this task should handle the given bucket. Returns true if the bucket is
+     * assigned to this task based on the task assignment function.
      */
-    public boolean isBucketToLoad(int bucketNumber, String partition) {
+    public boolean shouldTaskHandleBucket(int bucketNumber, String partition) {
         int numBuckets = numBucketsFunction.getNumBuckets(partition);
-        return partitionIndexFunc.apply(numBuckets, partition, bucketNumber) == taskID;
+        return taskAssignmentFunc.apply(numBuckets, partition, bucketNumber) == taskID;
     }
 
     /**
@@ -242,7 +241,7 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
                         fileSlice -> {
                             String fileId = fileSlice.getFileId();
                             int bucketNumber = BucketIdentifier.bucketIdFromFileId(fileId);
-                            if (isBucketToLoad(bucketNumber, partition)) {
+                            if (shouldTaskHandleBucket(bucketNumber, partition)) {
                                 LOG.info(
                                         String.format(
                                                 "Should load this partition bucket %s with fileId %s",
