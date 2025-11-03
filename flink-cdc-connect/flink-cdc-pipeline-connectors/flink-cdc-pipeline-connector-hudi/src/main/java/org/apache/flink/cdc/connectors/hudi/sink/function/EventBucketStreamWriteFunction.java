@@ -30,6 +30,7 @@ import org.apache.flink.cdc.connectors.hudi.sink.model.BucketAssignmentIndex;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.table.types.logical.RowType;
+
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
 import org.apache.hudi.common.util.Functions;
 import org.apache.hudi.common.util.hash.BucketIndexUtil;

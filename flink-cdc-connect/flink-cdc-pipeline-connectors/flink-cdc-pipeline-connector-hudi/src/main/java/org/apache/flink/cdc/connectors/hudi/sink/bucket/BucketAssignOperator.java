@@ -38,6 +38,7 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+
 import org.apache.hudi.common.util.Functions;
 import org.apache.hudi.common.util.hash.BucketIndexUtil;
 import org.apache.hudi.configuration.FlinkOptions;
@@ -174,9 +175,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     }
 
     /**
-     * Calculate which task index should handle this event by:
-     * 1. Calculating the bucket number (0 to numBuckets-1) based on record key
-     * 2. Using partitionIndexFunc to map bucket -> task index for balanced distribution
+     * Calculate which task index should handle this event by: 1. Calculating the bucket number (0
+     * to numBuckets-1) based on record key 2. Using partitionIndexFunc to map bucket -> task index
+     * for balanced distribution
      *
      * @param event The DataChangeEvent to calculate task index for
      * @return The task index (0 to parallelism-1) that should handle this event
@@ -252,9 +253,10 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         String tableIndexKeyFields = String.join(",", primaryKeys);
         int bucketNumber = BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
 
+        // Extract partition path from the event
+        String partition = extractPartitionPath(event, finalSchema, fieldGetters);
+
         // Use partition function to map bucket to task index for balanced distribution
-        // partition is "default" since we're not using Hudi partition fields in this context
-        String partition = "default";
         int taskIndex = partitionIndexFunc.apply(numBuckets, partition, bucketNumber);
 
         return taskIndex;
@@ -287,5 +289,124 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         }
 
         return String.join(",", recordKeyPairs);
+    }
+
+    /**
+     * Extract partition path from the DataChangeEvent based on schema partition keys.
+     *
+     * <p>If the schema has partition keys defined:
+     *
+     * <ul>
+     *   <li>Extracts partition field values from the record data
+     *   <li>Formats them as "field1=value1/field2=value2" (Hive-style partitioning)
+     * </ul>
+     *
+     * <p>If no partition keys are defined, returns "default".
+     *
+     * @param event The DataChangeEvent to extract partition from
+     * @param schema The table schema containing partition key definitions
+     * @param fieldGetters Field getters for extracting values (not used currently, may be needed
+     *     for optimization)
+     * @return The partition path string
+     */
+    private String extractPartitionPath(
+            DataChangeEvent event, Schema schema, List<RecordData.FieldGetter> fieldGetters) {
+
+        // Check if schema has partition keys defined
+        List<String> partitionKeys = schema.partitionKeys();
+        if (partitionKeys == null || partitionKeys.isEmpty()) {
+            return "default";
+        }
+
+        // Get the record data to extract from (after for INSERT/UPDATE/REPLACE, before for DELETE)
+        RecordData recordData;
+        switch (event.op()) {
+            case INSERT:
+            case UPDATE:
+            case REPLACE:
+                recordData = event.after();
+                break;
+            case DELETE:
+                recordData = event.before();
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported operation: " + event.op());
+        }
+
+        if (recordData == null) {
+            throw new IllegalStateException(
+                    "Cannot extract partition path: " + event.op() + " event has null data");
+        }
+
+        // Extract partition values and build partition path
+        List<String> partitionParts = new ArrayList<>(partitionKeys.size());
+        for (String partitionKey : partitionKeys) {
+            int fieldIndex = schema.getColumnNames().indexOf(partitionKey);
+            if (fieldIndex == -1) {
+                throw new IllegalStateException(
+                        "Partition key field '"
+                                + partitionKey
+                                + "' not found in schema for table "
+                                + event.tableId());
+            }
+
+            // Get field value
+            Object fieldValue;
+            if (recordData.isNullAt(fieldIndex)) {
+                // Handle null partition values - use "__HIVE_DEFAULT_PARTITION__" as per Hive
+                // convention
+                fieldValue = "__HIVE_DEFAULT_PARTITION__";
+            } else {
+                // Get the field value based on the field type
+                DataType fieldType = schema.getColumns().get(fieldIndex).getType();
+                fieldValue = getFieldValue(recordData, fieldIndex, fieldType);
+            }
+
+            // Format as "key=value" (Hive-style partitioning)
+            partitionParts.add(partitionKey + "=" + fieldValue);
+        }
+
+        // Join partition parts with "/"
+        return String.join("/", partitionParts);
+    }
+
+    /**
+     * Extract field value from RecordData based on field type. This is a simplified version -
+     * complex types may need additional handling.
+     */
+    private Object getFieldValue(RecordData recordData, int fieldIndex, DataType fieldType) {
+        switch (fieldType.getTypeRoot()) {
+            case CHAR:
+            case VARCHAR:
+                return recordData.getString(fieldIndex).toString();
+            case BOOLEAN:
+                return recordData.getBoolean(fieldIndex);
+            case TINYINT:
+                return recordData.getByte(fieldIndex);
+            case SMALLINT:
+                return recordData.getShort(fieldIndex);
+            case INTEGER:
+            case DATE:
+                return recordData.getInt(fieldIndex);
+            case BIGINT:
+                return recordData.getLong(fieldIndex);
+            case FLOAT:
+                return recordData.getFloat(fieldIndex);
+            case DOUBLE:
+                return recordData.getDouble(fieldIndex);
+            case TIMESTAMP_WITHOUT_TIME_ZONE:
+                return recordData.getTimestamp(
+                        fieldIndex,
+                        org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision(fieldType));
+            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
+                return recordData.getLocalZonedTimestampData(
+                        fieldIndex,
+                        org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision(fieldType));
+            default:
+                // For other types, create a field getter and use it
+                RecordData.FieldGetter fieldGetter =
+                        RecordData.createFieldGetter(fieldType, fieldIndex);
+                return fieldGetter.getFieldOrNull(recordData);
+        }
     }
 }

@@ -45,6 +45,7 @@ import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
+
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.sink.common.AbstractStreamWriteFunction;

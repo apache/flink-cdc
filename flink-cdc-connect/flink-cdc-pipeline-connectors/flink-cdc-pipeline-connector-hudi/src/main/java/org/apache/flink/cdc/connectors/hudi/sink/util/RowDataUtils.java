@@ -262,9 +262,8 @@ public class RowDataUtils {
         // Extract record key from primary key fields
         String recordKey = extractRecordKeyFromDataChangeEvent(dataChangeEvent, schema);
 
-        // Default partition path - in real implementation this would be based on configured
-        // partition fields
-        String partitionPath = "default";
+        // Extract partition path from partition key fields
+        String partitionPath = extractPartitionPathFromDataChangeEvent(dataChangeEvent, schema);
 
         return convertDataChangeEventToHoodieFlinkInternalRow(
                 dataChangeEvent, schema, zoneId, recordKey, partitionPath, fileId, instantTime);
@@ -343,6 +342,84 @@ public class RowDataUtils {
         }
 
         return String.join(",", recordKeyValues);
+    }
+
+    /**
+     * Extract partition path from DataChangeEvent based on partition key fields in schema.
+     *
+     * <p>If the schema has partition keys defined:
+     *
+     * <ul>
+     *   <li>Extracts partition field values from the record data
+     *   <li>Formats them as "field1=value1/field2=value2" (Hive-style partitioning)
+     * </ul>
+     *
+     * <p>If no partition keys are defined, returns "default".
+     *
+     * @param dataChangeEvent The DataChangeEvent to extract partition from
+     * @param schema The table schema containing partition key definitions
+     * @return The partition path string
+     */
+    private static String extractPartitionPathFromDataChangeEvent(
+            DataChangeEvent dataChangeEvent, Schema schema) {
+        List<String> partitionKeys = schema.partitionKeys();
+        if (partitionKeys == null || partitionKeys.isEmpty()) {
+            return "default";
+        }
+
+        // Get the record data to extract from (after for INSERT/UPDATE/REPLACE, before for DELETE)
+        RecordData recordData;
+        switch (dataChangeEvent.op()) {
+            case INSERT:
+            case UPDATE:
+            case REPLACE:
+                recordData = dataChangeEvent.after();
+                break;
+            case DELETE:
+                recordData = dataChangeEvent.before();
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Unsupported operation: " + dataChangeEvent.op());
+        }
+
+        if (recordData == null) {
+            throw new IllegalStateException(
+                    "Cannot extract partition path: "
+                            + dataChangeEvent.op()
+                            + " event has null data");
+        }
+
+        // Extract partition values and build partition path
+        List<String> partitionParts = new ArrayList<>(partitionKeys.size());
+        for (String partitionKey : partitionKeys) {
+            int fieldIndex = schema.getColumnNames().indexOf(partitionKey);
+            if (fieldIndex == -1) {
+                throw new IllegalStateException(
+                        "Partition key field '"
+                                + partitionKey
+                                + "' not found in schema for table "
+                                + dataChangeEvent.tableId());
+            }
+
+            // Get field value
+            Object fieldValue;
+            if (recordData.isNullAt(fieldIndex)) {
+                // Handle null partition values - use "__HIVE_DEFAULT_PARTITION__" as per Hive
+                // convention
+                fieldValue = "__HIVE_DEFAULT_PARTITION__";
+            } else {
+                // Get the field value based on the field type
+                DataType fieldType = schema.getColumns().get(fieldIndex).getType();
+                fieldValue = getFieldValue(recordData, fieldIndex, fieldType);
+            }
+
+            // Format as "key=value" (Hive-style partitioning)
+            partitionParts.add(partitionKey + "=" + fieldValue);
+        }
+
+        // Join partition parts with "/"
+        return String.join("/", partitionParts);
     }
 
     /** Get field value from RecordData based on field type. */
