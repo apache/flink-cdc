@@ -314,7 +314,7 @@ public class RowDataUtils {
                     "Record data is null for operation: " + dataChangeEvent.op());
         }
 
-        List<String> recordKeyValues = new ArrayList<>(primaryKeyFields.size());
+        List<String> recordKeyPairs = new ArrayList<>(primaryKeyFields.size());
         for (String primaryKeyField : primaryKeyFields) {
             int fieldIndex = schema.getColumnNames().indexOf(primaryKeyField);
             if (fieldIndex == -1) {
@@ -338,10 +338,11 @@ public class RowDataUtils {
                         "Primary key field '" + primaryKeyField + "' is null in record");
             }
 
-            recordKeyValues.add(fieldValue.toString());
+            // Format as "fieldName:value" to match BucketAssignOperator format
+            recordKeyPairs.add(primaryKeyField + ":" + fieldValue);
         }
 
-        return String.join(",", recordKeyValues);
+        return String.join(",", recordKeyPairs);
     }
 
     /**

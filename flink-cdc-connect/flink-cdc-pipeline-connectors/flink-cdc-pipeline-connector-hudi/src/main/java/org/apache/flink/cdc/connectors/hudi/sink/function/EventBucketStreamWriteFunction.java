@@ -17,13 +17,10 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.function;
 
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.hudi.sink.event.HudiRecordEventSerializer;
 import org.apache.flink.cdc.connectors.hudi.sink.event.HudiRecordSerializer;
 import org.apache.flink.cdc.connectors.hudi.sink.model.BucketAssignmentIndex;
@@ -81,12 +78,6 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
 
     /** Cached primary key fields for this table. */
     private transient List<String> primaryKeyFields;
-
-    /** Cached field getters for primary key fields. */
-    private transient List<RecordData.FieldGetter> primaryKeyFieldGetters;
-
-    /** Cached schema for this table. */
-    private transient Schema cachedSchema;
 
     /** Number of buckets for this function. */
     private int numBuckets;
@@ -147,8 +138,8 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
         }
 
         HoodieFlinkInternalRow hoodieFlinkInternalRow = recordSerializer.serialize(event);
-        // Calculate bucket from event data for bucket assignment
-        int bucket = calculateBucketFromEvent(event);
+        // Calculate bucket from the serialized Hudi record
+        int bucket = calculateBucketFromRecord(hoodieFlinkInternalRow);
 
         // Define record location (file ID, instant time) based on bucket assignment
         defineRecordLocation(bucket, hoodieFlinkInternalRow);
@@ -173,6 +164,18 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
         // Handle schema events (CreateTableEvent, SchemaChangeEvent) - they don't produce records
         // null will be returned from serialize
         recordSerializer.serialize(event);
+
+        // Cache the schema's primary keys for bucket calculation
+        Schema schema = recordSerializer.getSchema(event.tableId());
+        if (schema != null) {
+            primaryKeyFields = schema.primaryKeys();
+            if (primaryKeyFields == null || primaryKeyFields.isEmpty()) {
+                throw new IllegalStateException(
+                        "Cannot initialize bucket calculation: table "
+                                + event.tableId()
+                                + " has no primary keys");
+            }
+        }
     }
 
     private void defineRecordLocation(int bucketId, HoodieFlinkInternalRow record) {
@@ -266,84 +269,33 @@ public class EventBucketStreamWriteFunction extends EventStreamWriteFunction {
         bucketAssignmentIndex.bootstrapPartition(partition, bucketToFileIDMap);
     }
 
-    /** Calculate bucket from DataChangeEvent using primary key fields. */
-    private int calculateBucketFromEvent(DataChangeEvent dataChangeEvent) {
-        // Initialize cache on first call
-        if (cachedSchema == null) {
-            cachedSchema = recordSerializer.getSchema(dataChangeEvent.tableId());
-            if (cachedSchema == null) {
-                throw new IllegalStateException(
-                        "No schema available for table " + dataChangeEvent.tableId());
-            }
-
-            // Cache primary key fields
-            primaryKeyFields = cachedSchema.primaryKeys();
-            if (primaryKeyFields.isEmpty()) {
-                throw new IllegalStateException(
-                        "Cannot calculate bucket: table "
-                                + dataChangeEvent.tableId()
-                                + " has no primary keys");
-            }
-
-            // Cache field getters for primary key fields
-            primaryKeyFieldGetters = new ArrayList<>(primaryKeyFields.size());
-            for (String primaryKeyField : primaryKeyFields) {
-                int fieldIndex = cachedSchema.getColumnNames().indexOf(primaryKeyField);
-                if (fieldIndex == -1) {
-                    throw new IllegalStateException(
-                            "Primary key field '"
-                                    + primaryKeyField
-                                    + "' not found in schema for table "
-                                    + dataChangeEvent.tableId());
-                }
-                DataType fieldType = cachedSchema.getColumns().get(fieldIndex).getType();
-                primaryKeyFieldGetters.add(RecordData.createFieldGetter(fieldType, fieldIndex));
-            }
-        }
-
-        // Extract record key from event data using cached field getters
-        String recordKey = extractRecordKeyFromEvent(dataChangeEvent);
-
-        // Calculate bucket using Hudi's bucket logic
-        return calculateBucketFromRecordKey(recordKey, primaryKeyFields);
-    }
-
     /**
-     * Extract record key from CDC event data using cached field getters for optimal performance.
+     * Calculate bucket from HoodieFlinkInternalRow using the record key. The record key is already
+     * computed by the serializer during conversion from CDC event.
      */
-    private String extractRecordKeyFromEvent(DataChangeEvent dataChangeEvent) {
-        // For DELETE operations, use 'before' data; for INSERT/UPDATE, use 'after' data
-        RecordData recordData =
-                dataChangeEvent.op() == OperationType.DELETE
-                        ? dataChangeEvent.before()
-                        : dataChangeEvent.after();
+    private int calculateBucketFromRecord(HoodieFlinkInternalRow record) {
+        // Get record key directly from HoodieFlinkInternalRow
+        String recordKey = record.getRecordKey();
 
-        if (recordData == null) {
-            throw new IllegalStateException(
-                    "Cannot extract record key: " + dataChangeEvent.op() + " event has null data");
-        }
-
-        // Use cached field getters for optimal performance
-        List<String> recordKeyPairs = new ArrayList<>(primaryKeyFields.size());
-        for (int i = 0; i < primaryKeyFields.size(); i++) {
-            RecordData.FieldGetter fieldGetter = primaryKeyFieldGetters.get(i);
-            Object fieldValue = fieldGetter.getFieldOrNull(recordData);
-
-            if (fieldValue == null) {
-                throw new IllegalStateException(
-                        "Primary key field '" + primaryKeyFields.get(i) + "' is null in record");
+        // Initialize primary key fields lazily if not already done
+        if (primaryKeyFields == null) {
+            // Parse the record key to extract field names
+            // Record key format: "fieldName1:value1,fieldName2:value2"
+            String[] keyPairs = recordKey.split(",");
+            primaryKeyFields = new ArrayList<>(keyPairs.length);
+            for (String keyPair : keyPairs) {
+                String[] parts = keyPair.split(":", 2);
+                if (parts.length == 2) {
+                    primaryKeyFields.add(parts[0]);
+                } else {
+                    throw new IllegalStateException(
+                            "Invalid record key format: "
+                                    + recordKey
+                                    + ". Expected 'fieldName:value' pairs.");
+                }
             }
-
-            // Format as "fieldName:value"
-            recordKeyPairs.add(primaryKeyFields.get(i) + ":" + fieldValue);
         }
 
-        // Join primary key pairs with comma (recordKey1:val1,recordKey2:val2)
-        return String.join(",", recordKeyPairs);
-    }
-
-    /** Calculate bucket ID from record key using Hudi's bucket logic. */
-    private int calculateBucketFromRecordKey(String recordKey, List<String> primaryKeyFields) {
         // Convert primary key field list to comma-separated string for Hudi bucket calculation
         String tableIndexKeyFields = String.join(",", primaryKeyFields);
         return BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
