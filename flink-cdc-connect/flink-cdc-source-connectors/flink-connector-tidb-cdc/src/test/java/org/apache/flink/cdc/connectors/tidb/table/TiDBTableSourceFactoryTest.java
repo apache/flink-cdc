@@ -30,7 +30,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.ZoneId;
@@ -51,7 +52,6 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_K
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.JDBC_DRIVER;
-import static org.junit.Assert.assertEquals;
 
 /** Unit tests for TiDB table source factory. */
 public class TiDBTableSourceFactoryTest {
@@ -128,7 +128,7 @@ public class TiDBTableSourceFactoryTest {
                         new HashMap<>(),
                         JDBC_DRIVER.defaultValue(),
                         StartupOptions.initial());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     @Test
@@ -137,6 +137,10 @@ public class TiDBTableSourceFactoryTest {
         properties.put("port", MY_PORT);
         properties.put("scan.startup.mode", "initial");
         properties.put("heartbeat.interval.ms", "15213ms");
+        properties.put("debezium.tombstones.on.delete", "true");
+        properties.put("debezium.snapshot.mode", "never");
+        properties.put("debezium.offset.flush.interval.ms", "3000");
+        properties.put("debezium.test", "test");
         //        properties.put("server-time-zone", "Asia/Shanghai");
 
         Properties dbzProperties = new Properties();
@@ -156,7 +160,7 @@ public class TiDBTableSourceFactoryTest {
         TiDBTableSource expectedSource =
                 new TiDBTableSource(
                         SCHEMA,
-                        4111,
+                        4000,
                         MY_HOSTNAME,
                         MY_DATABASE,
                         MY_TABLE,
@@ -179,10 +183,10 @@ public class TiDBTableSourceFactoryTest {
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue(),
                         SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue(),
                         null,
-                        null,
+                        new HashMap<>(),
                         JDBC_DRIVER.defaultValue(),
                         StartupOptions.initial());
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(expectedSource).isEqualTo(actualSource);
     }
 
     private Map<String, String> getAllOptions() {

@@ -47,6 +47,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** TiDBDefaultValueConverter. */
 public class TiDBDefaultValueConverter implements DefaultValueConverter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MySqlDefaultValueConverter.class);
@@ -377,7 +378,7 @@ public class TiDBDefaultValueConverter implements DefaultValueConverter {
     }
 
     /**
-     * Clean input timestamp to yyyy-mm-dd hh:mm:ss[.fffffffff] format
+     * Clean input timestamp to yyyy-mm-dd hh:mm:ss[.fffffffff] format.
      *
      * @param s input timestamp
      * @return cleaned timestamp
@@ -404,8 +405,8 @@ public class TiDBDefaultValueConverter implements DefaultValueConverter {
             }
         }
 
-        final int MAX_MONTH = 12;
-        final int MAX_DAY = 31;
+        final int maxMonth = 12;
+        final int maxDay = 31;
 
         // Parse the date
         int firstDash = s.indexOf('-');
@@ -436,7 +437,7 @@ public class TiDBDefaultValueConverter implements DefaultValueConverter {
                 day = Integer.parseInt(s.substring(secondDash + 1, len));
             }
 
-            if ((month >= 1 && month <= MAX_MONTH) && (day >= 1 && day <= MAX_DAY)) {
+            if ((month >= 1 && month <= maxMonth) && (day >= 1 && day <= maxDay)) {
                 parsedDate = true;
             }
         }
@@ -482,7 +483,7 @@ public class TiDBDefaultValueConverter implements DefaultValueConverter {
     }
 
     /**
-     * Replace the first non-numeric substring
+     * Replace the first non-numeric substring.
      *
      * @param s the original string
      * @param startIndex the beginning index, inclusive

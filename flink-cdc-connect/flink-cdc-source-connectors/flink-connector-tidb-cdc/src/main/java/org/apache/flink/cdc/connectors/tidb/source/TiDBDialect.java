@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** TiDB data source dialect. */
 public class TiDBDialect implements JdbcDataSourceDialect {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBDialect.class);
 

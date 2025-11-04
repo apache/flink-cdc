@@ -24,6 +24,7 @@ import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.tidb.source.offset.EventOffset.NO_STOPPING_OFFSET;
 
+/** The factory class for {@link EventOffset}. */
 public class EventOffsetFactory extends OffsetFactory {
 
     @Override

@@ -55,6 +55,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** TiDB source fetch task context. */
 public class TiDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(TiDBSourceFetchTaskContext.class);

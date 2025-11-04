@@ -59,10 +59,11 @@ import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptio
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.JDBC_DRIVER;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.PD_ADDRESSES;
 import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.TABLE_LIST;
-import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.TiDB_PORT;
+import static org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions.TIDB_PORT;
 import static org.apache.flink.cdc.debezium.table.DebeziumOptions.getDebeziumProperties;
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
 
+/** Factory for creating configured instances of {@link TiDBTableSource}. */
 public class TiDBTableFactory implements DynamicTableSourceFactory {
     private static final String IDENTIFIER = "tidb-cdc";
 
@@ -78,7 +79,7 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
         options.add(USERNAME);
         options.add(PASSWORD);
         options.add(PD_ADDRESSES);
-        options.add(TiDB_PORT);
+        options.add(TIDB_PORT);
 
         return options;
     }
@@ -161,7 +162,7 @@ public class TiDBTableFactory implements DynamicTableSourceFactory {
         String tableName = config.get(TABLE_NAME);
         String tableList = config.get(TABLE_LIST);
 
-        int port = config.get(TiDB_PORT);
+        int port = config.get(TIDB_PORT);
         String serverTimeZone = config.get(SERVER_TIME_ZONE);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
         String pdAddresses = config.get(PD_ADDRESSES);

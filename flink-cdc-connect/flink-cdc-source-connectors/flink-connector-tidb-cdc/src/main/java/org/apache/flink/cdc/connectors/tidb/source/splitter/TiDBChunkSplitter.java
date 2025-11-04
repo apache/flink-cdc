@@ -30,6 +30,7 @@ import io.debezium.relational.TableId;
 
 import java.sql.SQLException;
 
+/** TiDB chunk splitter. */
 public class TiDBChunkSplitter extends JdbcSourceChunkSplitter {
 
     public TiDBChunkSplitter(

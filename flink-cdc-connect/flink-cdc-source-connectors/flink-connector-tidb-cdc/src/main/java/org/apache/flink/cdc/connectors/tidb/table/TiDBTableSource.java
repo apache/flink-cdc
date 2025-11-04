@@ -46,12 +46,14 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
+/** TiDB table source. */
 public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata {
     private final ResolvedSchema physicalSchema;
 
@@ -291,5 +293,79 @@ public class TiDBTableSource implements ScanTableSource, SupportsReadingMetadata
                                         .orElseThrow(IllegalStateException::new))
                 .map(TiDBReadableMetadata::getConverter)
                 .toArray(MetadataConverter[]::new);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        TiDBTableSource that = (TiDBTableSource) o;
+        return port == that.port
+                && enableParallelRead == that.enableParallelRead
+                && splitSize == that.splitSize
+                && splitMetaGroupSize == that.splitMetaGroupSize
+                && fetchSize == that.fetchSize
+                && connectionPoolSize == that.connectionPoolSize
+                && connectMaxRetries == that.connectMaxRetries
+                && Double.compare(that.distributionFactorUpper, distributionFactorUpper) == 0
+                && Double.compare(that.distributionFactorLower, distributionFactorLower) == 0
+                && physicalSchema.equals(that.physicalSchema)
+                && startupOptions.equals(that.startupOptions)
+                && Objects.equals(tableList, that.tableList)
+                && Objects.equals(tableName, that.tableName)
+                && Objects.equals(connectTimeout, that.connectTimeout)
+                && Objects.equals(jdbcDriver, that.jdbcDriver)
+                && Objects.equals(serverTimeZone, that.serverTimeZone)
+                && Objects.equals(pdAddresses, that.pdAddresses)
+                && Objects.equals(hostMapping, that.hostMapping)
+                && Objects.equals(hostName, that.hostName)
+                && Objects.equals(database, that.database)
+                && Objects.equals(username, that.username)
+                && Objects.equals(password, that.password)
+                && Objects.equals(heartbeatInterval, that.heartbeatInterval)
+                && Objects.equals(chunkKeyColumn, that.chunkKeyColumn)
+                && Objects.equals(chunkKeyColumns, that.chunkKeyColumns)
+                && Objects.equals(jdbcProperties, that.jdbcProperties)
+                && Objects.equals(options, that.options)
+                && Objects.equals(producedDataType, that.producedDataType)
+                && Objects.equals(metadataKeys, that.metadataKeys);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+                physicalSchema,
+                startupOptions,
+                tableList,
+                tableName,
+                connectTimeout,
+                jdbcDriver,
+                serverTimeZone,
+                pdAddresses,
+                hostMapping,
+                port,
+                hostName,
+                database,
+                username,
+                password,
+                heartbeatInterval,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                chunkKeyColumn,
+                chunkKeyColumns,
+                jdbcProperties,
+                options,
+                enableParallelRead,
+                producedDataType,
+                metadataKeys);
     }
 }

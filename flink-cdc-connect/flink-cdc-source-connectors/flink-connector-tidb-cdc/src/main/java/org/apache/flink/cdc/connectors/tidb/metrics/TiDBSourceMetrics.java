@@ -24,15 +24,15 @@ import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_EMIT_EVENT_TI
 import static org.apache.flink.runtime.metrics.MetricNames.CURRENT_FETCH_EVENT_TIME_LAG;
 import static org.apache.flink.runtime.metrics.MetricNames.SOURCE_IDLE_TIME;
 
-/** A collection class for handling metrics in {@link }. */
+/** A collection class for handling metrics in {@link TiKVRichParallelSourceFunction}. */
 public class TiDBSourceMetrics {
 
     private final MetricGroup metricGroup;
 
     /**
-     * The last record processing time, which is updated after {@link } fetches a batch of data.
-     * It's mainly used to report metrics sourceIdleTime for sourceIdleTime =
-     * System.currentTimeMillis() - processTime.
+     * The last record processing time, which is updated after {@link
+     * TiKVRichParallelSourceFunction} fetches a batch of data. It's mainly used to report metrics
+     * sourceIdleTime for sourceIdleTime = System.currentTimeMillis() - processTime.
      */
     private long processTime = 0L;
 
