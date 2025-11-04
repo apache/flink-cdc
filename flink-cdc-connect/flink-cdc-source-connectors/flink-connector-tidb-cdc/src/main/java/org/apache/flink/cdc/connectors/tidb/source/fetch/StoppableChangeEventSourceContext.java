@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.tidb.source.fetch;
 
 import io.debezium.pipeline.source.spi.ChangeEventSource;
 
+/** A change event source context that can be stopped. */
 public class StoppableChangeEventSourceContext
         implements ChangeEventSource.ChangeEventSourceContext {
 

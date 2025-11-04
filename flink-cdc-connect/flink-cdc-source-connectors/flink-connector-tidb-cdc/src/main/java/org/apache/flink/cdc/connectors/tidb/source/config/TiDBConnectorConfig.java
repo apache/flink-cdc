@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+/** TiDB connector configuration. */
 public class TiDBConnectorConfig extends RelationalDatabaseConnectorConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(TiDBConnectorConfig.class);
 
@@ -85,7 +86,8 @@ public class TiDBConnectorConfig extends RelationalDatabaseConnectorConfig {
                                     + "false - delegates the implicit conversion to the database"
                                     + "true - (the default) Debezium makes the conversion");
 
-    public static enum BigIntUnsignedHandlingMode implements EnumeratedValue {
+    /** The set of predefined options for the handling mode configuration property. */
+    public enum BigIntUnsignedHandlingMode implements EnumeratedValue {
         /**
          * Represent {@code BIGINT UNSIGNED} values as precise {@link BigDecimal} values, which are
          * represented in change events in a binary form. This is precise but difficult to use.
@@ -203,7 +205,8 @@ public class TiDBConnectorConfig extends RelationalDatabaseConnectorConfig {
         return readOnlyConnection;
     }
 
-    public static enum SecureConnectionMode implements EnumeratedValue {
+    /** Whether to use SSL/TLS to connect to the database. */
+    public enum SecureConnectionMode implements EnumeratedValue {
         /** Establish an unencrypted connection. */
         DISABLED("disabled"),
 

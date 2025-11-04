@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import java.io.EOFException;
 import java.sql.SQLException;
 
+/** TiDBErrorHandler. */
 public class TiDBErrorHandler extends ErrorHandler {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBErrorHandler.class);
     private static final String SQL_CODE_TOO_MANY_CONNECTIONS = "08004";

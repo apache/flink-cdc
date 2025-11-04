@@ -30,6 +30,7 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Utils to obtain the connection of TiDB. */
 public class TiDBConnectionUtils {
 
     public static boolean isTableIdCaseInsensitive(JdbcConnection connection) {

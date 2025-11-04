@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+/** TiDBStreamFetchTask. */
 public class TiDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBStreamFetchTask.class);
     private final StreamSplit split;

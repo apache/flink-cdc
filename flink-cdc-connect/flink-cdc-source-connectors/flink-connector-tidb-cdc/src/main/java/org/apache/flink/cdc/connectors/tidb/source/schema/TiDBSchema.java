@@ -44,6 +44,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import static org.apache.flink.cdc.connectors.tidb.utils.TiDBConnectionUtils.getValueConverters;
 
+/** TiDB schema. */
 public class TiDBSchema {
     private static final String SHOW_CREATE_TABLE = "SHOW CREATE TABLE ";
     private static final String DESC_TABLE = "DESC ";

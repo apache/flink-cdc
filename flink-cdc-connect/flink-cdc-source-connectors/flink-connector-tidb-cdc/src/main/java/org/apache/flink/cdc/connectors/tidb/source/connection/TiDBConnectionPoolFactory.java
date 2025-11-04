@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.tidb.source.connection;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.connection.JdbcConnectionPoolFactory;
 
+/** The factory to create {@link TiDBConnectionPool}. */
 public class TiDBConnectionPoolFactory extends JdbcConnectionPoolFactory {
     private static final String MYSQL_URL_PATTERN =
             "jdbc:mysql://%s:%s/?useUnicode=true&useSSL=false&useInformationSchema=true&nullCatalogMeansCurrent=false&zeroDateTimeBehavior=convertToNull&characterEncoding=UTF-8&characterSetResults=UTF-8";
