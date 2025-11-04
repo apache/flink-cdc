@@ -66,6 +66,7 @@ import java.util.stream.IntStream;
 
 import static org.tikv.common.codec.TableCodec.decodeObjects;
 
+/** TiDB streaming change event source reader. */
 public class EventSourceReader
         implements StreamingChangeEventSource<TiDBPartition, EventOffsetContext> {
     private static final Logger LOG = LoggerFactory.getLogger(EventSourceReader.class);

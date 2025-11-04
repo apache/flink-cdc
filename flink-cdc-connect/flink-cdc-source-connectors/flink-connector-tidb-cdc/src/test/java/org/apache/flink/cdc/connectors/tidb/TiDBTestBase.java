@@ -17,15 +17,16 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
+import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfigFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.alibaba.dcm.DnsCacheManipulator;
 import org.apache.commons.lang3.RandomUtils;
+import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.FixedHostPortGenericContainer;
@@ -50,8 +51,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.junit.Assert.assertNotNull;
-
 /** Utility class for tidb tests. */
 public class TiDBTestBase extends AbstractTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBTestBase.class);
@@ -69,9 +68,8 @@ public class TiDBTestBase extends AbstractTestBase {
     public static final int PD_PORT_ORIGIN = 2379;
     public static int pdPort = PD_PORT_ORIGIN + RandomUtils.nextInt(0, 1000);
 
-    @ClassRule public static final Network NETWORK = Network.newNetwork();
+    public static final Network NETWORK = Network.newNetwork();
 
-    @ClassRule
     public static final GenericContainer<?> PD =
             new FixedHostPortGenericContainer<>("pingcap/pd:v6.1.0")
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
@@ -91,7 +89,6 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @ClassRule
     public static final GenericContainer<?> TIKV =
             new FixedHostPortGenericContainer<>("pingcap/tikv:v6.1.0")
                     .withFixedExposedPort(TIKV_PORT_ORIGIN, TIKV_PORT_ORIGIN)
@@ -109,7 +106,6 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @ClassRule
     public static final GenericContainer<?> TIDB =
             new GenericContainer<>("pingcap/tidb:v6.1.0")
                     .withExposedPorts(TIDB_PORT)
@@ -125,8 +121,8 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @BeforeClass
-    public static void startContainers() throws Exception {
+    @BeforeAll
+    static void startContainers() throws Exception {
         // Add jvm dns cache for flink to invoke pd interface.
         DnsCacheManipulator.setDnsCache(PD_SERVICE_NAME, "127.0.0.1");
         DnsCacheManipulator.setDnsCache(TIKV_SERVICE_NAME, "127.0.0.1");
@@ -135,8 +131,8 @@ public class TiDBTestBase extends AbstractTestBase {
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
-    public static void stopContainers() {
+    @AfterAll
+    static void stopContainers() {
         DnsCacheManipulator.removeDnsCache(PD_SERVICE_NAME);
         DnsCacheManipulator.removeDnsCache(TIKV_SERVICE_NAME);
         Stream.of(TIKV, PD, TIDB).forEach(GenericContainer::stop);
@@ -188,7 +184,7 @@ public class TiDBTestBase extends AbstractTestBase {
     protected void initializeTidbTable(String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = TiDBTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection("");
                 Statement statement = connection.createStatement()) {
             dropTestDatabase(connection, sqlFile);
@@ -212,5 +208,29 @@ public class TiDBTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected TiDBSourceConfigFactory getMockTiDBSourceConfigFactory(
+            String database, String schemaName, String tableName, int splitSize) {
+        return getMockTiDBSourceConfigFactory(database, schemaName, tableName, splitSize, false);
+    }
+
+    protected TiDBSourceConfigFactory getMockTiDBSourceConfigFactory(
+            String database,
+            String schemaName,
+            String tableName,
+            int splitSize,
+            boolean skipSnapshotBackfill) {
+
+        TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
+        tiDBSourceConfigFactory.hostname(TIDB.getContainerIpAddress());
+        tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
+        tiDBSourceConfigFactory.username(TIDB_USER);
+        tiDBSourceConfigFactory.password(TIDB_PASSWORD);
+        tiDBSourceConfigFactory.databaseList(database);
+        tiDBSourceConfigFactory.tableList(database + "." + tableName);
+        tiDBSourceConfigFactory.splitSize(splitSize);
+        tiDBSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
+        return tiDBSourceConfigFactory;
     }
 }

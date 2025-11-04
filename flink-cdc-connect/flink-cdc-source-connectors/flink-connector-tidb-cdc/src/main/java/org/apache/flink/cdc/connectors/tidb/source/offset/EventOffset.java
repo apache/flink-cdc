@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
+/** The offset of TiDB binlog. */
 public class EventOffset extends Offset {
     public static final String TIMESTAMP_KEY = "timestamp";
     // TimeStamp Oracle from pd

@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.apache.flink.cdc.connectors.tidb.source.reader;
 
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
@@ -22,8 +39,9 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,9 +52,8 @@ import java.util.Iterator;
 import java.util.Map;
 
 import static java.util.Collections.singletonList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
+/** Test for {@link TiDBTestBase}. */
 public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     private static final Logger LOG = LoggerFactory.getLogger(TiDBStreamSplitReaderTest.class);
     private static final String databaseName = "customer";
@@ -51,7 +68,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
     private TiDBDialect tiDBDialect;
     private EventOffsetFactory cdcEventOffsetFactory;
 
-    @Before
+    @BeforeEach
     public void before() {
         initializeTidbTable("customer");
         TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
@@ -117,7 +134,7 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                             Collections.singletonList(finishedSnapshotSplitInfo),
                             tableSchemas,
                             0);
-            assertTrue(streamSplitReader.canAssignNextSplit());
+            Assertions.assertThat(streamSplitReader.canAssignNextSplit()).isTrue();
             streamSplitReader.handleSplitsChanges(new SplitsAddition<>(singletonList(streamSplit)));
             int retry = 0;
             int count = 0;
@@ -130,11 +147,11 @@ public class TiDBStreamSplitReaderTest extends TiDBTestBase {
                         while (iterator.hasNext()) {
                             Struct value = (Struct) iterator.next().value();
                             String opType = value.getString("op");
-                            assertEquals(opType, "c");
+                            Assertions.assertThat(opType).isEqualTo("c");
                             Struct after = (Struct) value.get("after");
                             String name = after.getString("name");
 
-                            assertTrue(name.contains("user"));
+                            Assertions.assertThat(name.contains("user")).isTrue();
                             if (++count >= insertDataSql.length) {
                                 return;
                             }
