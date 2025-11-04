@@ -134,49 +134,7 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
      */
     @Override
     public HoodieFlinkInternalRow serialize(Event event) {
-        if (event instanceof CreateTableEvent) {
-            CreateTableEvent createTableEvent = (CreateTableEvent) event;
-            schemaMaps.put(createTableEvent.tableId(), createTableEvent.getSchema());
-            // Clear field getter cache for this table since schema changed
-            fieldGetterCache.remove(createTableEvent.tableId());
-            // Schema events don't produce records
-            return null;
-
-        } else if (event instanceof SchemaChangeEvent) {
-            SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            Schema existingSchema = schemaMaps.get(schemaChangeEvent.tableId());
-            if (existingSchema != null
-                    && !SchemaUtils.isSchemaChangeEventRedundant(
-                            existingSchema, schemaChangeEvent)) {
-                Schema newSchema =
-                        SchemaUtils.applySchemaChangeEvent(existingSchema, schemaChangeEvent);
-                schemaMaps.put(schemaChangeEvent.tableId(), newSchema);
-                // Clear field getter cache for this table since schema changed
-                fieldGetterCache.remove(schemaChangeEvent.tableId());
-            }
-            // Schema events don't produce records
-            return null;
-
-        } else if (event instanceof DataChangeEvent) {
-            DataChangeEvent dataChangeEvent = (DataChangeEvent) event;
-            Schema schema = schemaMaps.get(dataChangeEvent.tableId());
-
-            if (schema == null) {
-                throw new IllegalStateException(
-                        "No schema available for table "
-                                + dataChangeEvent.tableId()
-                                + ". CreateTableEvent should arrive before DataChangeEvent.");
-            }
-
-            // Convert DataChangeEvent to HoodieFlinkInternalRow using utility function
-            // Use temporary values that will be overridden later
-            return RowDataUtils.convertDataChangeEventToHoodieFlinkInternalRow(
-                    dataChangeEvent, schema, zoneId, "temp", "temp");
-        } else {
-            throw new IllegalArgumentException(
-                    "Unsupported event type for Hudi serialization: "
-                            + event.getClass().getSimpleName());
-        }
+        return serialize(event, "temp", "temp");
     }
 
     /**
@@ -197,22 +155,6 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
      */
     public boolean hasSchema(TableId tableId) {
         return schemaMaps.containsKey(tableId);
-    }
-
-    /**
-     * Get cached field getters for a table, creating them if needed.
-     *
-     * @param tableId The table identifier
-     * @return List of field getters or null if schema not available
-     */
-    public List<RecordData.FieldGetter> getFieldGetters(TableId tableId) {
-        Schema schema = schemaMaps.get(tableId);
-        if (schema == null) {
-            return null;
-        }
-
-        return fieldGetterCache.computeIfAbsent(
-                tableId, k -> RowDataUtils.createFieldGetters(schema, zoneId));
     }
 
     /**

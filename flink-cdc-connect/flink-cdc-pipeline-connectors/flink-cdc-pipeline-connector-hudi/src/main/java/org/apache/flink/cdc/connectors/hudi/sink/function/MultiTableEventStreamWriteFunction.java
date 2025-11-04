@@ -436,8 +436,8 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         tableFunction.setCorrespondent(tableCorrespondent);
         tableFunction.setTableId(tableId);
 
-        // This is the key change: instead of passing the raw gateway, we pass a proxy
-        // that intercepts and enhances events with the table path.
+        // Instead of passing the raw gateway, we pass a proxy that intercepts and enhances events
+        // with the table path
         String tablePath = tableConfig.getString(FlinkOptions.PATH);
         tableFunction.setOperatorEventGateway(
                 new InterceptingGateway(this.getOperatorEventGateway(), tablePath));
