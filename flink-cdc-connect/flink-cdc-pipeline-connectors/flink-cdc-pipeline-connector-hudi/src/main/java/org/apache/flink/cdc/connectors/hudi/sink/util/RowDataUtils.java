@@ -355,17 +355,18 @@ public class RowDataUtils {
      *   <li>Formats them as "field1=value1/field2=value2" (Hive-style partitioning)
      * </ul>
      *
-     * <p>If no partition keys are defined, returns "default".
+     * <p>If no partition keys are defined, returns empty string (for unpartitioned tables).
      *
      * @param dataChangeEvent The DataChangeEvent to extract partition from
      * @param schema The table schema containing partition key definitions
-     * @return The partition path string
+     * @return The partition path string (empty string for unpartitioned tables)
      */
     private static String extractPartitionPathFromDataChangeEvent(
             DataChangeEvent dataChangeEvent, Schema schema) {
         List<String> partitionKeys = schema.partitionKeys();
         if (partitionKeys == null || partitionKeys.isEmpty()) {
-            return "default";
+            // Hudi convention: unpartitioned tables use empty string, not "default"
+            return "";
         }
 
         // Get the record data to extract from (after for INSERT/UPDATE/REPLACE, before for DELETE)
