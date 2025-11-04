@@ -33,6 +33,12 @@ limitations under the License.
             <artifactId>flink-connector-oceanbase-cdc</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-mysql-cdc</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -55,18 +61,21 @@ limitations under the License.
                                     <include>io.debezium:debezium-api</include>
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
-                                    <include>org.apache.flink:flink-cdc-base</include>
+                                    <include>io.debezium:debezium-ddl-parser</include>
+                                    <include>io.debezium:debezium-connector-mysql</include>
+                                    <include>org.apache.flink:flink-cdc-common</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
-                                    <include>org.apache.flink:flink-connector-oceanbase-cdc</include>
-                                    <include>com.oceanbase:*</include>
-                                    <include>io.netty:*</include>
-                                    <include>com.google.protobuf:protobuf-java</include>
-                                    <include>commons-codec:commons-codec</include>
-                                    <include>org.lz4:lz4-java</include>
-                                    <include>org.apache.avro:avro</include>
-                                    <include>org.apache.commons:commons-lang3</include>
+                                    <include>org.apache.flink:flink-connector-mysql-cdc</include>
+                                    <include>org.antlr:antlr4-runtime</include>
                                     <include>org.apache.kafka:*</include>
+                                    <include>com.zendesk:mysql-binlog-connector-java</include>
                                     <include>com.fasterxml.*:*</include>
+                                    <include>com.google.guava:*</include>
+                                    <include>com.esri.geometry:esri-geometry-api</include>
+                                    <include>com.zaxxer:HikariCP</include>
+                                    <!--  Include fixed version 30.1.1-jre-14.0 of flink shaded guava  -->
+                                    <include>org.apache.flink:flink-shaded-guava</include>
+                                    <include>org.apache.flink:flink-connector-oceanbase-cdc</include>
                                 </includes>
                             </artifactSet>
                             <filters>
@@ -85,21 +94,15 @@ limitations under the License.
                             </filters>
                             <relocations>
                                 <relocation>
-                                    <pattern>org.apache.commons</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.commons
-                                    </shadedPattern>
-                                </relocation>
-                                <relocation>
                                     <pattern>org.apache.kafka</pattern>
                                     <shadedPattern>
                                         org.apache.flink.cdc.connectors.shaded.org.apache.kafka
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.apache.avro</pattern>
+                                    <pattern>org.antlr</pattern>
                                     <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.avro
+                                        org.apache.flink.cdc.connectors.shaded.org.antlr
                                     </shadedPattern>
                                 </relocation>
                                 <relocation>
@@ -112,6 +115,16 @@ limitations under the License.
                                     <pattern>com.google</pattern>
                                     <shadedPattern>
                                         org.apache.flink.cdc.connectors.shaded.com.google
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.esri.geometry</pattern>
+                                    <shadedPattern>org.apache.flink.cdc.connectors.shaded.com.esri.geometry</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.zaxxer</pattern>
+                                    <shadedPattern>
+                                        org.apache.flink.cdc.connectors.shaded.com.zaxxer
                                     </shadedPattern>
                                 </relocation>
                             </relocations>

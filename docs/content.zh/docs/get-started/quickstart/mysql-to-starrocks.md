@@ -34,16 +34,18 @@ under the License.
 
 ### 准备 Flink Standalone 集群
 1. 下载 [Flink 1.20.1](https://archive.apache.org/dist/flink/flink-1.20.1/flink-1.20.1-bin-scala_2.12.tgz) ，解压后得到 flink-1.20.1 目录。   
-   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-1.18.0 所在目录。
+   使用下面的命令跳转至 Flink 目录下，并且设置 FLINK_HOME 为 flink-1.20.1 所在目录。
 
    ```shell
    cd flink-1.20.1
    ```
 
-2. 通过在 conf/flink-conf.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
+2. 通过在 conf/config.yaml 配置文件追加下列参数开启 checkpoint，每隔 3 秒做一次 checkpoint。
 
    ```yaml
-   execution.checkpointing.interval: 3000
+   execution:
+     checkpointing:
+       interval: 3s
    ```
 
 3. 使用下面的命令启动 Flink 集群。

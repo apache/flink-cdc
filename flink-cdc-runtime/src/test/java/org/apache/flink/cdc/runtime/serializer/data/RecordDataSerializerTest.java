@@ -25,7 +25,7 @@ import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 /** A test for the {@link StringDataSerializer}. */
-public class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
+class RecordDataSerializerTest extends SerializerTestBase<RecordData> {
 
     @Override
     protected RecordDataSerializer createSerializer() {

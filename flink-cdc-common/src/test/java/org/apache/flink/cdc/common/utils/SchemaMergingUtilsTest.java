@@ -19,14 +19,17 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -49,6 +52,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -417,7 +421,28 @@ class SchemaMergingUtilsTest {
                                 TABLE_ID,
                                 Collections.singletonMap("name", STRING),
                                 Collections.singletonMap("name", VARCHAR(17))));
-
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "number", BIGINT),
+                                of("id", BIGINT)))
+                .as("test remove id while add gentle")
+                .containsExactly(new DropColumnEvent(TABLE_ID, Arrays.asList("number", "name")));
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "number", BIGINT),
+                                of("id", BIGINT, "name", STRING, "gentle", STRING)))
+                .as("test remove id while add gentle")
+                .containsExactly(
+                        new AddColumnEvent(
+                                TABLE_ID,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("gentle", STRING),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "name"))),
+                        new DropColumnEvent(TABLE_ID, Collections.singletonList("number")));
         Stream.of(TINYINT, SMALLINT, INT)
                 .forEach(
                         type ->
@@ -742,6 +767,10 @@ class SchemaMergingUtilsTest {
                         Tuple4.of(
                                 DATE, dateOf(2020, 4, 4), TIMESTAMP_TZ, zTsOf("2020", "04", "04")),
                         Tuple4.of(DATE, dateOf(2021, 5, 5), STRING, binStrOf("2021-05-05")),
+
+                        // From TIME
+                        Tuple4.of(TIME, timeOf(21, 48, 25), TIME, timeOf(21, 48, 25)),
+                        Tuple4.of(TIME, timeOf(21, 48, 25), STRING, binStrOf("21:48:25")),
 
                         // From TIMESTAMP
                         Tuple4.of(
@@ -1119,10 +1148,8 @@ class SchemaMergingUtilsTest {
     private static void assertTypeMergingVector(DataType incomingType, List<DataType> resultTypes) {
         Assertions.assertThat(ALL_TYPES)
                 .map(type -> getLeastCommonType(type, incomingType))
-                .containsExactlyElementsOf(resultTypes);
-
-        // Flip LHS and RHS should emit same outputs
-        Assertions.assertThat(ALL_TYPES)
+                .containsExactlyElementsOf(resultTypes)
+                // Flip LHS and RHS should emit same outputs
                 .map(type -> getLeastCommonType(incomingType, type))
                 .containsExactlyElementsOf(resultTypes);
     }
@@ -1147,8 +1174,12 @@ class SchemaMergingUtilsTest {
         return builder.build();
     }
 
-    private static long dateOf(int year, int month, int dayOfMonth) {
-        return LocalDate.of(year, month, dayOfMonth).toEpochDay();
+    private static DateData dateOf(int year, int month, int dayOfMonth) {
+        return DateData.fromLocalDate(LocalDate.of(year, month, dayOfMonth));
+    }
+
+    private static TimeData timeOf(int hour, int minute, int second) {
+        return TimeData.fromLocalTime(LocalTime.of(hour, minute, second));
     }
 
     private static TimestampData tsOf(String year, String month, String dayOfMonth) {

@@ -59,7 +59,7 @@ limitations under the License.
     </scm>
 
     <properties>
-        <revision>3.4-SNAPSHOT</revision>
+        <revision>3.6-SNAPSHOT</revision>
         <scala.binary.version>2.12</scala.binary.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
@@ -82,8 +82,7 @@ limitations under the License.
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <json-path.version>2.7.0</json-path.version>
         <jackson.version>2.13.2</jackson.version>
-        <junit5.version>5.10.1</junit5.version>
-        <junit4.version>4.13.2</junit4.version>
+        <junit.version>5.10.1</junit.version>
         <assertj.version>3.24.2</assertj.version>
         <markBundledAsOptional>true</markBundledAsOptional>
         <flatten-maven-plugin.version>1.5.0</flatten-maven-plugin.version>
@@ -96,6 +95,9 @@ limitations under the License.
         <scala.version>2.12.16</scala.version>
         <!-- Maven shade plugin prior to 3.2.0 could not correctly shade nested classes with JDK 8+. -->
         <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
+        <iceberg.version>1.6.1</iceberg.version>
+        <hive.version>2.3.9</hive.version>
+        <hadoop.version>3.3.4</hadoop.version>
     </properties>
 
     <dependencyManagement>
@@ -111,15 +113,9 @@ limitations under the License.
             <dependency>
                 <groupId>org.junit</groupId>
                 <artifactId>junit-bom</artifactId>
-                <version>${junit5.version}</version>
+                <version>${junit.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-
-            <dependency>
-                <groupId>junit</groupId>
-                <artifactId>junit</artifactId>
-                <version>${junit4.version}</version>
             </dependency>
 
             <dependency>
@@ -345,12 +341,6 @@ limitations under the License.
         </dependency>
 
         <dependency>
-            <groupId>org.junit.vintage</groupId>
-            <artifactId>junit-vintage-engine</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <version>${assertj.version}</version>
@@ -431,6 +421,8 @@ limitations under the License.
                     </licenseFamilies>
                     <excludes>
                         <!-- Additional files like .gitignore etc.-->
+                        <!-- Release files -->
+                        <exclude>**/release/**</exclude>
                         <exclude>**/README.md</exclude>
                         <exclude>**/.*/**</exclude>
                         <!-- Generated content -->
@@ -566,7 +558,7 @@ limitations under the License.
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
                     </systemPropertyVariables>
                     <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
-                         does not understanding some time zone which used in Ubuntu OS -->
+                         does not understand some time zone which used in Ubuntu OS -->
                     <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
                         -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
                     </argLine>
@@ -684,6 +676,16 @@ limitations under the License.
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+
+            <!-- Allow modification of pom.xml properties using Maven commands. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.5</version>
+                <configuration>
+                    <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
             </plugin>
         </plugins>

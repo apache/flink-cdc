@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.utils.StringUtils;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import java.io.Serializable;
@@ -71,6 +72,10 @@ public class TransformFilter implements Serializable {
         return columnNameMap;
     }
 
+    public String getColumnNameMapAsString() {
+        return TransformException.prettyPrintColumnNameMap(getColumnNameMap());
+    }
+
     public static Optional<TransformFilter> of(
             String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
@@ -88,5 +93,21 @@ public class TransformFilter implements Serializable {
 
     public boolean isValid() {
         return !columnNames.isEmpty();
+    }
+
+    @Override
+    public String toString() {
+        return "TransformFilter{"
+                + "expression='"
+                + expression
+                + '\''
+                + ", scriptExpression='"
+                + scriptExpression
+                + '\''
+                + ", columnNames="
+                + columnNames
+                + ", columnNameMap="
+                + columnNameMap
+                + '}';
     }
 }

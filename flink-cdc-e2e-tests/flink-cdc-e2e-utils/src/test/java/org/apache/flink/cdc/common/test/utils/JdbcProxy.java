@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.common.test.utils;
 
 import org.apache.commons.lang3.StringUtils;
-import org.junit.Assert;
+import org.assertj.core.api.Assertions;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -67,7 +67,7 @@ public class JdbcProxy {
             Collections.sort(results);
             Collections.sort(expectedResult);
             // make it easier to check the result
-            Assert.assertArrayEquals(expectedResult.toArray(), results.toArray());
+            Assertions.assertThat(expectedResult.toArray()).isEqualTo(results.toArray());
         }
     }
 

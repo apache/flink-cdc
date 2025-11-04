@@ -30,24 +30,14 @@ import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
 
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.hep.HepPlanner;
-import org.apache.calcite.plan.hep.HepProgramBuilder;
 import org.apache.calcite.prepare.CalciteCatalogReader;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.type.SqlTypeFactoryImpl;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
-import org.apache.calcite.sql2rel.RelDecorrelator;
-import org.apache.calcite.sql2rel.SqlToRelConverter;
-import org.apache.calcite.sql2rel.StandardConvertletTable;
-import org.apache.calcite.tools.RelBuilder;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +49,7 @@ import java.util.Map;
 import java.util.Properties;
 
 /** Unit tests for the {@link TransformParser}. */
-public class TransformParserTest {
+class TransformParserTest {
 
     private static final Schema CUSTOMERS_SCHEMA =
             Schema.newBuilder()
@@ -69,19 +59,18 @@ public class TransformParserTest {
                     .build();
 
     @Test
-    public void testCalciteParser() {
+    void testCalciteParser() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select CONCAT(id, order_id) as uniq_id, * from tb where uniq_id > 10 and id is not null");
-        Assertions.assertThat(parse.getSelectList().toString())
-                .isEqualTo("`CONCAT`(`id`, `order_id`) AS `uniq_id`, *");
+        Assertions.assertThat(parse.getSelectList())
+                .hasToString("`CONCAT`(`id`, `order_id`) AS `uniq_id`, *");
 
-        Assertions.assertThat(parse.getWhere().toString())
-                .isEqualTo("`uniq_id` > 10 AND `id` IS NOT NULL");
+        Assertions.assertThat(parse.getWhere()).hasToString("`uniq_id` > 10 AND `id` IS NOT NULL");
     }
 
     @Test
-    public void testTransformCalciteValidate() {
+    void testTransformCalciteValidate() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -110,10 +99,10 @@ public class TransformParserTest {
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
         SqlNode validateSqlNode = validator.validate(parse);
 
-        Assertions.assertThat(parse.getSelectList().toString())
-                .isEqualTo("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
+        Assertions.assertThat(parse.getSelectList())
+                .hasToString("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
 
-        Assertions.assertThat(parse.getWhere().toString()).isEqualTo("`tb`.`id` IS NOT NULL");
+        Assertions.assertThat(parse.getWhere()).hasToString("`tb`.`id` IS NOT NULL");
 
         Assertions.assertThat(validateSqlNode.toString().replaceAll("\r\n", "\n"))
                 .isEqualTo(
@@ -123,7 +112,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testCalciteRelNode() {
+    void testCalciteRelNode() {
         SqlSelect parse =
                 TransformParser.parseSelect(
                         "select SUBSTR(id, 1) as uniq_id, * from tb where id is not null");
@@ -151,29 +140,11 @@ public class TransformParserTest {
                         factory,
                         SqlValidator.Config.DEFAULT.withIdentifierExpansion(true));
         SqlNode validateSqlNode = validator.validate(parse);
-        RexBuilder rexBuilder = new RexBuilder(factory);
-        HepProgramBuilder builder = new HepProgramBuilder();
-        HepPlanner planner = new HepPlanner(builder.build());
-        RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
-        SqlToRelConverter.Config config = SqlToRelConverter.config().withTrimUnusedFields(false);
-        SqlToRelConverter sqlToRelConverter =
-                new SqlToRelConverter(
-                        null,
-                        validator,
-                        calciteCatalogReader,
-                        cluster,
-                        StandardConvertletTable.INSTANCE,
-                        config);
-        RelRoot relRoot = sqlToRelConverter.convertQuery(validateSqlNode, false, true);
-        relRoot = relRoot.withRel(sqlToRelConverter.flattenTypes(relRoot.rel, true));
-        RelBuilder relBuilder = config.getRelBuilderFactory().create(cluster, null);
-        relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, relBuilder));
-        RelNode relNode = relRoot.rel;
 
-        Assertions.assertThat(parse.getSelectList().toString())
-                .isEqualTo("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
+        Assertions.assertThat(parse.getSelectList())
+                .hasToString("SUBSTR(`tb`.`id`, 1) AS `uniq_id`, `tb`.`id`, `tb`.`order_id`");
 
-        Assertions.assertThat(parse.getWhere().toString()).isEqualTo("`tb`.`id` IS NOT NULL");
+        Assertions.assertThat(parse.getWhere()).hasToString("`tb`.`id` IS NOT NULL");
 
         Assertions.assertThat(validateSqlNode.toString().replaceAll("\r\n", "\n"))
                 .isEqualTo(
@@ -183,7 +154,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testParseComputedColumnNames() {
+    void testParseComputedColumnNames() {
         List<String> computedColumnNames =
                 TransformParser.parseComputedColumnNames(
                         "CONCAT(id, order_id) as uniq_id, *", new SupportedMetadataColumn[0]);
@@ -192,7 +163,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testParseFilterColumnNameList() {
+    void testParseFilterColumnNameList() {
         List<String> computedColumnNames =
                 TransformParser.parseFilterColumnNameList(" uniq_id > 10 and id is not null");
         Assertions.assertThat(computedColumnNames.toArray())
@@ -200,7 +171,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testTranslateFilterToJaninoExpression() {
+    void testTranslateFilterToJaninoExpression() {
         testFilterExpression("id is not null", "null != id");
         testFilterExpression("id is null", "null == id");
         testFilterExpression("id = 1 and uid = 2", "valueEquals(id, 1) && valueEquals(uid, 2)");
@@ -260,7 +231,8 @@ public class TransformParserTest {
         testFilterExpression("QUARTER(dt)", "quarter(dt)");
         testFilterExpression("MONTH(dt)", "month(dt)");
         testFilterExpression("WEEK(dt)", "week(dt)");
-        testFilterExpression("DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\")");
+        testFilterExpression(
+                "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression(
                 "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
         testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
@@ -461,7 +433,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testGenerateProjectionColumns() {
+    void testGenerateProjectionColumns() {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("id", DataTypes.INT(), "id"),
@@ -472,7 +444,8 @@ public class TransformParserTest {
                         Column.physicalColumn("address", DataTypes.VARCHAR(50), "newAddress"),
                         Column.physicalColumn("deposit", DataTypes.DECIMAL(10, 2), "deposit"),
                         Column.physicalColumn("weight", DataTypes.DOUBLE(), "weight"),
-                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"));
+                        Column.physicalColumn("height", DataTypes.DOUBLE(), "height"),
+                        Column.physicalColumn("op_type", DataTypes.TINYINT(), "op_type"));
 
         List<ProjectionColumn> result =
                 TransformParser.generateProjectionColumns(
@@ -494,7 +467,7 @@ public class TransformParserTest {
 
         List<ProjectionColumn> metadataResult =
                 TransformParser.generateProjectionColumns(
-                        "*, __namespace_name__, __schema_name__, __table_name__",
+                        "*, __namespace_name__, __schema_name__, __table_name__, __data_event_type__ AS op_type",
                         testColumns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0]);
@@ -509,6 +482,7 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`deposit` DECIMAL(10, 2) 'deposit', expression='deposit', scriptExpression='$0', originalColumnNames=[deposit], columnNameMap={deposit=$0}}",
                         "ProjectionColumn{column=`weight` DOUBLE 'weight', expression='weight', scriptExpression='$0', originalColumnNames=[weight], columnNameMap={weight=$0}}",
                         "ProjectionColumn{column=`height` DOUBLE 'height', expression='height', scriptExpression='$0', originalColumnNames=[height], columnNameMap={height=$0}}",
+                        "ProjectionColumn{column=`op_type` STRING NOT NULL, expression='__data_event_type__', scriptExpression='$0', originalColumnNames=[__data_event_type__], columnNameMap={__data_event_type__=$0}}",
                         "ProjectionColumn{column=`__namespace_name__` STRING NOT NULL, expression='__namespace_name__', scriptExpression='$0', originalColumnNames=[__namespace_name__], columnNameMap={__namespace_name__=$0}}",
                         "ProjectionColumn{column=`__schema_name__` STRING NOT NULL, expression='__schema_name__', scriptExpression='$0', originalColumnNames=[__schema_name__], columnNameMap={__schema_name__=$0}}",
                         "ProjectionColumn{column=`__table_name__` STRING NOT NULL, expression='__table_name__', scriptExpression='$0', originalColumnNames=[__table_name__], columnNameMap={__table_name__=$0}}");
@@ -566,7 +540,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testGenerateReferencedColumns() {
+    void testGenerateReferencedColumns() {
         List<Column> testColumns =
                 Arrays.asList(
                         Column.physicalColumn("id", DataTypes.INT(), "id"),
@@ -591,7 +565,7 @@ public class TransformParserTest {
                         "`address` STRING 'address'",
                         "`weight` DOUBLE 'weight'",
                         "`height` DOUBLE 'height'");
-        Assertions.assertThat(result.toString()).isEqualTo("[" + String.join(", ", expected) + "]");
+        Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
 
         // calculated columns must use AS to provide an alias name
         Assertions.assertThatThrownBy(
@@ -602,26 +576,7 @@ public class TransformParserTest {
     }
 
     @Test
-    public void testNormalizeFilter() {
-        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", "a > 0 and b > 0"))
-                .isEqualTo("`a` > 0 AND `b` > 0");
-        Assertions.assertThat(TransformParser.normalizeFilter("a, b, c, d", null)).isEqualTo(null);
-        Assertions.assertThat(
-                        TransformParser.normalizeFilter(
-                                "abs(a) as cal_a, char_length(b) as cal_b, c, d",
-                                "a > 4 and cal_a > 8 and cal_b < 17 and c != d"))
-                .isEqualTo("`a` > 4 AND ABS(`a`) > 8 AND CHAR_LENGTH(`b`) < 17 AND `c` <> `d`");
-
-        Assertions.assertThat(
-                        TransformParser.normalizeFilter(
-                                "x, y, z, 1 - x as u, 1 - y as v, 1 - z as w",
-                                "concat(u, concat(v, concat(w, x), y), z) != 10"))
-                .isEqualTo(
-                        "`concat`(1 - `x`, `concat`(1 - `y`, `concat`(1 - `z`, `x`), `y`), `z`) <> 10");
-    }
-
-    @Test
-    public void testTranslateUdfFilterToJaninoExpression() {
+    void testTranslateUdfFilterToJaninoExpression() {
         testFilterExpressionWithUdf(
                 "format(upper(id))", "__instanceOfFormatFunctionClass.eval(upper(id))");
         testFilterExpressionWithUdf(
@@ -772,6 +727,52 @@ public class TransformParserTest {
                         "ProjectionColumn{column=`test-meta-col` INT NOT NULL, expression='test-meta-col', scriptExpression='$0', originalColumnNames=[test-meta-col], columnNameMap={test-meta-col=$0}}",
                         "ProjectionColumn{column=`g` INT, expression='`TB`.`test-meta-col` - `TB`.`a` - `TB`.`b`', scriptExpression='$0 - $1 - $2', originalColumnNames=[test-meta-col, a, b], columnNameMap={a=$1, b=$2, test-meta-col=$0}}");
         Assertions.assertThat(result).hasToString("[" + String.join(", ", expected) + "]");
+    }
+
+    private static final String[] UNICODE_STRINGS = {
+        "ascii test!?",
+        "大五",
+        "测试数据",
+        "ひびぴ",
+        "죠주쥬",
+        "ÀÆÉ",
+        "ÓÔŐÖ",
+        "αβγδε",
+        "בבקשה",
+        "твой",
+        "ภาษาไทย",
+        "piedzimst brīvi"
+    };
+
+    @Test
+    void testParsingExpressionWithUnicodeLiterals() {
+        List<Column> columns =
+                Arrays.asList(
+                        Column.physicalColumn("a", DataTypes.STRING(), "a"),
+                        Column.physicalColumn("b", DataTypes.INT(), "b"));
+
+        for (String unicodeString : UNICODE_STRINGS) {
+            Assertions.assertThat(
+                            TransformParser.generateProjectionColumns(
+                                    "a, b, a = '{UNICODE_STRING}' AS c1, a <> '{UNICODE_STRING}' AS c2, b = '{UNICODE_STRING}' AS c3, b <> '{UNICODE_STRING}' AS c4"
+                                            .replace("{UNICODE_STRING}", unicodeString),
+                                    columns,
+                                    Collections.emptyList(),
+                                    new SupportedMetadataColumn[] {}))
+                    .map(ProjectionColumn::getScriptExpression)
+                    .containsExactly(
+                            "$0",
+                            "$0",
+                            "valueEquals($0, \"" + unicodeString + "\")",
+                            "!valueEquals($0, \"" + unicodeString + "\")",
+                            "valueEquals($0, castToInteger(\"" + unicodeString + "\"))",
+                            "!valueEquals($0, castToInteger(\"" + unicodeString + "\"))");
+
+            testFilterExpression(
+                    "a = '" + unicodeString + "'", "valueEquals(a, \"" + unicodeString + "\")");
+            testFilterExpression(
+                    "a <> '" + unicodeString + "'", "!valueEquals(a, \"" + unicodeString + "\")");
+        }
     }
 
     private void testFilterExpression(String expression, String expressionExpect) {

@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.common.utils;
 
+import org.apache.flink.cdc.common.data.DateData;
+import org.apache.flink.cdc.common.data.TimeData;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,12 +74,12 @@ public class DateTimeUtils {
      * @param ts the timestamp in milliseconds.
      * @return the date in days.
      */
-    public static int timestampMillisToDate(long ts) {
-        int days = (int) (ts / MILLIS_PER_DAY);
+    public static DateData timestampMillisToDate(long ts) {
+        long days = ts / MILLIS_PER_DAY;
         if (days < 0) {
             days = days - 1;
         }
-        return days;
+        return DateData.fromEpochDay((int) days);
     }
 
     /**
@@ -85,8 +88,8 @@ public class DateTimeUtils {
      * @param ts the timestamp in milliseconds.
      * @return the time in milliseconds.
      */
-    public static int timestampMillisToTime(long ts) {
-        return (int) (ts % MILLIS_PER_DAY);
+    public static TimeData timestampMillisToTime(long ts) {
+        return TimeData.fromMillisOfDay((int) (ts % MILLIS_PER_DAY));
     }
 
     // --------------------------------------------------------------------------------------------
@@ -103,12 +106,12 @@ public class DateTimeUtils {
         return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
     }
 
-    public static int parseDate(String dateStr, String fromFormat, String timezone) {
+    public static DateData parseDate(String dateStr, String fromFormat, String timezone) {
         long ts = internalParseTimestampMillis(dateStr, fromFormat, TimeZone.getTimeZone(timezone));
         ZoneId zoneId = ZoneId.of(timezone);
         Instant instant = Instant.ofEpochMilli(ts);
         ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, zoneId);
-        return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
+        return DateData.fromLocalDate(zdt.toLocalDate());
     }
 
     private static long internalParseTimestampMillis(String dateStr, String format, TimeZone tz) {

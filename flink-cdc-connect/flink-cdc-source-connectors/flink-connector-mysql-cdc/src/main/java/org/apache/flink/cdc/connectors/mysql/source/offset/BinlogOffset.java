@@ -238,7 +238,9 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         }
 
         // First compare the MySQL binlog filenames
-        if (this.getFilename().compareToIgnoreCase(that.getFilename()) != 0) {
+        if (this.getFilename() != null
+                && that.getFilename() != null
+                && this.getFilename().compareToIgnoreCase(that.getFilename()) != 0) {
             return this.getFilename().compareToIgnoreCase(that.getFilename());
         }
 

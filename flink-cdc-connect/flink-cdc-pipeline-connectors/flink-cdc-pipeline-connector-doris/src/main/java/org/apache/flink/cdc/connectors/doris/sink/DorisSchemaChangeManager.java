@@ -23,7 +23,7 @@ import org.apache.doris.flink.sink.schema.SchemaChangeManager;
 
 import java.io.IOException;
 
-import static org.apache.doris.flink.catalog.doris.DorisSystem.identifier;
+import static org.apache.doris.flink.catalog.doris.DorisSchemaFactory.identifier;
 
 /** An enriched version of Doris' {@link SchemaChangeManager}. */
 public class DorisSchemaChangeManager extends SchemaChangeManager {

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.metrics.MetricGroup;
@@ -25,6 +26,7 @@ import org.apache.flink.runtime.io.disk.iomanager.IOManager;
 import org.apache.flink.runtime.io.disk.iomanager.IOManagerAsync;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
@@ -36,10 +38,12 @@ import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.utils.ExecutorThreadFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +53,10 @@ import java.util.stream.Collectors;
 
 /** A {@link Sink} to write {@link DataChangeEvent} to Paimon storage. */
 public class PaimonWriter<InputT>
-        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable> {
+        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable>,
+                StatefulSinkWriter<InputT, PaimonWriterState> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(PaimonWriter.class);
 
     // use `static` because Catalog is unSerializable.
     private static Catalog catalog;
@@ -71,6 +78,8 @@ public class PaimonWriter<InputT>
     /** A workaround variable trace the checkpointId in {@link StreamOperator#snapshotState}. */
     private long lastCheckpointId;
 
+    private final PaimonWriterState stateCache;
+
     public PaimonWriter(
             Options catalogOptions,
             MetricGroup metricGroup,
@@ -89,25 +98,40 @@ public class PaimonWriter<InputT>
                                 Thread.currentThread().getName() + "-CdcMultiWrite-Compaction"));
         this.serializer = serializer;
         this.lastCheckpointId = lastCheckpointId;
+        this.stateCache = new PaimonWriterState(commitUser);
+        LOG.info(
+                "Created PaimonWriter with commit user {} and identifier {}",
+                commitUser,
+                lastCheckpointId);
     }
 
     @Override
-    public Collection<MultiTableCommittable> prepareCommit() throws IOException {
-        List<MultiTableCommittable> committables = new ArrayList<>();
-        for (Map.Entry<Identifier, StoreSinkWrite> entry : writes.entrySet()) {
-            Identifier key = entry.getKey();
-            StoreSinkWrite write = entry.getValue();
-            boolean waitCompaction = true;
-            committables.addAll(
-                    // here we set it to lastCheckpointId+1 to
-                    // avoid prepareCommit the same checkpointId with the first round.
-                    write.prepareCommit(waitCompaction, lastCheckpointId + 1).stream()
-                            .map(
-                                    committable ->
-                                            MultiTableCommittable.fromCommittable(key, committable))
-                            .collect(Collectors.toList()));
-        }
+    public Collection<MultiTableCommittable> prepareCommit() {
+        long startTime = System.currentTimeMillis();
+        List<MultiTableCommittable> committables =
+                writes.entrySet()
+                        .parallelStream()
+                        .flatMap(
+                                entry -> {
+                                    try {
+                                        // here we set it to lastCheckpointId+1 to
+                                        // avoid prepareCommit the same checkpointId with the first
+                                        // round.
+                                        return entry.getValue()
+                                                .prepareCommit(false, lastCheckpointId + 1).stream()
+                                                .map(
+                                                        committable ->
+                                                                MultiTableCommittable
+                                                                        .fromCommittable(
+                                                                                entry.getKey(),
+                                                                                committable));
+                                    } catch (IOException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })
+                        .collect(Collectors.toList());
         lastCheckpointId++;
+        LOG.debug("Spend {} ms to prepareCommit", System.currentTimeMillis() - startTime);
         return committables;
     }
 
@@ -142,13 +166,22 @@ public class PaimonWriter<InputT>
                     writes.computeIfAbsent(
                             tableId,
                             id -> {
+                                boolean waitCompaction =
+                                        Boolean.parseBoolean(
+                                                table.options()
+                                                        .getOrDefault(
+                                                                CoreOptions.DELETION_VECTORS_ENABLED
+                                                                        .key(),
+                                                                CoreOptions.DELETION_VECTORS_ENABLED
+                                                                        .defaultValue()
+                                                                        .toString()));
                                 StoreSinkWriteImpl storeSinkWrite =
                                         new StoreSinkWriteImpl(
                                                 table,
                                                 commitUser,
                                                 ioManager,
                                                 false,
-                                                false,
+                                                waitCompaction,
                                                 true,
                                                 memoryPoolFactory,
                                                 metricGroup);
@@ -190,5 +223,10 @@ public class PaimonWriter<InputT>
         if (compactExecutor != null) {
             compactExecutor.shutdownNow();
         }
+    }
+
+    @Override
+    public List<PaimonWriterState> snapshotState(long checkpointId) {
+        return Collections.singletonList(stateCache);
     }
 }

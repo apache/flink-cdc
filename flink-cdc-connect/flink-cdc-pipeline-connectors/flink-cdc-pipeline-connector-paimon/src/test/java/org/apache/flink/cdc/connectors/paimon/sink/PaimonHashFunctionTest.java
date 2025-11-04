@@ -31,7 +31,6 @@ import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.options.Options;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,7 +45,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Tests for {@link PaimonHashFunction}. */
-public class PaimonHashFunctionTest {
+class PaimonHashFunctionTest {
 
     @TempDir public static Path temporaryFolder;
 
@@ -122,12 +121,13 @@ public class PaimonHashFunctionTest {
                                     BinaryStringData.fromString("2024")
                                 }));
         int key3 = hashFunction.hashcode(dataChangeEvent3);
-        Assertions.assertTrue(
-                key1 >= 0 && key1 < 4 && key2 >= 0 && key2 < 4 && key3 >= 0 && key3 < 4);
+        assertThat(key1).isBetween(0, 3);
+        assertThat(key2).isBetween(0, 3);
+        assertThat(key3).isBetween(0, 3);
     }
 
     @Test
-    public void testHashCodeForFixedBucketTable() {
+    void testHashCodeForFixedBucketTable() {
         TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "10");
@@ -186,7 +186,6 @@ public class PaimonHashFunctionTest {
                                 }));
         int key3 = hashFunction.hashcode(dataChangeEvent3);
 
-        assertThat(key1).isEqualTo(key2);
-        assertThat(key1).isEqualTo(key3);
+        assertThat(key1).isEqualTo(key2).isEqualTo(key3);
     }
 }

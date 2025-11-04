@@ -34,6 +34,7 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.NlsString;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -41,6 +42,7 @@ import org.codehaus.janino.Java;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -66,7 +68,7 @@ public class JaninoCompiler {
                     "UNIX_TIMESTAMP");
 
     private static final List<String> TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS =
-            Arrays.asList("DATE_FORMAT");
+            Collections.emptyList();
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
             Arrays.asList(
@@ -75,7 +77,8 @@ public class JaninoCompiler {
                     "FROM_UNIXTIME",
                     "TIMESTAMPADD",
                     "TIMESTAMPDIFF",
-                    "TIMESTAMP_DIFF");
+                    "TIMESTAMP_DIFF",
+                    "DATE_FORMAT");
 
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
@@ -156,10 +159,10 @@ public class JaninoCompiler {
         if (sqlLiteral.getValue() == null) {
             return new Java.NullLiteral(Location.NOWHERE);
         }
-        String value = sqlLiteral.getValue().toString();
+        Object value = sqlLiteral.getValue();
         if (sqlLiteral instanceof SqlCharStringLiteral) {
             // Double quotation marks represent strings in Janino.
-            value = "\"" + value.substring(1, value.length() - 1) + "\"";
+            value = "\"" + sqlLiteral.getValueAs(NlsString.class).getValue() + "\"";
         } else if (sqlLiteral instanceof SqlNumericLiteral) {
             if (((SqlNumericLiteral) sqlLiteral).isInteger()) {
                 long longValue = sqlLiteral.longValue(true);
@@ -171,7 +174,7 @@ public class JaninoCompiler {
         if (SQL_TYPE_NAME_IGNORE.contains(sqlLiteral.getTypeName())) {
             value = "\"" + value + "\"";
         }
-        return new Java.AmbiguousName(Location.NOWHERE, new String[] {value});
+        return new Java.AmbiguousName(Location.NOWHERE, new String[] {value.toString()});
     }
 
     private static Java.Rvalue translateSqlBasicCall(

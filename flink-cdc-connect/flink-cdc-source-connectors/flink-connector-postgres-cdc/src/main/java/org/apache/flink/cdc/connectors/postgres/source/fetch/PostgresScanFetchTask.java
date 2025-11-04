@@ -202,7 +202,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
         try {
             replicationConnection.close(true);
         } catch (Throwable t) {
-            LOG.info("here exception occurs");
+            LOG.error("Unexpected error while dropping replication slot", t);
             throw new FlinkRuntimeException(t);
         }
     }
@@ -309,7 +309,7 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                                     snapshotSplit.getSplitStart(),
                                     snapshotSplit.getSplitEnd(),
                                     snapshotSplit.getSplitKeyType().getFieldCount(),
-                                    connectorConfig.getQueryFetchSize());
+                                    connectorConfig.getSnapshotFetchSize());
                     ResultSet rs = selectStatement.executeQuery()) {
 
                 ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);

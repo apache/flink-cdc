@@ -52,6 +52,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     private int lsnCommitCheckpointsDelay;
 
+    private boolean includePartitionedTables;
+
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -133,7 +135,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
                 lsnCommitCheckpointsDelay,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                includePartitionedTables);
     }
 
     /**
@@ -147,8 +150,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
 
     /**
      * The name of the Postgres logical decoding plug-in installed on the server. Supported values
-     * are decoderbufs, wal2json, wal2json_rds, wal2json_streaming, wal2json_rds_streaming and
-     * pgoutput.
+     * are decoderbufs and pgoutput.
      */
     public void decodingPluginName(String name) {
         this.pluginName = name;
@@ -181,5 +183,10 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The lsn commit checkpoints delay for Postgres. */
     public void setLsnCommitCheckpointsDelay(int lsnCommitCheckpointsDelay) {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+    }
+
+    /** Enable include partitioned table. */
+    public void setIncludePartitionedTables(boolean includePartitionedTables) {
+        this.includePartitionedTables = includePartitionedTables;
     }
 }

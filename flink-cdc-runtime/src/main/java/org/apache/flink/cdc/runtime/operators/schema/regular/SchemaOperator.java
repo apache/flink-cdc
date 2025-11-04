@@ -51,7 +51,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,10 +167,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         output.collect(
                 new StreamRecord<>(new FlushEvent(subTaskId, sinkTables, originalEvent.getType())));
 
+        LOG.info("{}> Going to request schema change...", subTaskId);
+
         // Then, queue to request schema change to SchemaCoordinator.
         SchemaChangeResponse response = requestSchemaChange(tableId, originalEvent);
 
-        LOG.info("{}> Successfully requested schema change.", subTaskId);
         LOG.info(
                 "{}> Finished schema change events: {}",
                 subTaskId,
@@ -240,12 +240,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             throw new IllegalStateException(
                     "Failed to send request to coordinator: " + request.toString(), e);
         }
-    }
-
-    /** Visible for mocking in test cases. */
-    @VisibleForTesting
-    protected int getCurrentTimestamp() {
-        return (int) Instant.now().getEpochSecond();
     }
 
     @VisibleForTesting

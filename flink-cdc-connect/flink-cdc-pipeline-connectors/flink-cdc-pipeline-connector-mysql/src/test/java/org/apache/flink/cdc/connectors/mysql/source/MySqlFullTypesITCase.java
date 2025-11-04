@@ -19,9 +19,11 @@ package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -40,10 +42,10 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
 import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.lifecycle.Startables;
 
 import java.math.BigDecimal;
@@ -59,7 +61,7 @@ import java.util.stream.Stream;
 import static javax.xml.bind.DatatypeConverter.parseHexBinary;
 
 /** IT case for MySQL event source. */
-public class MySqlFullTypesITCase extends MySqlSourceTestBase {
+class MySqlFullTypesITCase extends MySqlSourceTestBase {
 
     private static final MySqlContainer MYSQL8_CONTAINER =
             createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
@@ -80,21 +82,21 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() {
         LOG.info("Starting MySql8 containers...");
         Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         LOG.info("Container MySql8 is started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void afterClass() {
         LOG.info("Stopping MySql8 containers...");
         MYSQL8_CONTAINER.stop();
         LOG.info("Container MySql8 is stopped.");
     }
 
-    @Before
+    @BeforeEach
     public void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(200);
@@ -102,7 +104,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57CommonDataTypes() throws Throwable {
+    void testMysql57CommonDataTypes() throws Throwable {
         testCommonDataTypes(fullTypesMySql57Database);
     }
 
@@ -121,7 +123,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMySql8CommonDataTypes() throws Throwable {
+    void testMySql8CommonDataTypes() throws Throwable {
         testCommonDataTypes(fullTypesMySql8Database);
     }
 
@@ -140,7 +142,7 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql57TimeDataTypes() throws Throwable {
+    void testMysql57TimeDataTypes() throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -159,13 +161,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 new Object[] {
                     DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
-                    18460,
-                    64822000,
-                    64822123,
-                    // TIME(6) will lose precision for microseconds.
-                    // Because Flink's BinaryWriter force write int value for TIME(6).
-                    // See BinaryWriter#write for detail.
-                    64822123,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromNanoOfDay(64822000_000_000L),
+                    TimeData.fromNanoOfDay(64822123_000_000L),
+                    TimeData.fromNanoOfDay(64822123_456_000L),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
@@ -177,9 +176,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 new Object[] {
                     DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
-                    18460,
-                    64822000,
-                    64822123,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromNanoOfDay(64822000_000_000L),
+                    TimeData.fromNanoOfDay(64822123_000_000L),
                     null,
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
@@ -193,7 +192,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
     }
 
     @Test
-    public void testMysql8TimeDataTypes() throws Throwable {
+    void testMysql8TimeDataTypes() throws Throwable {
+        UniqueDatabase usedDd = fullTypesMySql8Database;
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -214,13 +214,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 new Object[] {
                     DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
-                    18460,
-                    64822000,
-                    64822123,
-                    // TIME(6) will lose precision for microseconds.
-                    // Because Flink's BinaryWriter force write int value for TIME(6).
-                    // See BinaryWriter#write for detail.
-                    64822123,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromNanoOfDay(64822000_000_000L),
+                    TimeData.fromNanoOfDay(64822123_000_000L),
+                    TimeData.fromNanoOfDay(64822123_456_000L),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123456")),
@@ -234,9 +231,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                 new Object[] {
                     DecimalData.fromBigDecimal(new BigDecimal("1"), 20, 0),
                     2021,
-                    18460,
-                    64822000,
-                    64822123,
+                    DateData.fromEpochDay(18460),
+                    TimeData.fromNanoOfDay(64822000_000_000L),
+                    TimeData.fromNanoOfDay(64822123_000_000L),
                     null,
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22.123")),
@@ -247,21 +244,20 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     LocalZonedTimestampData.fromInstant(toInstant("2000-01-01 00:00:00"))
                 };
 
-        testTimeDataTypes(
-                fullTypesMySql8Database, recordType, expectedSnapshot, expectedStreamRecord);
+        testTimeDataTypes(usedDd, recordType, expectedSnapshot, expectedStreamRecord);
     }
 
     @Test
-    public void testMysql57PrecisionTypes() throws Throwable {
+    void testMysql57PrecisionTypes() throws Throwable {
         testMysqlPrecisionTypes(fullTypesMySql57Database);
     }
 
     @Test
-    public void testMysql8PrecisionTypes() throws Throwable {
+    void testMysql8PrecisionTypes() throws Throwable {
         testMysqlPrecisionTypes(fullTypesMySql8Database);
     }
 
-    public void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
+    void testMysqlPrecisionTypes(UniqueDatabase database) throws Throwable {
         RowType recordType =
                 RowType.of(
                         DataTypes.DECIMAL(20, 0).notNull(),
@@ -296,9 +292,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DecimalData.fromBigDecimal(new BigDecimal("123.4"), 6, 2),
                     DecimalData.fromBigDecimal(new BigDecimal("1234.5"), 9, 4),
                     DecimalData.fromBigDecimal(new BigDecimal("1234.56"), 20, 4),
-                    64800000,
-                    64822100,
-                    64822100,
+                    TimeData.fromNanoOfDay(64800000_000_000L),
+                    TimeData.fromNanoOfDay(64822100_000_000L),
+                    TimeData.fromNanoOfDay(64822100_000_000L),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:00")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
@@ -325,8 +321,8 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DecimalData.fromBigDecimal(new BigDecimal("123.4"), 6, 2),
                     DecimalData.fromBigDecimal(new BigDecimal("1234.5"), 9, 4),
                     DecimalData.fromBigDecimal(new BigDecimal("1234.56"), 20, 4),
-                    64800000,
-                    64822100,
+                    TimeData.fromNanoOfDay(64800000_000_000L),
+                    TimeData.fromNanoOfDay(64822100_000_000L),
                     null,
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:00")),
                     TimestampData.fromTimestamp(Timestamp.valueOf("2020-07-17 18:00:22")),
@@ -468,7 +464,10 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     BinaryStringData.fromString(expectMultipointJsonText),
                     BinaryStringData.fromString(expectMultilineJsonText),
                     BinaryStringData.fromString(expectMultipolygonJsonText),
-                    BinaryStringData.fromString(expectGeometryCollectionJsonText)
+                    BinaryStringData.fromString(expectGeometryCollectionJsonText),
+                    BinaryStringData.fromString("long"),
+                    BinaryStringData.fromString("long varchar"),
+                    BinaryStringData.fromString("")
                 };
 
         // skip CreateTableEvent
@@ -670,6 +669,9 @@ public class MySqlFullTypesITCase extends MySqlSourceTestBase {
                     DataTypes.BYTES(),
                     DataTypes.BYTES(),
                     DataTypes.INT(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
+                    DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING(),
                     DataTypes.STRING(),

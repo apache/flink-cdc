@@ -17,38 +17,34 @@
 
 package com.github.shyiko.mysql.binlog.io;
 
-import org.junit.Test;
-
-import java.util.Arrays;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /** Unit test for {@link BufferedSocketInputStream}. */
-public class BufferedSocketInputStreamTest {
+class BufferedSocketInputStreamTest {
 
     @Test
-    public void testReadFromBufferedSocketInputStream() throws Exception {
+    void testReadFromBufferedSocketInputStream() throws Exception {
         BufferedSocketInputStream in =
                 new BufferedSocketInputStream(
                         new ByteArrayInputStream(
                                 new byte[] {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}));
         byte[] buf = new byte[3];
-        assertEquals(3, in.read(buf, 0, buf.length));
-        assertTrue(Arrays.equals(new byte[] {'A', 'B', 'C'}, buf));
-        assertEquals(5, in.available());
+        Assertions.assertThat(in.read(buf, 0, buf.length)).isEqualTo(3);
+        Assertions.assertThat(buf).isEqualTo(new byte[] {'A', 'B', 'C'});
+        Assertions.assertThat(in.available()).isEqualTo(5);
 
-        assertEquals(3, in.read(buf, 0, buf.length));
-        assertTrue(Arrays.equals(new byte[] {'D', 'E', 'F'}, buf));
-        assertEquals(2, in.available());
+        Assertions.assertThat(in.read(buf, 0, buf.length)).isEqualTo(3);
+        Assertions.assertThat(buf).isEqualTo(new byte[] {'D', 'E', 'F'});
+        Assertions.assertThat(in.available()).isEqualTo(2);
 
         buf = new byte[2];
-        assertEquals(2, in.read(buf, 0, buf.length));
-        assertTrue(Arrays.equals(new byte[] {'G', 'H'}, buf));
-        assertEquals(0, in.available());
+        Assertions.assertThat(in.read(buf, 0, buf.length)).isEqualTo(2);
+        Assertions.assertThat(buf).isEqualTo(new byte[] {'G', 'H'});
+        Assertions.assertThat(in.available()).isZero();
 
         // reach the end of stream normally
-        assertEquals(-1, in.read(buf, 0, buf.length));
-        assertEquals(0, in.available());
+        Assertions.assertThat(in.read(buf, 0, buf.length)).isEqualTo(-1);
+        Assertions.assertThat(in.available()).isZero();
     }
 }

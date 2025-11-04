@@ -419,15 +419,17 @@ public class SchemaCoordinator extends SchemaRegistry {
                     tableId, schemaManager.getLatestEvolvedSchema(tableId).orElse(null));
         }
 
-        // And returns all successfully applied schema change events to SchemaOperator.
-        responseFuture.complete(
-                wrap(new SchemaChangeResponse(appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
-
         pendingRequests.remove(sourceSubTaskId);
+
         LOG.info(
                 "Finished handling schema change request from {}. Pending requests: {}",
                 sourceSubTaskId,
                 pendingRequests);
+
+        // We release the response future at last to avoid leaking internal states to SchemaOperator
+        // client accidentally.
+        responseFuture.complete(
+                wrap(new SchemaChangeResponse(appliedSchemaChangeEvents, refreshedEvolvedSchemas)));
     }
 
     private boolean applyAndUpdateEvolvedSchemaChange(SchemaChangeEvent schemaChangeEvent) {
@@ -461,15 +463,6 @@ public class SchemaCoordinator extends SchemaRegistry {
         // In EXCEPTION mode, an exception will be thrown once captured
         return (throwable instanceof UnsupportedSchemaChangeEventException)
                 && (SchemaChangeBehavior.TRY_EVOLVE.equals(behavior));
-    }
-
-    /**
-     * {@code IDLE}: Initial idling state, ready for requests. <br>
-     * {@code APPLYING}: When schema change application finishes (successfully or with exceptions)
-     */
-    private enum RequestStatus {
-        IDLE,
-        APPLYING
     }
 
     /**
