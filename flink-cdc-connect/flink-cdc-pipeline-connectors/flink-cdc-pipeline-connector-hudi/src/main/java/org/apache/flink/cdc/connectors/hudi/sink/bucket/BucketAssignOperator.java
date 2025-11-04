@@ -17,16 +17,14 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.bucket;
 
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
-import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.cdc.connectors.hudi.sink.v2.OperatorIDGenerator;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.configuration.Configuration;
@@ -46,7 +44,6 @@ import org.apache.hudi.index.bucket.BucketIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,9 +82,6 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
 
     /** Cache of primary key fields per table. */
     private final Map<TableId, List<String>> primaryKeyCache = new HashMap<>();
-
-    /** Cache of field getters per table. */
-    private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache = new HashMap<>();
 
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {
         this.numBuckets = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
@@ -131,8 +125,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
             Schema newSchema = SchemaUtils.applySchemaChangeEvent(existingSchema, schemaEvent);
             schemaCache.put(schemaEvent.tableId(), newSchema);
 
-            // Clear caches when schema changes
-            fieldGetterCache.remove(schemaEvent.tableId());
+            // Clear primary key cache when schema changes
             primaryKeyCache.remove(schemaEvent.tableId());
 
             // Broadcast to all tasks
@@ -219,195 +212,17 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
                     "Cannot calculate bucket: table " + tableId + " has no primary keys");
         }
 
-        // Create final references for use in lambda
-        final List<String> finalPrimaryKeys = primaryKeys;
-
-        // Get or cache field getters
-        List<RecordData.FieldGetter> fieldGetters =
-                fieldGetterCache.computeIfAbsent(
-                        tableId,
-                        k -> {
-                            List<RecordData.FieldGetter> getters =
-                                    new ArrayList<>(finalPrimaryKeys.size());
-                            for (String primaryKeyField : finalPrimaryKeys) {
-                                int fieldIndex =
-                                        finalSchema.getColumnNames().indexOf(primaryKeyField);
-                                if (fieldIndex == -1) {
-                                    throw new IllegalStateException(
-                                            "Primary key field '"
-                                                    + primaryKeyField
-                                                    + "' not found in schema for table "
-                                                    + tableId);
-                                }
-                                DataType fieldType =
-                                        finalSchema.getColumns().get(fieldIndex).getType();
-                                getters.add(RecordData.createFieldGetter(fieldType, fieldIndex));
-                            }
-                            return getters;
-                        });
-
-        // Extract record key
-        String recordKey = extractRecordKey(event, primaryKeys, fieldGetters);
+        // Use RowDataUtils to extract record key and partition path
+        String recordKey = RowDataUtils.extractRecordKeyFromDataChangeEvent(event, finalSchema);
+        String partition = RowDataUtils.extractPartitionPathFromDataChangeEvent(event, finalSchema);
 
         // Calculate bucket using Hudi's logic (0 to numBuckets-1)
         String tableIndexKeyFields = String.join(",", primaryKeys);
         int bucketNumber = BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
 
-        // Extract partition path from the event
-        String partition = extractPartitionPath(event, finalSchema, fieldGetters);
-
         // Use partition function to map bucket to task index for balanced distribution
         int taskIndex = partitionIndexFunc.apply(numBuckets, partition, bucketNumber);
 
         return taskIndex;
-    }
-
-    private String extractRecordKey(
-            DataChangeEvent event,
-            List<String> primaryKeys,
-            List<RecordData.FieldGetter> fieldGetters) {
-        // For DELETE, use 'before' data; for INSERT/UPDATE, use 'after' data
-        RecordData recordData = event.op() == OperationType.DELETE ? event.before() : event.after();
-
-        if (recordData == null) {
-            throw new IllegalStateException(
-                    "Cannot extract record key: " + event.op() + " event has null data");
-        }
-
-        List<String> recordKeyPairs = new ArrayList<>(primaryKeys.size());
-        for (int i = 0; i < primaryKeys.size(); i++) {
-            RecordData.FieldGetter fieldGetter = fieldGetters.get(i);
-            Object fieldValue = fieldGetter.getFieldOrNull(recordData);
-
-            if (fieldValue == null) {
-                throw new IllegalStateException(
-                        "Primary key field '" + primaryKeys.get(i) + "' is null in record");
-            }
-
-            // Format as "fieldName:value"
-            recordKeyPairs.add(primaryKeys.get(i) + ":" + fieldValue);
-        }
-
-        return String.join(",", recordKeyPairs);
-    }
-
-    /**
-     * Extract partition path from the DataChangeEvent based on schema partition keys.
-     *
-     * <p>If the schema has partition keys defined:
-     *
-     * <ul>
-     *   <li>Extracts partition field values from the record data
-     *   <li>Formats them as "field1=value1/field2=value2" (Hive-style partitioning)
-     * </ul>
-     *
-     * <p>If no partition keys are defined, returns empty string (for unpartitioned tables).
-     *
-     * @param event The DataChangeEvent to extract partition from
-     * @param schema The table schema containing partition key definitions
-     * @param fieldGetters Field getters for extracting values (not used currently, may be needed
-     *     for optimization)
-     * @return The partition path string (empty string for unpartitioned tables)
-     */
-    private String extractPartitionPath(
-            DataChangeEvent event, Schema schema, List<RecordData.FieldGetter> fieldGetters) {
-
-        // Check if schema has partition keys defined
-        List<String> partitionKeys = schema.partitionKeys();
-        if (partitionKeys == null || partitionKeys.isEmpty()) {
-            // Hudi convention: unpartitioned tables use empty string, not "default"
-            return "";
-        }
-
-        // Get the record data to extract from (after for INSERT/UPDATE/REPLACE, before for DELETE)
-        RecordData recordData;
-        switch (event.op()) {
-            case INSERT:
-            case UPDATE:
-            case REPLACE:
-                recordData = event.after();
-                break;
-            case DELETE:
-                recordData = event.before();
-                break;
-            default:
-                throw new IllegalArgumentException("Unsupported operation: " + event.op());
-        }
-
-        if (recordData == null) {
-            throw new IllegalStateException(
-                    "Cannot extract partition path: " + event.op() + " event has null data");
-        }
-
-        // Extract partition values and build partition path
-        List<String> partitionParts = new ArrayList<>(partitionKeys.size());
-        for (String partitionKey : partitionKeys) {
-            int fieldIndex = schema.getColumnNames().indexOf(partitionKey);
-            if (fieldIndex == -1) {
-                throw new IllegalStateException(
-                        "Partition key field '"
-                                + partitionKey
-                                + "' not found in schema for table "
-                                + event.tableId());
-            }
-
-            // Get field value
-            Object fieldValue;
-            if (recordData.isNullAt(fieldIndex)) {
-                // Handle null partition values - use "__HIVE_DEFAULT_PARTITION__" as per Hive
-                // convention
-                fieldValue = "__HIVE_DEFAULT_PARTITION__";
-            } else {
-                // Get the field value based on the field type
-                DataType fieldType = schema.getColumns().get(fieldIndex).getType();
-                fieldValue = getFieldValue(recordData, fieldIndex, fieldType);
-            }
-
-            // Format as "key=value" (Hive-style partitioning)
-            partitionParts.add(partitionKey + "=" + fieldValue);
-        }
-
-        // Join partition parts with "/"
-        return String.join("/", partitionParts);
-    }
-
-    /**
-     * Extract field value from RecordData based on field type. This is a simplified version -
-     * complex types may need additional handling.
-     */
-    private Object getFieldValue(RecordData recordData, int fieldIndex, DataType fieldType) {
-        switch (fieldType.getTypeRoot()) {
-            case CHAR:
-            case VARCHAR:
-                return recordData.getString(fieldIndex).toString();
-            case BOOLEAN:
-                return recordData.getBoolean(fieldIndex);
-            case TINYINT:
-                return recordData.getByte(fieldIndex);
-            case SMALLINT:
-                return recordData.getShort(fieldIndex);
-            case INTEGER:
-            case DATE:
-                return recordData.getInt(fieldIndex);
-            case BIGINT:
-                return recordData.getLong(fieldIndex);
-            case FLOAT:
-                return recordData.getFloat(fieldIndex);
-            case DOUBLE:
-                return recordData.getDouble(fieldIndex);
-            case TIMESTAMP_WITHOUT_TIME_ZONE:
-                return recordData.getTimestamp(
-                        fieldIndex,
-                        org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision(fieldType));
-            case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                return recordData.getLocalZonedTimestampData(
-                        fieldIndex,
-                        org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision(fieldType));
-            default:
-                // For other types, create a field getter and use it
-                RecordData.FieldGetter fieldGetter =
-                        RecordData.createFieldGetter(fieldType, fieldIndex);
-                return fieldGetter.getFieldOrNull(recordData);
-        }
     }
 }

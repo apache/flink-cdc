@@ -243,7 +243,51 @@ public class RowDataUtils {
 
     /**
      * Convert a DataChangeEvent to a HoodieFlinkInternalRow with automatic record key and partition
-     * path extraction.
+     * path extraction using Hudi's RowDataKeyGen. This is the preferred method as it uses Hudi's
+     * built-in key generation logic.
+     *
+     * @param dataChangeEvent The DataChangeEvent to convert
+     * @param schema Schema for the table
+     * @param zoneId Time zone for timestamp conversion
+     * @param keyGen Hudi's RowDataKeyGen for extracting record keys and partition paths
+     * @param fileId The file ID for the record
+     * @param instantTime The instant time for the record
+     * @return HoodieFlinkInternalRow containing the converted data
+     */
+    public static HoodieFlinkInternalRow convertDataChangeEventToHoodieFlinkInternalRow(
+            DataChangeEvent dataChangeEvent,
+            Schema schema,
+            ZoneId zoneId,
+            org.apache.hudi.sink.bulk.RowDataKeyGen keyGen,
+            String fileId,
+            String instantTime) {
+
+        // Convert DataChangeEvent to RowData using existing utility
+        List<FieldGetter> fieldGetters = createFieldGetters(schema, zoneId);
+        RowData rowData = convertDataChangeEventToRowData(dataChangeEvent, fieldGetters);
+
+        // Use Hudi's RowDataKeyGen to extract record key and partition path
+        String recordKey = keyGen.getRecordKey(rowData);
+        String partitionPath = keyGen.getPartitionPath(rowData);
+
+        // Map CDC operation to Hudi operation type
+        String operationType = mapCdcOperationToHudiOperation(dataChangeEvent.op());
+
+        // Create and return HoodieFlinkInternalRow
+        return new HoodieFlinkInternalRow(
+                recordKey, // Record key
+                partitionPath, // Partition path
+                fileId, // File ID
+                instantTime, // Instant time
+                operationType, // Operation type
+                false, // isIndexRecord
+                rowData // Row data
+                );
+    }
+
+    /**
+     * Convert a DataChangeEvent to a HoodieFlinkInternalRow with automatic record key and partition
+     * path extraction. Falls back to manual extraction when RowDataKeyGen is not available.
      *
      * @param dataChangeEvent The DataChangeEvent to convert
      * @param schema Schema for the table
@@ -284,8 +328,15 @@ public class RowDataUtils {
         }
     }
 
-    /** Extract record key from DataChangeEvent based on primary key fields in schema. */
-    private static String extractRecordKeyFromDataChangeEvent(
+    /**
+     * Extract record key from DataChangeEvent based on primary key fields in schema. Public utility
+     * method for use by operators that need to calculate record keys.
+     *
+     * @param dataChangeEvent The DataChangeEvent to extract record key from
+     * @param schema The table schema containing primary key definitions
+     * @return The record key string in format "field1:value1,field2:value2"
+     */
+    public static String extractRecordKeyFromDataChangeEvent(
             DataChangeEvent dataChangeEvent, Schema schema) {
         List<String> primaryKeyFields = schema.primaryKeys();
         if (primaryKeyFields.isEmpty()) {
@@ -346,7 +397,8 @@ public class RowDataUtils {
     }
 
     /**
-     * Extract partition path from DataChangeEvent based on partition key fields in schema.
+     * Extract partition path from DataChangeEvent based on partition key fields in schema. Public
+     * utility method for use by operators that need to calculate partition paths.
      *
      * <p>If the schema has partition keys defined:
      *
@@ -361,7 +413,7 @@ public class RowDataUtils {
      * @param schema The table schema containing partition key definitions
      * @return The partition path string (empty string for unpartitioned tables)
      */
-    private static String extractPartitionPathFromDataChangeEvent(
+    public static String extractPartitionPathFromDataChangeEvent(
             DataChangeEvent dataChangeEvent, Schema schema) {
         List<String> partitionKeys = schema.partitionKeys();
         if (partitionKeys == null || partitionKeys.isEmpty()) {
