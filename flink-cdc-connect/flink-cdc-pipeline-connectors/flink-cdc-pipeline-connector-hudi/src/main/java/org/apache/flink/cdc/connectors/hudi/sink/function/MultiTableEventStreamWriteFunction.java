@@ -54,7 +54,6 @@ import org.apache.flink.util.OutputTag;
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.configuration.FlinkOptions;
-import org.apache.hudi.sink.bucket.BucketStreamWriteFunction;
 import org.apache.hudi.sink.common.AbstractStreamWriteFunction;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
 import org.apache.hudi.util.AvroSchemaConverter;
@@ -63,7 +62,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -73,9 +71,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Multi-table wrapper function that routes events to table-specific EventBucketStreamWriteFunction
- * instances. This approach maintains table isolation by creating dedicated function instances per
- * table while keeping the core write functions single-table focused.
+ * Multi-table wrapper function that routes events to table-specific
+ * EventExtendedBucketStreamWriteFunction instances. This approach maintains table isolation by
+ * creating dedicated function instances per table while keeping the core write functions
+ * single-table focused.
  */
 public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunction<Event>
         implements EventProcessorFunction {
@@ -84,7 +83,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
             LoggerFactory.getLogger(MultiTableEventStreamWriteFunction.class);
 
     /** Table-specific write functions created dynamically when new tables are encountered. */
-    private transient Map<TableId, BucketStreamWriteFunction> tableFunctions;
+    private transient Map<TableId, ExtendedBucketStreamWriteFunction> tableFunctions;
 
     /** Track tables that have been initialized to avoid duplicate initialization. */
     private transient Map<TableId, Boolean> initializedTables;
@@ -286,7 +285,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                     // which would cause a schema mismatch error.
                     // A new function with the updated schema will be created on the next
                     // DataChangeEvent
-                    BucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
+                    ExtendedBucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
                     if (tableFunction != null) {
                         LOG.info(
                                 "Schema changed for table {}, closing and removing old table function",
@@ -370,7 +369,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
             HoodieFlinkInternalRow hoodieFlinkInternalRow = recordSerializer.serialize(event);
 
             // Get or create table-specific function to handle this event
-            BucketStreamWriteFunction tableFunction = getOrCreateTableFunction(tableId);
+            ExtendedBucketStreamWriteFunction tableFunction = getOrCreateTableFunction(tableId);
 
             // Create context adapter to convert Event context to HoodieFlinkInternalRow context
             ProcessFunction<HoodieFlinkInternalRow, RowData>.Context adaptedContext =
@@ -409,7 +408,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 LOG.info(
                         "Received global flush event, flushing all {} table functions",
                         tableFunctions.size());
-                for (Map.Entry<TableId, BucketStreamWriteFunction> entry :
+                for (Map.Entry<TableId, ExtendedBucketStreamWriteFunction> entry :
                         tableFunctions.entrySet()) {
                     entry.getValue().flushRemaining(false);
                     LOG.debug("Flushed table function for: {}", entry.getKey());
@@ -421,7 +420,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                             "Flushing table {} with schema: {}",
                             tableId,
                             recordSerializer.getSchema(tableId));
-                    BucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
+                    ExtendedBucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
                     if (tableFunction != null) {
                         tableFunction.flushRemaining(false);
                         LOG.debug("Flushed table function for: {}", tableId);
@@ -453,15 +452,15 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         }
     }
 
-    private BucketStreamWriteFunction getOrCreateTableFunction(TableId tableId) {
-        BucketStreamWriteFunction existingFunction = tableFunctions.get(tableId);
+    private ExtendedBucketStreamWriteFunction getOrCreateTableFunction(TableId tableId) {
+        ExtendedBucketStreamWriteFunction existingFunction = tableFunctions.get(tableId);
         if (existingFunction != null) {
             return existingFunction;
         }
 
-        LOG.info("Creating new BucketStreamWriteFunction for table: {}", tableId);
+        LOG.info("Creating new ExtendedBucketStreamWriteFunction for table: {}", tableId);
         try {
-            BucketStreamWriteFunction tableFunction = createTableFunction(tableId);
+            ExtendedBucketStreamWriteFunction tableFunction = createTableFunction(tableId);
             tableFunctions.put(tableId, tableFunction);
             initializedTables.put(tableId, true);
             LOG.info("Successfully created and cached table function for: {}", tableId);
@@ -472,7 +471,8 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         }
     }
 
-    private BucketStreamWriteFunction createTableFunction(TableId tableId) throws Exception {
+    private ExtendedBucketStreamWriteFunction createTableFunction(TableId tableId)
+            throws Exception {
         Schema schema = schemaMaps.get(tableId);
         if (schema == null) {
             throw new IllegalStateException(
@@ -498,8 +498,8 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 schema.getColumnCount(),
                 avroSchemaInConfig);
 
-        BucketStreamWriteFunction tableFunction =
-                new BucketStreamWriteFunction(tableConfig, rowType);
+        ExtendedBucketStreamWriteFunction tableFunction =
+                new ExtendedBucketStreamWriteFunction(tableConfig, rowType);
 
         tableFunction.setRuntimeContext(getRuntimeContext());
 
@@ -612,9 +612,10 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         // 1. Call their abstract snapshotState() to flush buffers
         // 2. Manually update their checkpointId for instant requests
         long checkpointId = context.getCheckpointId();
-        for (Map.Entry<TableId, BucketStreamWriteFunction> entry : tableFunctions.entrySet()) {
+        for (Map.Entry<TableId, ExtendedBucketStreamWriteFunction> entry :
+                tableFunctions.entrySet()) {
             try {
-                BucketStreamWriteFunction tableFunction = entry.getValue();
+                ExtendedBucketStreamWriteFunction tableFunction = entry.getValue();
                 LOG.debug(
                         "Delegating snapshotState for table: {} with checkpointId: {}",
                         entry.getKey(),
@@ -623,10 +624,10 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 // Call abstract snapshotState() to flush buffers
                 tableFunction.snapshotState();
 
-                // Update the child function's checkpointId using reflection
+                // Update the child function's checkpointId
                 // This is necessary because child functions need the current checkpointId
                 // when requesting instants from the coordinator
-                setCheckpointId(tableFunction, checkpointId);
+                tableFunction.setCheckpointId(checkpointId);
 
                 LOG.debug("Successfully snapshotted state for table: {}", entry.getKey());
             } catch (Exception e) {
@@ -634,23 +635,6 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 throw new RuntimeException(
                         "Failed to snapshot state for table: " + entry.getKey(), e);
             }
-        }
-    }
-
-    /**
-     * Sets the checkpointId field on a child AbstractStreamWriteFunction using reflection. This is
-     * necessary because checkpointId is protected and child functions are composition objects that
-     * need the current checkpoint ID for coordinator communication.
-     */
-    private void setCheckpointId(AbstractStreamWriteFunction<?> function, long checkpointId) {
-        try {
-            Field checkpointIdField =
-                    AbstractStreamWriteFunction.class.getDeclaredField("checkpointId");
-            checkpointIdField.setAccessible(true);
-            checkpointIdField.setLong(function, checkpointId);
-        } catch (Exception e) {
-            LOG.error("Failed to set checkpointId on child function using reflection", e);
-            throw new RuntimeException("Failed to set checkpointId on child function", e);
         }
     }
 
@@ -680,7 +664,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     @Override
     public void close() throws Exception {
-        for (BucketStreamWriteFunction func : tableFunctions.values()) {
+        for (ExtendedBucketStreamWriteFunction func : tableFunctions.values()) {
             try {
                 func.close();
             } catch (Exception e) {
@@ -693,7 +677,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
     public void endInput() {
         super.endInput();
         flushRemaining(true);
-        for (BucketStreamWriteFunction func : tableFunctions.values()) {
+        for (ExtendedBucketStreamWriteFunction func : tableFunctions.values()) {
             try {
                 func.endInput();
             } catch (Exception e) {
@@ -705,8 +689,8 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
     /**
      * Adapter to convert ProcessFunction Event RowData Context to ProcessFunction
      * HoodieFlinkInternalRow RowData Context. This allows us to call
-     * BucketStreamWriteFunction.processElement with the correct context type without managing its
-     * internal state.
+     * ExtendedBucketStreamWriteFunction.processElement with the correct context type without
+     * managing its internal state.
      */
     private class ContextAdapter extends ProcessFunction<HoodieFlinkInternalRow, RowData>.Context {
         private final ProcessFunction<Event, RowData>.Context delegate;
