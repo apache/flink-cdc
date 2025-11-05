@@ -31,7 +31,7 @@ limitations under the License.
     <name>flink-cdc-pipeline-connector-hudi</name>
 
     <properties>
-        <hudi.version>1.1.0-SNAPSHOT</hudi.version>
+        <hudi.version>1.2.0-SNAPSHOT</hudi.version>
         <hadoop.version>2.10.2</hadoop.version>
         <mockito.version>3.4.6</mockito.version>
         <metrics.version>4.1.1</metrics.version>

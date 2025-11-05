@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.hudi.sink.function;
 
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.runtime.TupleSerializer;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -29,10 +30,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.connectors.hudi.sink.event.CreateTableOperatorEvent;
-import org.apache.flink.cdc.connectors.hudi.sink.event.EnhancedWriteMetadataEvent;
-import org.apache.flink.cdc.connectors.hudi.sink.event.HudiRecordEventSerializer;
-import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent;
+import org.apache.flink.cdc.connectors.hudi.sink.event.*;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
@@ -42,12 +40,17 @@ import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.operators.coordination.OperatorEventGateway;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.streaming.api.TimerService;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 
+import org.apache.hudi.client.model.HoodieFlinkInternalRow;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.configuration.FlinkOptions;
+import org.apache.hudi.sink.bucket.BucketStreamWriteFunction;
 import org.apache.hudi.sink.common.AbstractStreamWriteFunction;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
 import org.apache.hudi.util.AvroSchemaConverter;
@@ -60,6 +63,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +80,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
             LoggerFactory.getLogger(MultiTableEventStreamWriteFunction.class);
 
     /** Table-specific write functions created dynamically when new tables are encountered. */
-    private transient Map<TableId, EventBucketStreamWriteFunction> tableFunctions;
+    private transient Map<TableId, BucketStreamWriteFunction> tableFunctions;
 
     /** Track tables that have been initialized to avoid duplicate initialization. */
     private transient Map<TableId, Boolean> initializedTables;
@@ -91,6 +95,9 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     /** Schema evolution client to communicate with SchemaOperator. */
     private transient SchemaEvolutionClient schemaEvolutionClient;
+
+    /** Serializer for converting Events to HoodieFlinkInternalRow. */
+    private transient HudiRecordEventSerializer recordSerializer;
 
     /** Store the function initialization context for table functions. */
     private transient FunctionInitializationContext functionInitializationContext;
@@ -115,7 +122,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         TupleSerializer<Tuple2<TableId, Schema>> tupleSerializer =
                 new TupleSerializer(
                         Tuple2.class,
-                        new org.apache.flink.api.common.typeutils.TypeSerializer[] {
+                        new TypeSerializer[] {
                             TableIdSerializer.INSTANCE, SchemaSerializer.INSTANCE
                         });
         ListStateDescriptor<Tuple2<TableId, Schema>> schemaStateDescriptor =
@@ -154,6 +161,18 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
             this.schemaMaps = new HashMap<>();
         }
         this.tableConfigurations = new HashMap<>();
+        // Initialize record serializer (must be done in open() since it's transient)
+        this.recordSerializer = new HudiRecordEventSerializer(ZoneId.systemDefault());
+
+        // Restore schemas to recordSerializer if they were restored from state
+        // recordSerializer is transient and does not persist across restarts
+        if (!schemaMaps.isEmpty()) {
+            LOG.info("Restoring {} schemas to recordSerializer", schemaMaps.size());
+            for (Map.Entry<TableId, Schema> entry : schemaMaps.entrySet()) {
+                recordSerializer.setSchema(entry.getKey(), entry.getValue());
+                LOG.debug("Restored schema to recordSerializer for table: {}", entry.getKey());
+            }
+        }
     }
 
     @Override
@@ -162,7 +181,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
         // Route event to appropriate handler based on type
         if (event instanceof DataChangeEvent) {
-            processDataChange((DataChangeEvent) event);
+            processDataChange((DataChangeEvent) event, ctx, out);
         } else if (event instanceof SchemaChangeEvent) {
             processSchemaChange((SchemaChangeEvent) event);
         } else if (event instanceof FlushEvent) {
@@ -242,6 +261,11 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
                     schemaMaps.put(tableId, newSchema);
 
+                    // Update recordSerializer with the new schema immediately
+                    // This ensures future DataChangeEvents are serialized with the new schema
+                    recordSerializer.setSchema(tableId, newSchema);
+                    LOG.info("Updated recordSerializer with new schema for table: {}", tableId);
+
                     // Invalidate cached table configuration so it gets recreated with NEW
                     // schema
                     // The tableConfigurations cache holds FlinkOptions.SOURCE_AVRO_SCHEMA which
@@ -251,46 +275,59 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                             "Invalidated cached table configuration for {} to pick up new schema",
                             tableId);
 
-                    // If table function exists, flush buffers and update its rowType
-                    EventBucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
+                    // If table function exists, close and remove it
+                    // NOTE: Flushing should have been done earlier by a FlushEvent that was
+                    // sent BEFORE this SchemaChangeEvent. We don't flush here because the
+                    // table metadata may have already been updated to the new schema,
+                    // which would cause a schema mismatch error.
+                    // A new function with the updated schema will be created on the next
+                    // DataChangeEvent
+                    BucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
                     if (tableFunction != null) {
                         LOG.info(
-                                "Schema changed for table {}, flushing buffers with OLD schema and updating to NEW RowType",
+                                "Schema changed for table {}, closing and removing old table function",
                                 tableId);
-                        // NOTE: Capture the OLD RowType before any changes
-                        // Buffered records were created with this schema
-                        RowType oldRowType = convertSchemaToFlinkRowType(existingSchema);
 
-                        // Flush existing buffers using the OLD schema
-                        // This ensures records buffered with N columns are read with N-column
-                        // schema
-                        tableFunction.flushAllBuckets(oldRowType);
+                        // Close the function to release resources (write client, etc.)
+                        try {
+                            tableFunction.close();
+                            LOG.info("Closed old table function for table: {}", tableId);
+                        } catch (Exception e) {
+                            LOG.error("Failed to close table function for table: {}", tableId, e);
+                            // Continue with removal even if close fails
+                        }
 
-                        // Now safe to update to the NEW schema
-                        // Future records will use this new schema
-                        RowType newRowType = convertSchemaToFlinkRowType(newSchema);
-                        tableFunction.updateRowType(newRowType);
-
-                        String newAvroSchema =
-                                AvroSchemaConverter.convertToSchema(newRowType).toString();
-
+                        // Remove the old function - a new one will be created with the new schema
+                        tableFunctions.remove(tableId);
                         LOG.info(
-                                "Updating write client for table: {} with new schema: {}",
+                                "Removed old table function for table: {}. New function will be created with updated schema on next data event.",
+                                tableId);
+                    }
+
+                    // Notify coordinator about schema change so it can update its write client
+                    try {
+                        getOperatorEventGateway()
+                                .sendEventToCoordinator(
+                                        new SchemaChangeOperatorEvent(tableId, newSchema));
+                        LOG.info(
+                                "Sent SchemaChangeOperatorEvent to coordinator for table: {}",
+                                tableId);
+                    } catch (Exception e) {
+                        LOG.error(
+                                "Failed to send SchemaChangeOperatorEvent to coordinator for table: {}",
                                 tableId,
-                                newAvroSchema);
-
-                        // Update write client's source avro schema with new schema
-                        tableFunction.updateWriteClientWithNewSchema(newAvroSchema);
-
-                        LOG.info("Successfully handled schema change for table: {}", tableId);
+                                e);
+                        // Don't throw - schema change was applied locally, coordinator will
+                        // update on next operation
                     }
 
                     LOG.debug("Updated schema for table: {}", tableId);
                 }
             }
 
-            // Forward the event to tableFunction so that schemaMap for serializer is updated
-            tableFunctions.get(event.tableId()).processSchemaChange(event);
+            // Single-table functions typically receive schema via serializer setup
+            // This is called when CreateTableEvent arrives
+            LOG.info("Schema change event received: {}", event);
         } catch (Exception e) {
             LOG.error("Failed to process schema event for table: {}", tableId, e);
             throw new RuntimeException("Failed to process schema event for table: " + tableId, e);
@@ -305,16 +342,37 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
      */
     @Override
     public void processDataChange(DataChangeEvent event) throws Exception {
+        throw new UnsupportedOperationException(
+                "This method should not be called directly. Use processDataChange(DataChangeEvent, Context, Collector) instead.");
+    }
+
+    /**
+     * Processes change events with context and collector for writing. This triggers the actual Hudi
+     * write operations as side effects by delegating to table-specific functions.
+     */
+    public void processDataChange(DataChangeEvent event, Context ctx, Collector<RowData> out) {
         TableId tableId = event.tableId();
         try {
             LOG.debug("Processing change event for table: {}", tableId);
 
-            // Get or create table-specific function to handle this event
-            EventBucketStreamWriteFunction tableFunction = getOrCreateTableFunction(tableId);
+            // Check if schema is available before processing
+            if (!recordSerializer.hasSchema(event.tableId())) {
+                // Schema not available yet - CreateTableEvent hasn't arrived
+                throw new IllegalStateException(
+                        "No schema available for table "
+                                + event.tableId()
+                                + ". CreateTableEvent should arrive before DataChangeEvent.");
+            }
+            HoodieFlinkInternalRow hoodieFlinkInternalRow = recordSerializer.serialize(event);
 
-            // Use the table function to process the change event
-            // This will convert the event to HoodieFlinkInternalRow and buffer it for writing
-            tableFunction.processDataChange(event);
+            // Get or create table-specific function to handle this event
+            BucketStreamWriteFunction tableFunction = getOrCreateTableFunction(tableId);
+
+            // Create context adapter to convert Event context to HoodieFlinkInternalRow context
+            ProcessFunction<HoodieFlinkInternalRow, RowData>.Context adaptedContext =
+                    new ContextAdapter(ctx);
+
+            tableFunction.processElement(hoodieFlinkInternalRow, adaptedContext, out);
 
             LOG.debug("Successfully processed change event for table: {}", tableId);
 
@@ -347,15 +405,19 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 LOG.info(
                         "Received global flush event, flushing all {} table functions",
                         tableFunctions.size());
-                for (Map.Entry<TableId, EventBucketStreamWriteFunction> entry :
+                for (Map.Entry<TableId, BucketStreamWriteFunction> entry :
                         tableFunctions.entrySet()) {
                     entry.getValue().flushRemaining(false);
                     LOG.debug("Flushed table function for: {}", entry.getKey());
                 }
             } else {
-                LOG.info("Received flush event for {} specific tables", tableIds.size());
+                LOG.info("Received flush event {} for {} specific tables", event, tableIds.size());
                 for (TableId tableId : tableIds) {
-                    EventBucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
+                    LOG.info(
+                            "Flushing table {} with schema: {}",
+                            tableId,
+                            recordSerializer.getSchema(tableId));
+                    BucketStreamWriteFunction tableFunction = tableFunctions.get(tableId);
                     if (tableFunction != null) {
                         tableFunction.flushRemaining(false);
                         LOG.debug("Flushed table function for: {}", tableId);
@@ -387,15 +449,15 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         }
     }
 
-    private EventBucketStreamWriteFunction getOrCreateTableFunction(TableId tableId) {
-        EventBucketStreamWriteFunction existingFunction = tableFunctions.get(tableId);
+    private BucketStreamWriteFunction getOrCreateTableFunction(TableId tableId) {
+        BucketStreamWriteFunction existingFunction = tableFunctions.get(tableId);
         if (existingFunction != null) {
             return existingFunction;
         }
 
-        LOG.info("Creating new EventBucketStreamWriteFunction for table: {}", tableId);
+        LOG.info("Creating new BucketStreamWriteFunction for table: {}", tableId);
         try {
-            EventBucketStreamWriteFunction tableFunction = createTableFunction(tableId);
+            BucketStreamWriteFunction tableFunction = createTableFunction(tableId);
             tableFunctions.put(tableId, tableFunction);
             initializedTables.put(tableId, true);
             LOG.info("Successfully created and cached table function for: {}", tableId);
@@ -406,7 +468,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         }
     }
 
-    private EventBucketStreamWriteFunction createTableFunction(TableId tableId) throws Exception {
+    private BucketStreamWriteFunction createTableFunction(TableId tableId) throws Exception {
         Schema schema = schemaMaps.get(tableId);
         if (schema == null) {
             throw new IllegalStateException(
@@ -424,8 +486,16 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         Configuration tableConfig = createTableSpecificConfig(tableId);
         RowType rowType = convertSchemaToFlinkRowType(schema);
 
-        EventBucketStreamWriteFunction tableFunction =
-                new EventBucketStreamWriteFunction(tableConfig, rowType);
+        // Log the schema being used for this new function
+        String avroSchemaInConfig = tableConfig.get(FlinkOptions.SOURCE_AVRO_SCHEMA);
+        LOG.info(
+                "Creating table function for {} with schema: {} columns, Avro schema in config: {}",
+                tableId,
+                schema.getColumnCount(),
+                avroSchemaInConfig);
+
+        BucketStreamWriteFunction tableFunction =
+                new BucketStreamWriteFunction(tableConfig, rowType);
 
         tableFunction.setRuntimeContext(getRuntimeContext());
 
@@ -434,7 +504,6 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         TableAwareCorrespondent tableCorrespondent =
                 TableAwareCorrespondent.getInstance(correspondent, tableId);
         tableFunction.setCorrespondent(tableCorrespondent);
-        tableFunction.setTableId(tableId);
 
         // Instead of passing the raw gateway, we pass a proxy that intercepts and enhances events
         // with the table path
@@ -453,12 +522,8 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
         tableFunction.open(tableConfig);
 
-        if (tableFunction.getRecordSerializer() instanceof HudiRecordEventSerializer) {
-            HudiRecordEventSerializer serializer =
-                    (HudiRecordEventSerializer) tableFunction.getRecordSerializer();
-            serializer.setSchema(tableId, schema);
-            LOG.debug("Set schema for table function serializer: {}", tableId);
-        }
+        recordSerializer.setSchema(tableId, schema);
+        LOG.debug("Set schema for table function serializer: {}", tableId);
 
         LOG.debug("Successfully created table function for: {}", tableId);
         return tableFunction;
@@ -543,9 +608,9 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
         // 1. Call their abstract snapshotState() to flush buffers
         // 2. Manually update their checkpointId for instant requests
         long checkpointId = context.getCheckpointId();
-        for (Map.Entry<TableId, EventBucketStreamWriteFunction> entry : tableFunctions.entrySet()) {
+        for (Map.Entry<TableId, BucketStreamWriteFunction> entry : tableFunctions.entrySet()) {
             try {
-                EventBucketStreamWriteFunction tableFunction = entry.getValue();
+                BucketStreamWriteFunction tableFunction = entry.getValue();
                 LOG.debug(
                         "Delegating snapshotState for table: {} with checkpointId: {}",
                         entry.getKey(),
@@ -611,7 +676,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     @Override
     public void close() throws Exception {
-        for (EventBucketStreamWriteFunction func : tableFunctions.values()) {
+        for (BucketStreamWriteFunction func : tableFunctions.values()) {
             try {
                 func.close();
             } catch (Exception e) {
@@ -624,12 +689,41 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
     public void endInput() {
         super.endInput();
         flushRemaining(true);
-        for (EventBucketStreamWriteFunction func : tableFunctions.values()) {
+        for (BucketStreamWriteFunction func : tableFunctions.values()) {
             try {
                 func.endInput();
             } catch (Exception e) {
                 LOG.error("Failed to complete endInput for table function", e);
             }
+        }
+    }
+
+    /**
+     * Adapter to convert ProcessFunction Event RowData Context to ProcessFunction
+     * HoodieFlinkInternalRow RowData Context. This allows us to call
+     * BucketStreamWriteFunction.processElement with the correct context type without managing its
+     * internal state.
+     */
+    private class ContextAdapter extends ProcessFunction<HoodieFlinkInternalRow, RowData>.Context {
+        private final ProcessFunction<Event, RowData>.Context delegate;
+
+        ContextAdapter(ProcessFunction<Event, RowData>.Context delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public Long timestamp() {
+            return delegate.timestamp();
+        }
+
+        @Override
+        public TimerService timerService() {
+            return delegate.timerService();
+        }
+
+        @Override
+        public <X> void output(OutputTag<X> outputTag, X value) {
+            delegate.output(outputTag, value);
         }
     }
 

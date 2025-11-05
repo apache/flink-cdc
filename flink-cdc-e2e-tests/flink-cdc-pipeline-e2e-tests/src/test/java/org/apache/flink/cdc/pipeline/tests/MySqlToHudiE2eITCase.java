@@ -81,9 +81,9 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
     private static final String HUDI_FLINK_PROPERTIES =
             FLINK_PROPERTIES
                     + "\n"
-                    + "taskmanager.memory.jvm-metaspace.size: 1024m"
+                    + "taskmanager.memory.jvm-metaspace.size: 512M"
                     + "\n"
-                    + "taskmanager.memory.task.heap.size: 1024m"
+                    + "taskmanager.memory.task.heap.size: 1024M"
                     + "\n"
                     + "taskmanager.memory.process.size: 4GB";
 
@@ -92,7 +92,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
 
     private String warehouse;
 
-    private final boolean debug = true;
+    private final boolean debug = false;
 
     @BeforeAll
     public static void initializeContainers() {
@@ -129,11 +129,10 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                     "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9005");
             taskManager =
                     new FixedHostPortGenericContainer<>(getFlinkDockerImageTag())
-                            .withFixedExposedPort(9006, 9006);
-            //                            .withEnv(
-            //                                    "FLINK_ENV_JAVA_OPTS",
-            //
-            // "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9006");
+                            .withFixedExposedPort(9006, 9006)
+                            .withEnv(
+                                    "FLINK_ENV_JAVA_OPTS",
+                                    "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:9006");
         } else {
             jobManager =
                     new GenericContainer<>(getFlinkDockerImageTag())

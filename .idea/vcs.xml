@@ -20,8 +20,6 @@
   </component>
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/.github/actions/get-workflow-origin" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/.github/actions/label-when-approved-action" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/docs/themes/book" vcs="Git" />
   </component>
 </project>

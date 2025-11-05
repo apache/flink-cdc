@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.hudi.sink.event.CreateTableOperatorEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.EnhancedWriteMetadataEvent;
+import org.apache.flink.cdc.connectors.hudi.sink.event.SchemaChangeOperatorEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -453,6 +454,8 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                 () -> {
                     if (operatorEvent instanceof CreateTableOperatorEvent) {
                         handleCreateTableEvent((CreateTableOperatorEvent) operatorEvent);
+                    } else if (operatorEvent instanceof SchemaChangeOperatorEvent) {
+                        handleSchemaChangeEvent((SchemaChangeOperatorEvent) operatorEvent);
                     } else if (operatorEvent instanceof EnhancedWriteMetadataEvent) {
                         handleEnhancedWriteMetadataEvent(
                                 (EnhancedWriteMetadataEvent) operatorEvent);
@@ -505,6 +508,71 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                         return null;
                     }
                 });
+    }
+
+    /**
+     * Handles schema change events from the sink functions. Updates the cached schema and recreates
+     * the write client to ensure it uses the new schema.
+     *
+     * @param event The schema change event containing the table ID and new schema
+     */
+    private void handleSchemaChangeEvent(SchemaChangeOperatorEvent event) {
+        TableId tableId = event.getTableId();
+        Schema newSchema = event.getNewSchema();
+
+        LOG.info(
+                "Received schema change event for table {}: {} columns",
+                tableId,
+                newSchema.getColumnCount());
+
+        // Update the cached schema
+        tableSchemas.put(tableId, newSchema);
+        LOG.info("Updated coordinator's schema cache for table: {}", tableId);
+
+        // Get the existing table context
+        TableContext oldContext = tableContexts.get(tableId);
+        if (oldContext == null) {
+            LOG.warn(
+                    "Received schema change for unknown table: {}. Skipping write client update.",
+                    tableId);
+            return;
+        }
+
+        try {
+            // Close the old write client
+            if (oldContext.writeClient != null) {
+                oldContext.writeClient.close();
+                LOG.info("Closed old write client for table: {}", tableId);
+            }
+
+            // Create new configuration with updated schema
+            Configuration tableConfig = createTableSpecificConfig(tableId);
+
+            // Create new write client with updated schema
+            HoodieFlinkWriteClient<?> newWriteClient =
+                    FlinkWriteClients.createWriteClient(tableConfig);
+            LOG.info("Created new write client with updated schema for table: {}", tableId);
+
+            // Update the table context with the new write client
+            // Keep the same eventBuffers, tableState, and tablePath
+            TableContext newContext =
+                    new TableContext(
+                            newWriteClient,
+                            oldContext.eventBuffers,
+                            oldContext.tableState,
+                            oldContext.tablePath);
+            tableContexts.put(tableId, newContext);
+
+            LOG.info("Successfully updated write client for table {} after schema change", tableId);
+        } catch (Exception e) {
+            LOG.error("Failed to update write client for table {} after schema change", tableId, e);
+            context.failJob(
+                    new HoodieException(
+                            "Failed to update write client for table "
+                                    + tableId
+                                    + " after schema change",
+                            e));
+        }
     }
 
     private void handleEnhancedWriteMetadataEvent(EnhancedWriteMetadataEvent enhancedEvent) {
