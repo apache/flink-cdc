@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
+import org.apache.hudi.sink.bulk.RowDataKeyGen;
 
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -43,6 +44,7 @@ import java.util.Map;
  * <ul>
  *   <li>Caching schemas from CreateTableEvent and SchemaChangeEvent
  *   <li>Converting DataChangeEvent to HoodieFlinkInternalRow using cached schemas
+ *   <li>Using Hudi's RowDataKeyGen for record key and partition path extraction
  *   <li>Supporting bucket-wrapped events from upstream operators
  * </ul>
  *
@@ -57,12 +59,16 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
     /** Field getter cache per table for efficient conversion. */
     private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache;
 
+    /** RowDataKeyGen cache per table for key and partition extraction. */
+    private final Map<TableId, RowDataKeyGen> keyGenCache;
+
     /** Zone ID for timestamp conversion. */
     private final ZoneId zoneId;
 
     public HudiRecordEventSerializer(ZoneId zoneId) {
         this.schemaMaps = new HashMap<>();
         this.fieldGetterCache = new HashMap<>();
+        this.keyGenCache = new HashMap<>();
         this.zoneId = zoneId;
     }
 
@@ -81,8 +87,9 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             schemaMaps.put(createTableEvent.tableId(), createTableEvent.getSchema());
-            // Clear field getter cache for this table since schema changed
+            // Clear caches for this table since schema changed
             fieldGetterCache.remove(createTableEvent.tableId());
+            keyGenCache.remove(createTableEvent.tableId());
             // Schema events don't produce records
             return null;
 
@@ -95,8 +102,9 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
                 Schema newSchema =
                         SchemaUtils.applySchemaChangeEvent(existingSchema, schemaChangeEvent);
                 schemaMaps.put(schemaChangeEvent.tableId(), newSchema);
-                // Clear field getter cache for this table since schema changed
+                // Clear caches for this table since schema changed
                 fieldGetterCache.remove(schemaChangeEvent.tableId());
+                keyGenCache.remove(schemaChangeEvent.tableId());
             }
             // Schema events don't produce records
             return null;
@@ -112,9 +120,14 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
                                 + ". CreateTableEvent should arrive before DataChangeEvent.");
             }
 
-            // Convert DataChangeEvent to HoodieFlinkInternalRow using utility function
+            // Get or create RowDataKeyGen for this table
+            RowDataKeyGen keyGen =
+                    keyGenCache.computeIfAbsent(
+                            dataChangeEvent.tableId(), tid -> RowDataUtils.createKeyGen(schema));
+
+            // Convert DataChangeEvent to HoodieFlinkInternalRow using RowDataKeyGen
             return RowDataUtils.convertDataChangeEventToHoodieFlinkInternalRow(
-                    dataChangeEvent, schema, zoneId, fileId, instantTime);
+                    dataChangeEvent, schema, zoneId, keyGen, fileId, instantTime);
 
         } else {
             throw new IllegalArgumentException(
@@ -165,7 +178,9 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
      */
     public void setSchema(TableId tableId, Schema schema) {
         schemaMaps.put(tableId, schema);
-        // Clear cached field getters for this table so they get recreated with the new schema
+        // Clear cached field getters and key gens for this table so they get recreated with the new
+        // schema
         fieldGetterCache.remove(tableId);
+        keyGenCache.remove(tableId);
     }
 }

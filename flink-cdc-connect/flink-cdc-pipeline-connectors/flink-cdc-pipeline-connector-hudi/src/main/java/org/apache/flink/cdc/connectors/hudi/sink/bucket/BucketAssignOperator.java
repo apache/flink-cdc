@@ -36,14 +36,17 @@ import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
+import org.apache.flink.table.data.RowData;
 
 import org.apache.hudi.common.util.Functions;
 import org.apache.hudi.common.util.hash.BucketIndexUtil;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.index.bucket.BucketIdentifier;
+import org.apache.hudi.sink.bulk.RowDataKeyGen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +85,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
 
     /** Cache of primary key fields per table. */
     private final Map<TableId, List<String>> primaryKeyCache = new HashMap<>();
+
+    /** RowDataKeyGen cache per table for key and partition extraction. */
+    private final Map<TableId, RowDataKeyGen> keyGenCache = new HashMap<>();
 
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {
         this.numBuckets = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
@@ -125,8 +131,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
             Schema newSchema = SchemaUtils.applySchemaChangeEvent(existingSchema, schemaEvent);
             schemaCache.put(schemaEvent.tableId(), newSchema);
 
-            // Clear primary key cache when schema changes
+            // Clear caches when schema changes
             primaryKeyCache.remove(schemaEvent.tableId());
+            keyGenCache.remove(schemaEvent.tableId());
 
             // Broadcast to all tasks
             for (int i = 0; i < totalTasksNumber; i++) {
@@ -212,9 +219,19 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
                     "Cannot calculate bucket: table " + tableId + " has no primary keys");
         }
 
-        // Use RowDataUtils to extract record key and partition path
-        String recordKey = RowDataUtils.extractRecordKeyFromDataChangeEvent(event, finalSchema);
-        String partition = RowDataUtils.extractPartitionPathFromDataChangeEvent(event, finalSchema);
+        // Get or create RowDataKeyGen for this table
+        RowDataKeyGen keyGen =
+                keyGenCache.computeIfAbsent(tableId, k -> RowDataUtils.createKeyGen(finalSchema));
+
+        // Convert DataChangeEvent to RowData for key extraction
+        RowData rowData =
+                RowDataUtils.convertDataChangeEventToRowData(
+                        event,
+                        RowDataUtils.createFieldGetters(finalSchema, ZoneId.systemDefault()));
+
+        // Use RowDataKeyGen to extract record key and partition path
+        String recordKey = keyGen.getRecordKey(rowData);
+        String partition = keyGen.getPartitionPath(rowData);
 
         // Calculate bucket using Hudi's logic (0 to numBuckets-1)
         String tableIndexKeyFields = String.join(",", primaryKeys);

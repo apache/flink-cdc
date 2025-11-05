@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.TimestampData;
@@ -50,6 +51,8 @@ import org.apache.flink.table.types.logical.VarCharType;
 import org.apache.flink.types.RowKind;
 
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
+import org.apache.hudi.configuration.FlinkOptions;
+import org.apache.hudi.sink.bulk.RowDataKeyGen;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -202,46 +205,6 @@ public class RowDataUtils {
     }
 
     /**
-     * Convert a DataChangeEvent to a HoodieFlinkInternalRow.
-     *
-     * @param dataChangeEvent The DataChangeEvent to convert
-     * @param schema Schema for the table
-     * @param zoneId Time zone for timestamp conversion
-     * @param recordKey The record key extracted from the event
-     * @param partitionPath The partition path extracted from the event
-     * @param fileId The file ID for the record
-     * @param instantTime The instant time for the record
-     * @return HoodieFlinkInternalRow containing the converted data
-     */
-    public static HoodieFlinkInternalRow convertDataChangeEventToHoodieFlinkInternalRow(
-            DataChangeEvent dataChangeEvent,
-            Schema schema,
-            ZoneId zoneId,
-            String recordKey,
-            String partitionPath,
-            String fileId,
-            String instantTime) {
-
-        // Convert DataChangeEvent to RowData using existing utility
-        List<FieldGetter> fieldGetters = createFieldGetters(schema, zoneId);
-        RowData rowData = convertDataChangeEventToRowData(dataChangeEvent, fieldGetters);
-
-        // Map CDC operation to Hudi operation type
-        String operationType = mapCdcOperationToHudiOperation(dataChangeEvent.op());
-
-        // Create and return HoodieFlinkInternalRow
-        return new HoodieFlinkInternalRow(
-                recordKey, // Record key
-                partitionPath, // Partition path
-                fileId, // File ID
-                instantTime, // Instant time
-                operationType, // Operation type
-                false, // isIndexRecord
-                rowData // Row data
-                );
-    }
-
-    /**
      * Convert a DataChangeEvent to a HoodieFlinkInternalRow with automatic record key and partition
      * path extraction using Hudi's RowDataKeyGen. This is the preferred method as it uses Hudi's
      * built-in key generation logic.
@@ -283,34 +246,6 @@ public class RowDataUtils {
                 false, // isIndexRecord
                 rowData // Row data
                 );
-    }
-
-    /**
-     * Convert a DataChangeEvent to a HoodieFlinkInternalRow with automatic record key and partition
-     * path extraction. Falls back to manual extraction when RowDataKeyGen is not available.
-     *
-     * @param dataChangeEvent The DataChangeEvent to convert
-     * @param schema Schema for the table
-     * @param zoneId Time zone for timestamp conversion
-     * @param fileId The file ID for the record
-     * @param instantTime The instant time for the record
-     * @return HoodieFlinkInternalRow containing the converted data
-     */
-    public static HoodieFlinkInternalRow convertDataChangeEventToHoodieFlinkInternalRow(
-            DataChangeEvent dataChangeEvent,
-            Schema schema,
-            ZoneId zoneId,
-            String fileId,
-            String instantTime) {
-
-        // Extract record key from primary key fields
-        String recordKey = extractRecordKeyFromDataChangeEvent(dataChangeEvent, schema);
-
-        // Extract partition path from partition key fields
-        String partitionPath = extractPartitionPathFromDataChangeEvent(dataChangeEvent, schema);
-
-        return convertDataChangeEventToHoodieFlinkInternalRow(
-                dataChangeEvent, schema, zoneId, recordKey, partitionPath, fileId, instantTime);
     }
 
     /** Map CDC operation type to Hudi operation type string. */
@@ -632,5 +567,38 @@ public class RowDataUtils {
                 throw new UnsupportedOperationException(
                         "Unsupported CDC type: " + cdcType.getTypeRoot());
         }
+    }
+
+    /**
+     * Create a RowDataKeyGen for a table based on its schema.
+     *
+     * @param schema The table schema
+     * @return RowDataKeyGen configured with record key and partition fields from schema
+     */
+    public static RowDataKeyGen createKeyGen(Schema schema) {
+        Configuration config = new Configuration();
+
+        // Set record key fields from primary keys
+        List<String> primaryKeys = schema.primaryKeys();
+        if (primaryKeys == null || primaryKeys.isEmpty()) {
+            throw new IllegalStateException(
+                    "Table schema has no primary keys - cannot create RowDataKeyGen");
+        }
+        config.setString(FlinkOptions.RECORD_KEY_FIELD, String.join(",", primaryKeys));
+
+        // Set partition path fields from partition keys
+        List<String> partitionKeys = schema.partitionKeys();
+        if (partitionKeys != null && !partitionKeys.isEmpty()) {
+            config.setString(FlinkOptions.PARTITION_PATH_FIELD, String.join(",", partitionKeys));
+        } else {
+            // For unpartitioned tables, use empty string
+            config.setString(FlinkOptions.PARTITION_PATH_FIELD, "");
+        }
+
+        // Convert schema to RowType
+        RowType rowType = toRowType(schema);
+
+        // Create and return RowDataKeyGen using static factory method
+        return RowDataKeyGen.instance(config, rowType);
     }
 }
