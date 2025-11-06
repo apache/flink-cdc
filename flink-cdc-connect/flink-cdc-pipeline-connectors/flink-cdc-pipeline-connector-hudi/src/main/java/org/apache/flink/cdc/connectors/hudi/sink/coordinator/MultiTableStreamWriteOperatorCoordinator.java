@@ -286,7 +286,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
     public MultiTableStreamWriteOperatorCoordinator(Configuration conf, Context context) {
         super(conf, context);
-        conf.setString("fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem");
         this.baseConfig = conf;
         LOG.info(
                 "MultiTableStreamWriteOperatorCoordinator initialized for operator: {} with config: {}",
