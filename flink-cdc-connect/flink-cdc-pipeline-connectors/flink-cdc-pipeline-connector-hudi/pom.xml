@@ -94,7 +94,7 @@ limitations under the License.
 
         <dependency>
             <groupId>org.apache.hudi</groupId>
-            <artifactId>hudi-flink1.20.x</artifactId>
+            <artifactId>hudi-flink${flink.major.version}.x</artifactId>
             <version>${hudi.version}</version>
         </dependency>
 

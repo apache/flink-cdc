@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.event;
 
-import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -32,7 +31,6 @@ import org.apache.hudi.sink.bulk.RowDataKeyGen;
 
 import java.time.ZoneId;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -56,9 +54,6 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
     /** Schema cache per table - populated from CreateTableEvent and SchemaChangeEvent. */
     private final Map<TableId, Schema> schemaMaps;
 
-    /** Field getter cache per table for efficient conversion. */
-    private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache;
-
     /** RowDataKeyGen cache per table for key and partition extraction. */
     private final Map<TableId, RowDataKeyGen> keyGenCache;
 
@@ -67,7 +62,6 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
 
     public HudiRecordEventSerializer(ZoneId zoneId) {
         this.schemaMaps = new HashMap<>();
-        this.fieldGetterCache = new HashMap<>();
         this.keyGenCache = new HashMap<>();
         this.zoneId = zoneId;
     }
@@ -87,8 +81,7 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
         if (event instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) event;
             schemaMaps.put(createTableEvent.tableId(), createTableEvent.getSchema());
-            // Clear caches for this table since schema changed
-            fieldGetterCache.remove(createTableEvent.tableId());
+            // Clear keyGenCache for this table since schema changed
             keyGenCache.remove(createTableEvent.tableId());
             // Schema events don't produce records
             return null;
@@ -102,8 +95,7 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
                 Schema newSchema =
                         SchemaUtils.applySchemaChangeEvent(existingSchema, schemaChangeEvent);
                 schemaMaps.put(schemaChangeEvent.tableId(), newSchema);
-                // Clear caches for this table since schema changed
-                fieldGetterCache.remove(schemaChangeEvent.tableId());
+                // Clear keyGenCache for this table since schema changed
                 keyGenCache.remove(schemaChangeEvent.tableId());
             }
             // Schema events don't produce records
@@ -180,7 +172,6 @@ public class HudiRecordEventSerializer implements HudiRecordSerializer<Event> {
         schemaMaps.put(tableId, schema);
         // Clear cached field getters and key gens for this table so they get recreated with the new
         // schema
-        fieldGetterCache.remove(tableId);
         keyGenCache.remove(tableId);
     }
 }

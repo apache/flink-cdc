@@ -57,13 +57,11 @@ public class MultiTableWriteOperator extends AbstractWriteOperator<Event> {
      * @param config Configuration for the operator
      */
     public MultiTableWriteOperator(Configuration config, String schemaOperatorUid) {
-        this(config, schemaOperatorUid, new MultiTableEventStreamWriteFunction(config));
+        this(schemaOperatorUid, new MultiTableEventStreamWriteFunction(config));
     }
 
     private MultiTableWriteOperator(
-            Configuration config,
-            String schemaOperatorUid,
-            MultiTableEventStreamWriteFunction writeFunction) {
+            String schemaOperatorUid, MultiTableEventStreamWriteFunction writeFunction) {
         super(writeFunction);
         this.schemaOperatorUid = schemaOperatorUid;
         this.multiTableWriteFunction = writeFunction;
@@ -84,7 +82,7 @@ public class MultiTableWriteOperator extends AbstractWriteOperator<Event> {
         multiTableWriteFunction.setSchemaEvolutionClient(schemaEvolutionClient);
 
         // Register this sink subtask with the SchemaOperator
-        int subtaskIndex = getRuntimeContext().getIndexOfThisSubtask();
+        int subtaskIndex = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         try {
             schemaEvolutionClient.registerSubtask(subtaskIndex);
             LOG.info(

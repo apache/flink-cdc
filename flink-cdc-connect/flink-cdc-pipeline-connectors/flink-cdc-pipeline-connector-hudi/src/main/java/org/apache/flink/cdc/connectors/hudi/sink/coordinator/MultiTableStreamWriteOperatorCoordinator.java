@@ -63,7 +63,11 @@ import org.apache.hudi.util.StreamerUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.Serializable;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -488,6 +492,9 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                         Configuration tableConfig = createTableSpecificConfig(tId);
                         String tablePath = tableConfig.getString(FlinkOptions.PATH);
                         pathToTableId.put(tablePath, tId);
+
+                        // Create physical directory for Hudi table before initializing
+                        createHudiTablePath(tableConfig);
 
                         StreamerUtil.initTableIfNotExists(tableConfig);
                         HoodieFlinkWriteClient<?> writeClient =
@@ -920,6 +927,26 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
     }
 
     // --- Helper Methods ---
+
+    /**
+     * Creates the physical directory for a Hudi table if it doesn't exist. This must be done on the
+     * coordinator side to avoid race conditions when multiple task managers try to create the same
+     * directory simultaneously.
+     *
+     * @param config The table-specific configuration containing the path
+     * @throws IOException if directory creation fails
+     */
+    private static void createHudiTablePath(Configuration config) throws IOException {
+        String tablePath = config.get(FlinkOptions.PATH);
+        Path path = Paths.get(tablePath);
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
+            LOG.info("Created physical directory for Hudi table at: {}", tablePath);
+        } else {
+            LOG.debug("Hudi table directory already exists at: {}", tablePath);
+        }
+    }
+
     private Configuration createTableSpecificConfig(TableId tableId) {
         Configuration tableConfig = new Configuration(baseConfig);
         String coordinatorPath = baseConfig.getString(FlinkOptions.PATH);

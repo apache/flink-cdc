@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.bucket;
 
+import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
@@ -83,11 +84,11 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     /** Cache of schemas per table for bucket calculation. */
     private final Map<TableId, Schema> schemaCache = new HashMap<>();
 
-    /** Cache of primary key fields per table. */
-    private final Map<TableId, List<String>> primaryKeyCache = new HashMap<>();
-
     /** RowDataKeyGen cache per table for key and partition extraction. */
     private final Map<TableId, RowDataKeyGen> keyGenCache = new HashMap<>();
+
+    /** Field getter cache per table - lazily created and invalidated on schema changes. */
+    private final Map<TableId, List<RecordData.FieldGetter>> fieldGetterCache = new HashMap<>();
 
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {
         this.numBuckets = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
@@ -132,8 +133,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
             schemaCache.put(schemaEvent.tableId(), newSchema);
 
             // Clear caches when schema changes
-            primaryKeyCache.remove(schemaEvent.tableId());
             keyGenCache.remove(schemaEvent.tableId());
+            fieldGetterCache.remove(schemaEvent.tableId());
 
             // Broadcast to all tasks
             for (int i = 0; i < totalTasksNumber; i++) {
@@ -211,8 +212,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         final Schema finalSchema = schema;
 
         // Get or cache primary keys
-        List<String> primaryKeys =
-                primaryKeyCache.computeIfAbsent(tableId, k -> finalSchema.primaryKeys());
+        List<String> primaryKeys = finalSchema.primaryKeys();
 
         if (primaryKeys.isEmpty()) {
             throw new IllegalStateException(
@@ -223,11 +223,14 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         RowDataKeyGen keyGen =
                 keyGenCache.computeIfAbsent(tableId, k -> RowDataUtils.createKeyGen(finalSchema));
 
+        // Get or create field getters for this table, lazily cached
+        List<RecordData.FieldGetter> fieldGetters =
+                fieldGetterCache.computeIfAbsent(
+                        tableId,
+                        k -> RowDataUtils.createFieldGetters(finalSchema, ZoneId.systemDefault()));
+
         // Convert DataChangeEvent to RowData for key extraction
-        RowData rowData =
-                RowDataUtils.convertDataChangeEventToRowData(
-                        event,
-                        RowDataUtils.createFieldGetters(finalSchema, ZoneId.systemDefault()));
+        RowData rowData = RowDataUtils.convertDataChangeEventToRowData(event, fieldGetters);
 
         // Use RowDataKeyGen to extract record key and partition path
         String recordKey = keyGen.getRecordKey(rowData);
@@ -237,9 +240,9 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
         String tableIndexKeyFields = String.join(",", primaryKeys);
         int bucketNumber = BucketIdentifier.getBucketId(recordKey, tableIndexKeyFields, numBuckets);
 
+        // partitionIndexFunc is designed for single table, events may come from different tables,
+        // prefix them with tableId e.g. tableId + "_" + partition
         // Use partition function to map bucket to task index for balanced distribution
-        int taskIndex = partitionIndexFunc.apply(numBuckets, partition, bucketNumber);
-
-        return taskIndex;
+        return partitionIndexFunc.apply(numBuckets, tableId + "_" + partition, bucketNumber);
     }
 }

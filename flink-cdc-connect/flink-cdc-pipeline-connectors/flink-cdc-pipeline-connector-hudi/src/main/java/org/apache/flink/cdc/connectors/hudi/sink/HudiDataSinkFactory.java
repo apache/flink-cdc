@@ -57,6 +57,17 @@ public class HudiDataSinkFactory implements DataSinkFactory {
         FactoryHelper.DefaultContext factoryContext = (FactoryHelper.DefaultContext) context;
         Configuration config = factoryContext.getFactoryConfiguration();
 
+        // Validate that only BUCKET index type is used
+        String indexType = config.get(HudiConfig.INDEX_TYPE);
+        if (indexType != null && !indexType.equalsIgnoreCase("BUCKET")) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Unsupported index type '%s'. Currently only 'BUCKET' index type is supported. "
+                                    + "Other index types (e.g., FLINK_STATE, BLOOM, SIMPLE) are not yet implemented "
+                                    + "for multi-table CDC pipelines.",
+                            indexType));
+        }
+
         String schemaOperatorUid =
                 context.getPipelineConfiguration()
                         .get(PipelineOptions.PIPELINE_SCHEMA_OPERATOR_UID);
@@ -69,8 +80,6 @@ public class HudiDataSinkFactory implements DataSinkFactory {
         Set<ConfigOption<?>> options = new HashSet<>();
         options.add(HudiConfig.PATH);
         options.add(HudiConfig.RECORD_KEY_FIELD);
-        //        options.add(HudiConfig.PRECOMBINE_FIELD);
-        //        options.add(HudiConfig.BUCKET_INDEX_NUM_BUCKETS);
         return options;
     }
 
