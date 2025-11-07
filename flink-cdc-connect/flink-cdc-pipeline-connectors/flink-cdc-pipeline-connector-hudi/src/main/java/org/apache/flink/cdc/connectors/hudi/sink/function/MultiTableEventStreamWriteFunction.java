@@ -52,12 +52,10 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
 import org.apache.hudi.client.model.HoodieFlinkInternalRow;
-import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.sink.common.AbstractStreamWriteFunction;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
 import org.apache.hudi.util.AvroSchemaConverter;
-import org.apache.hudi.util.ViewStorageProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,7 +105,12 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
-        super.initializeState(context);
+        // NOTE: Do NOT call super.initializeState(context) here.
+        // The parent class (AbstractStreamWriteFunction) expects to manage a single Hudi table
+        // and tries to create a HoodieTableMetaClient during initialization.
+        // MultiTableEventStreamWriteFunction is a dispatcher that manages multiple tables
+        // dynamically, so it doesn't have a single table path. Each child function
+        // (ExtendedBucketStreamWriteFunction) handles its own state initialization.
         this.functionInitializationContext = context;
 
         // Initialize schema map before restoring state
@@ -523,28 +526,13 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                             AvroSchemaConverter.convertToSchema(rowType).toString();
                     localTableConfig.set(FlinkOptions.SOURCE_AVRO_SCHEMA, tableAvroSchema);
 
-                    String rootPath = this.config.get(FlinkOptions.PATH).split("/coordinator")[0];
-                    if (rootPath != null) {
-                        String tableBasePath =
-                                String.format(
-                                        "%s/%s/%s",
-                                        rootPath, tableId.getSchemaName(), tableId.getTableName());
-                        localTableConfig.set(FlinkOptions.PATH, tableBasePath);
-                    }
+                    String rootPath = this.config.get(FlinkOptions.PATH);
+                    String tableBasePath =
+                            String.format(
+                                    "%s/%s/%s",
+                                    rootPath, tableId.getSchemaName(), tableId.getTableName());
+                    localTableConfig.set(FlinkOptions.PATH, tableBasePath);
 
-                    // Modify ViewStorageProperties to point to coordinator table
-                    FileSystemViewStorageConfig viewStorageConfig =
-                            ViewStorageProperties.loadFromProperties(
-                                    this.config.get(FlinkOptions.PATH), localTableConfig);
-                    localTableConfig.setString(
-                            FileSystemViewStorageConfig.VIEW_TYPE.key(),
-                            viewStorageConfig.getStorageType().name());
-                    localTableConfig.setString(
-                            FileSystemViewStorageConfig.REMOTE_HOST_NAME.key(),
-                            viewStorageConfig.getRemoteViewServerHost());
-                    localTableConfig.setString(
-                            FileSystemViewStorageConfig.REMOTE_PORT_NUM.key(),
-                            viewStorageConfig.getRemoteViewServerPort() + "");
                     return localTableConfig;
                 });
     }
@@ -634,11 +622,13 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     @Override
     public void close() throws Exception {
-        for (ExtendedBucketStreamWriteFunction func : tableFunctions.values()) {
-            try {
-                func.close();
-            } catch (Exception e) {
-                LOG.error("Failed to close table function", e);
+        if (tableFunctions != null) {
+            for (ExtendedBucketStreamWriteFunction func : tableFunctions.values()) {
+                try {
+                    func.close();
+                } catch (Exception e) {
+                    LOG.error("Failed to close table function", e);
+                }
             }
         }
         super.close();
@@ -646,11 +636,13 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
     public void endInput() {
         super.endInput();
-        for (ExtendedBucketStreamWriteFunction func : tableFunctions.values()) {
-            try {
-                func.endInput();
-            } catch (Exception e) {
-                LOG.error("Failed to complete endInput for table function", e);
+        if (tableFunctions != null) {
+            for (ExtendedBucketStreamWriteFunction func : tableFunctions.values()) {
+                try {
+                    func.endInput();
+                } catch (Exception e) {
+                    LOG.error("Failed to complete endInput for table function", e);
+                }
             }
         }
     }

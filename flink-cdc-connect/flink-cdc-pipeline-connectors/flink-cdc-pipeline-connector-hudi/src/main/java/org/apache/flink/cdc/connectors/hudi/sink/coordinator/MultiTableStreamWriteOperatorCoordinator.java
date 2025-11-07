@@ -39,12 +39,10 @@ import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.model.WriteOperationType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.collection.Pair;
-import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.configuration.OptionsResolver;
 import org.apache.hudi.exception.HoodieException;
@@ -275,12 +273,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
      */
     private transient SubtaskGateway[] gateways;
 
-    /**
-     * A dedicated write client whose only job is to run the embedded timeline server. This ensures
-     * there is only one timeline server for the entire job.
-     */
-    private transient HoodieFlinkWriteClient<?> timelineServerClient;
-
     /** A single-thread executor to handle instant time requests, mimicking the parent behavior. */
     private transient NonThrownExecutor instantRequestExecutor;
 
@@ -327,20 +319,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
         // Initialize the gateways array to avoid NullPointerException when subtasks are ready.
         this.gateways = new SubtaskGateway[context.currentParallelism()];
-
-        // Initialize a single write client for the coordinator path.
-        // Its primary role is to start and manage the embedded timeline server.
-        try {
-            // The baseConfig points to the dummy coordinator path.
-            // A .hoodie directory is required for the timeline server to start.
-            StreamerUtil.initTableIfNotExists(this.baseConfig);
-            this.timelineServerClient = FlinkWriteClients.createWriteClient(this.baseConfig);
-            LOG.info("Successfully started timeline server on coordinator.");
-        } catch (Exception e) {
-            LOG.error("Failed to start timeline server on coordinator.", e);
-            context.failJob(e);
-            return;
-        }
 
         // Re-initialize transient fields after deserialization from a Flink checkpoint.
         // When the coordinator is restored, the `tableContexts` map is deserialized, but all
@@ -903,9 +881,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
     @Override
     public void close() throws Exception {
-        if (timelineServerClient != null) {
-            timelineServerClient.close();
-        }
         if (instantRequestExecutor != null) {
             instantRequestExecutor.close();
         }
@@ -948,9 +923,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
     private Configuration createTableSpecificConfig(TableId tableId) {
         Configuration tableConfig = new Configuration(baseConfig);
-        String coordinatorPath = baseConfig.getString(FlinkOptions.PATH);
-        // Use the same logic as MultiTableEventStreamWriteFunction to strip "/coordinator"
-        String rootPath = coordinatorPath.split("/coordinator")[0];
+        String rootPath = baseConfig.getString(FlinkOptions.PATH);
         String tablePath =
                 String.format(
                         "%s/%s/%s", rootPath, tableId.getSchemaName(), tableId.getTableName());
@@ -973,13 +946,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                     "No schema found in cache for table {}. WriteClient may use incorrect schema!",
                     tableId);
         }
-
-        // Disable both embedded timeline server and metadata table for per-table clients.
-        // The central coordinator manages the only timeline server.
-        tableConfig.setBoolean(HoodieWriteConfig.EMBEDDED_TIMELINE_SERVER_ENABLE.key(), false);
-
-        // Use memory-based file system view since each client is lightweight.
-        tableConfig.setString(FileSystemViewStorageConfig.VIEW_TYPE.key(), "MEMORY");
 
         return tableConfig;
     }

@@ -25,7 +25,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 
-import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.sink.common.AbstractWriteOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,56 +104,8 @@ public class MultiTableWriteOperator extends AbstractWriteOperator<Event> {
      */
     public static MultiTableWriteOperatorFactory<Event> getFactory(
             Configuration conf, String schemaOperatorUid) {
-        // Create coordinator-specific configuration with dummy table settings
-        // This satisfies the coordinator's requirement for table initialization
-        Configuration coordinatorConfig = createCoordinatorConfig(conf);
-
         LOG.info("Creating multi-table write operator factory with extended coordinator support");
         return MultiTableWriteOperatorFactory.instance(
-                coordinatorConfig,
-                new MultiTableWriteOperator(coordinatorConfig, schemaOperatorUid));
-    }
-
-    /**
-     * Creates a coordinator-specific configuration with dummy table settings. This satisfies the
-     * coordinator's requirement for table initialization while actual table routing happens
-     * dynamically based on incoming events. Uses deterministic naming to allow reuse of existing
-     * coordinator tables.
-     */
-    private static Configuration createCoordinatorConfig(Configuration originalConfig) {
-        Configuration coordinatorConfig = new Configuration();
-        coordinatorConfig.addAll(originalConfig);
-
-        // Create deterministic dummy table name based on base path hash for reusability
-        String originalPath = coordinatorConfig.get(FlinkOptions.PATH, "default");
-        String pathHash = String.valueOf(Math.abs(originalPath.hashCode()));
-        String dummyTableName = "coordinator_" + pathHash;
-
-        coordinatorConfig.set(FlinkOptions.TABLE_NAME, dummyTableName);
-        coordinatorConfig.set(FlinkOptions.DATABASE_NAME, "coordinator_db");
-
-        // Set deterministic path for coordinator table (allows reuse)
-        String coordinatorPath = originalPath + "/coordinator/" + dummyTableName;
-        coordinatorConfig.set(FlinkOptions.PATH, coordinatorPath);
-
-        // Set dummy Avro schema with a simple structure (id: int)
-        String dummyAvroSchema =
-                "{\n"
-                        + "  \"type\": \"record\",\n"
-                        + "  \"name\": \"coordinator_record\",\n"
-                        + "  \"fields\": [\n"
-                        + "    {\n"
-                        + "      \"name\": \"id\",\n"
-                        + "      \"type\": \"int\"\n"
-                        + "    }\n"
-                        + "  ]\n"
-                        + "}";
-        coordinatorConfig.set(FlinkOptions.SOURCE_AVRO_SCHEMA, dummyAvroSchema);
-
-        LOG.info(
-                "Created coordinator config with reusable dummy table: coordinator_db.{} at path: {}",
-                dummyTableName,
-                coordinatorPath);
-        return coordinatorConfig;
+                conf, new MultiTableWriteOperator(conf, schemaOperatorUid));
     }
 }
