@@ -243,7 +243,6 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
             LOG.error("Update table for CDC failed.", e);
             throw e;
         }
-
         List<String> recordsInSnapshotPhase =
                 new ArrayList<>(
                         Arrays.asList(
@@ -262,7 +261,6 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
         recordsInSnapshotPhase =
                 recordsInSnapshotPhase.stream().sorted().collect(Collectors.toList());
         validateSinkResult(warehouse, database, "products", recordsInSnapshotPhase);
-        Thread.sleep(3600000L);
     }
 
     /**

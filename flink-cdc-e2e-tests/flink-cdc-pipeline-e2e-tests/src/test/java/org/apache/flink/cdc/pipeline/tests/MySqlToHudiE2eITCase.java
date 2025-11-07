@@ -812,11 +812,6 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             JobStatusMessage message = optMessage.get();
             JobStatus jobStatus = message.getJobState();
             if (!expectedStatus.isTerminalState() && jobStatus.isTerminalState()) {
-                try {
-                    Thread.sleep(50000);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
                 throw new ValidationException(
                         String.format(
                                 "Job has been terminated! JobName: %s, JobID: %s, Status: %s",

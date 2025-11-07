@@ -135,7 +135,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "blob.server.port: 6124",
                     "taskmanager.numberOfTaskSlots: 10",
                     "parallelism.default: 4",
-                    "execution.checkpointing.interval: 30s",
+                    "execution.checkpointing.interval: 300",
                     "state.backend.type: hashmap",
                     "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false",
                     "execution.checkpointing.savepoint-dir: file:///opt/flink",
@@ -389,11 +389,6 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                 JobStatusMessage message = jobStatusMessages.iterator().next();
                 JobStatus jobStatus = message.getJobState();
                 if (!expectedStatus.isTerminalState() && jobStatus.isTerminalState()) {
-                    try {
-                        Thread.sleep(50000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
                     throw new ValidationException(
                             String.format(
                                     "Job has been terminated! JobName: %s, JobID: %s, Status: %s",

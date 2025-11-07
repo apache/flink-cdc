@@ -565,7 +565,8 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
         TableId tableId = pathToTableId.get(tablePath);
 
         if (tableId == null) {
-            LOG.warn("No tableId found for path: {}. Cannot process event.", tablePath);
+            LOG.error("No tableId found for path: {}. Cannot process event.", tablePath);
+            context.failJob(new IllegalStateException("No tableId found for path: " + tablePath));
             return;
         }
 
