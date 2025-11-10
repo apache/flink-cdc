@@ -419,8 +419,15 @@ public abstract class PipelineTestEnvironment extends TestLogger {
             } else {
                 LOG.error(execResult.getStderr());
                 throw new AssertionError(
-                        "Failed when submitting the pipeline job. Exit code: "
-                                + execResult.getExitCode());
+                        "Failed when submitting the pipeline job.\n"
+                                + "Exit code: "
+                                + execResult.getExitCode()
+                                + "\n"
+                                + "StdOut: "
+                                + execResult.getStdout()
+                                + "\n"
+                                + "StdErr: "
+                                + execResult.getStderr());
             }
         } catch (Exception e) {
             throw new RuntimeException(
@@ -467,6 +474,12 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         for (String event : expectedEvents) {
             waitUntilSpecificEvent(consumer, event);
         }
+    }
+
+    protected void validateResult(
+            ToStringConsumer consumer, Function<String, String> mapper, String... expectedEvents)
+            throws Exception {
+        validateResult(consumer, Stream.of(expectedEvents).map(mapper).toArray(String[]::new));
     }
 
     protected void waitUntilSpecificEvent(String event) throws Exception {

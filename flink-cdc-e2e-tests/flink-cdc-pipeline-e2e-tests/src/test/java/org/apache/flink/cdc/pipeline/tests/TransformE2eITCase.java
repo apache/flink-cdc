@@ -183,7 +183,7 @@ class TransformE2eITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "sink:\n"
                                 + "  type: values\n"
-                                + "route:\n"
+                                + "\n"
                                 + "transform:\n"
                                 + "  - source-table: %s.\\.*\n"
                                 + "    projection: ID, VERSION, 'Type-A' AS CATEGORY\n"

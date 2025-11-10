@@ -60,8 +60,8 @@ pipeline:
   schema-operator.rpc-timeout: 1 h
   execution.runtime-mode: STREAMING
   model:
-    model-name: GET_EMBEDDING
-    class-name: OpenAIEmbeddingModel
-    openai.model: text-embedding-3-small
-    openai.host: https://xxxx
-    openai.apikey: abcd1234
+    - model-name: GET_EMBEDDING
+      class-name: OpenAIEmbeddingModel
+      openai.model: text-embedding-3-small
+      openai.host: https://xxxx
+      openai.apikey: abcd1234
