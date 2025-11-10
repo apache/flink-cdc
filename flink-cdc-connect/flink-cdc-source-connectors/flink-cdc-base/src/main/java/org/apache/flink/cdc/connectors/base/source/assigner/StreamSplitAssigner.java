@@ -129,11 +129,9 @@ public class StreamSplitAssigner implements SplitAssigner {
 
     @Override
     public void addSplits(Collection<SourceSplitBase> splits) {
-        if (!CollectionUtil.isNullOrEmpty(splits)) {
-            // we don't store the split, but will re-create stream split later
-            isStreamSplitAssigned = false;
-            enumeratorMetrics.exitStreamReading();
-        }
+        // we don't store the split, but will re-create stream split later
+        isStreamSplitAssigned = false;
+        enumeratorMetrics.exitStreamReading();
     }
 
     @Override
