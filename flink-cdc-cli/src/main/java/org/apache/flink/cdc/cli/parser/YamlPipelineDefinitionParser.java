@@ -42,6 +42,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YA
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -125,8 +126,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         validateJsonNodeKeys(
                 TOP_LEVEL_NAME,
                 pipelineDefJsonNode,
-                List.of(SOURCE_KEY, SINK_KEY),
-                List.of(ROUTE_KEY, TRANSFORM_KEY, PIPELINE_KEY));
+                Arrays.asList(SOURCE_KEY, SINK_KEY),
+                Arrays.asList(ROUTE_KEY, TRANSFORM_KEY, PIPELINE_KEY));
 
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
@@ -263,8 +264,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         validateJsonNodeKeys(
                 "route",
                 routeNode,
-                List.of(ROUTE_SOURCE_TABLE_KEY, ROUTE_SINK_TABLE_KEY),
-                List.of(ROUTE_REPLACE_SYMBOL, ROUTE_DESCRIPTION_KEY));
+                Arrays.asList(ROUTE_SOURCE_TABLE_KEY, ROUTE_SINK_TABLE_KEY),
+                Arrays.asList(ROUTE_REPLACE_SYMBOL, ROUTE_DESCRIPTION_KEY));
 
         String sourceTable =
                 checkNotNull(
@@ -291,7 +292,10 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private UdfDef toUdfDef(JsonNode udfNode) {
         validateJsonNodeKeys(
-                "UDF", udfNode, List.of(UDF_FUNCTION_NAME_KEY, UDF_CLASSPATH_KEY), List.of());
+                "UDF",
+                udfNode,
+                Arrays.asList(UDF_FUNCTION_NAME_KEY, UDF_CLASSPATH_KEY),
+                Collections.emptyList());
 
         String functionName =
                 checkNotNull(
@@ -313,8 +317,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         validateJsonNodeKeys(
                 "transform",
                 transformNode,
-                List.of(TRANSFORM_SOURCE_TABLE_KEY),
-                List.of(
+                Collections.singletonList(TRANSFORM_SOURCE_TABLE_KEY),
+                Arrays.asList(
                         TRANSFORM_PROJECTION_KEY,
                         TRANSFORM_FILTER_KEY,
                         TRANSFORM_PRIMARY_KEY_KEY,
