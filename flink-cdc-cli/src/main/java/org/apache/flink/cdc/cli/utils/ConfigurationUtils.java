@@ -43,7 +43,7 @@ public class ConfigurationUtils {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, String> flattenConfigMap(
+    public static Map<String, String> flattenConfigMap(
             Map<String, Object> config, String keyPrefix) {
         final Map<String, String> flattenedMap = new HashMap<>();
 
@@ -53,7 +53,7 @@ public class ConfigurationUtils {
                     if (value instanceof Map) {
                         Map<String, Object> e = (Map<String, Object>) value;
                         flattenedMap.putAll(flattenConfigMap(e, flattenedKey + KEY_SEPARATOR));
-                    } else {
+                    } else if (value != null) {
                         if (value instanceof List) {
                             flattenedMap.put(flattenedKey, YamlParserUtils.toYAMLString(value));
                         } else {
@@ -63,21 +63,5 @@ public class ConfigurationUtils {
                 });
 
         return flattenedMap;
-    }
-
-    public static Class<?> getClaimModeClass() {
-        try {
-            return Class.forName("org.apache.flink.core.execution.RecoveryClaimMode");
-        } catch (ClassNotFoundException classNotFoundException) {
-            try {
-                return Class.forName("org.apache.flink.core.execution.RestoreMode");
-            } catch (ClassNotFoundException ignored) {
-                try {
-                    return Class.forName("org.apache.flink.runtime.jobgraph.RestoreMode");
-                } catch (ClassNotFoundException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        }
     }
 }

@@ -126,7 +126,13 @@ sink:
 pipeline:
  name: Sync MySQL Database to Doris
  parallelism: 2
-
+ flink-conf:
+   rest.bind-port: {{REST_PORT}}
+   rest.address: {{NODE_IP}}
+   yarn.application.id: {{YARN_APPLICATION_ID}}
+   execution.checkpointing.interval: 2min
+   # 如需从 savepoint 恢复，可配置以下参数：
+   # execution.savepoint.path: hdfs:///flink/savepoint-1537
 ```
 
 你可以按需修改配置文件。

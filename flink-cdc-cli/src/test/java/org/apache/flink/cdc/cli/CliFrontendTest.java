@@ -20,7 +20,7 @@ package org.apache.flink.cdc.cli;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
-import org.apache.flink.core.execution.RestoreMode;
+import org.apache.flink.core.execution.RestoreModeAdapter;
 import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -28,7 +28,6 @@ import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,11 +35,18 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 
-import static org.apache.flink.configuration.StateRecoveryOptions.RESTORE_MODE;
+import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTING_INTERVAL;
+import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTING_TIMEOUT;
+import static org.apache.flink.configuration.CheckpointingOptions.MAX_CONCURRENT_CHECKPOINTS;
+import static org.apache.flink.configuration.CoreOptions.DEFAULT_PARALLELISM;
+import static org.apache.flink.configuration.JobManagerOptions.ADDRESS;
+import static org.apache.flink.configuration.JobManagerOptions.PORT;
 import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
 import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_PATH;
+import static org.apache.flink.configuration.TaskManagerOptions.NUM_TASK_SLOTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -107,9 +113,107 @@ class CliFrontendTest {
                         "-n");
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_PATH))
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getFlinkConfig().get(RESTORE_MODE).toString())
-                .isEqualTo(RestoreMode.NO_CLAIM.toString());
+        assertThat(RestoreModeAdapter.getRestoreMode(executor.getFlinkConfig()).toString())
+                .isEqualTo("NO_CLAIM");
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
+    }
+
+    @Test
+    void testFlinkConfigurationWithPriority() throws Exception {
+        // 1. Command-line options have higher priority than pipeline definition options
+        CliExecutor executorWithCliOverride =
+                createExecutor(
+                        pipelineDef(),
+                        "--flink-home",
+                        flinkHome(),
+                        "-D",
+                        "execution.checkpointing.timeout=11min");
+        assertThat(executorWithCliOverride.getFlinkConfig().get(CHECKPOINTING_TIMEOUT))
+                .isEqualTo(Duration.ofMinutes(11));
+        assertThat(executorWithCliOverride.getFlinkConfig().get(DEFAULT_PARALLELISM)).isEqualTo(1);
+
+        // 2. Pipeline definition options have higher priority than cluster config.yaml options
+        CliExecutor executorWithoutCliOverride =
+                createExecutor(pipelineDef(), "--flink-home", flinkHome());
+        assertThat(executorWithoutCliOverride.getFlinkConfig().get(CHECKPOINTING_TIMEOUT))
+                .isEqualTo(Duration.ofMinutes(12));
+        assertThat(executorWithoutCliOverride.getFlinkConfig().get(DEFAULT_PARALLELISM))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void testFlinkConfigurationMutualOverridePriority() throws Exception {
+        // Verify all 3 configuration provision methods (CLI args, pipeline.yaml, config.yaml)
+        // interacting simultaneously with different override relationships:
+        // 1. CLI overrides both pipeline.yaml and config.yaml (parallelism.default: 3 vs 2 vs 1)
+        // 2. pipeline.yaml overrides config.yaml when CLI does not specify
+        // (taskmanager.numberOfTaskSlots: 4 vs 1)
+        // 3. CLI overrides config.yaml directly when pipeline.yaml does not specify
+        // (jobmanager.rpc.port: 9999 vs 6123)
+        // 4. CLI overrides pipeline.yaml directly (execution.checkpointing.timeout: 11min vs 12min)
+        // 5. pipeline.yaml value used when not overridden (execution.checkpointing.interval: 3min)
+        // 6. CLI value used for option only set via CLI
+        // (execution.checkpointing.max-concurrent-checkpoints: 5)
+        // 7. config.yaml value preserved for option only set in cluster config
+        // (jobmanager.rpc.address: localhost)
+        CliExecutor executorWithCli =
+                createExecutor(
+                        pipelineDefWithPriority(),
+                        "--flink-home",
+                        flinkHome(),
+                        "-D",
+                        "parallelism.default=3",
+                        "-D",
+                        "jobmanager.rpc.port=9999",
+                        "-D",
+                        "execution.checkpointing.timeout=11min",
+                        "-D",
+                        "execution.checkpointing.max-concurrent-checkpoints=5");
+        org.apache.flink.configuration.Configuration flinkConfigWithCli =
+                executorWithCli.getFlinkConfig();
+
+        assertThat(flinkConfigWithCli.get(DEFAULT_PARALLELISM)).isEqualTo(3);
+        assertThat(flinkConfigWithCli.get(NUM_TASK_SLOTS)).isEqualTo(4);
+        assertThat(flinkConfigWithCli.get(PORT)).isEqualTo(9999);
+        assertThat(flinkConfigWithCli.get(ADDRESS)).isEqualTo("localhost");
+        assertThat(flinkConfigWithCli.get(CHECKPOINTING_TIMEOUT)).isEqualTo(Duration.ofMinutes(11));
+        assertThat(flinkConfigWithCli.get(CHECKPOINTING_INTERVAL)).isEqualTo(Duration.ofMinutes(3));
+        assertThat(flinkConfigWithCli.get(MAX_CONCURRENT_CHECKPOINTS)).isEqualTo(5);
+
+        // When no CLI arguments are provided, verify pipeline.yaml overrides config.yaml
+        // while non-overridden cluster configs are safely preserved
+        CliExecutor executorWithoutCli =
+                createExecutor(pipelineDefWithPriority(), "--flink-home", flinkHome());
+        org.apache.flink.configuration.Configuration flinkConfigWithoutCli =
+                executorWithoutCli.getFlinkConfig();
+
+        assertThat(flinkConfigWithoutCli.get(DEFAULT_PARALLELISM)).isEqualTo(2);
+        assertThat(flinkConfigWithoutCli.get(NUM_TASK_SLOTS)).isEqualTo(4);
+        assertThat(flinkConfigWithoutCli.get(PORT)).isEqualTo(6123);
+        assertThat(flinkConfigWithoutCli.get(ADDRESS)).isEqualTo("localhost");
+        assertThat(flinkConfigWithoutCli.get(CHECKPOINTING_TIMEOUT))
+                .isEqualTo(Duration.ofMinutes(12));
+        assertThat(flinkConfigWithoutCli.get(CHECKPOINTING_INTERVAL))
+                .isEqualTo(Duration.ofMinutes(3));
+    }
+
+    @Test
+    void testFlinkConfigurationWithNestedYaml() throws Exception {
+        CliExecutor executor =
+                createExecutor(
+                        pipelineDefWithNestedFlinkConf(),
+                        "--flink-home",
+                        flinkHome(),
+                        "-D",
+                        "execution.checkpointing.interval=5min");
+        org.apache.flink.configuration.Configuration flinkConfig = executor.getFlinkConfig();
+
+        // Command-line override takes precedence over nested YAML
+        assertThat(flinkConfig.get(CHECKPOINTING_INTERVAL)).isEqualTo(Duration.ofMinutes(5));
+        // Nested YAML takes effect
+        assertThat(flinkConfig.get(CHECKPOINTING_TIMEOUT)).isEqualTo(Duration.ofMinutes(15));
+        // Nested YAML overrides config.yaml default parallelism
+        assertThat(flinkConfig.get(DEFAULT_PARALLELISM)).isEqualTo(4);
     }
 
     @Test
@@ -183,8 +287,8 @@ class CliFrontendTest {
     }
 
     @Test
-    void testPipelineExecutingWithUnValidFlinkConfig() throws Exception {
-        Assertions.assertThatThrownBy(
+    void testPipelineExecutingWithInvalidFlinkConfig() throws Exception {
+        assertThatThrownBy(
                         () ->
                                 createExecutor(
                                         pipelineDef(),
@@ -198,7 +302,7 @@ class CliFrontendTest {
                                 "null or white space argument for key or value: %s=%s",
                                 "", "execution.target"));
 
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () ->
                                 createExecutor(
                                         pipelineDef(),
@@ -212,7 +316,7 @@ class CliFrontendTest {
                                 "null or white space argument for key or value: %s=%s",
                                 "execution.target", ""));
 
-        Assertions.assertThatThrownBy(
+        assertThatThrownBy(
                         () -> createExecutor(pipelineDef(), "--flink-home", flinkHome(), "-D", "="))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(
@@ -228,6 +332,20 @@ class CliFrontendTest {
 
     private String pipelineDef() throws Exception {
         URL resource = Resources.getResource("definitions/pipeline-definition-full.yaml");
+        return Paths.get(resource.toURI()).toString();
+    }
+
+    private String pipelineDefWithPriority() throws Exception {
+        URL resource =
+                Resources.getResource(
+                        "definitions/pipeline-definition-with-flink-conf-priority.yaml");
+        return Paths.get(resource.toURI()).toString();
+    }
+
+    private String pipelineDefWithNestedFlinkConf() throws Exception {
+        URL resource =
+                Resources.getResource(
+                        "definitions/pipeline-definition-with-nested-flink-conf.yaml");
         return Paths.get(resource.toURI()).toString();
     }
 
