@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.metrics.MetricGroup;
@@ -42,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +53,8 @@ import java.util.stream.Collectors;
 
 /** A {@link Sink} to write {@link DataChangeEvent} to Paimon storage. */
 public class PaimonWriter<InputT>
-        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable> {
+        implements TwoPhaseCommittingSink.PrecommittingSinkWriter<InputT, MultiTableCommittable>,
+                StatefulSinkWriter<InputT, PaimonWriterState> {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaimonWriter.class);
 
@@ -75,6 +78,8 @@ public class PaimonWriter<InputT>
     /** A workaround variable trace the checkpointId in {@link StreamOperator#snapshotState}. */
     private long lastCheckpointId;
 
+    private final PaimonWriterState stateCache;
+
     public PaimonWriter(
             Options catalogOptions,
             MetricGroup metricGroup,
@@ -93,6 +98,11 @@ public class PaimonWriter<InputT>
                                 Thread.currentThread().getName() + "-CdcMultiWrite-Compaction"));
         this.serializer = serializer;
         this.lastCheckpointId = lastCheckpointId;
+        this.stateCache = new PaimonWriterState(commitUser);
+        LOG.info(
+                "Created PaimonWriter with commit user {} and identifier {}",
+                commitUser,
+                lastCheckpointId);
     }
 
     @Override
@@ -213,5 +223,10 @@ public class PaimonWriter<InputT>
         if (compactExecutor != null) {
             compactExecutor.shutdownNow();
         }
+    }
+
+    @Override
+    public List<PaimonWriterState> snapshotState(long checkpointId) {
+        return Collections.singletonList(stateCache);
     }
 }
