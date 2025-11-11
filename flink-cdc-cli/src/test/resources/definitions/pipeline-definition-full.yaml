@@ -65,3 +65,5 @@ pipeline:
       openai.model: text-embedding-3-small
       openai.host: https://xxxx
       openai.apikey: abcd1234
+  flink-conf:
+    execution.checkpointing.timeout: 12min
