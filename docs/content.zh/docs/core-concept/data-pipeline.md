@@ -60,6 +60,8 @@ under the License.
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 ## 包含可选部分
@@ -112,7 +114,7 @@ under the License.
 下面是 Data Pipeline 级别支持的配置选项。
 请注意，虽然这些参数都是可选的，但至少需要指定其中一个。也就是说，`pipeline` 部分是必需的，不能为空。
 
-| 参数                            | 含义                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | optional/required |
+| 参数                          | 含义                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | optional/required |
 |-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
 | `name`                        | 这个 pipeline 的名称，会用在 Flink 集群中作为作业的名称。                                                                                                                                                                                                                                                                                                                                                                                                                                     | optional          |
 | `parallelism`                 | pipeline的全局并发度，默认值是1。                                                                                                                                                                                                                                                                                                                                                                                                                                                     | optional          |
@@ -124,5 +126,6 @@ under the License.
 | `schema-operator.rpc-timeout` | SchemaOperator 等待下游 SchemaChangeEvent 应用完成的超时时间，默认值是 3 分钟。                                                                                                                                                                                                                                                                                                                                                                                                                | optional          |
 | `operator.uid.prefix`         | Pipeline 中算子 UID 的前缀。如果不设置，Flink 会为每个算子生成唯一的 UID。 建议设置这个参数以提供稳定和可识别的算子 ID，这有助于有状态升级、问题排查和在 Flink UI 上的诊断。                                                                                                                                                                                                                                                                                                                                                                 | optional          |
 | `sink.partitioning.strategy`  | Sink 写入数据时使用的分区策略。数据类型：String。默认值：`SINK_DEFINED`。备注：可配置的值如下：`SINK_DEFINED`：使用 Sink 定义的分区策略；`PRIMARY_KEY`：按表 ID 和主键分区；`TABLE_ID`：仅按表 ID 分区。                                                                                                                                                                                                                                                                                   | optional          |
+| `flink-conf`                  | 用于配置[Flink相关参数](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/config/)。 <br/>Flink参数优先级：config.yaml < job command-line < pipeline.yaml | optional          |
 
 注意：虽然上述参数都是可选的，但至少需要指定其中一个。`pipeline` 部分是必需的，不能为空。

@@ -59,6 +59,8 @@ sink:
 pipeline:
    name: MySQL to StarRocks Pipeline
    parallelism: 2
+   flink-conf:
+     execution.checkpointing.interval: 2min
 ```
 
 ## Connector Options
