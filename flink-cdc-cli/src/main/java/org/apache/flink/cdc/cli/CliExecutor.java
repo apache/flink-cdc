@@ -74,7 +74,7 @@ public class CliExecutor {
             case YARN_APPLICATION:
                 return deployWithApplicationComposer(new YarnApplicationDeploymentExecutor());
             case LOCAL:
-                return deployWithComposer(FlinkPipelineComposer.ofMiniCluster());
+                return deployWithComposer(FlinkPipelineComposer.ofMiniCluster(flinkConfig));
             case REMOTE:
             case YARN_SESSION:
                 return deployWithComposer(

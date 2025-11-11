@@ -41,6 +41,7 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -69,6 +70,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String TRANSFORM_KEY = "transform";
     private static final String PIPELINE_KEY = "pipeline";
     private static final String MODEL_KEY = "model";
+    private static final String FLINK_KEY = "flink-conf";
 
     // Source / sink keys
     private static final String TYPE_KEY = "type";
@@ -109,8 +111,6 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     public static final String TRANSFORM_TABLE_OPTION_KEY = "table-options";
 
-    public static final String TRANSFORM_TABLE_OPTION_DELIMITER_KEY = "table-options.delimiter";
-
     private final ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
 
     /** Parse the specified pipeline definition file. */
@@ -149,6 +149,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
+
+            ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(FLINK_KEY);
         }
 
         // Pipeline configs are optional
@@ -576,4 +578,20 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                             contextName, jsonNode.getNodeType(), jsonNode));
         }
     }
+
+    public static Map<String, String> getFlinkConfigFromPipelineDef(Path pipelineDefPath)
+            throws IOException {
+        FileSystem fileSystem = FileSystem.get(pipelineDefPath.toUri());
+        try (FSDataInputStream pipelineInStream = fileSystem.open(pipelineDefPath)) {
+            JsonNode pipelineDefJsonNode = mapper.readTree(pipelineInStream);
+            return Optional.ofNullable(pipelineDefJsonNode.get(PIPELINE_KEY))
+                    .map(node -> node.get(FLINK_KEY))
+                    .map(
+                            flinkNode ->
+                                    mapper.convertValue(
+                                            flinkNode, new TypeReference<Map<String, String>>() {}))
+                    .orElse(Collections.emptyMap());
+        }
+    }
+
 }
