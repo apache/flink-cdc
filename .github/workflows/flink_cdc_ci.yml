@@ -84,7 +84,7 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[8]"
-      flink-versions: "['1.19.2', '1.20.1']"
+      flink-versions: "['1.19.3', '1.20.3']"
       modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
@@ -92,5 +92,5 @@ jobs:
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
       java-versions: "[8]"
-      flink-versions: "['1.19.2', '1.20.1']"
+      flink-versions: "['1.19.3', '1.20.3']"
       modules: "['source_e2e']"
