@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
+import org.apache.flink.cdc.connectors.mysql.source.utils.SplitKeyUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.types.logical.RowType;
@@ -280,11 +281,12 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
                 Struct target = RecordUtils.getStructContainsChunkKey(sourceRecord);
                 Object[] chunkKey =
-                        RecordUtils.getSplitKey(
+                        SplitKeyUtils.getSplitKey(
                                 splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
 
                 FinishedSnapshotSplitInfo matchedSplit =
-                        RecordUtils.findSplitByKeyBinary(finishedSplitsInfo.get(tableId), chunkKey);
+                        SplitKeyUtils.findSplitByKeyBinary(
+                                finishedSplitsInfo.get(tableId), chunkKey);
 
                 return matchedSplit != null && position.isAfter(matchedSplit.getHighWatermark());
             }
@@ -349,7 +351,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             }
             // Sort splits by splitStart for binary search optimization
             // Binary search requires sorted data to work correctly
-            splitsInfoMap.values().forEach(RecordUtils::sortFinishedSplitInfos);
+            splitsInfoMap.values().forEach(SplitKeyUtils::sortFinishedSplitInfos);
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;

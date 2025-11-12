@@ -22,7 +22,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
-import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
+import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -202,7 +202,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 if (supportsSplitKeyOptimization) {
                     Object[] splitKey = taskContext.getSplitKey(sourceRecord);
                     FinishedSnapshotSplitInfo matchedSplit =
-                            SourceRecordUtils.findSplitByKeyBinary(tableSplits, splitKey);
+                            SplitKeyUtils.findSplitByKeyBinary(tableSplits, splitKey);
                     return matchedSplit != null
                             && position.isAfter(matchedSplit.getHighWatermark());
                 } else {
@@ -274,7 +274,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 }
             }
             if (supportsSplitKeyOptimization) {
-                splitsInfoMap.values().forEach(SourceRecordUtils::sortFinishedSplitInfos);
+                splitsInfoMap.values().forEach(SplitKeyUtils::sortFinishedSplitInfos);
             }
         }
         this.finishedSplitsInfo = splitsInfoMap;

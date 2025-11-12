@@ -29,12 +29,12 @@ import org.mockito.Mockito;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.findSplitByKeyBinary;
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.sortFinishedSplitInfos;
-import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.splitKeyRangeContains;
+import static org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils.findSplitByKeyBinary;
+import static org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils.sortFinishedSplitInfos;
+import static org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils.splitKeyRangeContains;
 
-/** Tests for {@link SourceRecordUtils}. */
-class SourceRecordUtilsTest {
+/** Tests for {@link SplitKeyUtils}. */
+class SplitKeyUtilsTest {
 
     @Test
     void testSortFinishedSplitInfos() {

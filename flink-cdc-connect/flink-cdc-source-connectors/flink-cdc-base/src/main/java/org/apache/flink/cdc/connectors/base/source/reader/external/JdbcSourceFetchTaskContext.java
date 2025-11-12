@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.JdbcDataSourceDialect;
 import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
+import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.config.CommonConnectorConfig;
@@ -74,7 +75,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     @Override
     public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
         Object[] key = getSplitKey(record);
-        return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
+        return SplitKeyUtils.splitKeyRangeContains(key, splitStart, splitEnd);
     }
 
     @Override
@@ -85,7 +86,7 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
     @Override
     public Object[] getSplitKey(SourceRecord record) {
         RowType splitKeyType = getSplitType(getDatabaseSchema().tableFor(this.getTableId(record)));
-        return SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
+        return SplitKeyUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
     }
 
     @Override
