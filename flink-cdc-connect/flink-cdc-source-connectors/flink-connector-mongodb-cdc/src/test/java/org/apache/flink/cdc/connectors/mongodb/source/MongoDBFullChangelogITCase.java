@@ -77,6 +77,9 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
     private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
+    private static final StreamExecutionEnvironment env =
+            StreamExecutionEnvironment.getExecutionEnvironment();
+
     @Test
     void testGetMongoDBVersion() {
         MongoDBSourceConfig config =
@@ -470,7 +473,6 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                 customerDatabase);
         MONGO_CONTAINER.executeCommandFileInDatabase("customer", customerDatabase);
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
         env.setParallelism(1);
 
@@ -580,7 +582,6 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                     customerDatabase);
         }
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
@@ -752,7 +753,6 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                     customerDatabase);
         }
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);

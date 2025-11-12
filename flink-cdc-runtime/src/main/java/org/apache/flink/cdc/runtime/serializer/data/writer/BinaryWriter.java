@@ -20,16 +20,19 @@ package org.apache.flink.cdc.runtime.serializer.data.writer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.ArrayData;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.MapData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
+import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
@@ -82,6 +85,10 @@ public interface BinaryWriter {
 
     void writeRecord(int pos, RecordData value, TypeSerializer<RecordData> serializer);
 
+    void writeDate(int pos, DateData value);
+
+    void writeTime(int pos, TimeData value, int precision);
+
     /** Finally, complete write to set real size to binary. */
     void complete();
 
@@ -98,9 +105,25 @@ public interface BinaryWriter {
                 writer.writeShort(pos, (short) o);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 writer.writeInt(pos, (int) o);
+                break;
+            case DATE:
+                if (o instanceof DateData) {
+                    writer.writeDate(pos, (DateData) o);
+                } else {
+                    // This path is kept for backward compatibility, as legacy data might represent
+                    // dates as integers (days since epoch).
+                    writer.writeInt(pos, (int) o);
+                }
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                if (o instanceof TimeData) {
+                    writer.writeTime(pos, (TimeData) o, ((TimeType) type).getPrecision());
+                } else {
+                    // This path is kept for backward compatibility, as legacy data might represent
+                    // time as integers (milliseconds of the day).
+                    writer.writeInt(pos, (int) o);
+                }
                 break;
             case BIGINT:
                 writer.writeLong(pos, (long) o);

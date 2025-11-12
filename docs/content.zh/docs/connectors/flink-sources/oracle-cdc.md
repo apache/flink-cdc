@@ -351,8 +351,15 @@ Connector Options
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial"
-           and "latest-offset". 
+           , "latest-offset" , specific-offset. 
            Please see <a href="#startup-reading-position">Startup Reading Position</a> section for more detailed information.</td>
+    </tr>
+    <tr>
+      <td>scan.startup.specific-offset.scn</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>Long</td>
+      <td>Optional SCN used in case of "specific-offset" startup mode</td>
     </tr>
     <tr>
           <td>scan.incremental.snapshot.enabled</td>
@@ -428,12 +435,11 @@ Connector Options
     <tr>
       <td>scan.incremental.snapshot.unbounded-chunk-first.enabled</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>
         Whether to assign the unbounded chunks first during snapshot reading phase.<br>
         This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.<br> 
-        Experimental option, defaults to false.
       </td>
     </tr>
     <tr>
@@ -544,6 +550,7 @@ The config option `scan.startup.mode` specifies the startup mode for Oracle CDC 
 - `initial` (default): Performs an initial snapshot on the monitored database tables upon first startup, and continue to read the latest redo log.
 - `latest-offset`: Never to perform a snapshot on the monitored database tables upon first startup, just read from
   the change since the connector was started.
+- `specific-offset`: Skip snapshot phase and start reading redo log from a specific offset with scn.
 
 _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapshot.mode` configuration. So please do not use them together. If you specific both `scan.startup.mode` and `debezium.snapshot.mode` options in the table DDL, it may make `scan.startup.mode` doesn't work._
 

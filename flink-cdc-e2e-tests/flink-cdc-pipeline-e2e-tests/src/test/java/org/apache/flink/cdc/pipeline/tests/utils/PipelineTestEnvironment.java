@@ -64,6 +64,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -113,7 +114,7 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")
                             .withNetwork(NETWORK)
-                            .withNetworkAliases("mysql")
+                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
                             .withLogConsumer(new Slf4jLogConsumer(LOG));
 
     // ------------------------------------------------------------------------------------------
@@ -138,7 +139,13 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "state.backend.type: hashmap",
                     "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false",
                     "execution.checkpointing.savepoint-dir: file:///opt/flink",
-                    "restart-strategy.type: off");
+                    "restart-strategy.type: off",
+                    // Set off-heap memory explicitly to avoid "java.lang.OutOfMemoryError: Direct
+                    // buffer memory" error.
+                    "taskmanager.memory.task.off-heap.size: 128mb",
+                    // Fix `java.lang.OutOfMemoryError: Metaspace. The metaspace out-of-memory error
+                    // has occurred` error.
+                    "taskmanager.memory.jvm-metaspace.size: 512mb");
     public static final String FLINK_PROPERTIES = String.join("\n", EXTERNAL_PROPS);
 
     @Nullable protected RestClusterClient<StandaloneClusterId> restClusterClient;
@@ -162,6 +169,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
         return flinkVersion;
     }
 
+    protected List<String> copyJarToFlinkLib() {
+        return Collections.emptyList();
+    }
+
     @BeforeEach
     public void before() throws Exception {
         LOG.info("Starting containers...");
@@ -175,6 +186,15 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                         .withEnv("FLINK_PROPERTIES", FLINK_PROPERTIES)
                         .withCreateContainerCmdModifier(cmd -> cmd.withVolumes(sharedVolume))
                         .withLogConsumer(jobManagerConsumer);
+
+        List<String> jarToCopy = copyJarToFlinkLib();
+        if (!jarToCopy.isEmpty()) {
+            for (String jar : jarToCopy) {
+                jobManager.withCopyFileToContainer(
+                        MountableFile.forHostPath(TestUtils.getResource(jar)), "/opt/flink/lib/");
+            }
+        }
+
         Startables.deepStart(Stream.of(jobManager)).join();
         runInContainerAsRoot(jobManager, "chmod", "0777", "-R", sharedVolume.toString());
         LOG.info("JobManager is started.");

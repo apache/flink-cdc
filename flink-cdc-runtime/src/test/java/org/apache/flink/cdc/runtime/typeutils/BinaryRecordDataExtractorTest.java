@@ -17,11 +17,13 @@
 
 package org.apache.flink.cdc.runtime.typeutils;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -34,7 +36,9 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,7 +61,7 @@ public class BinaryRecordDataExtractorTest {
                     .physicalColumn("bin_col", DataTypes.BINARY(17))
                     .physicalColumn("varbin_col", DataTypes.VARBINARY(17))
                     .physicalColumn("date_col", DataTypes.DATE())
-                    .physicalColumn("time_col", DataTypes.TIME())
+                    .physicalColumn("time_col", DataTypes.TIME(9))
                     .physicalColumn("ts_col", DataTypes.TIMESTAMP(3))
                     .physicalColumn("ts_tz_col", DataTypes.TIMESTAMP_TZ(3))
                     .physicalColumn("ts_ltz_col", DataTypes.TIMESTAMP_LTZ(3))
@@ -88,8 +92,8 @@ public class BinaryRecordDataExtractorTest {
                             BinaryStringData.fromString("Nine"),
                             "Ten\1".getBytes(),
                             "Eleven\2".getBytes(),
-                            19673,
-                            (8 * 3600 + 30 * 60 + 15) * 1000,
+                            DateData.fromLocalDate(LocalDate.of(2019, 12, 31)),
+                            TimeData.fromLocalTime(LocalTime.of(8, 30, 17, 123456789)),
                             TimestampData.fromLocalDateTime(
                                     LocalDateTime.of(2023, 11, 11, 11, 11, 11, 11)),
                             ZonedTimestampData.fromZonedDateTime(
@@ -131,8 +135,8 @@ public class BinaryRecordDataExtractorTest {
                             BinaryStringData.fromString("-Nine"),
                             "-Ten\1".getBytes(),
                             "-Eleven\2".getBytes(),
-                            2000,
-                            (8 * 3600 + 30 * 60 + 17) * 1000,
+                            DateData.fromLocalDate(LocalDate.of(2019, 12, 31)),
+                            TimeData.fromLocalTime(LocalTime.of(8, 30, 17, 123456789)),
                             TimestampData.fromLocalDateTime(
                                     LocalDateTime.of(2021, 11, 11, 11, 11, 11, 11)),
                             ZonedTimestampData.fromZonedDateTime(
@@ -166,24 +170,24 @@ public class BinaryRecordDataExtractorTest {
     }
 
     @Test
-    void testConvertingBinaryRecordData() throws Exception {
+    void testConvertingBinaryRecordData() {
         Assertions.assertThat(generateEventWithAllTypes())
                 .map(e -> BinaryRecordDataExtractor.extractRecord(e, SCHEMA.toRowDataType()))
                 .containsExactly(
-                        "{id: INT NOT NULL -> 1, bool_col: BOOLEAN -> true, tinyint_col: TINYINT -> 2, smallint_col: SMALLINT -> 3, int_col: INT -> 4, bigint_col: BIGINT -> 5, float_col: FLOAT -> 6.0, double_col: DOUBLE -> 7.0, decimal_col: DECIMAL(17, 10) -> 0.1234567890, char_col: CHAR(17) -> Eight, varchar_col: VARCHAR(17) -> Nine, bin_col: BINARY(17) -> VGVuAQ==, varbin_col: VARBINARY(17) -> RWxldmVuAg==, date_col: DATE -> 19673, time_col: TIME(0) -> 30615000, ts_col: TIMESTAMP(3) -> 2023-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2023-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2023-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [One, Two, Three], map_col: MAP<INT, STRING> -> {1 -> yi, 2 -> er, 3 -> san}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 3, f1: DOUBLE -> 0.1415926}}",
-                        "{id: INT NOT NULL -> -1, bool_col: BOOLEAN -> false, tinyint_col: TINYINT -> -2, smallint_col: SMALLINT -> -3, int_col: INT -> -4, bigint_col: BIGINT -> -5, float_col: FLOAT -> -6.0, double_col: DOUBLE -> -7.0, decimal_col: DECIMAL(17, 10) -> -0.1234567890, char_col: CHAR(17) -> -Eight, varchar_col: VARCHAR(17) -> -Nine, bin_col: BINARY(17) -> LVRlbgE=, varbin_col: VARBINARY(17) -> LUVsZXZlbgI=, date_col: DATE -> 2000, time_col: TIME(0) -> 30617000, ts_col: TIMESTAMP(3) -> 2021-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2021-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2021-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [Ninety, Eighty, Seventy], map_col: MAP<INT, STRING> -> {7 -> qi, 8 -> ba, 9 -> jiu}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 2, f1: DOUBLE -> 0.718281828}}",
-                        "{id: INT NOT NULL -> 0, bool_col: BOOLEAN -> null, tinyint_col: TINYINT -> null, smallint_col: SMALLINT -> null, int_col: INT -> null, bigint_col: BIGINT -> null, float_col: FLOAT -> null, double_col: DOUBLE -> null, decimal_col: DECIMAL(17, 10) -> null, char_col: CHAR(17) -> null, varchar_col: VARCHAR(17) -> null, bin_col: BINARY(17) -> null, varbin_col: VARBINARY(17) -> null, date_col: DATE -> null, time_col: TIME(0) -> null, ts_col: TIMESTAMP(3) -> null, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> null, ts_ltz_col: TIMESTAMP_LTZ(3) -> null, array_col: ARRAY<STRING> -> null, map_col: MAP<INT, STRING> -> null, row_col: ROW<`f0` INT, `f1` DOUBLE> -> null}",
+                        "{id: INT NOT NULL -> 1, bool_col: BOOLEAN -> true, tinyint_col: TINYINT -> 2, smallint_col: SMALLINT -> 3, int_col: INT -> 4, bigint_col: BIGINT -> 5, float_col: FLOAT -> 6.0, double_col: DOUBLE -> 7.0, decimal_col: DECIMAL(17, 10) -> 0.1234567890, char_col: CHAR(17) -> Eight, varchar_col: VARCHAR(17) -> Nine, bin_col: BINARY(17) -> VGVuAQ==, varbin_col: VARBINARY(17) -> RWxldmVuAg==, date_col: DATE -> 2019-12-31, time_col: TIME(9) -> 08:30:17.123, ts_col: TIMESTAMP(3) -> 2023-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2023-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2023-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [One, Two, Three], map_col: MAP<INT, STRING> -> {1 -> yi, 2 -> er, 3 -> san}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 3, f1: DOUBLE -> 0.1415926}}",
+                        "{id: INT NOT NULL -> -1, bool_col: BOOLEAN -> false, tinyint_col: TINYINT -> -2, smallint_col: SMALLINT -> -3, int_col: INT -> -4, bigint_col: BIGINT -> -5, float_col: FLOAT -> -6.0, double_col: DOUBLE -> -7.0, decimal_col: DECIMAL(17, 10) -> -0.1234567890, char_col: CHAR(17) -> -Eight, varchar_col: VARCHAR(17) -> -Nine, bin_col: BINARY(17) -> LVRlbgE=, varbin_col: VARBINARY(17) -> LUVsZXZlbgI=, date_col: DATE -> 2019-12-31, time_col: TIME(9) -> 08:30:17.123, ts_col: TIMESTAMP(3) -> 2021-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2021-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2021-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [Ninety, Eighty, Seventy], map_col: MAP<INT, STRING> -> {7 -> qi, 8 -> ba, 9 -> jiu}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 2, f1: DOUBLE -> 0.718281828}}",
+                        "{id: INT NOT NULL -> 0, bool_col: BOOLEAN -> null, tinyint_col: TINYINT -> null, smallint_col: SMALLINT -> null, int_col: INT -> null, bigint_col: BIGINT -> null, float_col: FLOAT -> null, double_col: DOUBLE -> null, decimal_col: DECIMAL(17, 10) -> null, char_col: CHAR(17) -> null, varchar_col: VARCHAR(17) -> null, bin_col: BINARY(17) -> null, varbin_col: VARBINARY(17) -> null, date_col: DATE -> null, time_col: TIME(9) -> null, ts_col: TIMESTAMP(3) -> null, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> null, ts_ltz_col: TIMESTAMP_LTZ(3) -> null, array_col: ARRAY<STRING> -> null, map_col: MAP<INT, STRING> -> null, row_col: ROW<`f0` INT, `f1` DOUBLE> -> null}",
                         "null");
     }
 
     @Test
-    void testConvertingBinaryRecordDataWithSchema() throws Exception {
+    void testConvertingBinaryRecordDataWithSchema() {
         Assertions.assertThat(generateEventWithAllTypes())
                 .map(e -> BinaryRecordDataExtractor.extractRecord(e, SCHEMA))
                 .containsExactly(
-                        "{id: INT NOT NULL -> 1, bool_col: BOOLEAN -> true, tinyint_col: TINYINT -> 2, smallint_col: SMALLINT -> 3, int_col: INT -> 4, bigint_col: BIGINT -> 5, float_col: FLOAT -> 6.0, double_col: DOUBLE -> 7.0, decimal_col: DECIMAL(17, 10) -> 0.1234567890, char_col: CHAR(17) -> Eight, varchar_col: VARCHAR(17) -> Nine, bin_col: BINARY(17) -> VGVuAQ==, varbin_col: VARBINARY(17) -> RWxldmVuAg==, date_col: DATE -> 19673, time_col: TIME(0) -> 30615000, ts_col: TIMESTAMP(3) -> 2023-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2023-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2023-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [One, Two, Three], map_col: MAP<INT, STRING> -> {1 -> yi, 2 -> er, 3 -> san}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 3, f1: DOUBLE -> 0.1415926}}",
-                        "{id: INT NOT NULL -> -1, bool_col: BOOLEAN -> false, tinyint_col: TINYINT -> -2, smallint_col: SMALLINT -> -3, int_col: INT -> -4, bigint_col: BIGINT -> -5, float_col: FLOAT -> -6.0, double_col: DOUBLE -> -7.0, decimal_col: DECIMAL(17, 10) -> -0.1234567890, char_col: CHAR(17) -> -Eight, varchar_col: VARCHAR(17) -> -Nine, bin_col: BINARY(17) -> LVRlbgE=, varbin_col: VARBINARY(17) -> LUVsZXZlbgI=, date_col: DATE -> 2000, time_col: TIME(0) -> 30617000, ts_col: TIMESTAMP(3) -> 2021-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2021-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2021-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [Ninety, Eighty, Seventy], map_col: MAP<INT, STRING> -> {7 -> qi, 8 -> ba, 9 -> jiu}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 2, f1: DOUBLE -> 0.718281828}}",
-                        "{id: INT NOT NULL -> 0, bool_col: BOOLEAN -> null, tinyint_col: TINYINT -> null, smallint_col: SMALLINT -> null, int_col: INT -> null, bigint_col: BIGINT -> null, float_col: FLOAT -> null, double_col: DOUBLE -> null, decimal_col: DECIMAL(17, 10) -> null, char_col: CHAR(17) -> null, varchar_col: VARCHAR(17) -> null, bin_col: BINARY(17) -> null, varbin_col: VARBINARY(17) -> null, date_col: DATE -> null, time_col: TIME(0) -> null, ts_col: TIMESTAMP(3) -> null, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> null, ts_ltz_col: TIMESTAMP_LTZ(3) -> null, array_col: ARRAY<STRING> -> null, map_col: MAP<INT, STRING> -> null, row_col: ROW<`f0` INT, `f1` DOUBLE> -> null}",
+                        "{id: INT NOT NULL -> 1, bool_col: BOOLEAN -> true, tinyint_col: TINYINT -> 2, smallint_col: SMALLINT -> 3, int_col: INT -> 4, bigint_col: BIGINT -> 5, float_col: FLOAT -> 6.0, double_col: DOUBLE -> 7.0, decimal_col: DECIMAL(17, 10) -> 0.1234567890, char_col: CHAR(17) -> Eight, varchar_col: VARCHAR(17) -> Nine, bin_col: BINARY(17) -> VGVuAQ==, varbin_col: VARBINARY(17) -> RWxldmVuAg==, date_col: DATE -> 2019-12-31, time_col: TIME(9) -> 08:30:17.123, ts_col: TIMESTAMP(3) -> 2023-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2023-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2023-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [One, Two, Three], map_col: MAP<INT, STRING> -> {1 -> yi, 2 -> er, 3 -> san}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 3, f1: DOUBLE -> 0.1415926}}",
+                        "{id: INT NOT NULL -> -1, bool_col: BOOLEAN -> false, tinyint_col: TINYINT -> -2, smallint_col: SMALLINT -> -3, int_col: INT -> -4, bigint_col: BIGINT -> -5, float_col: FLOAT -> -6.0, double_col: DOUBLE -> -7.0, decimal_col: DECIMAL(17, 10) -> -0.1234567890, char_col: CHAR(17) -> -Eight, varchar_col: VARCHAR(17) -> -Nine, bin_col: BINARY(17) -> LVRlbgE=, varbin_col: VARBINARY(17) -> LUVsZXZlbgI=, date_col: DATE -> 2019-12-31, time_col: TIME(9) -> 08:30:17.123, ts_col: TIMESTAMP(3) -> 2021-11-11T11:11:11.000000011, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> 2021-11-11T11:11:11.000000011+05:00, ts_ltz_col: TIMESTAMP_LTZ(3) -> 2021-11-11T06:11:11.000000011, array_col: ARRAY<STRING> -> [Ninety, Eighty, Seventy], map_col: MAP<INT, STRING> -> {7 -> qi, 8 -> ba, 9 -> jiu}, row_col: ROW<`f0` INT, `f1` DOUBLE> -> {f0: INT -> 2, f1: DOUBLE -> 0.718281828}}",
+                        "{id: INT NOT NULL -> 0, bool_col: BOOLEAN -> null, tinyint_col: TINYINT -> null, smallint_col: SMALLINT -> null, int_col: INT -> null, bigint_col: BIGINT -> null, float_col: FLOAT -> null, double_col: DOUBLE -> null, decimal_col: DECIMAL(17, 10) -> null, char_col: CHAR(17) -> null, varchar_col: VARCHAR(17) -> null, bin_col: BINARY(17) -> null, varbin_col: VARBINARY(17) -> null, date_col: DATE -> null, time_col: TIME(9) -> null, ts_col: TIMESTAMP(3) -> null, ts_tz_col: TIMESTAMP(3) WITH TIME ZONE -> null, ts_ltz_col: TIMESTAMP_LTZ(3) -> null, array_col: ARRAY<STRING> -> null, map_col: MAP<INT, STRING> -> null, row_col: ROW<`f0` INT, `f1` DOUBLE> -> null}",
                         "null");
     }
 }

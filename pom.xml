@@ -59,7 +59,7 @@ limitations under the License.
     </scm>
 
     <properties>
-        <revision>3.5-SNAPSHOT</revision>
+        <revision>3.6-SNAPSHOT</revision>
         <scala.binary.version>2.12</scala.binary.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- Enforce single fork execution due to heavy mini cluster use in the tests -->
@@ -67,7 +67,7 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.1</flink.version>
+        <flink.version>1.20.3</flink.version>
         <flink.major.version>1.20</flink.major.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
@@ -421,6 +421,8 @@ limitations under the License.
                     </licenseFamilies>
                     <excludes>
                         <!-- Additional files like .gitignore etc.-->
+                        <!-- Release files -->
+                        <exclude>**/release/**</exclude>
                         <exclude>**/README.md</exclude>
                         <exclude>**/.*/**</exclude>
                         <!-- Generated content -->
@@ -674,6 +676,16 @@ limitations under the License.
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+                </configuration>
+            </plugin>
+
+            <!-- Allow modification of pom.xml properties using Maven commands. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.5</version>
+                <configuration>
+                    <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
             </plugin>
         </plugins>

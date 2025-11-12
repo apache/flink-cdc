@@ -163,6 +163,12 @@ public interface RecordData {
      */
     RecordData getRow(int pos, int numFields);
 
+    /** Returns the Date data at the given position. */
+    DateData getDate(int pos);
+
+    /** Returns the Time data at the given position. */
+    TimeData getTime(int pos);
+
     /**
      * Creates an accessor for getting elements in an internal RecordData structure at the given
      * position.
@@ -197,9 +203,13 @@ public interface RecordData {
                 fieldGetter = record -> record.getShort(fieldPos);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = record -> record.getInt(fieldPos);
+                break;
+            case DATE:
+                fieldGetter = record -> record.getDate(fieldPos);
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = record -> record.getTime(fieldPos);
                 break;
             case BIGINT:
                 fieldGetter = record -> record.getLong(fieldPos);

@@ -596,6 +596,8 @@ source:
         TEXT<br>
         MEDIUMTEXT<br>
         LONGTEXT<br>
+        LONG<br>
+        LONG VARCHAR<br>
       </td>
       <td>STRING</td>
       <td></td>
