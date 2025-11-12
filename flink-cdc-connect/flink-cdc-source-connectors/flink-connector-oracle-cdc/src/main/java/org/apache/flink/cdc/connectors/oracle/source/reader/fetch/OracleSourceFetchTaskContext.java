@@ -231,6 +231,11 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     @Override
+    public boolean supportsSplitKeyOptimization() {
+        return false;
+    }
+
+    @Override
     public JdbcSourceEventDispatcher<OraclePartition> getEventDispatcher() {
         return dispatcher;
     }

@@ -73,9 +73,19 @@ public abstract class JdbcSourceFetchTaskContext implements FetchTask.Context {
 
     @Override
     public boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd) {
-        RowType splitKeyType = getSplitType(getDatabaseSchema().tableFor(this.getTableId(record)));
-        Object[] key = SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
+        Object[] key = getSplitKey(record);
         return SourceRecordUtils.splitKeyRangeContains(key, splitStart, splitEnd);
+    }
+
+    @Override
+    public boolean supportsSplitKeyOptimization() {
+        return true;
+    }
+
+    @Override
+    public Object[] getSplitKey(SourceRecord record) {
+        RowType splitKeyType = getSplitType(getDatabaseSchema().tableFor(this.getTableId(record)));
+        return SourceRecordUtils.getSplitKey(splitKeyType, record, getSchemaNameAdjuster());
     }
 
     @Override

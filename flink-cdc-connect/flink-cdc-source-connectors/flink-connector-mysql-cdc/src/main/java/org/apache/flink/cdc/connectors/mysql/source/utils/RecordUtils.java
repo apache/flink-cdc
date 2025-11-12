@@ -453,7 +453,7 @@ public class RecordUtils {
     /** Returns the specific key contains in the split key range or not. */
     public static boolean splitKeyRangeContains(
             Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
-        return compareKeyWithRange(key, splitKeyStart, splitKeyEnd) == 0;
+        return compareKeyWithRange(key, splitKeyStart, splitKeyEnd) == RangePosition.WITHIN;
     }
 
     /**
@@ -502,6 +502,10 @@ public class RecordUtils {
      * <p>IMPORTANT: The splits list MUST be sorted by splitStart before calling this method. Use
      * sortFinishedSplitInfos() to sort the list if needed.
      *
+     * <p>To leverage data locality for append-heavy workloads (e.g. auto-increment PKs), this
+     * method checks the first and last splits before applying binary search to the remaining
+     * subset.
+     *
      * @param sortedSplits List of splits sorted by splitStart (MUST be sorted!)
      * @param key The chunk key to search for
      * @return The split containing the key, or null if not found
@@ -513,22 +517,49 @@ public class RecordUtils {
             return null;
         }
 
-        int left = 0;
-        int right = sortedSplits.size() - 1;
+        int size = sortedSplits.size();
+
+        FinishedSnapshotSplitInfo firstSplit = sortedSplits.get(0);
+        RangePosition firstPosition =
+                compareKeyWithRange(key, firstSplit.getSplitStart(), firstSplit.getSplitEnd());
+        if (firstPosition == RangePosition.WITHIN) {
+            return firstSplit;
+        }
+        if (firstPosition == RangePosition.BEFORE) {
+            return null;
+        }
+        if (size == 1) {
+            return null;
+        }
+
+        FinishedSnapshotSplitInfo lastSplit = sortedSplits.get(size - 1);
+        RangePosition lastPosition =
+                compareKeyWithRange(key, lastSplit.getSplitStart(), lastSplit.getSplitEnd());
+        if (lastPosition == RangePosition.WITHIN) {
+            return lastSplit;
+        }
+        if (lastPosition == RangePosition.AFTER) {
+            return null;
+        }
+        if (size == 2) {
+            return null;
+        }
+
+        int left = 1;
+        int right = size - 2;
 
         while (left <= right) {
             int mid = left + (right - left) / 2;
             FinishedSnapshotSplitInfo split = sortedSplits.get(mid);
 
-            int position = compareKeyWithSplit(key, split);
+            RangePosition position =
+                    compareKeyWithRange(key, split.getSplitStart(), split.getSplitEnd());
 
-            if (position == 0) {
+            if (position == RangePosition.WITHIN) {
                 return split;
-            } else if (position < 0) {
-                // key < splitStart, search left
+            } else if (position == RangePosition.BEFORE) {
                 right = mid - 1;
             } else {
-                // key >= splitEnd, search right
                 left = mid + 1;
             }
         }
@@ -536,51 +567,46 @@ public class RecordUtils {
         return null;
     }
 
-    /**
-     * Compares the position of key relative to split.
-     *
-     * @return -1: key < splitStart, 0: splitStart <= key < splitEnd, 1: key >= splitEnd
-     */
-    private static int compareKeyWithSplit(Object[] key, FinishedSnapshotSplitInfo split) {
-        return compareKeyWithRange(key, split.getSplitStart(), split.getSplitEnd());
+    /** Describes the relative position of a key to a split range. */
+    private enum RangePosition {
+        BEFORE,
+        WITHIN,
+        AFTER
     }
 
     /**
-     * Compares the position of key relative to a split range [splitStart, splitEnd).
-     *
-     * @param key The key to compare
-     * @param splitStart Start boundary (inclusive), null means MIN
-     * @param splitEnd End boundary (exclusive), null means MAX
-     * @return -1: key < splitStart, 0: splitStart <= key < splitEnd, 1: key >= splitEnd
+     * Compares {@code key} against the half-open interval {@code [splitStart, splitEnd)} and
+     * returns where the key lies relative to that interval.
      */
-    private static int compareKeyWithRange(Object[] key, Object[] splitStart, Object[] splitEnd) {
+    private static RangePosition compareKeyWithRange(
+            Object[] key, Object[] splitStart, Object[] splitEnd) {
         if (splitStart == null) {
             if (splitEnd == null) {
-                return 0; // Full range split
+                return RangePosition.WITHIN; // Full range split
             }
             // key < splitEnd ?
             int cmp = compareSplit(key, splitEnd);
-            return cmp < 0 ? 0 : 1;
+            return cmp < 0 ? RangePosition.WITHIN : RangePosition.AFTER;
         }
 
         if (splitEnd == null) {
             // key >= splitStart ?
             int cmp = compareSplit(key, splitStart);
-            return cmp >= 0 ? 0 : -1;
+            return cmp >= 0 ? RangePosition.WITHIN : RangePosition.BEFORE;
         }
 
         // Normal case: [splitStart, splitEnd)
         int cmpStart = compareSplit(key, splitStart);
         if (cmpStart < 0) {
-            return -1; // key < splitStart
+            return RangePosition.BEFORE; // key < splitStart
         }
 
         int cmpEnd = compareSplit(key, splitEnd);
         if (cmpEnd >= 0) {
-            return 1; // key >= splitEnd
+            return RangePosition.AFTER; // key >= splitEnd
         }
 
-        return 0; // splitStart <= key < splitEnd
+        return RangePosition.WITHIN; // splitStart <= key < splitEnd
     }
 
     private static int compareSplit(Object[] leftSplit, Object[] rightSplit) {
