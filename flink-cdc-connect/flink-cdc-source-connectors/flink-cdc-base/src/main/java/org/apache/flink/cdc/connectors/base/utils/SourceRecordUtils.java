@@ -220,7 +220,7 @@ public class SourceRecordUtils {
      * @return The split containing the key, or null if not found
      */
     public static FinishedSnapshotSplitInfo findSplitByKeyBinary(
-        List<FinishedSnapshotSplitInfo> sortedSplits, Object[] key) {
+            List<FinishedSnapshotSplitInfo> sortedSplits, Object[] key) {
 
         if (sortedSplits == null || sortedSplits.isEmpty()) {
             return null;
@@ -230,7 +230,7 @@ public class SourceRecordUtils {
 
         FinishedSnapshotSplitInfo firstSplit = sortedSplits.get(0);
         RangePosition firstPosition =
-            compareKeyWithRange(key, firstSplit.getSplitStart(), firstSplit.getSplitEnd());
+                compareKeyWithRange(key, firstSplit.getSplitStart(), firstSplit.getSplitEnd());
         if (firstPosition == RangePosition.WITHIN) {
             return firstSplit;
         }
@@ -243,7 +243,7 @@ public class SourceRecordUtils {
 
         FinishedSnapshotSplitInfo lastSplit = sortedSplits.get(size - 1);
         RangePosition lastPosition =
-            compareKeyWithRange(key, lastSplit.getSplitStart(), lastSplit.getSplitEnd());
+                compareKeyWithRange(key, lastSplit.getSplitStart(), lastSplit.getSplitEnd());
         if (lastPosition == RangePosition.WITHIN) {
             return lastSplit;
         }
@@ -262,7 +262,7 @@ public class SourceRecordUtils {
             FinishedSnapshotSplitInfo split = sortedSplits.get(mid);
 
             RangePosition position =
-                compareKeyWithRange(key, split.getSplitStart(), split.getSplitEnd());
+                    compareKeyWithRange(key, split.getSplitStart(), split.getSplitEnd());
 
             if (position == RangePosition.WITHIN) {
                 return split;
@@ -288,7 +288,7 @@ public class SourceRecordUtils {
      * returns where the key lies relative to that interval.
      */
     private static RangePosition compareKeyWithRange(
-        Object[] key, Object[] splitStart, Object[] splitEnd) {
+            Object[] key, Object[] splitStart, Object[] splitEnd) {
         if (splitStart == null) {
             if (splitEnd == null) {
                 return RangePosition.WITHIN; // Full range split
@@ -322,9 +322,9 @@ public class SourceRecordUtils {
         // Ensure both splits have the same length
         if (leftSplit.length != rightSplit.length) {
             throw new IllegalArgumentException(
-                String.format(
-                    "Split key arrays must have the same length. Left: %d, Right: %d",
-                    leftSplit.length, rightSplit.length));
+                    String.format(
+                            "Split key arrays must have the same length. Left: %d, Right: %d",
+                            leftSplit.length, rightSplit.length));
         }
 
         int compareResult = 0;
@@ -336,5 +336,4 @@ public class SourceRecordUtils {
         }
         return compareResult;
     }
-
 }
