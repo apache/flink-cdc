@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.dialect.DataSourceDialect;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
+import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 
 import io.debezium.connector.base.ChangeEventQueue;
@@ -66,6 +67,23 @@ public interface FetchTask<Split> {
         boolean isDataChangeRecord(SourceRecord record);
 
         boolean isRecordBetween(SourceRecord record, Object[] splitStart, Object[] splitEnd);
+
+        /**
+         * Returns true if the implementation can provide a split key that is comparable with {@link
+         * FinishedSnapshotSplitInfo} boundaries, enabling binary search optimizations.
+         */
+        default boolean supportsSplitKeyOptimization() {
+            return false;
+        }
+
+        /**
+         * Returns the chunk key extracted from the given {@link SourceRecord}. Only invoked when
+         * {@link #supportsSplitKeyOptimization()} returns true.
+         */
+        default Object[] getSplitKey(SourceRecord record) {
+            throw new UnsupportedOperationException(
+                    "Split key extraction is not supported by this fetch task context.");
+        }
 
         void rewriteOutputBuffer(Map<Struct, SourceRecord> outputBuffer, SourceRecord changeRecord);
 

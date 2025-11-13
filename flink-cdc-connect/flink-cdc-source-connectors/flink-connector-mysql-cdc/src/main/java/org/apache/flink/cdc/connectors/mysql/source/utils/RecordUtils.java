@@ -41,12 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -111,8 +108,8 @@ public class RecordUtils {
             Struct value = (Struct) binlogRecord.value();
             if (value != null) {
                 Struct chunkKeyStruct = getStructContainsChunkKey(binlogRecord);
-                if (splitKeyRangeContains(
-                        getSplitKey(splitBoundaryType, nameAdjuster, chunkKeyStruct),
+                if (SplitKeyUtils.splitKeyRangeContains(
+                        SplitKeyUtils.getSplitKey(splitBoundaryType, nameAdjuster, chunkKeyStruct),
                         splitStart,
                         splitEnd)) {
                     boolean hasPrimaryKey = binlogRecord.key() != null;
@@ -139,8 +136,8 @@ public class RecordUtils {
                                         binlogRecord,
                                         createReadOpValue(binlogRecord, Envelope.FieldName.BEFORE),
                                         true);
-                                if (!splitKeyRangeContains(
-                                        getSplitKey(
+                                if (!SplitKeyUtils.splitKeyRangeContains(
+                                        SplitKeyUtils.getSplitKey(
                                                 splitBoundaryType, nameAdjuster, structFromAfter),
                                         splitStart,
                                         splitEnd)) {
@@ -431,13 +428,6 @@ public class RecordUtils {
         return !StringUtils.isNullOrWhitespaceOnly(tableName);
     }
 
-    public static Object[] getSplitKey(
-            RowType splitBoundaryType, SchemaNameAdjuster nameAdjuster, Struct target) {
-        // the split key field contains single field now
-        String splitFieldName = nameAdjuster.adjust(splitBoundaryType.getFieldNames().get(0));
-        return new Object[] {target.get(splitFieldName)};
-    }
-
     public static BinlogOffset getBinlogPosition(SourceRecord dataRecord) {
         return getBinlogPosition(dataRecord.sourceOffset());
     }
@@ -449,70 +439,6 @@ public class RecordUtils {
                     entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
         }
         return BinlogOffset.builder().setOffsetMap(offsetStrMap).build();
-    }
-
-    /** Returns the specific key contains in the split key range or not. */
-    public static boolean splitKeyRangeContains(
-            Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
-        // for all range
-        if (splitKeyStart == null && splitKeyEnd == null) {
-            return true;
-        }
-        // first split
-        if (splitKeyStart == null) {
-            int[] upperBoundRes = new int[key.length];
-            for (int i = 0; i < key.length; i++) {
-                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i]);
-            }
-            return Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
-                    && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0);
-        }
-        // last split
-        else if (splitKeyEnd == null) {
-            int[] lowerBoundRes = new int[key.length];
-            for (int i = 0; i < key.length; i++) {
-                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i]);
-            }
-            return Arrays.stream(lowerBoundRes).allMatch(value -> value >= 0);
-        }
-        // other split
-        else {
-            int[] lowerBoundRes = new int[key.length];
-            int[] upperBoundRes = new int[key.length];
-            for (int i = 0; i < key.length; i++) {
-                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i]);
-                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i]);
-            }
-            return Arrays.stream(lowerBoundRes).anyMatch(value -> value >= 0)
-                    && (Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
-                            && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0));
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static int compareObjects(Object o1, Object o2) {
-        if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
-            return ((Comparable) o1).compareTo(o2);
-        } else if (isNumericObject(o1) && isNumericObject(o2)) {
-            return toBigDecimal(o1).compareTo(toBigDecimal(o2));
-        } else {
-            return o1.toString().compareTo(o2.toString());
-        }
-    }
-
-    private static boolean isNumericObject(Object obj) {
-        return obj instanceof Byte
-                || obj instanceof Short
-                || obj instanceof Integer
-                || obj instanceof Long
-                || obj instanceof Float
-                || obj instanceof Double
-                || obj instanceof BigInteger
-                || obj instanceof BigDecimal;
-    }
-
-    private static BigDecimal toBigDecimal(Object numericObj) {
-        return new BigDecimal(numericObj.toString());
     }
 
     public static HistoryRecord getHistoryRecord(SourceRecord schemaRecord) throws IOException {
