@@ -102,9 +102,6 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             emitElement(element, output);
         } else if (RecordUtils.isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
-        } else if (RecordUtils.isTransactionMetadataEvent(element)) {
-        updateStartingOffsetForSplit(splitState, element);
-        emitElement(element, output);
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
