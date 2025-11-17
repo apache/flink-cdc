@@ -122,6 +122,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         options.add(IcebergDataSinkOptions.PARTITION_KEY);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_ENABLED);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL);
+        options.add(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM);
         return options;
     }
 }
