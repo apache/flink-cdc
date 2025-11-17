@@ -168,10 +168,6 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .with(DROP_SLOT_ON_STOP.name(), false)
                                     .build());
         }
-
-        LOG.info(
-                "PostgresConnectorConfig is {}",
-                redactSensitiveProperties(dbzConfig.getConfig().asProperties()));
         setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
@@ -389,33 +385,5 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return sourceSplitBase.isStreamSplit()
                 && !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(
                         sourceSplitBase.asStreamSplit().splitId());
-    }
-
-    /**
-     * Redacts sensitive properties from the configuration for safe logging.
-     *
-     * @param properties the properties to redact
-     * @return a new Properties object with sensitive values redacted
-     */
-    private static Properties redactSensitiveProperties(Properties properties) {
-        Properties redacted = new Properties();
-        redacted.putAll(properties);
-
-        // Redact password-related properties
-        String[] sensitiveKeys = {
-            "database.password",
-            "password",
-            "database.sslpassword",
-            "database.truststore.password",
-            "database.keystore.password"
-        };
-
-        for (String key : sensitiveKeys) {
-            if (redacted.containsKey(key)) {
-                redacted.setProperty(key, "******");
-            }
-        }
-
-        return redacted;
     }
 }
