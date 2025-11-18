@@ -92,7 +92,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             new StoppableChangeEventSourceContext();
     private final boolean isParsingOnLineSchemaChanges;
     private final boolean isBackfillSkipped;
-    private final Map<String, SourceRecord> pendingSchemaChangeEvents;
+    private final Map<String, List<SourceRecord>> pendingSchemaChangeEvents;
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
@@ -188,7 +188,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                             LOG.info(
                                     "Received the start event of online schema change: {}. Save it for later.",
                                     oscRecord.get());
-                            pendingSchemaChangeEvents.put(tableId.toString(), oscRecord.get());
+                            pendingSchemaChangeEvents
+                                    .computeIfAbsent(tableId.toString(), k -> new ArrayList<>())
+                                    .add(oscRecord.get());
                             continue;
                         }
                     }
@@ -203,7 +205,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                                 finishedTableId);
 
                         if (pendingSchemaChangeEvents.containsKey(finishedTableId)) {
-                            sourceRecords.add(pendingSchemaChangeEvents.remove(finishedTableId));
+                            sourceRecords.addAll(pendingSchemaChangeEvents.remove(finishedTableId));
                         } else {
                             LOG.error(
                                     "Error: met an unexpected osc finish event. Current pending events: {}, Record: {}",
