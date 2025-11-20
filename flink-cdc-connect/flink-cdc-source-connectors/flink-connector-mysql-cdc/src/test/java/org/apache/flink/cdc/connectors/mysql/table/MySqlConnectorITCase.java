@@ -1514,7 +1514,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "     double_c DOUBLE DEFAULT ' 25',\n"
                             + "     double_un_c DOUBLE UNSIGNED DEFAULT ' 26',\n"
                             + "     double_un_z_c DOUBLE UNSIGNED ZEROFILL DEFAULT ' 27',\n"
-                            + "     tiny_un_c TINYINT UNSIGNED DEFAULT ' 28 '"
+                            + "     tiny_un_c TINYINT UNSIGNED DEFAULT \" 28 \""
                             + " );");
         }
         actualRows.addAll(fetchRows(iterator, expected.length - 2));
