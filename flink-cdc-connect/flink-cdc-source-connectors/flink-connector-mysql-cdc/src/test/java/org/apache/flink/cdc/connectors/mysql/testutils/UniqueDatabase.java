@@ -163,8 +163,8 @@ public class UniqueDatabase {
     }
 
     /**
-     * Enable SSL requirement for the database user. This should be called after createAndInitialize()
-     * to enforce SSL connections for the user.
+     * Enable SSL requirement for the database user. This should be called after
+     * createAndInitialize() to enforce SSL connections for the user.
      */
     public void enableSSLForUser() {
         try {
@@ -172,8 +172,7 @@ public class UniqueDatabase {
                             DriverManager.getConnection(
                                     container.getJdbcUrl(), username, password);
                     Statement statement = connection.createStatement()) {
-                String alterUserSQL = String.format(
-                        "ALTER USER '%s'@'%%' REQUIRE SSL;", username);
+                String alterUserSQL = String.format("ALTER USER '%s'@'%%' REQUIRE SSL;", username);
                 statement.execute(alterUserSQL);
                 statement.execute("FLUSH PRIVILEGES;");
             }
