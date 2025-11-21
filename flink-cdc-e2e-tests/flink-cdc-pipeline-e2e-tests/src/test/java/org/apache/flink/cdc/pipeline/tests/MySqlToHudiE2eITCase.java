@@ -804,7 +804,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
             Optional<JobStatusMessage> optMessage =
                     jobStatusMessages.stream().filter(j -> j.getJobId().equals(jobId)).findFirst();
 
-            if (optMessage.isEmpty()) {
+            if (!optMessage.isPresent()) {
                 LOG.warn("Job: {} not found, waiting for the next loop...", jobId);
                 continue;
             }
