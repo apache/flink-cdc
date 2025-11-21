@@ -31,7 +31,7 @@ limitations under the License.
     <name>flink-cdc-pipeline-connector-hudi</name>
 
     <properties>
-        <hudi.version>1.2.0-SNAPSHOT</hudi.version>
+        <hudi.version>1.1.0</hudi.version>
         <hadoop.version>2.10.2</hadoop.version>
         <mockito.version>3.4.6</mockito.version>
         <metrics.version>4.1.1</metrics.version>
@@ -314,9 +314,7 @@ limitations under the License.
                                     <include>javax.servlet:javax.servlet-api</include>
                                     <include>org.apache.httpcomponents:*</include>
 
-<!--                                    <include>org.apache.flink:${flink.hadoop.compatibility.artifactId}</include>-->
                                     <include>org.apache.flink:flink-json</include>
-<!--                                    <include>org.apache.flink:${flink.parquet.artifactId}</include>-->
                                     <include>org.apache.flink:flink-metrics-dropwizard</include>
 
                                     <include>org.apache.hive:hive-common</include>
@@ -335,7 +333,6 @@ limitations under the License.
                                     <include>commons-io:commons-io</include>
                                     <include>org.openjdk.jol:jol-core</include>
 
-                                    <!-- added by voon during flink-cdc testing -->
                                     <include>com.fasterxml.jackson.module:jackson-module-afterburner</include>
                                     <include>io.airlift:aircompressor</include>
 
@@ -372,6 +369,8 @@ limitations under the License.
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
+                                        <!-- Prevent Error: packaged jar contains files with incompatible licenses -->
+                                        <exclude>META-INF/maven/org.openjdk.jol/jol-core/pom.xml</exclude>
                                     </excludes>
                                 </filter>
                             </filters>

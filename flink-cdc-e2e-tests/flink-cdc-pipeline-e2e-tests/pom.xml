@@ -43,7 +43,7 @@ limitations under the License.
         <iceberg.version>1.6.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <fluss.version>0.7.0</fluss.version>
-        <hudi.version>1.2.0-SNAPSHOT</hudi.version>
+        <hudi.version>1.1.0</hudi.version>
     </properties>
 
     <dependencies>
