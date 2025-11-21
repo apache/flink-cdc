@@ -247,9 +247,9 @@ public class DebeziumUtils {
         try {
             return mode == null ? null : SSLMode.valueOf(mode.name());
         } catch (IllegalArgumentException e) {
-            LOG.error("Invalid SecureConnectionMode provided {}", mode.name(), e);
+            throw new FlinkRuntimeException(
+                    String.format("Invalid SecureConnectionMode provided: %s ", mode.name()), e);
         }
-        return null;
     }
 
     public static BinlogOffset findBinlogOffset(
