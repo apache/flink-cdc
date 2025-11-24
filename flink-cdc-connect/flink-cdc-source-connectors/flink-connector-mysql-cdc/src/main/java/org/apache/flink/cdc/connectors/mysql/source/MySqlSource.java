@@ -131,7 +131,8 @@ public class MySqlSource<T>
                         new MySqlRecordEmitter<>(
                                 deserializationSchema,
                                 sourceReaderMetrics,
-                                sourceConfig.isIncludeSchemaChanges()));
+                                sourceConfig.isIncludeSchemaChanges(),
+                                sourceConfig.isIncludeTransactionMetadataEvents()));
     }
 
     MySqlSource(
