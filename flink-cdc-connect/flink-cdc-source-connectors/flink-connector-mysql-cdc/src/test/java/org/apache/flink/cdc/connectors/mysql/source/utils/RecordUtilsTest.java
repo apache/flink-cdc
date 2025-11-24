@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.splitKeyRangeContains;
+import static org.apache.flink.cdc.connectors.mysql.source.utils.SplitKeyUtils.splitKeyRangeContains;
 
 /** Tests for {@link org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils}. */
 class RecordUtilsTest {
