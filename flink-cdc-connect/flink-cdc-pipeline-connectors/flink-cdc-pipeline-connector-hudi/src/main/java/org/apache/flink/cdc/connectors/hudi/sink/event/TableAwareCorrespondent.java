@@ -132,7 +132,7 @@ public class TableAwareCorrespondent extends Correspondent {
     }
 
     /**
-     * An CoordinationRequest that encapsulates a {@link CreateTableEvent}.
+     * A CoordinationRequest that encapsulates a {@link CreateTableEvent}.
      *
      * <p>This request is sent from the {@code MultiTableEventStreamWriteFunction} to the {@code
      * MultiTableStreamWriteOperatorCoordinator} to signal that a new table has been discovered in
@@ -157,6 +157,10 @@ public class TableAwareCorrespondent extends Correspondent {
         }
     }
 
+    /**
+     * Response for a {@link CreateTableRequest}. This response is sent from writer coordinator to
+     * indicate whether the table is created successfully.
+     */
     public static class CreateTableResponse implements CoordinationResponse {
         private static final long serialVersionUID = 1L;
         private final boolean success;
