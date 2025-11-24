@@ -30,7 +30,6 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
-import org.apache.flink.cdc.connectors.hudi.sink.event.CreateTableOperatorEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.EnhancedWriteMetadataEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.HudiRecordEventSerializer;
 import org.apache.flink.cdc.connectors.hudi.sink.event.SchemaChangeOperatorEvent;
@@ -209,28 +208,35 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 schemaMaps.put(tableId, createTableEvent.getSchema());
                 LOG.debug("Cached schema for new table: {}", tableId);
 
-                initializedTables.computeIfAbsent(
-                        tableId,
-                        tId -> {
-                            try {
-                                // Send an explicit event to the coordinator so it can prepare
-                                // resources (including creating physical directory) *before* we
-                                // attempt to write any data.
-                                getOperatorEventGateway()
-                                        .sendEventToCoordinator(
-                                                new CreateTableOperatorEvent(createTableEvent));
-                                LOG.info(
-                                        "Sent CreateTableOperatorEvent to coordinator for new table: {}",
-                                        tId);
-                            } catch (Exception e) {
-                                // Re-throw to fail the Flink task if initialization fails.
-                                throw new RuntimeException(
-                                        "Failed during first-time initialization for table: " + tId,
-                                        e);
-                            }
-                            // Mark as initialized for this function instance
-                            return true;
-                        });
+                boolean createTableSuccess =
+                        initializedTables.computeIfAbsent(
+                                tableId,
+                                tId -> {
+                                    try {
+                                        // Send an explicit event to the coordinator so it can
+                                        // prepare
+                                        // resources (including creating physical directory)
+                                        // *before* we
+                                        // attempt to write any data.
+                                        boolean success =
+                                                getTableAwareCorrespondent(tableId)
+                                                        .requestCreatingTable(createTableEvent);
+                                        LOG.info(
+                                                "Sent CreateTableRequest to coordinator for new table: {}",
+                                                tId);
+                                        return success;
+                                    } catch (Exception e) {
+                                        // Re-throw to fail the Flink task if initialization fails.
+                                        throw new RuntimeException(
+                                                "Failed during first-time initialization for table: "
+                                                        + tId,
+                                                e);
+                                    }
+                                });
+
+                if (!createTableSuccess) {
+                    throw new RuntimeException("Failed to create table: " + tableId);
+                }
 
                 // Ensure tableFunction is initialized
                 getOrCreateTableFunction(tableId);
@@ -238,23 +244,20 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
             }
 
             LOG.info("Schema change event received: {}", event);
-            SchemaChangeEvent schemaChangeEvent = event;
             Schema existingSchema = schemaMaps.get(tableId);
             if (existingSchema == null
-                    || SchemaUtils.isSchemaChangeEventRedundant(
-                            existingSchema, schemaChangeEvent)) {
+                    || SchemaUtils.isSchemaChangeEventRedundant(existingSchema, event)) {
                 return;
             }
 
-            LOG.info("Schema change event received for table {}: {}", tableId, schemaChangeEvent);
+            LOG.info("Schema change event received for table {}: {}", tableId, event);
             LOG.info(
                     "Existing schema for table {} has {} columns: {}",
                     tableId,
                     existingSchema.getColumnCount(),
                     existingSchema.getColumnNames());
 
-            Schema newSchema =
-                    SchemaUtils.applySchemaChangeEvent(existingSchema, schemaChangeEvent);
+            Schema newSchema = SchemaUtils.applySchemaChangeEvent(existingSchema, event);
 
             LOG.info(
                     "New schema for table {} has {} columns: {}",
@@ -645,6 +648,10 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 }
             }
         }
+    }
+
+    private TableAwareCorrespondent getTableAwareCorrespondent(TableId tableId) {
+        return TableAwareCorrespondent.getInstance(correspondent, tableId);
     }
 
     /**

@@ -20,9 +20,11 @@ package org.apache.flink.cdc.connectors.hudi.sink.coordinator;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
-import org.apache.flink.cdc.connectors.hudi.sink.event.CreateTableOperatorEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.EnhancedWriteMetadataEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.SchemaChangeOperatorEvent;
+import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.CreateTableRequest;
+import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.CreateTableResponse;
+import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.MultiTableInstantTimeRequest;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -95,29 +97,6 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
 
     private static final Logger LOG =
             LoggerFactory.getLogger(MultiTableStreamWriteOperatorCoordinator.class);
-
-    /**
-     * A custom coordination request that includes the TableId to request an instant for a specific
-     * table.
-     */
-    public static class MultiTableInstantTimeRequest implements CoordinationRequest, Serializable {
-        private static final long serialVersionUID = 1L;
-        private final long checkpointId;
-        private final TableId tableId;
-
-        public MultiTableInstantTimeRequest(long checkpointId, TableId tableId) {
-            this.checkpointId = checkpointId;
-            this.tableId = tableId;
-        }
-
-        public long getCheckpointId() {
-            return checkpointId;
-        }
-
-        public TableId getTableId() {
-            return tableId;
-        }
-    }
 
     /**
      * Encapsulates all state and resources for a single table. This simplifies management by
@@ -406,8 +385,19 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                                         Correspondent.InstantTimeResponse.getInstance(
                                                 instantTime)));
                     },
-                    "handling instant time request for checkpoint %d",
+                    "Handling instant time request for checkpoint %d",
                     ((MultiTableInstantTimeRequest) request).getCheckpointId());
+            return future;
+        } else if (request instanceof CreateTableRequest) {
+            CompletableFuture<CoordinationResponse> future = new CompletableFuture<>();
+            executor.execute(
+                    () -> {
+                        boolean isSuccess = handleCreateTableEvent(((CreateTableRequest) request));
+                        future.complete(
+                                CoordinationResponseSerDe.wrap(new CreateTableResponse(isSuccess)));
+                    },
+                    "Handling create table request: ",
+                    request);
             return future;
         } else {
             LOG.warn("Received an unknown coordination request: {}", request.getClass().getName());
@@ -433,9 +423,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             int subtask, int attemptNumber, OperatorEvent operatorEvent) {
         executor.execute(
                 () -> {
-                    if (operatorEvent instanceof CreateTableOperatorEvent) {
-                        handleCreateTableEvent((CreateTableOperatorEvent) operatorEvent);
-                    } else if (operatorEvent instanceof SchemaChangeOperatorEvent) {
+                    if (operatorEvent instanceof SchemaChangeOperatorEvent) {
                         handleSchemaChangeEvent((SchemaChangeOperatorEvent) operatorEvent);
                     } else if (operatorEvent instanceof EnhancedWriteMetadataEvent) {
                         handleEnhancedWriteMetadataEvent(
@@ -450,8 +438,8 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                 operatorEvent);
     }
 
-    private void handleCreateTableEvent(CreateTableOperatorEvent createTableOperatorEvent) {
-        CreateTableEvent event = createTableOperatorEvent.getCreateTableEvent();
+    private boolean handleCreateTableEvent(CreateTableRequest createTableRequest) {
+        CreateTableEvent event = createTableRequest.getCreateTableEvent();
         TableId tableId = event.tableId();
 
         // Store the schema for this table
@@ -461,37 +449,44 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                 tableId,
                 event.getSchema().getColumnCount());
 
-        tableContexts.computeIfAbsent(
-                tableId,
-                tId -> {
-                    LOG.info("New table detected: {}. Initializing Hudi resources.", tId);
-                    try {
-                        Configuration tableConfig = createTableSpecificConfig(tId);
-                        String tablePath = tableConfig.getString(FlinkOptions.PATH);
-                        pathToTableId.put(tablePath, tId);
+        TableContext tableContext =
+                tableContexts.computeIfAbsent(
+                        tableId,
+                        tId -> {
+                            LOG.info("New table detected: {}. Initializing Hudi resources.", tId);
+                            try {
+                                Configuration tableConfig = createTableSpecificConfig(tId);
+                                String tablePath = tableConfig.getString(FlinkOptions.PATH);
+                                pathToTableId.put(tablePath, tId);
 
-                        // Create physical directory for Hudi table before initializing
-                        createHudiTablePath(tableConfig);
+                                // Create physical directory for Hudi table before initializing
+                                createHudiTablePath(tableConfig);
 
-                        StreamerUtil.initTableIfNotExists(tableConfig);
-                        HoodieFlinkWriteClient<?> writeClient =
-                                FlinkWriteClients.createWriteClient(tableConfig);
-                        TableState tableState = new TableState(tableConfig);
-                        EventBuffers eventBuffers = EventBuffers.getInstance(tableConfig);
+                                StreamerUtil.initTableIfNotExists(tableConfig);
+                                HoodieFlinkWriteClient<?> writeClient =
+                                        FlinkWriteClients.createWriteClient(tableConfig);
+                                TableState tableState = new TableState(tableConfig);
+                                EventBuffers eventBuffers = EventBuffers.getInstance(tableConfig);
 
-                        LOG.info(
-                                "Successfully initialized resources for table: {} at path: {}",
-                                tId,
-                                tablePath);
-                        return new TableContext(writeClient, eventBuffers, tableState, tablePath);
-                    } catch (Exception e) {
-                        LOG.error("Failed to initialize Hudi table resources for: {}", tId, e);
-                        context.failJob(
-                                new HoodieException(
-                                        "Failed to initialize Hudi writer for table " + tId, e));
-                        return null;
-                    }
-                });
+                                LOG.info(
+                                        "Successfully initialized resources for table: {} at path: {}",
+                                        tId,
+                                        tablePath);
+                                return new TableContext(
+                                        writeClient, eventBuffers, tableState, tablePath);
+                            } catch (Exception e) {
+                                LOG.error(
+                                        "Failed to initialize Hudi table resources for: {}",
+                                        tId,
+                                        e);
+                                context.failJob(
+                                        new HoodieException(
+                                                "Failed to initialize Hudi writer for table " + tId,
+                                                e));
+                                return null;
+                            }
+                        });
+        return tableContext != null;
     }
 
     /**
