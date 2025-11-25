@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.factories;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.configuration.ReadableConfig;
 
 import java.util.Set;
 
@@ -78,5 +79,10 @@ public interface Factory {
          * <p>The class loader is in particular useful for discovering factories.
          */
         ClassLoader getClassLoader();
+
+        /** Returns the flink configuration of the current session. */
+        default ReadableConfig getFlinkConf() {
+            return new org.apache.flink.configuration.Configuration();
+        }
     }
 }

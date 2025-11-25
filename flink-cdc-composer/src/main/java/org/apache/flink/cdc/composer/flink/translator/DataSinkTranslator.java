@@ -76,7 +76,8 @@ public class DataSinkTranslator {
                 new FactoryHelper.DefaultContext(
                         sinkDef.getConfig(),
                         pipelineConfig,
-                        Thread.currentThread().getContextClassLoader()));
+                        Thread.currentThread().getContextClassLoader(),
+                        env.getConfiguration()));
     }
 
     public void translate(
