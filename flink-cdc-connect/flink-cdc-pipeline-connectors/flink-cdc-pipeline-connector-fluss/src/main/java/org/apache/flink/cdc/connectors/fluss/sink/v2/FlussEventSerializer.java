@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
-import com.alibaba.fluss.client.Connection;
+import org.apache.fluss.client.Connection;
 
 import java.io.IOException;
 import java.io.Serializable;

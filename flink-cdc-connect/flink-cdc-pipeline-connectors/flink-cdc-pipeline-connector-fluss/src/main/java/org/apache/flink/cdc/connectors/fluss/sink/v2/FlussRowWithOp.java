@@ -17,13 +17,13 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
-import com.alibaba.fluss.row.InternalRow;
+import org.apache.fluss.row.InternalRow;
 
 import javax.annotation.Nullable;
 
 import java.util.Objects;
 
-import static com.alibaba.fluss.utils.Preconditions.checkNotNull;
+import static org.apache.fluss.utils.Preconditions.checkNotNull;
 
 /* This file is based on source code of Apache Fluss Project (https://fluss.apache.org/), licensed by the Apache
  * Software Foundation (ASF) under the Apache License, Version 2.0. See the NOTICE file distributed with this work for

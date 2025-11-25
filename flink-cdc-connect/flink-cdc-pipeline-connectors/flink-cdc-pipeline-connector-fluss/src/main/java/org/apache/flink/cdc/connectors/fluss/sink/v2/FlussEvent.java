@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2;
 
-import com.alibaba.fluss.metadata.TablePath;
+import org.apache.fluss.metadata.TablePath;
 
 import java.util.List;
 

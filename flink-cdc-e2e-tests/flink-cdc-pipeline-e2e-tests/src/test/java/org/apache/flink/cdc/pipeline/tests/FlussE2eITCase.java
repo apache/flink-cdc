@@ -64,7 +64,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
                     "remote.data.dir: /tmp/fluss/remote-data",
                     "security.protocol.map: CLIENT:SASL, INTERNAL:PLAINTEXT",
                     "security.sasl.enabled.mechanisms: PLAIN",
-                    "security.sasl.plain.jaas.config: com.alibaba.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
+                    "security.sasl.plain.jaas.config: org.apache.fluss.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
                     "super.users: User:admin");
 
     private static final List<String> flussTabletServerProperties =
@@ -78,7 +78,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
                     "remote.data.dir: /tmp/fluss/remote-data",
                     "security.protocol.map: CLIENT:SASL, INTERNAL:PLAINTEXT",
                     "security.sasl.enabled.mechanisms: PLAIN",
-                    "security.sasl.plain.jaas.config: com.alibaba.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
+                    "security.sasl.plain.jaas.config: org.apache.fluss.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
                     "super.users: User:admin");
 
     @Container

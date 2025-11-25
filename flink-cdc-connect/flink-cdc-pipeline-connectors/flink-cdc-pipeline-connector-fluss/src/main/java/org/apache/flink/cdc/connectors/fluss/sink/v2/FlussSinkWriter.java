@@ -23,18 +23,18 @@ import org.apache.flink.cdc.connectors.fluss.sink.v2.metrics.WrapperFlussMetricR
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.groups.SinkWriterMetricGroup;
 
-import com.alibaba.fluss.client.Connection;
-import com.alibaba.fluss.client.ConnectionFactory;
-import com.alibaba.fluss.client.table.Table;
-import com.alibaba.fluss.client.table.writer.AppendWriter;
-import com.alibaba.fluss.client.table.writer.TableWriter;
-import com.alibaba.fluss.client.table.writer.UpsertWriter;
-import com.alibaba.fluss.config.Configuration;
-import com.alibaba.fluss.metadata.TablePath;
-import com.alibaba.fluss.metrics.Gauge;
-import com.alibaba.fluss.metrics.Metric;
-import com.alibaba.fluss.metrics.MetricNames;
-import com.alibaba.fluss.row.InternalRow;
+import org.apache.fluss.client.Connection;
+import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.client.table.Table;
+import org.apache.fluss.client.table.writer.AppendWriter;
+import org.apache.fluss.client.table.writer.TableWriter;
+import org.apache.fluss.client.table.writer.UpsertWriter;
+import org.apache.fluss.config.Configuration;
+import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.metrics.Gauge;
+import org.apache.fluss.metrics.Metric;
+import org.apache.fluss.metrics.MetricNames;
+import org.apache.fluss.row.InternalRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

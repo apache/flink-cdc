@@ -23,8 +23,8 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.fluss.sink.FlussDataSink;
 
-import com.alibaba.fluss.config.ConfigOptions;
-import com.alibaba.fluss.config.Configuration;
+import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.config.Configuration;
 
 import java.util.HashMap;
 import java.util.HashSet;

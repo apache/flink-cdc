@@ -39,9 +39,9 @@ import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.util.CollectionUtil;
 
-import com.alibaba.fluss.annotation.VisibleForTesting;
-import com.alibaba.fluss.metadata.Schema;
-import com.alibaba.fluss.metadata.TableDescriptor;
+import org.apache.fluss.annotation.VisibleForTesting;
+import org.apache.fluss.metadata.Schema;
+import org.apache.fluss.metadata.TableDescriptor;
 
 import javax.annotation.Nullable;
 
@@ -85,7 +85,7 @@ public class FlussConversions {
                 .build();
     }
 
-    public static com.alibaba.fluss.metadata.Schema toFlussSchema(
+    public static org.apache.fluss.metadata.Schema toFlussSchema(
             org.apache.flink.cdc.common.schema.Schema cdcSchema) {
         Schema.Builder schemBuilder = Schema.newBuilder();
         if (!CollectionUtil.isNullOrEmpty(cdcSchema.primaryKeys())) {
@@ -108,7 +108,7 @@ public class FlussConversions {
     }
 
     @VisibleForTesting
-    private static com.alibaba.fluss.types.DataType toFlussType(
+    private static org.apache.fluss.types.DataType toFlussType(
             org.apache.flink.cdc.common.types.DataType flinkDataType) {
         return flinkDataType.accept(TO_FLUSS_TYPE_INSTANCE);
     }
@@ -137,117 +137,116 @@ public class FlussConversions {
 
     private static class CdcTypeToFlussType
             implements org.apache.flink.cdc.common.types.DataTypeVisitor<
-                    com.alibaba.fluss.types.DataType> {
+                    org.apache.fluss.types.DataType> {
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(CharType charType) {
-            return new com.alibaba.fluss.types.CharType(
-                    charType.isNullable(), charType.getLength());
+        public org.apache.fluss.types.DataType visit(CharType charType) {
+            return new org.apache.fluss.types.CharType(charType.isNullable(), charType.getLength());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(VarCharType varCharType) {
+        public org.apache.fluss.types.DataType visit(VarCharType varCharType) {
             // fluss not support varchar type
-            return new com.alibaba.fluss.types.StringType(varCharType.isNullable());
+            return new org.apache.fluss.types.StringType(varCharType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(BooleanType booleanType) {
-            return new com.alibaba.fluss.types.BooleanType(booleanType.isNullable());
+        public org.apache.fluss.types.DataType visit(BooleanType booleanType) {
+            return new org.apache.fluss.types.BooleanType(booleanType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(BinaryType binaryType) {
-            return new com.alibaba.fluss.types.BinaryType(
+        public org.apache.fluss.types.DataType visit(BinaryType binaryType) {
+            return new org.apache.fluss.types.BinaryType(
                     binaryType.isNullable(), binaryType.getLength());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(VarBinaryType varBinaryType) {
+        public org.apache.fluss.types.DataType visit(VarBinaryType varBinaryType) {
             // fluss not support varbinary type
-            return new com.alibaba.fluss.types.BytesType(varBinaryType.isNullable());
+            return new org.apache.fluss.types.BytesType(varBinaryType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(DecimalType decimalType) {
-            return new com.alibaba.fluss.types.DecimalType(
+        public org.apache.fluss.types.DataType visit(DecimalType decimalType) {
+            return new org.apache.fluss.types.DecimalType(
                     decimalType.isNullable(), decimalType.getPrecision(), decimalType.getScale());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(TinyIntType tinyIntType) {
-            return new com.alibaba.fluss.types.TinyIntType(tinyIntType.isNullable());
+        public org.apache.fluss.types.DataType visit(TinyIntType tinyIntType) {
+            return new org.apache.fluss.types.TinyIntType(tinyIntType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(SmallIntType smallIntType) {
-            return new com.alibaba.fluss.types.SmallIntType(smallIntType.isNullable());
+        public org.apache.fluss.types.DataType visit(SmallIntType smallIntType) {
+            return new org.apache.fluss.types.SmallIntType(smallIntType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(IntType intType) {
-            return new com.alibaba.fluss.types.IntType(intType.isNullable());
+        public org.apache.fluss.types.DataType visit(IntType intType) {
+            return new org.apache.fluss.types.IntType(intType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(BigIntType bigIntType) {
-            return new com.alibaba.fluss.types.BigIntType(bigIntType.isNullable());
+        public org.apache.fluss.types.DataType visit(BigIntType bigIntType) {
+            return new org.apache.fluss.types.BigIntType(bigIntType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(FloatType floatType) {
-            return new com.alibaba.fluss.types.FloatType(floatType.isNullable());
+        public org.apache.fluss.types.DataType visit(FloatType floatType) {
+            return new org.apache.fluss.types.FloatType(floatType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(DoubleType doubleType) {
-            return new com.alibaba.fluss.types.DoubleType(doubleType.isNullable());
+        public org.apache.fluss.types.DataType visit(DoubleType doubleType) {
+            return new org.apache.fluss.types.DoubleType(doubleType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(DateType dateType) {
-            return new com.alibaba.fluss.types.DateType(dateType.isNullable());
+        public org.apache.fluss.types.DataType visit(DateType dateType) {
+            return new org.apache.fluss.types.DateType(dateType.isNullable());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(TimeType timeType) {
-            return new com.alibaba.fluss.types.TimeType(
+        public org.apache.fluss.types.DataType visit(TimeType timeType) {
+            return new org.apache.fluss.types.TimeType(
                     timeType.isNullable(), timeType.getPrecision());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(TimestampType timestampType) {
-            return new com.alibaba.fluss.types.TimestampType(
+        public org.apache.fluss.types.DataType visit(TimestampType timestampType) {
+            return new org.apache.fluss.types.TimestampType(
                     timestampType.isNullable(), timestampType.getPrecision());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(ZonedTimestampType zonedTimestampType) {
+        public org.apache.fluss.types.DataType visit(ZonedTimestampType zonedTimestampType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss " + zonedTimestampType);
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(
+        public org.apache.fluss.types.DataType visit(
                 LocalZonedTimestampType localZonedTimestampType) {
-            return new com.alibaba.fluss.types.LocalZonedTimestampType(
+            return new org.apache.fluss.types.LocalZonedTimestampType(
                     localZonedTimestampType.isNullable(), localZonedTimestampType.getPrecision());
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(ArrayType arrayType) {
+        public org.apache.fluss.types.DataType visit(ArrayType arrayType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss version under 0.7: " + arrayType);
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(MapType mapType) {
+        public org.apache.fluss.types.DataType visit(MapType mapType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss version under 0.7: " + mapType);
         }
 
         @Override
-        public com.alibaba.fluss.types.DataType visit(RowType rowType) {
+        public org.apache.fluss.types.DataType visit(RowType rowType) {
             throw new UnsupportedOperationException(
                     "Unsupported data type in fluss version under 0.7: " + rowType);
         }
