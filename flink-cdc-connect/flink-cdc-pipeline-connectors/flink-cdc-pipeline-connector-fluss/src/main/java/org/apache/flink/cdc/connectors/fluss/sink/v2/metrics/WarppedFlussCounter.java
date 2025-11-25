@@ -26,9 +26,9 @@ import org.apache.flink.metrics.Counter;
 /** An implementation of Flink's {@link Counter} which wraps Fluss's Counter. */
 public class WarppedFlussCounter implements Counter {
 
-    private final com.alibaba.fluss.metrics.Counter flussCounter;
+    private final org.apache.fluss.metrics.Counter flussCounter;
 
-    public WarppedFlussCounter(com.alibaba.fluss.metrics.Counter flussCounter) {
+    public WarppedFlussCounter(org.apache.fluss.metrics.Counter flussCounter) {
         this.flussCounter = flussCounter;
     }
 
