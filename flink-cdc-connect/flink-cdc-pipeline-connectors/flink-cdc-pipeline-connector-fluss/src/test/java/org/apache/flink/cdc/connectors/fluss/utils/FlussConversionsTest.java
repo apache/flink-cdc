@@ -20,8 +20,8 @@ package org.apache.flink.cdc.connectors.fluss.utils;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 
-import com.alibaba.fluss.metadata.TableDescriptor;
-import com.alibaba.fluss.types.RowType;
+import org.apache.fluss.metadata.TableDescriptor;
+import org.apache.fluss.types.RowType;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -48,7 +48,7 @@ class FlussConversionsTest {
                         .primaryKey("id")
                         .build();
 
-        com.alibaba.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
+        org.apache.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
 
         assertThat(flussSchema.getColumnNames()).containsExactly("id", "name");
         assertThat(flussSchema.getPrimaryKeyColumnNames()).containsExactly("id");
@@ -62,7 +62,7 @@ class FlussConversionsTest {
                         .physicalColumn("name", DataTypes.STRING())
                         .build();
 
-        com.alibaba.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
+        org.apache.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
 
         assertThat(flussSchema.getColumnNames()).hasSize(2);
         assertThat(flussSchema.getPrimaryKeyColumnNames()).isEmpty();
@@ -90,31 +90,30 @@ class FlussConversionsTest {
                         .physicalColumn("ltz_col", DataTypes.TIMESTAMP_LTZ(6))
                         .build();
 
-        com.alibaba.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
+        org.apache.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
 
         RowType rowType = flussSchema.getRowType();
         assertThat(rowType.getFieldCount()).isEqualTo(16);
 
-        assertThat(rowType.getTypeAt(0)).isEqualTo(com.alibaba.fluss.types.DataTypes.BOOLEAN());
-        assertThat(rowType.getTypeAt(1)).isEqualTo(com.alibaba.fluss.types.DataTypes.TINYINT());
-        assertThat(rowType.getTypeAt(2)).isEqualTo(com.alibaba.fluss.types.DataTypes.SMALLINT());
-        assertThat(rowType.getTypeAt(3)).isEqualTo(com.alibaba.fluss.types.DataTypes.INT());
-        assertThat(rowType.getTypeAt(4)).isEqualTo(com.alibaba.fluss.types.DataTypes.BIGINT());
-        assertThat(rowType.getTypeAt(5)).isEqualTo(com.alibaba.fluss.types.DataTypes.FLOAT());
-        assertThat(rowType.getTypeAt(6)).isEqualTo(com.alibaba.fluss.types.DataTypes.DOUBLE());
-        assertThat(rowType.getTypeAt(7))
-                .isEqualTo(com.alibaba.fluss.types.DataTypes.DECIMAL(10, 2));
-        assertThat(rowType.getTypeAt(8)).isEqualTo(com.alibaba.fluss.types.DataTypes.CHAR(10));
+        assertThat(rowType.getTypeAt(0)).isEqualTo(org.apache.fluss.types.DataTypes.BOOLEAN());
+        assertThat(rowType.getTypeAt(1)).isEqualTo(org.apache.fluss.types.DataTypes.TINYINT());
+        assertThat(rowType.getTypeAt(2)).isEqualTo(org.apache.fluss.types.DataTypes.SMALLINT());
+        assertThat(rowType.getTypeAt(3)).isEqualTo(org.apache.fluss.types.DataTypes.INT());
+        assertThat(rowType.getTypeAt(4)).isEqualTo(org.apache.fluss.types.DataTypes.BIGINT());
+        assertThat(rowType.getTypeAt(5)).isEqualTo(org.apache.fluss.types.DataTypes.FLOAT());
+        assertThat(rowType.getTypeAt(6)).isEqualTo(org.apache.fluss.types.DataTypes.DOUBLE());
+        assertThat(rowType.getTypeAt(7)).isEqualTo(org.apache.fluss.types.DataTypes.DECIMAL(10, 2));
+        assertThat(rowType.getTypeAt(8)).isEqualTo(org.apache.fluss.types.DataTypes.CHAR(10));
         // VarChar maps to StringType in Fluss
-        assertThat(rowType.getTypeAt(9)).isEqualTo(com.alibaba.fluss.types.DataTypes.STRING());
-        assertThat(rowType.getTypeAt(10)).isEqualTo(com.alibaba.fluss.types.DataTypes.BINARY(16));
+        assertThat(rowType.getTypeAt(9)).isEqualTo(org.apache.fluss.types.DataTypes.STRING());
+        assertThat(rowType.getTypeAt(10)).isEqualTo(org.apache.fluss.types.DataTypes.BINARY(16));
         // VarBinary maps to BytesType in Fluss
-        assertThat(rowType.getTypeAt(11)).isEqualTo(com.alibaba.fluss.types.DataTypes.BYTES());
-        assertThat(rowType.getTypeAt(12)).isEqualTo(com.alibaba.fluss.types.DataTypes.DATE());
-        assertThat(rowType.getTypeAt(13)).isEqualTo(com.alibaba.fluss.types.DataTypes.TIME());
-        assertThat(rowType.getTypeAt(14)).isEqualTo(com.alibaba.fluss.types.DataTypes.TIMESTAMP(3));
+        assertThat(rowType.getTypeAt(11)).isEqualTo(org.apache.fluss.types.DataTypes.BYTES());
+        assertThat(rowType.getTypeAt(12)).isEqualTo(org.apache.fluss.types.DataTypes.DATE());
+        assertThat(rowType.getTypeAt(13)).isEqualTo(org.apache.fluss.types.DataTypes.TIME());
+        assertThat(rowType.getTypeAt(14)).isEqualTo(org.apache.fluss.types.DataTypes.TIMESTAMP(3));
         assertThat(rowType.getTypeAt(15))
-                .isEqualTo(com.alibaba.fluss.types.DataTypes.TIMESTAMP_LTZ(6));
+                .isEqualTo(org.apache.fluss.types.DataTypes.TIMESTAMP_LTZ(6));
     }
 
     @Test
@@ -126,7 +125,7 @@ class FlussConversionsTest {
                         .physicalColumn("not_null_col", DataTypes.INT().notNull())
                         .build();
 
-        com.alibaba.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
+        org.apache.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
 
         RowType rowType = flussSchema.getRowType();
         assertThat(rowType.getTypeAt(0).isNullable()).isTrue();

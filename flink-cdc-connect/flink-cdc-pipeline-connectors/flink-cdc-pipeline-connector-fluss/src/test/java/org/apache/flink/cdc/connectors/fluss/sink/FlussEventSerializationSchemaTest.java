@@ -41,10 +41,10 @@ import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRowWithOp;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
-import com.alibaba.fluss.client.Connection;
-import com.alibaba.fluss.client.ConnectionFactory;
-import com.alibaba.fluss.metadata.TablePath;
-import com.alibaba.fluss.server.testutils.FlussClusterExtension;
+import org.apache.fluss.client.Connection;
+import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
