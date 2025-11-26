@@ -377,6 +377,9 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             String str = (String) dbzObj;
             // ZonedTimestamp type is encoded in string type with timezone offset
             // Format: ISO-8601 with timezone offset (e.g., "2020-07-17T18:00:22+00:00")
+            // According to Debezium documentation, PostgreSQL TIMESTAMPTZ is ALWAYS encoded as
+            // String
+            // with ZonedTimestamp.SCHEMA_NAME, regardless of time.precision.mode
             if (ZonedTimestamp.SCHEMA_NAME.equals(schema.name())) {
                 // Parse using Debezium's ZonedTimestamp formatter
                 OffsetDateTime offsetDateTime = OffsetDateTime.parse(str, ZonedTimestamp.FORMATTER);
@@ -391,7 +394,11 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 "Unable to convert to TIMESTAMP WITH TIME ZONE from unexpected value '"
                         + dbzObj
                         + "' of type "
-                        + dbzObj.getClass().getName());
+                        + dbzObj.getClass().getName()
+                        + " with schema name '"
+                        + (schema != null ? schema.name() : "null")
+                        + "'. PostgreSQL TIMESTAMPTZ should always be encoded as String with "
+                        + ZonedTimestamp.SCHEMA_NAME);
     }
 
     protected Object convertToLocalTimeZoneTimestamp(Object dbzObj, Schema schema) {
