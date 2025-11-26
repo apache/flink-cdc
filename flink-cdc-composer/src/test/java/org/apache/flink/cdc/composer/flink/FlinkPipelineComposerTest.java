@@ -50,8 +50,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /** A test for the {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerTest {
@@ -95,7 +95,7 @@ class FlinkPipelineComposerTest {
                         Collections.emptyList(),
                         new Configuration());
 
-        assertDoesNotThrow(() -> composer.compose(pipelineDef));
+        assertThatCode(() -> composer.compose(pipelineDef)).doesNotThrowAnyException();
     }
 
     /** A dummy {@link DataSinkFactory} that validates the execution target. */
