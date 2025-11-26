@@ -168,14 +168,28 @@ public class FactoryHelper {
         private final Configuration factoryConfiguration;
         private final ClassLoader classLoader;
         private final Configuration pipelineConfiguration;
+        private final ReadableConfig flinkConf;
 
         public DefaultContext(
                 Configuration factoryConfiguration,
                 Configuration pipelineConfiguration,
                 ClassLoader classLoader) {
+            this(
+                    factoryConfiguration,
+                    pipelineConfiguration,
+                    classLoader,
+                    new org.apache.flink.configuration.Configuration());
+        }
+
+        public DefaultContext(
+                Configuration factoryConfiguration,
+                Configuration pipelineConfiguration,
+                ClassLoader classLoader,
+                ReadableConfig flinkConf) {
             this.factoryConfiguration = factoryConfiguration;
             this.pipelineConfiguration = pipelineConfiguration;
             this.classLoader = classLoader;
+            this.flinkConf = flinkConf;
         }
 
         @Override
@@ -191,6 +205,11 @@ public class FactoryHelper {
         @Override
         public ClassLoader getClassLoader() {
             return classLoader;
+        }
+
+        @Override
+        public ReadableConfig getFlinkConf() {
+            return flinkConf;
         }
     }
 }
