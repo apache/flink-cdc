@@ -1241,7 +1241,29 @@ public class MySqlStreamingChangeEventSource
                 }
             }
             while (context.isRunning()) {
-                Thread.sleep(100);
+                // Check if client is connected
+                if (!client.isConnected()) {
+                    LOGGER.warn("Binlog client disconnected. Attempting to reconnect...");
+                    try {
+                        client.connect(connectorConfig.getConnectionTimeout().toMillis());
+                        LOGGER.info("Successfully reconnected to MySQL binlog");
+                    } catch (AuthenticationException e) {
+                        throw new DebeziumException(
+                                "Authentication failure detected during reconnection to the MySQL database at "
+                                        + connectorConfig.hostname()
+                                        + ":"
+                                        + connectorConfig.port()
+                                        + " with user '"
+                                        + connectorConfig.username()
+                                        + "'",
+                                e);
+                    } catch (Exception e) {
+                        LOGGER.error("Reconnection failed: {}", e.getMessage());
+                        Thread.sleep(1000);
+                    }
+                } else {
+                    Thread.sleep(100);
+                }
             }
         } finally {
             try {
