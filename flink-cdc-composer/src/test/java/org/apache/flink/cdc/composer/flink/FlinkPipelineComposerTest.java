@@ -51,6 +51,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /** A test for the {@link FlinkPipelineComposer}. */
 class FlinkPipelineComposerTest {
@@ -93,8 +94,8 @@ class FlinkPipelineComposerTest {
                         Collections.emptyList(),
                         Collections.emptyList(),
                         new Configuration());
-        // No exception will be thrown.
-        composer.compose(pipelineDef);
+
+        assertDoesNotThrow(() -> composer.compose(pipelineDef));
     }
 
     /** A dummy {@link DataSinkFactory} that validates the execution target. */
