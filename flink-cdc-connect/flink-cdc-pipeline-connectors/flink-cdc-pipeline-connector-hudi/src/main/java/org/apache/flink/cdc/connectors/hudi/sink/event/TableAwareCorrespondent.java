@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.hudi.sink.event;
 
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.hudi.sink.coordinator.MultiTableStreamWriteOperatorCoordinator;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
@@ -117,7 +118,31 @@ public class TableAwareCorrespondent extends Correspondent {
     public boolean requestCreatingTable(CreateTableEvent createTableEvent) {
         try {
             CreateTableRequest request = new CreateTableRequest(createTableEvent);
-            CreateTableResponse response =
+            SchemaChangeResponse response =
+                    CoordinationResponseSerDe.unwrap(
+                            this.gateway
+                                    .sendRequestToCoordinator(
+                                            this.operatorID, new SerializedValue<>(request))
+                                    .get());
+            return response.isSuccess();
+        } catch (Exception e) {
+            throw new HoodieException(
+                    "Error requesting the instant time from the coordinator for table " + tableId,
+                    e);
+        }
+    }
+
+    /**
+     * Send a request to coordinator to apply the schema change.
+     *
+     * @param tableId the id of table
+     * @param newSchema the new table schema
+     * @return Whether the schema change is applied successfully.
+     */
+    public boolean requestSchemaChange(TableId tableId, Schema newSchema) {
+        try {
+            SchemaChangeRequest request = new SchemaChangeRequest(tableId, newSchema);
+            SchemaChangeResponse response =
                     CoordinationResponseSerDe.unwrap(
                             this.gateway
                                     .sendRequestToCoordinator(
@@ -139,38 +164,70 @@ public class TableAwareCorrespondent extends Correspondent {
      * the CDC stream. The coordinator uses this event to initialize all necessary resources for the
      * new table, such as its dedicated write client and event buffers, before any data is written.
      */
-    public static class CreateTableRequest implements CoordinationRequest {
+    public static class CreateTableRequest extends SchemaChangeRequest {
         private static final long serialVersionUID = 1L;
-        private final CreateTableEvent createTableEvent;
 
-        public CreateTableRequest(CreateTableEvent createtableEvent) {
-            this.createTableEvent = createtableEvent;
-        }
-
-        public CreateTableEvent getCreateTableEvent() {
-            return createTableEvent;
-        }
-
-        @Override
-        public String toString() {
-            return "CreateTableRequest{" + "tableId=" + createTableEvent.tableId() + '}';
+        public CreateTableRequest(CreateTableEvent createTableEvent) {
+            super(createTableEvent.tableId(), createTableEvent.getSchema());
         }
     }
 
     /**
-     * Response for a {@link CreateTableRequest}. This response is sent from writer coordinator to
-     * indicate whether the table is created successfully.
+     * A CoordinationRequest that represents a request to change table schema.
+     *
+     * <p>This request is sent from the {@code MultiTableEventStreamWriteFunction} to the {@code
+     * MultiTableStreamWriteOperatorCoordinator} to signal that a schema change has been discovered
+     * in the CDC stream.
      */
-    public static class CreateTableResponse implements CoordinationResponse {
+    public static class SchemaChangeRequest implements CoordinationRequest {
         private static final long serialVersionUID = 1L;
+
+        private final TableId tableId;
+        private final Schema schema;
+
+        public SchemaChangeRequest(TableId tableId, Schema schema) {
+            this.tableId = tableId;
+            this.schema = schema;
+        }
+
+        public TableId getTableId() {
+            return tableId;
+        }
+
+        public Schema getSchema() {
+            return schema;
+        }
+
+        @Override
+        public String toString() {
+            return "SchemaChangeRequest{" + "tableId=" + tableId + ", schema=" + schema + '}';
+        }
+    }
+
+    /**
+     * Response for a {@link CreateTableRequest} or {@link SchemaChangeRequest}. This response is
+     * sent from writer coordinator to indicate whether the schema change is applied successfully.
+     */
+    public static class SchemaChangeResponse implements CoordinationResponse {
+        private static final long serialVersionUID = 1L;
+        private final TableId tableId;
         private final boolean success;
 
-        public CreateTableResponse(boolean success) {
+        private SchemaChangeResponse(TableId tableId, boolean success) {
+            this.tableId = tableId;
             this.success = success;
         }
 
         public boolean isSuccess() {
             return success;
+        }
+
+        public TableId getTableId() {
+            return tableId;
+        }
+
+        public static SchemaChangeResponse of(TableId tableId, boolean success) {
+            return new SchemaChangeResponse(tableId, success);
         }
     }
 }

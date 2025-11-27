@@ -17,14 +17,13 @@
 
 package org.apache.flink.cdc.connectors.hudi.sink.coordinator;
 
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.hudi.sink.event.EnhancedWriteMetadataEvent;
-import org.apache.flink.cdc.connectors.hudi.sink.event.SchemaChangeOperatorEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.CreateTableRequest;
-import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.CreateTableResponse;
 import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.MultiTableInstantTimeRequest;
+import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.SchemaChangeRequest;
+import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent.SchemaChangeResponse;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -392,11 +391,28 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             CompletableFuture<CoordinationResponse> future = new CompletableFuture<>();
             executor.execute(
                     () -> {
-                        boolean isSuccess = handleCreateTableEvent(((CreateTableRequest) request));
+                        CreateTableRequest createTableRequest = (CreateTableRequest) request;
+                        boolean isSuccess = handleCreateTableRequest(createTableRequest);
                         future.complete(
-                                CoordinationResponseSerDe.wrap(new CreateTableResponse(isSuccess)));
+                                CoordinationResponseSerDe.wrap(
+                                        SchemaChangeResponse.of(
+                                                createTableRequest.getTableId(), isSuccess)));
                     },
                     "Handling create table request: ",
+                    request);
+            return future;
+        } else if (request instanceof SchemaChangeRequest) {
+            CompletableFuture<CoordinationResponse> future = new CompletableFuture<>();
+            executor.execute(
+                    () -> {
+                        SchemaChangeRequest createTableRequest = (SchemaChangeRequest) request;
+                        boolean isSuccess = handleSchemaChangeRequest(createTableRequest);
+                        future.complete(
+                                CoordinationResponseSerDe.wrap(
+                                        SchemaChangeResponse.of(
+                                                createTableRequest.getTableId(), isSuccess)));
+                    },
+                    "Handling create schema change request: ",
                     request);
             return future;
         } else {
@@ -423,9 +439,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             int subtask, int attemptNumber, OperatorEvent operatorEvent) {
         executor.execute(
                 () -> {
-                    if (operatorEvent instanceof SchemaChangeOperatorEvent) {
-                        handleSchemaChangeEvent((SchemaChangeOperatorEvent) operatorEvent);
-                    } else if (operatorEvent instanceof EnhancedWriteMetadataEvent) {
+                    if (operatorEvent instanceof EnhancedWriteMetadataEvent) {
                         handleEnhancedWriteMetadataEvent(
                                 (EnhancedWriteMetadataEvent) operatorEvent);
                     } else {
@@ -438,16 +452,14 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                 operatorEvent);
     }
 
-    private boolean handleCreateTableEvent(CreateTableRequest createTableRequest) {
-        CreateTableEvent event = createTableRequest.getCreateTableEvent();
-        TableId tableId = event.tableId();
-
+    private boolean handleCreateTableRequest(CreateTableRequest createTableRequest) {
+        TableId tableId = createTableRequest.getTableId();
         // Store the schema for this table
-        tableSchemas.put(tableId, event.getSchema());
+        tableSchemas.put(tableId, createTableRequest.getSchema());
         LOG.info(
                 "Cached schema for table {}: {} columns",
                 tableId,
-                event.getSchema().getColumnCount());
+                createTableRequest.getSchema().getColumnCount());
 
         TableContext tableContext =
                 tableContexts.computeIfAbsent(
@@ -493,20 +505,28 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
      * Handles schema change events from the sink functions. Updates the cached schema and recreates
      * the write client to ensure it uses the new schema.
      *
-     * @param event The schema change event containing the table ID and new schema
+     * @param request The schema change request containing the table ID and new schema
      */
-    private void handleSchemaChangeEvent(SchemaChangeOperatorEvent event) {
-        TableId tableId = event.getTableId();
-        Schema newSchema = event.getNewSchema();
+    private boolean handleSchemaChangeRequest(SchemaChangeRequest request) {
+        TableId tableId = request.getTableId();
+        Schema newSchema = request.getSchema();
 
         LOG.info(
                 "Received schema change event for table {}: {} columns",
                 tableId,
                 newSchema.getColumnCount());
 
+        Schema oldSchema = tableSchemas.get(tableId);
+        if (Objects.equals(oldSchema, newSchema)) {
+            LOG.warn("Schema change already applied, tableId: {}, schema: {}.", tableId, newSchema);
+            return true;
+        }
         // Update the cached schema
         tableSchemas.put(tableId, newSchema);
-        LOG.info("Updated coordinator's schema cache for table: {}", tableId);
+        LOG.info(
+                "Updated coordinator's schema cache for table: {}, new schema: {}",
+                tableId,
+                newSchema);
 
         // Get the existing table context
         TableContext oldContext = tableContexts.get(tableId);
@@ -514,7 +534,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             LOG.warn(
                     "Received schema change for unknown table: {}. Skipping write client update.",
                     tableId);
-            return;
+            return true;
         }
 
         try {
@@ -543,6 +563,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             tableContexts.put(tableId, newContext);
 
             LOG.info("Successfully updated write client for table {} after schema change", tableId);
+            return true;
         } catch (Exception e) {
             LOG.error("Failed to update write client for table {} after schema change", tableId, e);
             context.failJob(
@@ -551,6 +572,7 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
                                     + tableId
                                     + " after schema change",
                             e));
+            return false;
         }
     }
 
@@ -736,7 +758,21 @@ public class MultiTableStreamWriteOperatorCoordinator extends StreamWriteOperato
             long checkpointId,
             String instant,
             WriteMetadataEvent[] eventBuffer) {
-
+        final HoodieTimeline completedTimeline =
+                tableContext
+                        .writeClient
+                        .getHoodieTable()
+                        .getMetaClient()
+                        .getActiveTimeline()
+                        .filterCompletedInstants();
+        if (completedTimeline.containsInstant(instant)) {
+            LOG.info(
+                    "Instant {} already committed, table {}, checkpoint id: {}.",
+                    instant,
+                    tableId,
+                    checkpointId);
+            return;
+        }
         if (Arrays.stream(eventBuffer).allMatch(Objects::isNull)) {
             LOG.info("No events for instant {}, table {}. Resetting buffer.", instant, tableId);
             tableContext.eventBuffers.reset(checkpointId);

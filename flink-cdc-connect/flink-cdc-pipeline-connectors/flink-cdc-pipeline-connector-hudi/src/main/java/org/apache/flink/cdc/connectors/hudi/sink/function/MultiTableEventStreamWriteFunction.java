@@ -32,7 +32,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.hudi.sink.event.EnhancedWriteMetadataEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.HudiRecordEventSerializer;
-import org.apache.flink.cdc.connectors.hudi.sink.event.SchemaChangeOperatorEvent;
 import org.apache.flink.cdc.connectors.hudi.sink.event.TableAwareCorrespondent;
 import org.apache.flink.cdc.connectors.hudi.sink.util.RowDataUtils;
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
@@ -312,8 +311,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
             // Notify coordinator about schema change so it can update its write client
             try {
-                getOperatorEventGateway()
-                        .sendEventToCoordinator(new SchemaChangeOperatorEvent(tableId, newSchema));
+                getTableAwareCorrespondent(tableId).requestSchemaChange(tableId, newSchema);
                 LOG.info("Sent SchemaChangeOperatorEvent to coordinator for table: {}", tableId);
             } catch (Exception e) {
                 LOG.error(
@@ -493,6 +491,9 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
 
         try {
             tableFunction.initializeState(functionInitializationContext);
+            if (this.checkpointId != -1) {
+                tableFunction.setCheckpointId(this.checkpointId);
+            }
             LOG.info("Successfully initialized state for table function: {}", tableId);
         } catch (Exception e) {
             LOG.error("Failed to initialize state for table function: {}", tableId, e);
@@ -566,13 +567,6 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
             LOG.info("Persisted {} schemas to state", schemaMaps.size());
         }
 
-        // Delegate snapshot to table functions
-        // Child functions are composition objects, not Flink operators, so they shouldn't
-        // go through the full snapshotState(FunctionSnapshotContext) lifecycle which
-        // includes state reloading. Instead, we:
-        // 1. Call their abstract snapshotState() to flush buffers
-        // 2. Manually update their checkpointId for instant requests
-        long checkpointId = context.getCheckpointId();
         for (Map.Entry<TableId, ExtendedBucketStreamWriteFunction> entry :
                 tableFunctions.entrySet()) {
             try {
@@ -580,16 +574,8 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                 LOG.debug(
                         "Delegating snapshotState for table: {} with checkpointId: {}",
                         entry.getKey(),
-                        checkpointId);
-
-                // Call abstract snapshotState() to flush buffers
-                tableFunction.snapshotState();
-
-                // Update the child function's checkpointId
-                // This is necessary because child functions need the current checkpointId
-                // when requesting instants from the coordinator
-                tableFunction.setCheckpointId(checkpointId);
-
+                        context.getCheckpointId());
+                tableFunction.snapshotState(context);
                 LOG.debug("Successfully snapshotted state for table: {}", entry.getKey());
             } catch (Exception e) {
                 LOG.error("Failed to snapshot state for table: {}", entry.getKey(), e);
@@ -597,30 +583,7 @@ public class MultiTableEventStreamWriteFunction extends AbstractStreamWriteFunct
                         "Failed to snapshot state for table: " + entry.getKey(), e);
             }
         }
-    }
-
-    protected void flushRemaining(boolean endInput) {
-        boolean hasData = !tableFunctions.isEmpty();
-        this.currentInstant = instantToWrite(hasData);
-
-        if (this.currentInstant == null) {
-            if (hasData) {
-                throw new RuntimeException(
-                        "No inflight instant when flushing data for multi-table function!");
-            }
-        }
-
-        LOG.debug(
-                "Multi-table function requested instant: {} for {} table functions",
-                this.currentInstant,
-                tableFunctions.size());
-
-        // This method is intentionally overridden to be a no-op.
-        // The MultiTableEventStreamWriteFunction is a dispatcher and does not have its own
-        // data buffers to flush. Flushing is handled by the individual, table-specific
-        // write functions it manages. Calling the parent's flushRemaining would cause
-        // an erroneous, non-table-specific instant request to be sent to the coordinator,
-        // resulting in the NullPointerException.
+        this.checkpointId = context.getCheckpointId();
     }
 
     @Override
