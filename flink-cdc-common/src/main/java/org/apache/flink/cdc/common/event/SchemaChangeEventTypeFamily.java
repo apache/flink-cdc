@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.event;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_POSITION;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
@@ -36,7 +37,7 @@ public class SchemaChangeEventTypeFamily {
 
     public static final SchemaChangeEventType[] ADD = {ADD_COLUMN};
 
-    public static final SchemaChangeEventType[] ALTER = {ALTER_COLUMN_TYPE};
+    public static final SchemaChangeEventType[] ALTER = {ALTER_COLUMN_TYPE, ALTER_COLUMN_POSITION};
 
     public static final SchemaChangeEventType[] CREATE = {CREATE_TABLE};
 
@@ -47,12 +48,13 @@ public class SchemaChangeEventTypeFamily {
     public static final SchemaChangeEventType[] TABLE = {CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE};
 
     public static final SchemaChangeEventType[] COLUMN = {
-        ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN
+        ADD_COLUMN, ALTER_COLUMN_TYPE, ALTER_COLUMN_POSITION, DROP_COLUMN, RENAME_COLUMN
     };
 
     public static final SchemaChangeEventType[] ALL = {
         ADD_COLUMN,
         ALTER_COLUMN_TYPE,
+        ALTER_COLUMN_POSITION,
         CREATE_TABLE,
         DROP_COLUMN,
         DROP_TABLE,

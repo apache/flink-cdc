@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_POSITION;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
@@ -37,7 +38,7 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.RENAME_COL
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_TABLE;
 import static org.apache.flink.cdc.common.testutils.assertions.EventAssertions.assertThat;
 
-/** A test for the {@link org.apache.flink.cdc.common.utils.ChangeEventUtils}. */
+/** A test for the {@link ChangeEventUtils}. */
 class ChangeEventUtilsTest {
     @Test
     void testResolveSchemaEvolutionOptions() {
@@ -54,6 +55,7 @@ class ChangeEventUtilsTest {
                                 CREATE_TABLE,
                                 DROP_TABLE,
                                 ALTER_COLUMN_TYPE,
+                                ALTER_COLUMN_POSITION,
                                 ADD_COLUMN,
                                 DROP_COLUMN));
 
@@ -64,6 +66,7 @@ class ChangeEventUtilsTest {
                         Sets.set(
                                 ADD_COLUMN,
                                 ALTER_COLUMN_TYPE,
+                                ALTER_COLUMN_POSITION,
                                 RENAME_COLUMN,
                                 CREATE_TABLE,
                                 TRUNCATE_TABLE));
@@ -77,7 +80,12 @@ class ChangeEventUtilsTest {
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
                                 Collections.singletonList("column"),
                                 Collections.singletonList("drop.column")))
-                .isEqualTo(Sets.set(ADD_COLUMN, ALTER_COLUMN_TYPE, RENAME_COLUMN));
+                .isEqualTo(
+                        Sets.set(
+                                ADD_COLUMN,
+                                ALTER_COLUMN_TYPE,
+                                ALTER_COLUMN_POSITION,
+                                RENAME_COLUMN));
 
         assertThat(
                         ChangeEventUtils.resolveSchemaEvolutionOptions(
@@ -89,6 +97,7 @@ class ChangeEventUtilsTest {
                                 TRUNCATE_TABLE,
                                 RENAME_COLUMN,
                                 ALTER_COLUMN_TYPE,
+                                ALTER_COLUMN_POSITION,
                                 CREATE_TABLE));
     }
 
@@ -99,6 +108,7 @@ class ChangeEventUtilsTest {
                         Arrays.asList(
                                 ADD_COLUMN,
                                 ALTER_COLUMN_TYPE,
+                                ALTER_COLUMN_POSITION,
                                 CREATE_TABLE,
                                 DROP_COLUMN,
                                 DROP_TABLE,
@@ -107,7 +117,12 @@ class ChangeEventUtilsTest {
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("column"))
                 .isEqualTo(
-                        Arrays.asList(ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN));
+                        Arrays.asList(
+                                ADD_COLUMN,
+                                ALTER_COLUMN_TYPE,
+                                ALTER_COLUMN_POSITION,
+                                DROP_COLUMN,
+                                RENAME_COLUMN));
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("table"))
                 .isEqualTo(Arrays.asList(CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE));
@@ -128,7 +143,7 @@ class ChangeEventUtilsTest {
                 .isEqualTo(Collections.singletonList(CREATE_TABLE));
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter"))
-                .isEqualTo(Collections.singletonList(ALTER_COLUMN_TYPE));
+                .isEqualTo(Arrays.asList(ALTER_COLUMN_TYPE, ALTER_COLUMN_POSITION));
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter.column.type"))
                 .isEqualTo(Collections.singletonList(ALTER_COLUMN_TYPE));
@@ -138,5 +153,8 @@ class ChangeEventUtilsTest {
 
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("add.column"))
                 .isEqualTo(Collections.singletonList(ADD_COLUMN));
+
+        assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("alter.column.position"))
+                .isEqualTo(Collections.singletonList(ALTER_COLUMN_POSITION));
     }
 }

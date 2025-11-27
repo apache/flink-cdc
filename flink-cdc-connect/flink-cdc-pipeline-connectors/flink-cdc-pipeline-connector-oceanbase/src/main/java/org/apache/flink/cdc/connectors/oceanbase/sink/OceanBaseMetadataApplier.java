@@ -75,6 +75,9 @@ public class OceanBaseMetadataApplier implements MetadataApplier {
                     applyAlterColumnTypeEvent(alterColumnTypeEvent);
                     return null;
                 },
+                alterColumnPositionEvent -> {
+                    return null;
+                },
                 createTableEvent -> {
                     applyCreateTableEvent(createTableEvent);
                     return null;
