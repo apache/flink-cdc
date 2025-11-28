@@ -74,6 +74,12 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private boolean binlogFailOnReconnectionError =
+            MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.defaultValue();
+    private int binlogReconnectionMaxRetries =
+            MySqlSourceOptions.BINLOG_RECONNECTION_MAX_RETRIES.defaultValue();
+    private Duration binlogReconnectionTimeout =
+            MySqlSourceOptions.BINLOG_RECONNECTION_TIMEOUT.defaultValue();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -324,6 +330,35 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to fail the job when binlog reader encounters reconnection errors. When enabled, the
+     * job will fail after exhausting all retry attempts. When disabled (default), the job will keep
+     * retrying indefinitely.
+     */
+    public MySqlSourceConfigFactory binlogFailOnReconnectionError(
+            boolean binlogFailOnReconnectionError) {
+        this.binlogFailOnReconnectionError = binlogFailOnReconnectionError;
+        return this;
+    }
+
+    /**
+     * Maximum number of reconnection attempts when binlog reader connection fails. This option is
+     * only effective when 'binlogFailOnReconnectionError' is enabled.
+     */
+    public MySqlSourceConfigFactory binlogReconnectionMaxRetries(int binlogReconnectionMaxRetries) {
+        this.binlogReconnectionMaxRetries = binlogReconnectionMaxRetries;
+        return this;
+    }
+
+    /**
+     * Total timeout for all reconnection attempts when binlog reader connection fails. This option
+     * is only effective when 'binlogFailOnReconnectionError' is enabled.
+     */
+    public MySqlSourceConfigFactory binlogReconnectionTimeout(Duration binlogReconnectionTimeout) {
+        this.binlogReconnectionTimeout = binlogReconnectionTimeout;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -392,6 +427,23 @@ public class MySqlSourceConfigFactory implements Serializable {
             jdbcProperties = new Properties();
         }
 
+        // Add the new configs to debezium properties only if not already provided by user
+        if (!props.containsKey("binlog.fail-on-reconnection-error")) {
+            props.setProperty(
+                    "binlog.fail-on-reconnection-error",
+                    String.valueOf(binlogFailOnReconnectionError));
+        }
+        if (!props.containsKey("binlog.reconnection.max-retries")) {
+            props.setProperty(
+                    "binlog.reconnection.max-retries",
+                    String.valueOf(binlogReconnectionMaxRetries));
+        }
+        if (!props.containsKey("binlog.reconnection.timeout")) {
+            props.setProperty(
+                    "binlog.reconnection.timeout",
+                    String.valueOf(binlogReconnectionTimeout.toMillis()));
+        }
+
         return new MySqlSourceConfig(
                 hostname,
                 port,
@@ -421,6 +473,9 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                binlogFailOnReconnectionError,
+                binlogReconnectionMaxRetries,
+                binlogReconnectionTimeout);
     }
 }

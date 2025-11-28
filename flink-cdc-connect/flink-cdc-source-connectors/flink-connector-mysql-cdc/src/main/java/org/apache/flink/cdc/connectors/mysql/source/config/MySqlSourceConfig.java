@@ -70,6 +70,9 @@ public class MySqlSourceConfig implements Serializable {
     private final boolean parseOnLineSchemaChanges;
     public static boolean useLegacyJsonFormat = true;
     private final boolean assignUnboundedChunkFirst;
+    private final boolean binlogFailOnReconnectionError;
+    private final int binlogReconnectionMaxRetries;
+    private final Duration binlogReconnectionTimeout;
 
     // --------------------------------------------------------------------------------------------
     // Debezium Configurations
@@ -108,7 +111,10 @@ public class MySqlSourceConfig implements Serializable {
             boolean parseOnLineSchemaChanges,
             boolean treatTinyInt1AsBoolean,
             boolean useLegacyJsonFormat,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean binlogFailOnReconnectionError,
+            int binlogReconnectionMaxRetries,
+            Duration binlogReconnectionTimeout) {
         this.hostname = checkNotNull(hostname);
         this.port = port;
         this.username = checkNotNull(username);
@@ -152,6 +158,9 @@ public class MySqlSourceConfig implements Serializable {
         this.treatTinyInt1AsBoolean = treatTinyInt1AsBoolean;
         this.useLegacyJsonFormat = useLegacyJsonFormat;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.binlogFailOnReconnectionError = binlogFailOnReconnectionError;
+        this.binlogReconnectionMaxRetries = binlogReconnectionMaxRetries;
+        this.binlogReconnectionTimeout = checkNotNull(binlogReconnectionTimeout);
     }
 
     public String getHostname() {
@@ -284,5 +293,17 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isTreatTinyInt1AsBoolean() {
         return treatTinyInt1AsBoolean;
+    }
+
+    public boolean isBinlogFailOnReconnectionError() {
+        return binlogFailOnReconnectionError;
+    }
+
+    public int getBinlogReconnectionMaxRetries() {
+        return binlogReconnectionMaxRetries;
+    }
+
+    public Duration getBinlogReconnectionTimeout() {
+        return binlogReconnectionTimeout;
     }
 }

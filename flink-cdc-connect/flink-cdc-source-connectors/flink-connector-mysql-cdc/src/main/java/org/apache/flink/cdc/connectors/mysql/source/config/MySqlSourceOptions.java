@@ -292,4 +292,29 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
+
+    public static final ConfigOption<Boolean> BINLOG_FAIL_ON_RECONNECTION_ERROR =
+            ConfigOptions.key("binlog.fail-on-reconnection-error")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to fail the job when binlog reader encounters reconnection errors. "
+                                    + "When enabled, the job will fail after exhausting all retry attempts. "
+                                    + "When disabled (default), the job will keep retrying indefinitely.");
+
+    public static final ConfigOption<Integer> BINLOG_RECONNECTION_MAX_RETRIES =
+            ConfigOptions.key("binlog.reconnection.max-retries")
+                    .intType()
+                    .defaultValue(3)
+                    .withDescription(
+                            "Maximum number of reconnection attempts when binlog reader connection fails. "
+                                    + "This option is only effective when 'binlog.fail-on-reconnection-error' is enabled.");
+
+    public static final ConfigOption<Duration> BINLOG_RECONNECTION_TIMEOUT =
+            ConfigOptions.key("binlog.reconnection.timeout")
+                    .durationType()
+                    .defaultValue(Duration.ofMinutes(5))
+                    .withDescription(
+                            "Total timeout for all reconnection attempts when binlog reader connection fails. "
+                                    + "This option is only effective when 'binlog.fail-on-reconnection-error' is enabled.");
 }
