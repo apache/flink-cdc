@@ -1,0 +1,57 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+group: Common
+spec: Invalid Cases
+steps:
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      execution:
+        execution.coordinator-close-timeout: 300000
+        checkpointing:
+          interval: 600000
+          timeout: 30000
+          max-concurrent-checkpoints: 1
+          min-pause-between-checkpoints: 300000
+    error: |
+      Unexpected key `execution` in YAML top-level block.
+      Allowed keys in this context are: [source, sink, route, transform, pipeline]
+      Note: Flink configurations should be defined in "Runtime Configurations" instead of YAML scripts.
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      route:
+        - source-table: user_course.\.*
+          sink-table: ods.ods_user_course_<>
+          replace-symbol: <>
+          description: sync table to one destination table with given prefix ods_
+          transformers:
+            - type: cast
+              fields:
+                - name: "*"
+                  type: BIT
+                  target-type: TINYINT
+    error: |
+      Unexpected key `transformers` in YAML route block.
+      Allowed keys in this context are: [source-table, sink-table, replace-symbol, description]
+      Note: option transformers: [{"type":"cast","fields":[{"name":"*","type":"BIT","target-type":"TINYINT"}]}] is unexpected.
+      It was silently ignored in previous versions, and probably should be removed.
