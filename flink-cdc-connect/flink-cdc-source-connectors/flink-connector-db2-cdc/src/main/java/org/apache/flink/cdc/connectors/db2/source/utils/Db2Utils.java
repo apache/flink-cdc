@@ -357,7 +357,7 @@ public class Db2Utils {
     }
 
     public static String quote(String dbOrTableName) {
-        return "\"" + dbOrTableName + "\"";
+        return "\"" + dbOrTableName.replace("\"", "\"\"") + "\"";
     }
 
     public static String quote(TableId tableId) {

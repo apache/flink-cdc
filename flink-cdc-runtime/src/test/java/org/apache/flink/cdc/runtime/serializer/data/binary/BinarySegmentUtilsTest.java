@@ -23,15 +23,15 @@ import org.apache.flink.cdc.runtime.serializer.data.util.DataFormatTestUtil;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.cdc.runtime.serializer.data.binary.BinaryRecordDataDataUtil.BYTE_ARRAY_BASE_OFFSET;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** Utilities for binary data segments which heavily uses {@link MemorySegment}. */
-public class BinarySegmentUtilsTest {
+class BinarySegmentUtilsTest {
     @Test
-    public void testCopy() {
+    void testCopy() {
         // test copy the content of the latter Seg
         MemorySegment[] segments = new MemorySegment[2];
         segments[0] = MemorySegmentFactory.wrap(new byte[] {0, 2, 5});
@@ -42,7 +42,7 @@ public class BinarySegmentUtilsTest {
     }
 
     @Test
-    public void testEquals() {
+    void testEquals() {
         // test copy the content of the latter Seg
         MemorySegment[] segments1 = new MemorySegment[3];
         segments1[0] = MemorySegmentFactory.wrap(new byte[] {0, 2, 5});
@@ -60,7 +60,7 @@ public class BinarySegmentUtilsTest {
     }
 
     @Test
-    public void testBoundaryByteArrayEquals() {
+    void testBoundaryByteArrayEquals() {
         byte[] bytes1 = new byte[5];
         bytes1[3] = 81;
         byte[] bytes2 = new byte[100];
@@ -73,16 +73,14 @@ public class BinarySegmentUtilsTest {
     }
 
     @Test
-    public void testBoundaryEquals() {
+    void testBoundaryEquals() {
         BinaryRecordData row24 = DataFormatTestUtil.get24BytesBinaryRow();
         BinaryRecordData row160 = DataFormatTestUtil.get160BytesBinaryRow();
         BinaryRecordData varRow160 = DataFormatTestUtil.getMultiSeg160BytesBinaryRow(row160);
         BinaryRecordData varRow160InOne = DataFormatTestUtil.getMultiSeg160BytesInOneSegRow(row160);
 
-        assertThat(varRow160InOne).isEqualTo(row160);
-        assertThat(varRow160InOne).isEqualTo(varRow160);
-        assertThat(varRow160).isEqualTo(row160);
-        assertThat(varRow160).isEqualTo(varRow160InOne);
+        assertThat(varRow160InOne).isEqualTo(row160).isEqualTo(varRow160);
+        assertThat(varRow160).isEqualTo(row160).isEqualTo(varRow160InOne);
 
         assertThat(row160).isNotEqualTo(row24);
         assertThat(varRow160).isNotEqualTo(row24);
@@ -114,7 +112,7 @@ public class BinarySegmentUtilsTest {
     }
 
     @Test
-    public void testBoundaryCopy() {
+    void testBoundaryCopy() {
         MemorySegment[] segments1 = new MemorySegment[2];
         segments1[0] = MemorySegmentFactory.wrap(new byte[32]);
         segments1[1] = MemorySegmentFactory.wrap(new byte[32]);
@@ -147,7 +145,7 @@ public class BinarySegmentUtilsTest {
     }
 
     @Test
-    public void testCopyToUnsafe() {
+    void testCopyToUnsafe() {
         MemorySegment[] segments1 = new MemorySegment[2];
         segments1[0] = MemorySegmentFactory.wrap(new byte[32]);
         segments1[1] = MemorySegmentFactory.wrap(new byte[32]);
@@ -180,7 +178,7 @@ public class BinarySegmentUtilsTest {
     }
 
     @Test
-    public void testFind() {
+    void testFind() {
         MemorySegment[] segments1 = new MemorySegment[2];
         segments1[0] = MemorySegmentFactory.wrap(new byte[32]);
         segments1[1] = MemorySegmentFactory.wrap(new byte[32]);

@@ -23,6 +23,7 @@ import org.apache.flink.cdc.connectors.base.source.EmbeddedFlinkDatabaseHistory;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
@@ -33,6 +34,7 @@ import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
+import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresErrorHandler;
@@ -143,17 +145,28 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                                     .with(Heartbeat.HEARTBEAT_INTERVAL, 0)
                                     .build());
         } else {
+
+            Configuration.Builder builder = dbzConfig.getConfig().edit();
+            if (isBackFillSplit(sourceSplitBase)) {
+                // when backfilled split, only current table schema should be scan
+                builder.with(
+                        "table.include.list",
+                        sourceSplitBase
+                                .asStreamSplit()
+                                .getTableSchemas()
+                                .keySet()
+                                .iterator()
+                                .next()
+                                .toString());
+            }
+
             dbzConfig =
                     new PostgresConnectorConfig(
-                            dbzConfig
-                                    .getConfig()
-                                    .edit()
+                            builder
                                     // never drop slot for stream split, which is also global split
                                     .with(DROP_SLOT_ON_STOP.name(), false)
                                     .build());
         }
-
-        LOG.info("PostgresConnectorConfig is ", dbzConfig.getConfig().asProperties().toString());
         setDbzConnectorConfig(dbzConfig);
         PostgresConnectorConfig.SnapshotMode snapshotMode =
                 PostgresConnectorConfig.SnapshotMode.parse(
@@ -365,5 +378,11 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return PostgresConnectorConfig.LogicalDecoder.parse(
                         sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name()))
                 .getPostgresPluginName();
+    }
+
+    private boolean isBackFillSplit(SourceSplitBase sourceSplitBase) {
+        return sourceSplitBase.isStreamSplit()
+                && !StreamSplit.STREAM_SPLIT_ID.equalsIgnoreCase(
+                        sourceSplitBase.asStreamSplit().splitId());
     }
 }

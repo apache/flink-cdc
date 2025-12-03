@@ -18,8 +18,10 @@
 
 package org.apache.flink.cdc.connectors.maxcompute.utils;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
@@ -35,8 +37,7 @@ import com.aliyun.odps.Column;
 import com.aliyun.odps.TableSchema;
 import com.aliyun.odps.data.ArrayRecord;
 import com.aliyun.odps.type.TypeInfoFactory;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -44,8 +45,10 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /** test for TypeConvertUtils. */
-public class TypeConvertUtilsTest {
+class TypeConvertUtilsTest {
     static Schema allTypeSchema =
             Schema.newBuilder()
                     .physicalColumn("char(5)", DataTypes.CHAR(5))
@@ -83,7 +86,7 @@ public class TypeConvertUtilsTest {
                     .build();
 
     @Test
-    public void schemaConvertTest() {
+    void schemaConvertTest() {
         TableSchema maxComputeSchema = TypeConvertUtils.toMaxCompute(allTypeSchema);
 
         TableSchema expectSchema = new TableSchema();
@@ -133,15 +136,14 @@ public class TypeConvertUtilsTest {
         List<Column> current = maxComputeSchema.getAllColumns();
 
         for (int i = 0; i < expect.size(); i++) {
-            Assert.assertEquals(
-                    expect.get(i).getTypeInfo().getTypeName(),
-                    current.get(i).getTypeInfo().getTypeName());
-            Assert.assertEquals(expect.get(i).getName(), current.get(i).getName());
+            assertThat(current.get(i).getTypeInfo().getTypeName())
+                    .isEqualTo(expect.get(i).getTypeInfo().getTypeName());
+            assertThat(current.get(i).getName()).isEqualTo(expect.get(i).getName());
         }
     }
 
     @Test
-    public void testRecordConvert() {
+    void testRecordConvert() {
         Schema schemaWithoutComplexType =
                 allTypeSchema.copy(
                         allTypeSchema.getColumns().stream()
@@ -165,8 +167,8 @@ public class TypeConvertUtilsTest {
                             12345L,
                             123.456f,
                             123456.789d,
-                            12345,
-                            12345,
+                            TimeData.fromMillisOfDay(1234567),
+                            DateData.fromEpochDay(12345),
                             TimestampData.fromTimestamp(Timestamp.valueOf("1970-01-01 00:00:00")),
                             LocalZonedTimestampData.fromInstant(Instant.ofEpochSecond(0)),
                             ZonedTimestampData.fromZonedDateTime(
@@ -179,7 +181,7 @@ public class TypeConvertUtilsTest {
         TypeConvertUtils.toMaxComputeRecord(schemaWithoutComplexType, record1, arrayRecord);
 
         String expect =
-                "char,varchar,string,false,=01=02=03=04=05,=01=02=03=04=05=06=07=08=09=0A,0.00,1,2,12345,12345,123.456,123456.789,00:00:00.012345,2003-10-20,1970-01-01T00:00,1970-01-01T00:00:00Z,1970-01-01T00:00:00Z";
-        Assert.assertEquals(expect, arrayRecord.toString());
+                "char,varchar,string,false,=01=02=03=04=05,=01=02=03=04=05=06=07=08=09=0A,0.00,1,2,12345,12345,123.456,123456.789,00:20:34.567,2003-10-20,1970-01-01T00:00,1970-01-01T00:00:00Z,1970-01-01T00:00:00Z";
+        assertThat(arrayRecord).hasToString(expect);
     }
 }

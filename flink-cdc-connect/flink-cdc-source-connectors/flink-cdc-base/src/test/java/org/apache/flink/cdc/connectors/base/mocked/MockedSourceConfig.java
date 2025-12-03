@@ -85,7 +85,8 @@ public class MockedSourceConfig extends JdbcSourceConfig {
                 connectionPoolSize,
                 null,
                 true,
-                isScanNewlyAddedTableEnabled);
+                isScanNewlyAddedTableEnabled,
+                false);
     }
 
     @Override

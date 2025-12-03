@@ -123,7 +123,9 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.currentParallelism = context.currentParallelism();
         this.activeSinkWriters = ConcurrentHashMap.newKeySet();
         this.failedReasons = new ConcurrentHashMap<>();
-        this.schemaManager = new SchemaManager();
+        if (this.schemaManager == null) {
+            this.schemaManager = new SchemaManager();
+        }
         this.router = new TableIdRouter(routingRules);
     }
 

@@ -202,7 +202,9 @@ public class MySqlTypeUtils {
             case CHAR:
                 return DataTypes.CHAR(column.length());
             case VARCHAR:
-                return DataTypes.VARCHAR(column.length());
+                return column.length() == 0
+                        ? DataTypes.STRING()
+                        : DataTypes.VARCHAR(column.length());
             case TINYTEXT:
             case TEXT:
             case MEDIUMTEXT:

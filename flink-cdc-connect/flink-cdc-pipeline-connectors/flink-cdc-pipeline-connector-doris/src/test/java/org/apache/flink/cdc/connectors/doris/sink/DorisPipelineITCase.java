@@ -38,10 +38,10 @@ import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -57,7 +57,7 @@ import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.SI
 import static org.apache.flink.cdc.connectors.doris.sink.DorisDataSinkOptions.USERNAME;
 
 /** IT tests for {@link DorisDataSink}. */
-public class DorisPipelineITCase extends DorisSinkTestBase {
+class DorisPipelineITCase extends DorisSinkTestBase {
 
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -65,14 +65,14 @@ public class DorisPipelineITCase extends DorisSinkTestBase {
     private static final int DATABASE_OPERATION_TIMEOUT_SECONDS = 5;
     private static final int DATA_FETCHING_TIMEOUT = 30;
 
-    @BeforeClass
+    @BeforeAll
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
     }
 
-    @Before
+    @BeforeEach
     public void initializeDatabaseAndTable() {
         createDatabase(DorisContainer.DORIS_DATABASE_NAME);
 
@@ -104,7 +104,7 @@ public class DorisPipelineITCase extends DorisSinkTestBase {
         LOG.info("Table {} created.", DorisContainer.DORIS_TABLE_NAME);
     }
 
-    @After
+    @AfterEach
     public void destroyDatabaseAndTable() {
         dropTable(DorisContainer.DORIS_DATABASE_NAME, DorisContainer.DORIS_TABLE_NAME);
         // waiting for table to be dropped
@@ -128,12 +128,12 @@ public class DorisPipelineITCase extends DorisSinkTestBase {
     }
 
     @Test
-    public void testDorisSinkStreamJob() throws Exception {
+    void testDorisSinkStreamJob() throws Exception {
         runValuesToDorisJob(false);
     }
 
     @Test
-    public void testDorisSinkBatchJob() throws Exception {
+    void testDorisSinkBatchJob() throws Exception {
         runValuesToDorisJob(true);
     }
 

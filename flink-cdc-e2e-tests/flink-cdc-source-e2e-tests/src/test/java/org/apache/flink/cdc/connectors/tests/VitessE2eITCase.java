@@ -23,9 +23,10 @@ import org.apache.flink.cdc.connectors.tests.utils.FlinkContainerTestEnvironment
 import org.apache.flink.cdc.connectors.vitess.VitessTestBase;
 import org.apache.flink.cdc.connectors.vitess.container.VitessContainer;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -47,10 +48,9 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.vitess.container.VitessContainer.GRPC_PORT;
 import static org.apache.flink.cdc.connectors.vitess.container.VitessContainer.MYSQL_PORT;
-import static org.junit.Assert.assertNotNull;
 
 /** End-to-end test for Vitess CDC connector. */
-public class VitessE2eITCase extends FlinkContainerTestEnvironment {
+class VitessE2eITCase extends FlinkContainerTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(VitessE2eITCase.class);
     private static final String VITESS_CONTAINER_NETWORK_ALIAS = "vitess";
     private static final Path VITESS_CDC_JAR = TestUtils.getResource("vitess-cdc-connector.jar");
@@ -69,14 +69,14 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
                             .withNetwork(NETWORK)
                             .withNetworkAliases(VITESS_CONTAINER_NETWORK_ALIAS);
 
-    @Before
+    @BeforeEach
     public void setup() {
         LOG.info("Starting Vitess container...");
         VITESS_CONTAINER.start();
         LOG.info("Vitess container is started.");
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
         LOG.info("Stopping Vitess container...");
         VITESS_CONTAINER.stop();
@@ -84,7 +84,7 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
     }
 
     @Test
-    public void testVitessCDC() throws Exception {
+    void testVitessCDC() throws Exception {
         initializeTable();
         String sourceDDL =
                 String.format(
@@ -194,7 +194,7 @@ public class VitessE2eITCase extends FlinkContainerTestEnvironment {
     private static void initializeTable() {
         final String ddlFile = String.format("ddl/%s.sql", "vitess_inventory");
         final URL ddlTestFile = VitessTestBase.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = DriverManager.getConnection(VITESS_CONTAINER.getJdbcUrl());
                 Statement statement = connection.createStatement()) {
             final List<String> statements =

@@ -21,11 +21,14 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -145,20 +148,48 @@ public class FactoryHelper {
         validateUnconsumedKeys(factory.identifier(), filteredOptionKeys, allOptionKeys);
     }
 
+    public ReadableConfig getFormatConfig(String formatPrefix) {
+        final String prefix = formatPrefix + ".";
+        Map<String, String> formatConfigMap = new HashMap<>();
+        context.getFactoryConfiguration()
+                .toMap()
+                .forEach(
+                        (k, v) -> {
+                            if (k.startsWith(prefix)) {
+                                formatConfigMap.put(k.substring(prefix.length()), v);
+                            }
+                        });
+        return org.apache.flink.configuration.Configuration.fromMap(formatConfigMap);
+    }
+
     /** Default implementation of {@link Factory.Context}. */
     public static class DefaultContext implements Factory.Context {
 
         private final Configuration factoryConfiguration;
         private final ClassLoader classLoader;
         private final Configuration pipelineConfiguration;
+        private final ReadableConfig flinkConf;
 
         public DefaultContext(
                 Configuration factoryConfiguration,
                 Configuration pipelineConfiguration,
                 ClassLoader classLoader) {
+            this(
+                    factoryConfiguration,
+                    pipelineConfiguration,
+                    classLoader,
+                    new org.apache.flink.configuration.Configuration());
+        }
+
+        public DefaultContext(
+                Configuration factoryConfiguration,
+                Configuration pipelineConfiguration,
+                ClassLoader classLoader,
+                ReadableConfig flinkConf) {
             this.factoryConfiguration = factoryConfiguration;
             this.pipelineConfiguration = pipelineConfiguration;
             this.classLoader = classLoader;
+            this.flinkConf = flinkConf;
         }
 
         @Override
@@ -174,6 +205,11 @@ public class FactoryHelper {
         @Override
         public ClassLoader getClassLoader() {
             return classLoader;
+        }
+
+        @Override
+        public ReadableConfig getFlinkConf() {
+            return flinkConf;
         }
     }
 }

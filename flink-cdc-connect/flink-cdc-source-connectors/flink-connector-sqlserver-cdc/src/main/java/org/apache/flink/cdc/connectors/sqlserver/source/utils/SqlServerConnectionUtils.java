@@ -92,7 +92,7 @@ public class SqlServerConnectionUtils {
             try {
                 jdbc.query(
                         "SELECT * FROM "
-                                + dbName
+                                + SqlServerUtils.quote(dbName)
                                 + ".INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';",
                         rs -> {
                             while (rs.next()) {

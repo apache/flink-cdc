@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
@@ -66,10 +67,8 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils.unwrap;
 
 /**
@@ -90,6 +89,9 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
     public static final OperatorID SCHEMA_OPERATOR_ID = new OperatorID(15213L, 15513L);
 
     public static final OperatorID SINK_OPERATOR_ID = new OperatorID(15214L, 15514L);
+
+    private static final Duration DEFAULT_RPC_TIMEOUT =
+            PipelineOptions.DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT;
 
     private final OP operator;
     private final int numOutputs;
@@ -130,7 +132,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 null,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 SchemaChangeBehavior.EVOLVE,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -143,7 +145,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 SchemaChangeBehavior.EVOLVE,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -159,7 +161,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL).collect(Collectors.toSet()),
                 Collections.emptySet());
@@ -176,7 +178,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 enabledEventTypes,
                 Collections.emptySet());
@@ -195,7 +197,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 operator,
                 numOutputs,
                 evolveDuration,
-                null,
+                DEFAULT_RPC_TIMEOUT,
                 behavior,
                 enabledEventTypes,
                 errorOnEventTypes);
@@ -238,31 +240,6 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                 schemaRegistry
                         .handleCoordinationRequest(new SchemaChangeRequest(tableId, event, 0))
                         .get());
-    }
-
-    public SchemaChangeResponse requestSchemaChangeResult(TableId tableId, SchemaChangeEvent event)
-            throws ExecutionException, InterruptedException, TimeoutException {
-        long rpcTimeOutInMillis = DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT.toMillis();
-        long deadline = System.currentTimeMillis() + rpcTimeOutInMillis;
-        while (true) {
-            LOG.info("request schema change result");
-            SchemaChangeResponse response = requestSchemaChangeEvent(tableId, event);
-            if (System.currentTimeMillis() < deadline) {
-                if (response.isRegistryBusy()) {
-                    LOG.info("{}> Schema Registry is busy now, waiting for next request...", 0);
-                    Thread.sleep(1000);
-                } else if (response.isWaitingForFlush()) {
-                    LOG.info(
-                            "{}> Schema change event has not collected enough flush success events from writers, waiting...",
-                            0);
-                    Thread.sleep(1000);
-                } else {
-                    return response;
-                }
-            } else {
-                throw new TimeoutException("Timeout when requesting schema change.");
-            }
-        }
     }
 
     public Schema getLatestOriginalSchema(TableId tableId) throws Exception {

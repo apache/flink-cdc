@@ -52,9 +52,13 @@ public abstract class OceanBaseCatalog implements Serializable {
         LOG.info("Open OceanBase catalog");
     }
 
-    protected List<String> executeSingleColumnStatement(String sql) throws SQLException {
+    protected List<String> executeSingleColumnStatement(String sql, Object... params)
+            throws SQLException {
         try (Connection conn = connectionProvider.getConnection();
                 PreparedStatement statement = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                statement.setObject(i + 1, params[i]);
+            }
             List<String> columnValues = Lists.newArrayList();
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {

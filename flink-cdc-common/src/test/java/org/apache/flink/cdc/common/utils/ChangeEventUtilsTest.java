@@ -39,9 +39,9 @@ import static org.apache.flink.cdc.common.event.SchemaChangeEventType.TRUNCATE_T
 import static org.apache.flink.cdc.common.testutils.assertions.EventAssertions.assertThat;
 
 /** A test for the {@link org.apache.flink.cdc.common.utils.ChangeEventUtils}. */
-public class ChangeEventUtilsTest {
+class ChangeEventUtilsTest {
     @Test
-    public void testResolveSchemaEvolutionOptions() {
+    void testResolveSchemaEvolutionOptions() {
 
         List<String> allTags =
                 Arrays.stream(SchemaChangeEventTypeFamily.ALL)
@@ -97,7 +97,7 @@ public class ChangeEventUtilsTest {
     }
 
     @Test
-    public void testResolveSchemaEvolutionTag() {
+    void testResolveSchemaEvolutionTag() {
         assertThat(ChangeEventUtils.resolveSchemaEvolutionTag("all"))
                 .isEqualTo(
                         Arrays.asList(

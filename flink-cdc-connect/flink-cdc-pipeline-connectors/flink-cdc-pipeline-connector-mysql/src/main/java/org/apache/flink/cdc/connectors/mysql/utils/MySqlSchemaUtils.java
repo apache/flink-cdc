@@ -158,5 +158,13 @@ public class MySqlSchemaUtils {
                 tableId.getSchemaName(), null, tableId.getTableName());
     }
 
+    public static boolean isTableIdCaseInsensitive(MySqlSourceConfig sourceConfig) {
+        try (MySqlConnection jdbc = createMySqlConnection(sourceConfig)) {
+            return jdbc.isTableIdCaseSensitive();
+        } catch (Exception e) {
+            throw new RuntimeException("Error to get table id caseSensitive: " + e.getMessage(), e);
+        }
+    }
+
     private MySqlSchemaUtils() {}
 }

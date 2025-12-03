@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.VarCharType;
 
 import io.debezium.relational.Column;
 
@@ -83,6 +84,8 @@ public class MySqlTypeUtils {
     private static final String MEDIUMTEXT = "MEDIUMTEXT";
     private static final String TEXT = "TEXT";
     private static final String LONGTEXT = "LONGTEXT";
+    private static final String LONG_VARCHAR = "LONG VARCHAR";
+    private static final String LONG = "LONG";
     private static final String DATE = "DATE";
     private static final String TIME = "TIME";
     private static final String DATETIME = "DATETIME";
@@ -127,7 +130,8 @@ public class MySqlTypeUtils {
         String typeName = column.typeName();
         switch (typeName) {
             case BIT:
-                return column.length() == 1
+                // column.length() might be -1
+                return column.length() <= 1
                         ? DataTypes.BOOLEAN()
                         : DataTypes.BINARY((column.length() + 7) / 8);
             case BOOL:
@@ -212,11 +216,15 @@ public class MySqlTypeUtils {
                         ? DataTypes.CHAR(column.length())
                         : column.length() == 0 ? CharType.ofEmptyLiteral() : DataTypes.CHAR(1);
             case VARCHAR:
-                return DataTypes.VARCHAR(column.length());
+                return column.length() == 0
+                        ? VarCharType.stringType()
+                        : DataTypes.VARCHAR(column.length());
             case TINYTEXT:
             case TEXT:
             case MEDIUMTEXT:
             case LONGTEXT:
+            case LONG_VARCHAR:
+            case LONG:
             case JSON:
             case ENUM:
             case GEOMETRY:

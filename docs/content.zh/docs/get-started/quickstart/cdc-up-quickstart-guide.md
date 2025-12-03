@@ -73,8 +73,8 @@ Commands:
 🐿️ Which Flink version would you like to use? (Press ↑/↓ arrow to move and Enter to select)
   1.17.2
   1.18.1
-  1.19.1
-‣ 1.20.0
+  1.19.3
+‣ 1.20.3
 ```
 
 Use the arrow keys to navigate and press Enter to select specified Flink and CDC version, source, and sink connectors.

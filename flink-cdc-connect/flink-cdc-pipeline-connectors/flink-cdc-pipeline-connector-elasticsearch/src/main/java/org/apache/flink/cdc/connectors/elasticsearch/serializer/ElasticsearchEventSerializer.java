@@ -46,11 +46,14 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
+import static org.apache.flink.cdc.connectors.elasticsearch.sink.ElasticsearchDataSinkOptions.SHARDING_SUFFIX_SEPARATOR;
 
 /** A serializer for Event to BulkOperationVariant. */
 public class ElasticsearchEventSerializer implements ElementConverter<Event, BulkOperationVariant> {
@@ -70,8 +73,18 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     private final ZoneId pipelineZoneId;
 
+    private final Map<TableId, String> shardingKey;
+    private final String shardingSeparator;
+
     public ElasticsearchEventSerializer(ZoneId zoneId) {
+        this(zoneId, Collections.emptyMap(), SHARDING_SUFFIX_SEPARATOR.defaultValue());
+    }
+
+    public ElasticsearchEventSerializer(
+            ZoneId zoneId, Map<TableId, String> shardingKey, String shardingSeparator) {
         this.pipelineZoneId = zoneId;
+        this.shardingKey = shardingKey;
+        this.shardingSeparator = shardingSeparator;
     }
 
     @Override
@@ -145,7 +158,7 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             case UPDATE:
                 valueMap = serializeRecord(tableId, event.after(), schema, pipelineZoneId);
                 return new IndexOperation.Builder<>()
-                        .index(tableId.toString())
+                        .index(tableSharding(tableId, schema, valueMap))
                         .id(id)
                         .document(valueMap)
                         .build();
@@ -154,6 +167,16 @@ public class ElasticsearchEventSerializer implements ElementConverter<Event, Bul
             default:
                 throw new UnsupportedOperationException("Unsupported Operation " + op);
         }
+    }
+
+    public String tableSharding(TableId tableId, Schema schema, Map<String, Object> valueMap) {
+        Object value = null;
+        if (shardingKey.containsKey(tableId)) {
+            value = valueMap.get(shardingKey.get(tableId));
+        } else if (!schema.partitionKeys().isEmpty()) {
+            value = valueMap.get(schema.partitionKeys().get(0));
+        }
+        return value != null ? tableId.toString() + shardingSeparator + value : tableId.toString();
     }
 
     private Object[] generateUniqueId(RecordData recordData, Schema schema, TableId tableId) {

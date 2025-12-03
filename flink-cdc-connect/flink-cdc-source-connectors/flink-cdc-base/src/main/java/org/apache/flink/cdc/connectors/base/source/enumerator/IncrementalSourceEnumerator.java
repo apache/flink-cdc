@@ -40,6 +40,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.util.CollectionUtil;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Lists;
@@ -126,7 +127,9 @@ public class IncrementalSourceEnumerator
             LOG.info("The enumerator adds add stream split back: {}", streamSplit);
             this.streamSplitTaskId = null;
         }
-        splitAssigner.addSplits(splits);
+        if (!CollectionUtil.isNullOrEmpty(splits)) {
+            splitAssigner.addSplits(splits);
+        }
     }
 
     @Override

@@ -230,6 +230,15 @@ public class SqlServerSourceBuilder<T> {
     }
 
     /**
+     * Whether the {@link SqlServerSourceBuilder} should assign the unbounded chunks first or not
+     * during snapshot reading phase.
+     */
+    public SqlServerSourceBuilder<T> assignUnboundedChunkFirst(boolean assignUnboundedChunkFirst) {
+        this.configFactory.assignUnboundedChunkFirst(assignUnboundedChunkFirst);
+        return this;
+    }
+
+    /**
      * Build the {@link SqlServerIncrementalSource}.
      *
      * @return a SqlSeverParallelSource with the settings made for this builder.

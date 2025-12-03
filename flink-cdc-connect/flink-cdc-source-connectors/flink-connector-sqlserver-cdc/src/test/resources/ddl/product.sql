@@ -20,6 +20,11 @@
 CREATE DATABASE product;
 
 USE product;
+
+-- Avoid SqlServer error com.microsoft.sqlserver.jdbc.SQLServerException: Could not update the metadata that indicates,
+-- the root cause is 14258: 'Cannot perform this operation while SQLServerAgent is starting. Try again later.'. We simply
+-- wait for 3 seconds to improve the test stabilises.
+WAITFOR DELAY '00:00:03';
 EXEC sys.sp_cdc_enable_db;
 
 CREATE TABLE products (

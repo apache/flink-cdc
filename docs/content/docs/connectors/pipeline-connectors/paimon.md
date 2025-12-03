@@ -110,7 +110,7 @@ Pipeline Connector Options
       <td>Uri of metastore server.</td>
     </tr>
     <tr>
-      <td>commit.user</td>
+      <td>commit.user-prefix</td>
       <td>optional</td>
       <td style="word-wrap: break-word;"><code>"admin"</code></td>
       <td>String</td>

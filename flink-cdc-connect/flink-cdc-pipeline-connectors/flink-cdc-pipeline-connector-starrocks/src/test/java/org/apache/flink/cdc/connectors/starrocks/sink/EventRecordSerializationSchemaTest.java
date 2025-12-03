@@ -25,6 +25,7 @@ import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -61,9 +62,10 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import com.starrocks.connector.flink.table.data.StarRocksRowData;
 import com.starrocks.connector.flink.table.sink.StarRocksSinkOptions;
 import com.starrocks.connector.flink.table.sink.v2.DefaultStarRocksSinkContext;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -78,18 +80,15 @@ import java.util.OptionalLong;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-
 /**
  * Tests for {@link org.apache.flink.cdc.connectors.starrocks.sink.EventRecordSerializationSchema}.
  */
-public class EventRecordSerializationSchemaTest {
+class EventRecordSerializationSchemaTest {
 
     private EventRecordSerializationSchema serializer;
     private ObjectMapper objectMapper;
 
-    @Before
+    @BeforeEach
     public void setup() {
         this.serializer = new EventRecordSerializationSchema(ZoneId.of("+08"));
         this.serializer.open(
@@ -100,13 +99,13 @@ public class EventRecordSerializationSchemaTest {
         this.objectMapper = new ObjectMapper();
     }
 
-    @After
+    @AfterEach
     public void teardown() {
         this.serializer.close();
     }
 
     @Test
-    public void testMixedSchemaAndDataChanges() throws Exception {
+    void testMixedSchemaAndDataChanges() throws Exception {
         // 1. create table1, and insert/delete/update data
         TableId table1 = TableId.parse("test.tbl1");
         Schema schema1 =
@@ -117,7 +116,7 @@ public class EventRecordSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schema1);
-        assertNull(serializer.serialize(createTableEvent1));
+        Assertions.assertThat(serializer.serialize(createTableEvent1)).isNull();
 
         BinaryRecordDataGenerator generator1 =
                 new BinaryRecordDataGenerator(
@@ -184,7 +183,7 @@ public class EventRecordSerializationSchemaTest {
                         .primaryKey("col1")
                         .build();
         CreateTableEvent createTableEvent2 = new CreateTableEvent(table2, schema2);
-        assertNull(serializer.serialize(createTableEvent2));
+        Assertions.assertThat(serializer.serialize(createTableEvent2)).isNull();
 
         BinaryRecordDataGenerator generator2 =
                 new BinaryRecordDataGenerator(
@@ -194,7 +193,7 @@ public class EventRecordSerializationSchemaTest {
                         table2,
                         generator2.generate(
                                 new Object[] {
-                                    (int) LocalDate.of(2023, 11, 27).toEpochDay(),
+                                    DateData.fromLocalDate(LocalDate.of(2023, 11, 27)),
                                     3.4f,
                                     BinaryStringData.fromString("insert table2")
                                 }));
@@ -219,7 +218,7 @@ public class EventRecordSerializationSchemaTest {
         BinaryRecordDataGenerator newGenerator1 =
                 new BinaryRecordDataGenerator(
                         newSchema1.getColumnDataTypes().toArray(new DataType[0]));
-        assertNull(serializer.serialize(addColumnEvent));
+        Assertions.assertThat(serializer.serialize(addColumnEvent)).isNull();
 
         DataChangeEvent deleteEvent2 =
                 DataChangeEvent.deleteEvent(
@@ -248,13 +247,13 @@ public class EventRecordSerializationSchemaTest {
         BinaryRecordDataGenerator newGenerator2 =
                 new BinaryRecordDataGenerator(
                         newSchema2.getColumnDataTypes().toArray(new DataType[0]));
-        assertNull(serializer.serialize(dropColumnEvent));
+        Assertions.assertThat(serializer.serialize(dropColumnEvent)).isNull();
 
         DataChangeEvent insertEvent3 =
                 DataChangeEvent.insertEvent(
                         table2,
                         newGenerator2.generate(
-                                new Object[] {(int) LocalDate.of(2023, 11, 28).toEpochDay()}));
+                                new Object[] {DateData.fromLocalDate(LocalDate.of(2023, 11, 28))}));
         verifySerializeResult(
                 table2,
                 "{\"col1\":\"2023-11-28\",\"__op\":0}",
@@ -264,17 +263,17 @@ public class EventRecordSerializationSchemaTest {
     private void verifySerializeResult(
             TableId expectTable, String expectRow, StarRocksRowData actualRowData)
             throws Exception {
-        assertEquals(expectTable.getSchemaName(), actualRowData.getDatabase());
-        assertEquals(expectTable.getTableName(), actualRowData.getTable());
-        SortedMap expectMap =
+        Assertions.assertThat(actualRowData.getDatabase()).isEqualTo(expectTable.getSchemaName());
+        Assertions.assertThat(actualRowData.getTable()).isEqualTo(expectTable.getTableName());
+        SortedMap<String, Object> expectMap =
                 objectMapper.readValue(expectRow, new TypeReference<TreeMap<String, Object>>() {});
-        SortedMap actualMap =
+        SortedMap<String, Object> actualMap =
                 actualRowData.getRow() == null
                         ? null
                         : objectMapper.readValue(
                                 actualRowData.getRow(),
                                 new TypeReference<TreeMap<String, Object>>() {});
-        assertEquals(expectMap, actualMap);
+        Assertions.assertThat(actualMap).isEqualTo(expectMap);
     }
 
     /** A mock context for serialization schema testing. */

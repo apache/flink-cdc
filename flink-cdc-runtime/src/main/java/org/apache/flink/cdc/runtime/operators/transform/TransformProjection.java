@@ -37,13 +37,8 @@ import java.util.Optional;
  */
 public class TransformProjection implements Serializable {
     private static final long serialVersionUID = 1L;
-    private String projection;
-    private List<ProjectionColumn> projectionColumns;
-
-    public TransformProjection(String projection) {
-        this.projection = projection;
-        this.projectionColumns = new ArrayList<>();
-    }
+    private final String projection;
+    private final List<ProjectionColumn> projectionColumns;
 
     public TransformProjection(String projection, List<ProjectionColumn> projectionColumns) {
         this.projection = projection;
@@ -58,10 +53,6 @@ public class TransformProjection implements Serializable {
         return projectionColumns;
     }
 
-    public void setProjectionColumns(List<ProjectionColumn> projectionColumns) {
-        this.projectionColumns = projectionColumns;
-    }
-
     public boolean isValid() {
         return !StringUtils.isNullOrWhitespaceOnly(projection);
     }
@@ -71,5 +62,16 @@ public class TransformProjection implements Serializable {
             return Optional.empty();
         }
         return Optional.of(new TransformProjection(projection, new ArrayList<>()));
+    }
+
+    @Override
+    public String toString() {
+        return "TransformProjection{"
+                + "projection='"
+                + getProjection()
+                + '\''
+                + ", projectionColumns="
+                + getProjectionColumns()
+                + '}';
     }
 }

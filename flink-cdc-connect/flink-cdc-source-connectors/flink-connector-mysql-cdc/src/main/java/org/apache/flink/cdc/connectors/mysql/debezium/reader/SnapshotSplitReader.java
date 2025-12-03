@@ -282,79 +282,103 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
         checkReadException();
 
         if (hasNextElement.get()) {
-            // data input: [low watermark event][snapshot events][high watermark event][binlog
-            // events][binlog-end event]
-            // data output: [low watermark event][normalized events][high watermark event]
-            boolean reachBinlogStart = false;
-            boolean reachBinlogEnd = false;
-            SourceRecord lowWatermark = null;
-            SourceRecord highWatermark = null;
-
-            Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
-            while (!reachBinlogEnd) {
-                checkReadException();
-                List<DataChangeEvent> batch = queue.poll();
-                for (DataChangeEvent event : batch) {
-                    SourceRecord record = event.getRecord();
-                    if (lowWatermark == null) {
-                        lowWatermark = record;
-                        assertLowWatermark(lowWatermark);
-                        continue;
-                    }
-
-                    if (highWatermark == null && RecordUtils.isHighWatermarkEvent(record)) {
-                        highWatermark = record;
-                        // snapshot events capture end and begin to capture binlog events
-                        reachBinlogStart = true;
-                        continue;
-                    }
-
-                    if (reachBinlogStart && RecordUtils.isEndWatermarkEvent(record)) {
-                        // capture to end watermark events, stop the loop
-                        reachBinlogEnd = true;
-                        break;
-                    }
-
-                    if (!reachBinlogStart) {
-                        if (record.key() != null) {
-                            snapshotRecords.put(
-                                    (Struct) record.key(), Collections.singletonList(record));
-                        } else {
-                            List<SourceRecord> records =
-                                    snapshotRecords.computeIfAbsent(
-                                            (Struct) record.value(), key -> new LinkedList<>());
-                            records.add(record);
-                        }
-                    } else {
-                        RecordUtils.upsertBinlog(
-                                snapshotRecords,
-                                record,
-                                currentSnapshotSplit.getSplitKeyType(),
-                                nameAdjuster,
-                                currentSnapshotSplit.getSplitStart(),
-                                currentSnapshotSplit.getSplitEnd());
-                    }
-                }
+            if (statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill()) {
+                return pollWithoutBuffer();
+            } else {
+                return pollWithBuffer();
             }
-            // snapshot split return its data once
-            hasNextElement.set(false);
-
-            final List<SourceRecord> normalizedRecords = new ArrayList<>();
-            normalizedRecords.add(lowWatermark);
-            normalizedRecords.addAll(
-                    RecordUtils.formatMessageTimestamp(
-                            snapshotRecords.values().stream()
-                                    .flatMap(Collection::stream)
-                                    .collect(Collectors.toList())));
-            normalizedRecords.add(highWatermark);
-
-            final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
-            sourceRecordsSet.add(new SourceRecords(normalizedRecords));
-            return sourceRecordsSet.iterator();
         }
+
         // the data has been polled, no more data
         reachEnd.compareAndSet(false, true);
         return null;
+    }
+
+    public Iterator<SourceRecords> pollWithoutBuffer() throws InterruptedException {
+        checkReadException();
+        List<DataChangeEvent> batch = queue.poll();
+        final List<SourceRecord> records = new ArrayList<>();
+        for (DataChangeEvent event : batch) {
+            if (RecordUtils.isEndWatermarkEvent(event.getRecord())) {
+                hasNextElement.set(false);
+                break;
+            }
+            records.add(event.getRecord());
+        }
+
+        return Collections.singletonList(new SourceRecords(records)).iterator();
+    }
+
+    public Iterator<SourceRecords> pollWithBuffer() throws InterruptedException {
+        // data input: [low watermark event][snapshot events][high watermark event][binlog
+        // events][binlog-end event]
+        // data output: [low watermark event][normalized events][high watermark event]
+        boolean reachBinlogStart = false;
+        boolean reachBinlogEnd = false;
+        SourceRecord lowWatermark = null;
+        SourceRecord highWatermark = null;
+
+        Map<Struct, List<SourceRecord>> snapshotRecords = new HashMap<>();
+        while (!reachBinlogEnd) {
+            checkReadException();
+            List<DataChangeEvent> batch = queue.poll();
+            for (DataChangeEvent event : batch) {
+                SourceRecord record = event.getRecord();
+                if (lowWatermark == null) {
+                    lowWatermark = record;
+                    assertLowWatermark(lowWatermark);
+                    continue;
+                }
+
+                if (highWatermark == null && RecordUtils.isHighWatermarkEvent(record)) {
+                    highWatermark = record;
+                    // snapshot events capture end and begin to capture binlog events
+                    reachBinlogStart = true;
+                    continue;
+                }
+
+                if (reachBinlogStart && RecordUtils.isEndWatermarkEvent(record)) {
+                    // capture to end watermark events, stop the loop
+                    reachBinlogEnd = true;
+                    break;
+                }
+
+                if (!reachBinlogStart) {
+                    if (record.key() != null) {
+                        snapshotRecords.put(
+                                (Struct) record.key(), Collections.singletonList(record));
+                    } else {
+                        List<SourceRecord> records =
+                                snapshotRecords.computeIfAbsent(
+                                        (Struct) record.value(), key -> new LinkedList<>());
+                        records.add(record);
+                    }
+                } else {
+                    RecordUtils.upsertBinlog(
+                            snapshotRecords,
+                            record,
+                            currentSnapshotSplit.getSplitKeyType(),
+                            nameAdjuster,
+                            currentSnapshotSplit.getSplitStart(),
+                            currentSnapshotSplit.getSplitEnd());
+                }
+            }
+        }
+        // snapshot split return its data once
+        hasNextElement.set(false);
+
+        final List<SourceRecord> normalizedRecords = new ArrayList<>();
+        normalizedRecords.add(lowWatermark);
+        normalizedRecords.addAll(
+                RecordUtils.formatMessageTimestamp(
+                        snapshotRecords.values().stream()
+                                .flatMap(Collection::stream)
+                                .collect(Collectors.toList())));
+        normalizedRecords.add(highWatermark);
+
+        final List<SourceRecords> sourceRecordsSet = new ArrayList<>();
+        sourceRecordsSet.add(new SourceRecords(normalizedRecords));
+        return sourceRecordsSet.iterator();
     }
 
     private void checkReadException() {

@@ -271,18 +271,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
 
                 // case 2: there are new tables to add
                 if (!newlyAddedTables.isEmpty()) {
-                    // if job is still in snapshot reading phase, directly add all newly added
-                    // tables
                     LOG.info("Found newly added tables, start capture newly added tables process");
 
-                    // add new tables
                     remainingTables.addAll(newlyAddedTables);
-                    if (AssignerStatus.isAssigningFinished(assignerStatus)) {
-                        // start the newly added tables process under binlog reading phase
-                        LOG.info(
-                                "Found newly added tables, start capture newly added tables process under binlog reading phase");
-                        this.startAssignNewlyAddedTables();
-                    }
+                    this.startAssignNewlyAddedTables();
                 }
             } catch (Exception e) {
                 throw new FlinkRuntimeException(
@@ -324,12 +316,19 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     tableSchema.putAll(splits.iterator().next().getTableSchemas());
                     tableSchemas.putAll(tableSchema);
                 }
-                final List<MySqlSchemalessSnapshotSplit> schemaLessSnapshotSplits =
-                        splits.stream()
-                                .map(MySqlSnapshotSplit::toSchemalessSnapshotSplit)
-                                .collect(Collectors.toList());
+
+                for (MySqlSnapshotSplit split : splits) {
+                    MySqlSchemalessSnapshotSplit schemalessSnapshotSplit =
+                            split.toSchemalessSnapshotSplit();
+                    if (sourceConfig.isAssignUnboundedChunkFirst() && split.getSplitEnd() == null) {
+                        // assign unbounded split first
+                        remainingSplits.add(0, schemalessSnapshotSplit);
+                    } else {
+                        remainingSplits.add(schemalessSnapshotSplit);
+                    }
+                }
+
                 chunkNum += splits.size();
-                remainingSplits.addAll(schemaLessSnapshotSplits);
                 if (!chunkSplitter.hasNextChunk()) {
                     remainingTables.remove(nextTable);
                 }

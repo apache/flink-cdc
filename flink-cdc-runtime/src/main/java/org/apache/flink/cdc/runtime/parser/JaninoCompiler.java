@@ -34,6 +34,7 @@ import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.NlsString;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -41,7 +42,9 @@ import org.codehaus.janino.Java;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -65,7 +68,7 @@ public class JaninoCompiler {
                     "UNIX_TIMESTAMP");
 
     private static final List<String> TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS =
-            Arrays.asList("DATE_FORMAT");
+            Collections.emptyList();
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
             Arrays.asList(
@@ -74,7 +77,8 @@ public class JaninoCompiler {
                     "FROM_UNIXTIME",
                     "TIMESTAMPADD",
                     "TIMESTAMPDIFF",
-                    "TIMESTAMP_DIFF");
+                    "TIMESTAMP_DIFF",
+                    "DATE_FORMAT");
 
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
@@ -105,8 +109,11 @@ public class JaninoCompiler {
     }
 
     public static String translateSqlNodeToJaninoExpression(
-            SqlNode transform, List<UserDefinedFunctionDescriptor> udfDescriptors) {
-        Java.Rvalue rvalue = translateSqlNodeToJaninoRvalue(transform, udfDescriptors);
+            SqlNode transform,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap) {
+        Java.Rvalue rvalue =
+                translateSqlNodeToJaninoRvalue(transform, udfDescriptors, columnNameMap);
         if (rvalue != null) {
             return rvalue.toString();
         }
@@ -114,20 +121,23 @@ public class JaninoCompiler {
     }
 
     public static Java.Rvalue translateSqlNodeToJaninoRvalue(
-            SqlNode transform, List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            SqlNode transform,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap) {
         if (transform instanceof SqlIdentifier) {
-            return translateSqlIdentifier((SqlIdentifier) transform);
+            return translateSqlIdentifier((SqlIdentifier) transform, columnNameMap);
         } else if (transform instanceof SqlBasicCall) {
-            return translateSqlBasicCall((SqlBasicCall) transform, udfDescriptors);
+            return translateSqlBasicCall((SqlBasicCall) transform, udfDescriptors, columnNameMap);
         } else if (transform instanceof SqlCase) {
-            return translateSqlCase((SqlCase) transform, udfDescriptors);
+            return translateSqlCase((SqlCase) transform, udfDescriptors, columnNameMap);
         } else if (transform instanceof SqlLiteral) {
             return translateSqlSqlLiteral((SqlLiteral) transform);
         }
         return null;
     }
 
-    private static Java.Rvalue translateSqlIdentifier(SqlIdentifier sqlIdentifier) {
+    private static Java.Rvalue translateSqlIdentifier(
+            SqlIdentifier sqlIdentifier, Map<String, String> columnNameMap) {
         String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
         if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(columnName.toUpperCase())) {
             return generateTimezoneFreeTemporalFunctionOperation(columnName);
@@ -139,7 +149,9 @@ public class JaninoCompiler {
                 columnName.toUpperCase())) {
             return generateTimezoneRequiredTemporalConversionFunctionOperation(columnName);
         } else {
-            return new Java.AmbiguousName(Location.NOWHERE, new String[] {columnName});
+            return new Java.AmbiguousName(
+                    Location.NOWHERE,
+                    new String[] {columnNameMap.getOrDefault(columnName, columnName)});
         }
     }
 
@@ -147,10 +159,10 @@ public class JaninoCompiler {
         if (sqlLiteral.getValue() == null) {
             return new Java.NullLiteral(Location.NOWHERE);
         }
-        String value = sqlLiteral.getValue().toString();
+        Object value = sqlLiteral.getValue();
         if (sqlLiteral instanceof SqlCharStringLiteral) {
             // Double quotation marks represent strings in Janino.
-            value = "\"" + value.substring(1, value.length() - 1) + "\"";
+            value = "\"" + sqlLiteral.getValueAs(NlsString.class).getValue() + "\"";
         } else if (sqlLiteral instanceof SqlNumericLiteral) {
             if (((SqlNumericLiteral) sqlLiteral).isInteger()) {
                 long longValue = sqlLiteral.longValue(true);
@@ -162,15 +174,17 @@ public class JaninoCompiler {
         if (SQL_TYPE_NAME_IGNORE.contains(sqlLiteral.getTypeName())) {
             value = "\"" + value + "\"";
         }
-        return new Java.AmbiguousName(Location.NOWHERE, new String[] {value});
+        return new Java.AmbiguousName(Location.NOWHERE, new String[] {value.toString()});
     }
 
     private static Java.Rvalue translateSqlBasicCall(
-            SqlBasicCall sqlBasicCall, List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            SqlBasicCall sqlBasicCall,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap) {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
-            translateSqlNodeToAtoms(sqlNode, atoms, udfDescriptors);
+            translateSqlNodeToAtoms(sqlNode, atoms, udfDescriptors, columnNameMap);
         }
         if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(
                 sqlBasicCall.getOperator().getName().toUpperCase())) {
@@ -188,19 +202,22 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue translateSqlCase(
-            SqlCase sqlCase, List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            SqlCase sqlCase,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap) {
         SqlNodeList whenOperands = sqlCase.getWhenOperands();
         SqlNodeList thenOperands = sqlCase.getThenOperands();
         SqlNode elseOperand = sqlCase.getElseOperand();
         List<Java.Rvalue> whenAtoms = new ArrayList<>();
         for (SqlNode sqlNode : whenOperands) {
-            translateSqlNodeToAtoms(sqlNode, whenAtoms, udfDescriptors);
+            translateSqlNodeToAtoms(sqlNode, whenAtoms, udfDescriptors, columnNameMap);
         }
         List<Java.Rvalue> thenAtoms = new ArrayList<>();
         for (SqlNode sqlNode : thenOperands) {
-            translateSqlNodeToAtoms(sqlNode, thenAtoms, udfDescriptors);
+            translateSqlNodeToAtoms(sqlNode, thenAtoms, udfDescriptors, columnNameMap);
         }
-        Java.Rvalue elseAtoms = translateSqlNodeToJaninoRvalue(elseOperand, udfDescriptors);
+        Java.Rvalue elseAtoms =
+                translateSqlNodeToJaninoRvalue(elseOperand, udfDescriptors, columnNameMap);
         Java.Rvalue sqlCaseRvalueTemp = elseAtoms;
         for (int i = whenAtoms.size() - 1; i >= 0; i--) {
             sqlCaseRvalueTemp =
@@ -216,19 +233,20 @@ public class JaninoCompiler {
     private static void translateSqlNodeToAtoms(
             SqlNode sqlNode,
             List<Java.Rvalue> atoms,
-            List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap) {
         if (sqlNode instanceof SqlIdentifier) {
-            atoms.add(translateSqlIdentifier((SqlIdentifier) sqlNode));
+            atoms.add(translateSqlIdentifier((SqlIdentifier) sqlNode, columnNameMap));
         } else if (sqlNode instanceof SqlLiteral) {
             atoms.add(translateSqlSqlLiteral((SqlLiteral) sqlNode));
         } else if (sqlNode instanceof SqlBasicCall) {
-            atoms.add(translateSqlBasicCall((SqlBasicCall) sqlNode, udfDescriptors));
+            atoms.add(translateSqlBasicCall((SqlBasicCall) sqlNode, udfDescriptors, columnNameMap));
         } else if (sqlNode instanceof SqlNodeList) {
             for (SqlNode node : (SqlNodeList) sqlNode) {
-                translateSqlNodeToAtoms(node, atoms, udfDescriptors);
+                translateSqlNodeToAtoms(node, atoms, udfDescriptors, columnNameMap);
             }
         } else if (sqlNode instanceof SqlCase) {
-            atoms.add(translateSqlCase((SqlCase) sqlNode, udfDescriptors));
+            atoms.add(translateSqlCase((SqlCase) sqlNode, udfDescriptors, columnNameMap));
         }
     }
 

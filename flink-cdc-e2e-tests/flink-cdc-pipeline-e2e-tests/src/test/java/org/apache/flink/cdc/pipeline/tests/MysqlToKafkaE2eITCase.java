@@ -20,8 +20,6 @@ package org.apache.flink.cdc.pipeline.tests;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.kafka.sink.KafkaUtil;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
@@ -36,17 +34,14 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.ClassRule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.shaded.org.apache.commons.lang3.StringUtils;
 
@@ -76,18 +71,8 @@ import static org.apache.flink.util.DockerImageVersions.KAFKA;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end tests for mysql cdc to Kafka pipeline job. */
-@RunWith(Parameterized.class)
-public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
+class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlToKafkaE2eITCase.class);
-
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
-    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
 
     private static AdminClient admin;
     private static final String INTER_CONTAINER_KAFKA_ALIAS = "kafka";
@@ -97,22 +82,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     private String topic;
     private KafkaConsumer<byte[], byte[]> consumer;
 
-    @ClassRule
-    public static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
-
-    @ClassRule
-    public static final KafkaContainer KAFKA_CONTAINER =
+    @Container
+    static final KafkaContainer KAFKA_CONTAINER =
             KafkaUtil.createKafkaContainer(KAFKA, LOG)
                     .withNetworkAliases("kafka")
                     .withEmbeddedZookeeper()
@@ -122,8 +93,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
 
-    @BeforeClass
-    public static void initializeContainers() {
+    @BeforeAll
+    static void initializeContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL)).join();
         Startables.deepStart(Stream.of(KAFKA_CONTAINER)).join();
@@ -135,7 +106,7 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         LOG.info("Containers are started.");
     }
 
-    @Before
+    @BeforeEach
     public void before() throws Exception {
         super.before();
         createTestTopic(1, TOPIC_REPLICATION_FACTOR);
@@ -145,7 +116,7 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
         mysqlInventoryDatabase.createAndInitialize();
     }
 
-    @After
+    @AfterEach
     public void after() {
         super.after();
         admin.deleteTopics(Collections.singletonList(topic));
@@ -154,7 +125,7 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
-    public void testSyncWholeDatabaseWithDebeziumJson() throws Exception {
+    void testSyncWholeDatabaseWithDebeziumJson() throws Exception {
         String pipelineJob =
                 String.format(
                         "source:\n"
@@ -180,10 +151,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         mysqlInventoryDatabase.getDatabaseName(),
                         topic,
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -256,10 +225,8 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                         mysqlInventoryDatabase.getDatabaseName(),
                         topic,
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
         Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob, kafkaCdcJar);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
         List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
@@ -304,10 +271,87 @@ public class MysqlToKafkaE2eITCase extends PipelineTestEnvironment {
                 .containsExactlyInAnyOrderElementsOf(deserializeValues(collectedRecords));
     }
 
+    @Test
+    public void testSyncWholeDatabaseWithDebeziumJsonHasSchema() throws Exception {
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: %s\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.\\.*\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: kafka\n"
+                                + "  properties.bootstrap.servers: kafka:9092\n"
+                                + "  topic: %s\n"
+                                + "  debezium-json.include-schema.enabled: true\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  parallelism: %d",
+                        INTER_CONTAINER_MYSQL_ALIAS,
+                        MYSQL_TEST_USER,
+                        MYSQL_TEST_PASSWORD,
+                        mysqlInventoryDatabase.getDatabaseName(),
+                        topic,
+                        parallelism);
+        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
+        Path kafkaCdcJar = TestUtils.getResource("kafka-cdc-pipeline-connector.jar");
+        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
+        submitPipelineJob(pipelineJob, mysqlCdcJar, kafkaCdcJar, mysqlDriverJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+        List<ConsumerRecord<byte[], byte[]>> collectedRecords = new ArrayList<>();
+        int expectedEventCount = 13;
+        waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
+        List<String> expectedRecords =
+                getExpectedRecords("expectedEvents/mysqlToKafka/debezium-json-with-schema.txt");
+        assertThat(expectedRecords).containsAll(deserializeValues(collectedRecords));
+        LOG.info("Begin incremental reading stage.");
+        // generate binlogs
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(),
+                        MYSQL.getDatabasePort(),
+                        mysqlInventoryDatabase.getDatabaseName());
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+            stat.execute("UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
+            stat.execute("UPDATE products SET weight='5.1' WHERE id=107;");
+
+            // modify table schema
+            stat.execute("ALTER TABLE products ADD COLUMN new_col INT;");
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'jacket','water resistent white wind breaker',0.2, null, null, null, 1);"); // 110
+            stat.execute(
+                    "INSERT INTO products VALUES (default,'scooter','Big 2-wheel scooter ',5.18, null, null, null, 1);"); // 111
+            stat.execute(
+                    "UPDATE products SET description='new water resistent white wind breaker', weight='0.5' WHERE id=110;");
+            stat.execute("UPDATE products SET weight='5.17' WHERE id=111;");
+            stat.execute("DELETE FROM products WHERE id=111;");
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        expectedEventCount = 20;
+        waitUntilSpecificEventCount(collectedRecords, expectedEventCount);
+        assertThat(expectedRecords)
+                .containsExactlyInAnyOrderElementsOf(deserializeValues(collectedRecords));
+    }
+
     private void waitUntilSpecificEventCount(
             List<ConsumerRecord<byte[], byte[]>> actualEvent, int expectedCount) throws Exception {
         boolean result = false;
-        long endTimeout = System.currentTimeMillis() + MysqlToKafkaE2eITCase.EVENT_WAITING_TIMEOUT;
+        long endTimeout =
+                System.currentTimeMillis() + MysqlToKafkaE2eITCase.EVENT_WAITING_TIMEOUT.toMillis();
         while (System.currentTimeMillis() < endTimeout) {
             ConsumerRecords<byte[], byte[]> records = consumer.poll(Duration.ofSeconds(1));
             records.forEach(actualEvent::add);

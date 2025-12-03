@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
  * Unit tests for the DataSinkOperator ({@link DataSinkWriterOperator}/{@link
  * DataSinkFunctionOperator} handling schema evolution events.
  */
-public class DataSinkOperatorWithSchemaEvolveTest {
+class DataSinkOperatorWithSchemaEvolveTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -87,16 +87,12 @@ public class DataSinkOperatorWithSchemaEvolveTest {
         // Create the flush event to process before the schema change event
         FlushEvent flushEvent = createFlushEvent(tableId, event);
 
-        // Send schema change request to coordinator
-        schemaOperatorHarness.requestSchemaChangeEvent(tableId, event);
-
         // Send flush event to SinkWriterOperator
         dataSinkWriterOperator.processElement(new StreamRecord<>(flushEvent));
 
-        // Wait for coordinator to complete the schema change and get the finished schema change
-        // events
+        // Send schema change request to coordinator
         SchemaChangeResponse schemaEvolveResponse =
-                schemaOperatorHarness.requestSchemaChangeResult(tableId, event);
+                schemaOperatorHarness.requestSchemaChangeEvent(tableId, event);
         List<SchemaChangeEvent> finishedSchemaChangeEvents =
                 schemaEvolveResponse.getAppliedSchemaChangeEvents();
 
@@ -134,7 +130,7 @@ public class DataSinkOperatorWithSchemaEvolveTest {
      * operator under normal conditions.
      */
     @Test
-    public void testSchemaChangeEvent() throws Exception {
+    void testSchemaChangeEvent() throws Exception {
         DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
         try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
                 dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {
@@ -196,7 +192,7 @@ public class DataSinkOperatorWithSchemaEvolveTest {
      * operator after failover.
      */
     @Test
-    public void testSchemaChangeEventAfterFailover() throws Exception {
+    void testSchemaChangeEventAfterFailover() throws Exception {
         DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
         try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
                 dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {
@@ -253,7 +249,7 @@ public class DataSinkOperatorWithSchemaEvolveTest {
      * operator under normal conditions.
      */
     @Test
-    public void testDataChangeEvent() throws Exception {
+    void testDataChangeEvent() throws Exception {
         DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
         try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
                 dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {
@@ -294,7 +290,7 @@ public class DataSinkOperatorWithSchemaEvolveTest {
      * after failover.
      */
     @Test
-    public void testDataChangeEventAfterFailover() throws Exception {
+    void testDataChangeEventAfterFailover() throws Exception {
         DataSinkOperatorAdapter dataSinkWriterOperator = new DataSinkOperatorAdapter();
         try (RegularEventOperatorTestHarness<DataSinkOperatorAdapter, Event>
                 dataSinkWriterOperatorHarness = setupHarness(dataSinkWriterOperator)) {

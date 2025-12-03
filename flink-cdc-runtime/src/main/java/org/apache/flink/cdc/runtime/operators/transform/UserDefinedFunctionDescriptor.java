@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
@@ -47,6 +48,11 @@ public class UserDefinedFunctionDescriptor implements Serializable {
     }
 
     public UserDefinedFunctionDescriptor(
+            Tuple3<String, String, Map<String, String>> descriptorTuple) {
+        this(descriptorTuple.f0, descriptorTuple.f1, descriptorTuple.f2);
+    }
+
+    public UserDefinedFunctionDescriptor(
             String name, String classpath, Map<String, String> parameters) {
         this.name = name;
         this.parameters = parameters;
@@ -60,7 +66,9 @@ public class UserDefinedFunctionDescriptor implements Serializable {
                 // into UserDefinedFunction interface, thus the provided UDF classes
                 // might not be compatible with the interface definition in CDC common.
                 returnTypeHint =
-                        (DataType) clazz.getMethod("getReturnType").invoke(clazz.newInstance());
+                        (DataType)
+                                clazz.getMethod("getReturnType")
+                                        .invoke(clazz.getConstructor().newInstance());
             } else {
                 returnTypeHint = null;
             }

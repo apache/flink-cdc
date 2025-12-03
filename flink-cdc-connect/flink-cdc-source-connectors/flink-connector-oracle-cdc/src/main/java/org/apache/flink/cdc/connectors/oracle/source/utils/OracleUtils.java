@@ -231,7 +231,7 @@ public class OracleUtils {
     }
 
     public static String quote(String dbOrTableName) {
-        return "\"" + dbOrTableName + "\"";
+        return "\"" + dbOrTableName.replace("\"", "\"\"") + "\"";
     }
 
     public static String quoteSchemaAndTable(TableId tableId) {

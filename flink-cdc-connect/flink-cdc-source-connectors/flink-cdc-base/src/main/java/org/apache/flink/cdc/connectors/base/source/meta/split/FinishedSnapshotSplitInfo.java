@@ -92,16 +92,16 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         FinishedSnapshotSplitInfo that = (FinishedSnapshotSplitInfo) o;
         return Objects.equals(tableId, that.tableId)
                 && Objects.equals(splitId, that.splitId)
-                && Arrays.equals(splitStart, that.splitStart)
-                && Arrays.equals(splitEnd, that.splitEnd)
+                && Arrays.deepEquals(splitStart, that.splitStart)
+                && Arrays.deepEquals(splitEnd, that.splitEnd)
                 && Objects.equals(highWatermark, that.highWatermark);
     }
 
     @Override
     public int hashCode() {
         int result = Objects.hash(tableId, splitId, highWatermark);
-        result = 31 * result + Arrays.hashCode(splitStart);
-        result = 31 * result + Arrays.hashCode(splitEnd);
+        result = 31 * result + Arrays.deepHashCode(splitStart);
+        result = 31 * result + Arrays.deepHashCode(splitEnd);
         return result;
     }
 
@@ -114,9 +114,9 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
                 + splitId
                 + '\''
                 + ", splitStart="
-                + Arrays.toString(splitStart)
+                + Arrays.deepToString(splitStart)
                 + ", splitEnd="
-                + Arrays.toString(splitEnd)
+                + Arrays.deepToString(splitEnd)
                 + ", highWatermark="
                 + highWatermark
                 + '}';
@@ -129,7 +129,8 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
     public byte[] serialize() {
         try {
             final DataOutputSerializer out = SERIALIZER_CACHE.get();
-            final byte[] result = serialize(out);
+            serialize(out);
+            final byte[] result = out.getCopyOfBuffer();
             out.clear();
             return result;
         } catch (IOException e) {
@@ -137,7 +138,7 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         }
     }
 
-    public byte[] serialize(final DataOutputSerializer out) throws IOException {
+    public void serialize(final DataOutputSerializer out) throws IOException {
         out.writeUTF(this.getTableId().toString());
         out.writeUTF(this.getSplitId());
         out.writeUTF(SerializerUtils.rowToSerializedString(this.getSplitStart()));
@@ -147,7 +148,6 @@ public class FinishedSnapshotSplitInfo implements OffsetDeserializerSerializer {
         boolean useCatalogBeforeSchema =
                 SerializerUtils.shouldUseCatalogBeforeSchema(this.getTableId());
         out.writeBoolean(useCatalogBeforeSchema);
-        return out.getCopyOfBuffer();
     }
 
     @Override

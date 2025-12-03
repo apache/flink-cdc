@@ -18,7 +18,9 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -31,6 +33,8 @@ import java.util.Objects;
  *   <li>argumentNames: a list for the argument names in expression.
  *   <li>argumentClasses: a list for the argument classes in expression.
  *   <li>returnClass: a class for the return class in expression
+ *   <li>columnNameMap: a map whose key is the original column name and value is the mapped column
+ *       name
  * </ul>
  */
 public class TransformExpressionKey implements Serializable {
@@ -39,16 +43,19 @@ public class TransformExpressionKey implements Serializable {
     private final List<String> argumentNames;
     private final List<Class<?>> argumentClasses;
     private final Class<?> returnClass;
+    private final Map<String, String> columnNameMap;
 
     private TransformExpressionKey(
             String expression,
             List<String> argumentNames,
             List<Class<?>> argumentClasses,
-            Class<?> returnClass) {
+            Class<?> returnClass,
+            Map<String, String> columnNameMap) {
         this.expression = expression;
         this.argumentNames = argumentNames;
         this.argumentClasses = argumentClasses;
         this.returnClass = returnClass;
+        this.columnNameMap = columnNameMap;
     }
 
     public String getExpression() {
@@ -56,23 +63,29 @@ public class TransformExpressionKey implements Serializable {
     }
 
     public List<String> getArgumentNames() {
-        return argumentNames;
+        return Collections.unmodifiableList(argumentNames);
     }
 
     public List<Class<?>> getArgumentClasses() {
-        return argumentClasses;
+        return Collections.unmodifiableList(argumentClasses);
     }
 
     public Class<?> getReturnClass() {
         return returnClass;
     }
 
+    public Map<String, String> getColumnNameMap() {
+        return Collections.unmodifiableMap(columnNameMap);
+    }
+
     public static TransformExpressionKey of(
             String expression,
             List<String> argumentNames,
             List<Class<?>> argumentClasses,
-            Class<?> returnClass) {
-        return new TransformExpressionKey(expression, argumentNames, argumentClasses, returnClass);
+            Class<?> returnClass,
+            Map<String, String> columnNameMap) {
+        return new TransformExpressionKey(
+                expression, argumentNames, argumentClasses, returnClass, columnNameMap);
     }
 
     @Override
@@ -87,11 +100,29 @@ public class TransformExpressionKey implements Serializable {
         return expression.equals(that.expression)
                 && argumentNames.equals(that.argumentNames)
                 && argumentClasses.equals(that.argumentClasses)
-                && returnClass.equals(that.returnClass);
+                && returnClass.equals(that.returnClass)
+                && columnNameMap.equals(that.columnNameMap);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(expression, argumentNames, argumentClasses, returnClass);
+        return Objects.hash(expression, argumentNames, argumentClasses, returnClass, columnNameMap);
+    }
+
+    @Override
+    public String toString() {
+        return "TransformExpressionKey{"
+                + "expression='"
+                + expression
+                + '\''
+                + ", argumentNames="
+                + argumentNames
+                + ", argumentClasses="
+                + argumentClasses
+                + ", returnClass="
+                + returnClass
+                + ", columnNameMap="
+                + columnNameMap
+                + '}';
     }
 }

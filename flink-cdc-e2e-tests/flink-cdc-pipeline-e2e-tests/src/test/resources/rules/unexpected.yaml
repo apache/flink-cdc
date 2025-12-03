@@ -1,0 +1,83 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+group: Common
+spec: Unexpected Structures
+steps:
+  # Unexpected top-level block
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      mapping:
+        - source: userUuid
+          sink: uuid
+        - source: userId
+          sink: user_id
+        - source: deviceUuid
+          sink: device_uuid
+    error: |
+      Unexpected key `mapping` in YAML top-level block.
+      Allowed keys in this context are: [source, sink, route, transform, pipeline]
+      Note: Flink configurations should be defined in "Runtime Configurations" instead of YAML scripts.
+  # Unexpected transform block keys
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      transform:
+        - source-table: foo.bar
+          mapping:
+            - source: userUuid
+              sink: uuid
+    error: |
+      Unexpected key `mapping` in YAML transform block.
+      Allowed keys in this context are: [source-table, projection, filter, primary-keys, partition-keys, table-options, description, converter-after-transform]
+      Note: option mapping: [{"source":"userUuid","sink":"uuid"}] is unexpected. It was silently ignored in previous versions, and probably should be removed.
+  # Unexpected route block keys
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      route:
+        - source-table: foo.bar
+          sink-table: fun.baz
+          regex-style: java
+    error: |
+      Unexpected key `regex-style` in YAML route block.
+      Allowed keys in this context are: [source-table, sink-table, replace-symbol, description]
+      Note: option regex-style: "java" is unexpected. It was silently ignored in previous versions, and probably should be removed.
+  # Unexpected UDF block keys
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      pipeline:
+        user-defined-function:
+          - name: addone
+            classpath: org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass
+            language: clojure
+    error: |
+      Unexpected key `language` in YAML UDF block.
+      Allowed keys in this context are: [name, classpath]
+      Note: option language: "clojure" is unexpected. It was silently ignored in previous versions, and probably should be removed.

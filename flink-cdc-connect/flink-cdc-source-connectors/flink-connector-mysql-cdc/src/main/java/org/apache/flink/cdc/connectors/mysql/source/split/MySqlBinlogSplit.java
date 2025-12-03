@@ -32,11 +32,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /** The split to describe the binlog of MySql table(s). */
 public class MySqlBinlogSplit extends MySqlSplit {
     private static final Logger LOG = LoggerFactory.getLogger(MySqlBinlogSplit.class);
+    private static final int TABLES_LENGTH_FOR_LOG = 3;
 
     private final BinlogOffset startingOffset;
     private final BinlogOffset endingOffset;
@@ -44,6 +46,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
     private final Map<TableId, TableChange> tableSchemas;
     private final int totalFinishedSplitSize;
     private final boolean isSuspended;
+    private final String tablesForLog;
     @Nullable transient byte[] serializedFormCache;
 
     public MySqlBinlogSplit(
@@ -61,6 +64,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = isSuspended;
+        this.tablesForLog = getTablesForLog();
     }
 
     public MySqlBinlogSplit(
@@ -77,6 +81,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
         this.tableSchemas = tableSchemas;
         this.totalFinishedSplitSize = totalFinishedSplitSize;
         this.isSuspended = false;
+        this.tablesForLog = getTablesForLog();
     }
 
     public BinlogOffset getStartingOffset() {
@@ -106,6 +111,20 @@ public class MySqlBinlogSplit extends MySqlSplit {
 
     public boolean isCompletedSplit() {
         return totalFinishedSplitSize == finishedSnapshotSplitInfos.size();
+    }
+
+    private String getTablesForLog() {
+        List<TableId> tablesForLog = new ArrayList<>();
+        if (tableSchemas != null) {
+            List<TableId> tableIds = new ArrayList<>(new TreeSet(tableSchemas.keySet()));
+            // Truncate tables length to avoid printing too much log
+            tablesForLog = tableIds.subList(0, Math.min(tableIds.size(), TABLES_LENGTH_FOR_LOG));
+        }
+        return tablesForLog.toString();
+    }
+
+    public String getTables() {
+        return tablesForLog;
     }
 
     @Override
@@ -146,6 +165,8 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 + "splitId='"
                 + splitId
                 + '\''
+                + ", tables="
+                + tablesForLog
                 + ", offset="
                 + startingOffset
                 + ", endOffset="
