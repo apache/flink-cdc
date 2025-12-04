@@ -98,6 +98,8 @@ limitations under the License.
         <iceberg.version>1.6.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <hadoop.version>3.3.4</hadoop.version>
+        <hikari.version>4.0.3</hikari.version>
+        <mysql.driver.version>8.0.27</mysql.driver.version>
     </properties>
 
     <dependencyManagement>

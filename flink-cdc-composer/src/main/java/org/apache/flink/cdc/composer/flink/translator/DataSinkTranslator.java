@@ -83,15 +83,24 @@ public class DataSinkTranslator {
     public void translate(
             SinkDef sinkDef,
             DataStream<Event> input,
+            int parallelism,
             DataSink dataSink,
             OperatorID schemaOperatorID,
             OperatorUidGenerator operatorUidGenerator) {
-        translate(sinkDef, input, dataSink, false, schemaOperatorID, operatorUidGenerator);
+        translate(
+                sinkDef,
+                input,
+                parallelism,
+                dataSink,
+                false,
+                schemaOperatorID,
+                operatorUidGenerator);
     }
 
     public void translate(
             SinkDef sinkDef,
             DataStream<Event> input,
+            int parallelism,
             DataSink dataSink,
             boolean isBatchMode,
             OperatorID schemaOperatorID,
@@ -103,7 +112,14 @@ public class DataSinkTranslator {
             // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
-            sinkTo(input, sink, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
+            sinkTo(
+                    input,
+                    parallelism,
+                    sink,
+                    sinkName,
+                    isBatchMode,
+                    schemaOperatorID,
+                    operatorUidGenerator);
         } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
             // SinkFunction
             FlinkSinkFunctionProvider sinkFunctionProvider =
@@ -111,6 +127,7 @@ public class DataSinkTranslator {
             SinkFunction<Event> sinkFunction = sinkFunctionProvider.getSinkFunction();
             sinkTo(
                     input,
+                    parallelism,
                     sinkFunction,
                     sinkName,
                     isBatchMode,
@@ -122,6 +139,7 @@ public class DataSinkTranslator {
     @VisibleForTesting
     void sinkTo(
             DataStream<Event> input,
+            int parallelism,
             Sink<Event> sink,
             String sinkName,
             boolean isBatchMode,
@@ -142,12 +160,14 @@ public class DataSinkTranslator {
                             CommittableMessageTypeInfo.noOutput(),
                             new DataSinkWriterOperatorFactory<>(
                                     sink, isBatchMode, schemaOperatorID))
-                    .uid(operatorUidGenerator.generateUid("sink-writer"));
+                    .uid(operatorUidGenerator.generateUid("sink-writer"))
+                    .setParallelism(parallelism);
         }
     }
 
     private void sinkTo(
             DataStream<Event> input,
+            int parallelism,
             SinkFunction<Event> sinkFunction,
             String sinkName,
             boolean isBatchMode,
@@ -165,7 +185,7 @@ public class DataSinkTranslator {
                         input.getTransformation(),
                         SINK_WRITER_PREFIX + sinkName,
                         sinkOperator,
-                        executionEnvironment.getParallelism(),
+                        parallelism,
                         false);
         transformation.setUid(operatorUidGenerator.generateUid("sink-writer"));
         executionEnvironment.addOperator(transformation);
