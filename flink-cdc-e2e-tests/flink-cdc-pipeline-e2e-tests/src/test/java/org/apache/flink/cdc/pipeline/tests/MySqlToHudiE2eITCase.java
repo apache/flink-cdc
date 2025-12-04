@@ -572,13 +572,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
                                 + "pipeline:\n"
                                 + "  schema.change.behavior: evolve\n"
                                 + "  parallelism: %s\n"
-                                + "\n"
-                                + "# Enable checkpointing for savepoint support\n"
-                                + "execution:\n"
-                                + "  checkpointing:\n"
-                                + "    interval: 3000\n"
-                                + "    timeout: 60000\n"
-                                + "    min-pause: 1000",
+                                + "\n",
                         MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse, parallelism);
 
         Path hudiCdcConnector = TestUtils.getResource("hudi-cdc-pipeline-connector.jar");
