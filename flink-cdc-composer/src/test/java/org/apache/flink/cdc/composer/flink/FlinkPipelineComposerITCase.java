@@ -1504,8 +1504,8 @@ class FlinkPipelineComposerITCase {
                                 "DataChangeEvent{tableId={}, before=[], after=[108, Zen, 19, 888888888.8888888888888888888], op=INSERT, meta=()}")
                         .map(
                                 s ->
-                                        s.replace(
-                                                "{}",
+                                        s.replaceFirst(
+                                                "\\{}",
                                                 "default_namespace.default_schema.default_everything_merged"))
                         .toArray(String[]::new);
 
