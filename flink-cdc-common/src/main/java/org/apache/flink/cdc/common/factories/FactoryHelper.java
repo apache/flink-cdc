@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.factories;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.configuration.FallbackKey;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /** A helper for working with {@link Factory}. */
 @PublicEvolving
@@ -70,7 +72,7 @@ public class FactoryHelper {
         final List<String> missingRequiredOptions =
                 requiredOptions.stream()
                         .filter(option -> configuration.get(option) == null)
-                        .map(ConfigOption::key)
+                        .flatMap(FactoryHelper::allKeys)
                         .sorted()
                         .collect(Collectors.toList());
 
@@ -109,8 +111,8 @@ public class FactoryHelper {
     public void validate() {
         Set<String> allOptionKeys =
                 Stream.concat(
-                                factory.requiredOptions().stream().map(ConfigOption::key),
-                                factory.optionalOptions().stream().map(ConfigOption::key))
+                                factory.requiredOptions().stream().flatMap(FactoryHelper::allKeys),
+                                factory.optionalOptions().stream().flatMap(FactoryHelper::allKeys))
                         .collect(Collectors.toSet());
 
         validateFactoryOptions(factory, context.getFactoryConfiguration());
@@ -135,8 +137,8 @@ public class FactoryHelper {
 
         Set<String> allOptionKeys =
                 Stream.concat(
-                                factory.requiredOptions().stream().map(ConfigOption::key),
-                                factory.optionalOptions().stream().map(ConfigOption::key))
+                                factory.requiredOptions().stream().flatMap(FactoryHelper::allKeys),
+                                factory.optionalOptions().stream().flatMap(FactoryHelper::allKeys))
                         .collect(Collectors.toSet());
 
         Set<String> filteredOptionKeys =
@@ -146,6 +148,13 @@ public class FactoryHelper {
 
         validateFactoryOptions(factory, context.getFactoryConfiguration());
         validateUnconsumedKeys(factory.identifier(), filteredOptionKeys, allOptionKeys);
+    }
+
+    private static Stream<String> allKeys(ConfigOption<?> option) {
+        return Stream.concat(
+                Stream.of(option.key()),
+                StreamSupport.stream(option.fallbackKeys().spliterator(), false)
+                        .map(FallbackKey::getKey));
     }
 
     public ReadableConfig getFormatConfig(String formatPrefix) {
