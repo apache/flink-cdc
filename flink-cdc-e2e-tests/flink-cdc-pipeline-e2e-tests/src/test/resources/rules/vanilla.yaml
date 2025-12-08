@@ -1,0 +1,70 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+group: Common
+spec: Vanilla Test Specs
+steps:
+  - type: exec
+    sql: |
+      CREATE TABLE foo (idx BIGINT NOT NULL PRIMARY KEY, name VARCHAR(17));
+      INSERT INTO foo VALUES
+        (1, 'Alice'),
+        (2, 'Brett'),
+        (3, 'Cicada'),
+        (4, 'Derrida'),
+        (5, 'Eve');
+  - type: submit
+    yaml: |
+      source:
+        type: mysql
+        hostname: $hostname$
+        tables: $database$.\.*
+        username: $username$
+        password: $password$
+      sink:
+        type: values
+      pipeline:
+        parallelism: 1
+  - type: check
+    jm: |
+      Successfully applied schema change event CreateTableEvent{tableId=$database$.foo, schema=columns={`idx` BIGINT NOT NULL,`name` VARCHAR(17)}, primaryKeys=idx, options=()} to external system.
+    tm: |
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[1, Alice], op=INSERT, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[2, Brett], op=INSERT, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[3, Cicada], op=INSERT, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[4, Derrida], op=INSERT, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[5, Eve], op=INSERT, meta=()}
+  - type: exec
+    sql: |
+      ALTER TABLE foo ADD COLUMN (digits DOUBLE);
+      INSERT INTO foo VALUES
+        (6, 'Faye', 3.14),
+        (7, 'Gem', 2.71828),
+        (8, 'Helen', 1.414);
+  - type: check
+    jm: |
+      Successfully applied schema change event AddColumnEvent{tableId=$database$.foo, addedColumns=[ColumnWithPosition{column=`digits` DOUBLE, position=LAST, existedColumnName=null}]} to external system.
+    tm: |
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[6, Faye, 3.14], op=INSERT, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[7, Gem, 2.71828], op=INSERT, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[], after=[8, Helen, 1.414], op=INSERT, meta=()}
+  - type: exec
+    sql: |
+      UPDATE foo SET digits = 42 WHERE idx < 4;
+  - type: check
+    tm: |
+      DataChangeEvent{tableId=$database$.foo, before=[1, Alice, null], after=[1, Alice, 42.0], op=UPDATE, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[2, Brett, null], after=[2, Brett, 42.0], op=UPDATE, meta=()}
+      DataChangeEvent{tableId=$database$.foo, before=[3, Cicada, null], after=[3, Cicada, 42.0], op=UPDATE, meta=()}

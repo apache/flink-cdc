@@ -217,7 +217,7 @@ class YamlJobMigrationITCase extends PipelineTestEnvironment {
                                 + "\n"
                                 + "pipeline:\n"
                                 + "  parallelism: %d\n"
-                                + "use.legacy.json.format: true\n",
+                                + "  use.legacy.json.format: true\n",
                         INTER_CONTAINER_MYSQL_ALIAS,
                         MySqlContainer.MYSQL_PORT,
                         MYSQL_TEST_USER,
