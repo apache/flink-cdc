@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
@@ -25,6 +28,9 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.CloseableIterator;
 
+import com.github.shyiko.mysql.binlog.BinaryLogClient;
+import com.github.shyiko.mysql.binlog.network.SSLMode;
+import io.debezium.connector.mysql.MySqlConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -139,6 +145,60 @@ class MySqlSourceSSLConnectionITCase extends MySqlSourceTestBase {
         } finally {
             executor.shutdownNow();
             env.close();
+        }
+    }
+
+    @Test
+    void testCreateBinaryClientWithSSLSocketFactory() throws Exception {
+        inventoryDatabase.createAndInitialize();
+
+        // Enable SSL requirement on the MySQL side
+        inventoryDatabase.enableSSLForUser();
+
+        Properties jdbcConfig = new Properties();
+        jdbcConfig.setProperty("useSSL", "true");
+        jdbcConfig.setProperty("requireSSL", "true");
+        jdbcConfig.setProperty("verifyServerCertificate", "false");
+
+        Properties debeziumConfig = new Properties();
+        debeziumConfig.setProperty("database.ssl.mode", "required");
+
+        MySqlSourceConfig sourceConfig =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + ".products")
+                        .username(inventoryDatabase.getUsername())
+                        .password(inventoryDatabase.getPassword())
+                        .serverId("5501-5504")
+                        .serverTimeZone("UTC")
+                        .jdbcProperties(jdbcConfig)
+                        .debeziumProperties(debeziumConfig)
+                        .startupOptions(StartupOptions.initial())
+                        .createConfig(0);
+
+        MySqlConnection mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+
+        BinaryLogClient binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
+
+        Assertions.assertThat(binaryLogClient.getSSLMode())
+                .as("SSL mode should be REQUIRED")
+                .isEqualTo(SSLMode.REQUIRED);
+
+        try {
+            binaryLogClient.connect(5000);
+            Assertions.assertThat(binaryLogClient.isConnected())
+                    .as("Binary log client should be able to connect with SSL")
+                    .isTrue();
+        } finally {
+            // Clean up
+            if (binaryLogClient.isConnected()) {
+                binaryLogClient.disconnect();
+            }
+            mySqlConnection.close();
         }
     }
 }

@@ -27,7 +27,9 @@ import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.event.EventData;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
+import com.github.shyiko.mysql.binlog.network.DefaultSSLSocketFactory;
 import com.github.shyiko.mysql.binlog.network.SSLMode;
+import com.github.shyiko.mysql.binlog.network.SSLSocketFactory;
 import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
@@ -47,7 +49,20 @@ import io.debezium.util.SchemaNameAdjuster;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+
 import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.X509Certificate;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,6 +71,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Predicate;
+
+import static io.debezium.util.Strings.isNullOrEmpty;
 
 /** Utilities related to Debezium. */
 public class DebeziumUtils {
@@ -94,13 +111,27 @@ public class DebeziumUtils {
     }
 
     /** Creates a new {@link BinaryLogClient} for consuming mysql binlog. */
-    public static BinaryLogClient createBinaryClient(Configuration dbzConfiguration) {
+    public static BinaryLogClient createBinaryClient(
+            Configuration dbzConfiguration, MySqlConnection connection) {
         final MySqlConnectorConfig connectorConfig = new MySqlConnectorConfig(dbzConfiguration);
-        return new BinaryLogClient(
-                connectorConfig.hostname(),
-                connectorConfig.port(),
-                connectorConfig.username(),
-                connectorConfig.password());
+        BinaryLogClient client =
+                new BinaryLogClient(
+                        connectorConfig.hostname(),
+                        connectorConfig.port(),
+                        connectorConfig.username(),
+                        connectorConfig.password());
+        SSLMode sslMode = sslModeFor(connectorConfig.sslMode());
+        if (sslMode != null) {
+            client.setSSLMode(sslMode);
+        }
+        if (connectorConfig.sslModeEnabled()) {
+            SSLSocketFactory sslSocketFactory =
+                    getBinlogSslSocketFactory(connectorConfig, connection);
+            if (sslSocketFactory != null) {
+                client.setSslSocketFactory(sslSocketFactory);
+            }
+        }
+        return client;
     }
 
     /** Creates a new {@link MySqlDatabaseSchema} to monitor the latest MySql database schemas. */
@@ -252,17 +283,92 @@ public class DebeziumUtils {
         }
     }
 
-    public static BinlogOffset findBinlogOffset(
-            long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
-        MySqlConnection.MySqlConnectionConfiguration config = connection.connectionConfig();
-        BinaryLogClient client =
-                new BinaryLogClient(
-                        config.hostname(), config.port(), config.username(), config.password());
-        SSLMode sslMode = sslModeFor(config.sslMode());
-        if (sslMode != null) {
-            client.setSSLMode(sslMode);
+    // see
+    // flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc/src/main/java/io/debezium/connector/mysql/MySqlStreamingChangeEventSource#getBinlogSslSocketFactory
+    static SSLSocketFactory getBinlogSslSocketFactory(
+            MySqlConnectorConfig connectorConfig, MySqlConnection connection) {
+        String acceptedTlsVersion = connection.getSessionVariableForSslVersion();
+        if (!isNullOrEmpty(acceptedTlsVersion)) {
+            SSLMode sslMode = sslModeFor(connectorConfig.sslMode());
+            LOG.info(
+                    "Enable ssl {} mode for connector {}",
+                    sslMode,
+                    connectorConfig.getLogicalName());
+
+            final char[] keyPasswordArray = connection.connectionConfig().sslKeyStorePassword();
+            final String keyFilename = connection.connectionConfig().sslKeyStore();
+            final char[] trustPasswordArray = connection.connectionConfig().sslTrustStorePassword();
+            final String trustFilename = connection.connectionConfig().sslTrustStore();
+            KeyManager[] keyManagers = null;
+            if (keyFilename != null) {
+                try {
+                    KeyStore ks = connection.loadKeyStore(keyFilename, keyPasswordArray);
+
+                    KeyManagerFactory kmf = KeyManagerFactory.getInstance("NewSunX509");
+                    kmf.init(ks, keyPasswordArray);
+
+                    keyManagers = kmf.getKeyManagers();
+                } catch (KeyStoreException
+                        | NoSuchAlgorithmException
+                        | UnrecoverableKeyException e) {
+                    throw new FlinkRuntimeException("Could not load keystore", e);
+                }
+            }
+            TrustManager[] trustManagers;
+            try {
+                KeyStore ks = null;
+                if (trustFilename != null) {
+                    ks = connection.loadKeyStore(trustFilename, trustPasswordArray);
+                }
+
+                if (ks == null && (sslMode == SSLMode.PREFERRED || sslMode == SSLMode.REQUIRED)) {
+                    trustManagers =
+                            new TrustManager[] {
+                                new X509TrustManager() {
+
+                                    @Override
+                                    public void checkClientTrusted(
+                                            X509Certificate[] x509Certificates, String s) {}
+
+                                    @Override
+                                    public void checkServerTrusted(
+                                            X509Certificate[] x509Certificates, String s) {}
+
+                                    @Override
+                                    public X509Certificate[] getAcceptedIssuers() {
+                                        return new X509Certificate[0];
+                                    }
+                                }
+                            };
+                } else {
+                    TrustManagerFactory tmf =
+                            TrustManagerFactory.getInstance(
+                                    TrustManagerFactory.getDefaultAlgorithm());
+                    tmf.init(ks);
+                    trustManagers = tmf.getTrustManagers();
+                }
+            } catch (KeyStoreException | NoSuchAlgorithmException e) {
+                throw new FlinkRuntimeException("Could not load truststore", e);
+            }
+            // DBZ-1208 Resembles the logic from the upstream BinaryLogClient, only that
+            // the accepted TLS version is passed to the constructed factory
+            final KeyManager[] finalKMS = keyManagers;
+            return new DefaultSSLSocketFactory(acceptedTlsVersion) {
+
+                @Override
+                protected void initSSLContext(SSLContext sc) throws GeneralSecurityException {
+                    sc.init(finalKMS, trustManagers, null);
+                }
+            };
         }
 
+        return null;
+    }
+
+    public static BinlogOffset findBinlogOffset(
+            long targetMs, MySqlConnection connection, MySqlSourceConfig mySqlSourceConfig) {
+        BinaryLogClient client =
+                createBinaryClient(mySqlSourceConfig.getDbzConfiguration(), connection);
         if (mySqlSourceConfig.getServerIdRange() != null) {
             client.setServerId(mySqlSourceConfig.getServerIdRange().getStartServerId());
         }
