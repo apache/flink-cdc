@@ -66,7 +66,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
@@ -81,7 +80,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -787,7 +785,6 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         reader.close();
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
-
 
     @Test
     void testRestoreFromCheckpointWithGtidSetAndSkippingEventsAndRows() throws Exception {
