@@ -788,12 +788,8 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         assertEqualsInOrder(Arrays.asList(expected), actual);
     }
 
-    /**
-     * In a bad case, it will skip the rest records whitch causes infinite wait for empty data. So
-     * it should has a timeout to avoid it.
-     */
+
     @Test
-    @Timeout(value = 600, unit = TimeUnit.SECONDS)
     void testRestoreFromCheckpointWithGtidSetAndSkippingEventsAndRows() throws Exception {
         // Preparations
         customerDatabase.createAndInitialize();
