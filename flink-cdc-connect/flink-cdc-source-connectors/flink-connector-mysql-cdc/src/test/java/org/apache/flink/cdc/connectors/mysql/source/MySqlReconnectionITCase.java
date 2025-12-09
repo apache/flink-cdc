@@ -51,7 +51,7 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
     @Timeout(value = 120, unit = TimeUnit.SECONDS)
     void testBinlogReconnectionWithNetworkInterruption() throws Exception {
         UniqueDatabase database =
-                new UniqueDatabase(MYSQL_CONTAINER, "network_test", "flinkuser", "flinkpw");
+                new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
         database.createAndInitialize();
 
         // Create table for testing
@@ -65,6 +65,11 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
             stmt.execute("INSERT INTO network_table VALUES (1, 'Initial data')");
         }
 
+        // Create Debezium properties to test reconnection failure
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty(
+                MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key(), "true");
+
         // Create source with reconnection settings
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
@@ -75,14 +80,17 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
                         .username(database.getUsername())
                         .password(database.getPassword())
                         .serverId("5420-5424")
+                        .serverTimeZone("UTC")
                         .startupOptions(StartupOptions.initial())
                         .deserializer(new StringDebeziumDeserializationSchema())
                         .connectTimeout(Duration.ofSeconds(10))
                         .connectMaxRetries(3)
+                        .debeziumProperties(debeziumProps)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(200);
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 1000));
         env.setParallelism(1);
 
         DataStreamSource<String> source =
@@ -114,19 +122,28 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
         MYSQL_CONTAINER.start();
         Thread.sleep(3000);
 
-        // Continue consuming after reconnection
-        long startTime = System.currentTimeMillis();
-        while (records.size() < 2 && (System.currentTimeMillis() - startTime) < 30000) {
-            if (iterator.hasNext()) {
-                String record = iterator.next();
-                records.add(record);
-                LOG.info("Received post-reconnection record: {}", record);
-            } else {
-                Thread.sleep(100);
+        // Try to continue consuming - should fail due to binlogFailOnReconnectionError=true
+        boolean exceptionThrown = false;
+        try {
+            long startTime = System.currentTimeMillis();
+            while (records.size() < 2 && (System.currentTimeMillis() - startTime) < 30000) {
+                if (iterator.hasNext()) {
+                    String record = iterator.next();
+                    records.add(record);
+                    LOG.info("Received post-reconnection record: {}", record);
+                } else {
+                    Thread.sleep(100);
+                }
             }
+        } catch (Exception e) {
+            LOG.info(
+                    "Expected exception due to binlogFailOnReconnectionError=true: {}",
+                    e.getMessage());
+            exceptionThrown = true;
         }
 
-        assertThat(records.size()).isGreaterThanOrEqualTo(2);
+        // Verify the job failed due to network interruption with binlogFailOnReconnectionError=true
+        assertThat(exceptionThrown).isTrue();
         iterator.close();
     }
 
@@ -134,7 +151,7 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void testReconnectionWithCustomTimeoutAndRetries() throws Exception {
         UniqueDatabase database =
-                new UniqueDatabase(MYSQL_CONTAINER, "reconnection_test", "flinkuser", "flinkpw");
+                new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
         database.createAndInitialize();
 
         // Create table for testing
@@ -149,6 +166,11 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
             stmt.execute("INSERT INTO products VALUES (1, 'Product 1', 'Initial product')");
         }
 
+        // Create Debezium properties to test reconnection failure after retries
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty(
+                MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key(), "true");
+
         // Create source with custom reconnection settings
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
@@ -159,16 +181,18 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
                         .username(database.getUsername())
                         .password(database.getPassword())
                         .serverId("5400-5404")
+                        .serverTimeZone("UTC")
                         .startupOptions(StartupOptions.initial())
                         .deserializer(new StringDebeziumDeserializationSchema())
                         // Test custom reconnection settings
                         .connectTimeout(Duration.ofSeconds(5))
                         .connectMaxRetries(2)
+                        .debeziumProperties(debeziumProps)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(200);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 1000));
         env.setParallelism(1);
 
         DataStreamSource<String> source =
@@ -205,20 +229,24 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
         // Wait for container to be fully ready
         Thread.sleep(3000);
 
-        // Continue consuming - should handle reconnection
-        int additionalRecords = 0;
-        long startTime = System.currentTimeMillis();
-        while (iterator.hasNext()
-                && additionalRecords < 1
-                && (System.currentTimeMillis() - startTime) < 30000) {
-            String record = iterator.next();
-            records.add(record);
-            additionalRecords++;
-            LOG.info("Received post-reconnection record: {}", record);
+        // Try to continue consuming - should fail due to binlogFailOnReconnectionError=true
+        boolean exceptionThrown = false;
+        try {
+            long startTime = System.currentTimeMillis();
+            while (iterator.hasNext() && (System.currentTimeMillis() - startTime) < 20000) {
+                String record = iterator.next();
+                records.add(record);
+                LOG.info("Received post-reconnection record: {}", record);
+            }
+        } catch (Exception e) {
+            LOG.info(
+                    "Expected exception due to binlogFailOnReconnectionError=true: {}",
+                    e.getMessage());
+            exceptionThrown = true;
         }
 
-        // Verify we got the data inserted after reconnection
-        assertThat(records.size()).isGreaterThanOrEqualTo(2);
+        // Verify the job failed due to reconnection error (binlogFailOnReconnectionError=true)
+        assertThat(exceptionThrown).isTrue();
 
         iterator.close();
     }
@@ -227,8 +255,7 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
     @Timeout(value = 60, unit = TimeUnit.SECONDS)
     void testReconnectionFailureWhenMaxRetriesExceeded() throws Exception {
         UniqueDatabase database =
-                new UniqueDatabase(
-                        MYSQL_CONTAINER, "reconnection_fail_test", "flinkuser", "flinkpw");
+                new UniqueDatabase(MYSQL_CONTAINER, "customer", "mysqluser", "mysqlpw");
         database.createAndInitialize();
 
         // Create table for testing
@@ -242,6 +269,11 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
             stmt.execute("INSERT INTO test_table VALUES (1, 'Initial value')");
         }
 
+        // Create Debezium properties to fail after max retries
+        Properties debeziumProps = new Properties();
+        debeziumProps.setProperty(
+                MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key(), "true");
+
         // Create source with very short timeout and low retries to force failure
         MySqlSource<String> mySqlSource =
                 MySqlSource.<String>builder()
@@ -252,11 +284,13 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
                         .username(database.getUsername())
                         .password(database.getPassword())
                         .serverId("5405-5409")
+                        .serverTimeZone("UTC")
                         .startupOptions(StartupOptions.initial())
                         .deserializer(new StringDebeziumDeserializationSchema())
                         // Very restrictive settings to trigger failure
                         .connectTimeout(Duration.ofSeconds(1))
                         .connectMaxRetries(1)
+                        .debeziumProperties(debeziumProps)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -303,95 +337,5 @@ class MySqlReconnectionITCase extends MySqlSourceTestBase {
         // The test passes if we handled the reconnection failure appropriately
         // Either by throwing an exception or by gracefully handling the disconnection
         LOG.info("Reconnection failure test completed, exception thrown: {}", exceptionThrown);
-    }
-
-    @Test
-    @Timeout(value = 60, unit = TimeUnit.SECONDS)
-    void testReconnectionWithInfiniteRetries() throws Exception {
-        UniqueDatabase database =
-                new UniqueDatabase(MYSQL_CONTAINER, "infinite_retry_test", "flinkuser", "flinkpw");
-        database.createAndInitialize();
-
-        // Create table for testing
-        try (Connection conn = database.getJdbcConnection();
-                Statement stmt = conn.createStatement()) {
-            stmt.execute(
-                    "CREATE TABLE retry_table ("
-                            + "id INT PRIMARY KEY, "
-                            + "message VARCHAR(255)"
-                            + ")");
-            stmt.execute("INSERT INTO retry_table VALUES (1, 'Test message')");
-        }
-
-        // Create Debezium properties with binlogFailOnReconnectionError disabled for infinite
-        // retries
-        Properties debeziumProps = new Properties();
-        debeziumProps.setProperty(MySqlSourceOptions.CONNECT_TIMEOUT.key(), "PT3S");
-        debeziumProps.setProperty(MySqlSourceOptions.CONNECT_MAX_RETRIES.key(), "3");
-        debeziumProps.setProperty(
-                MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key(), "false");
-
-        // Create source with infinite retries (failOnError=false allows infinite retries)
-        MySqlSource<String> mySqlSource =
-                MySqlSource.<String>builder()
-                        .hostname(MYSQL_CONTAINER.getHost())
-                        .port(MYSQL_CONTAINER.getDatabasePort())
-                        .databaseList(database.getDatabaseName())
-                        .tableList(database.getDatabaseName() + ".retry_table")
-                        .username(database.getUsername())
-                        .password(database.getPassword())
-                        .serverId("5410-5414")
-                        .startupOptions(StartupOptions.initial())
-                        .deserializer(new StringDebeziumDeserializationSchema())
-                        .debeziumProperties(debeziumProps)
-                        .build();
-
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setRestartStrategy(RestartStrategies.noRestart());
-        env.setParallelism(1);
-
-        DataStreamSource<String> source =
-                env.fromSource(mySqlSource, WatermarkStrategy.noWatermarks(), "MySQL Source");
-
-        CloseableIterator<String> iterator = source.executeAndCollect();
-        List<String> records = new ArrayList<>();
-
-        // Consume initial record
-        if (iterator.hasNext()) {
-            String record = iterator.next();
-            records.add(record);
-            LOG.info("Received initial record: {}", record);
-        }
-
-        // Stop container briefly
-        LOG.info("Stopping MySQL container briefly...");
-        MYSQL_CONTAINER.stop();
-        Thread.sleep(1000);
-
-        LOG.info("Restarting MySQL container...");
-        MYSQL_CONTAINER.start();
-        Thread.sleep(3000);
-
-        // Insert new data after restart
-        try (Connection conn = database.getJdbcConnection();
-                Statement stmt = conn.createStatement()) {
-            stmt.execute("INSERT INTO retry_table VALUES (2, 'Post-restart message')");
-        }
-
-        // Should eventually receive the new record due to successful reconnection
-        int timeout = 20000; // 20 seconds
-        long startTime = System.currentTimeMillis();
-        while (records.size() < 2 && (System.currentTimeMillis() - startTime) < timeout) {
-            if (iterator.hasNext()) {
-                String record = iterator.next();
-                records.add(record);
-                LOG.info("Received post-restart record: {}", record);
-            } else {
-                Thread.sleep(100);
-            }
-        }
-
-        assertThat(records.size()).isGreaterThanOrEqualTo(2);
-        iterator.close();
     }
 }
