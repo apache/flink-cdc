@@ -1250,14 +1250,12 @@ public class MySqlStreamingChangeEventSource
                             MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.defaultValue());
             int maxRetries =
                     configuration.getInteger(
-                            MySqlSourceOptions.BINLOG_RECONNECTION_MAX_RETRIES.key(),
-                            MySqlSourceOptions.BINLOG_RECONNECTION_MAX_RETRIES.defaultValue());
+                            MySqlSourceOptions.CONNECT_MAX_RETRIES.key(),
+                            MySqlSourceOptions.CONNECT_MAX_RETRIES.defaultValue());
             long timeoutMs =
                     configuration.getLong(
-                            MySqlSourceOptions.BINLOG_RECONNECTION_TIMEOUT.key(),
-                            MySqlSourceOptions.BINLOG_RECONNECTION_TIMEOUT
-                                    .defaultValue()
-                                    .toMillis());
+                            MySqlSourceOptions.CONNECT_TIMEOUT.key(),
+                            MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue().toMillis());
 
             int reconnectionAttempts = 0;
             long reconnectionStartTime = 0;

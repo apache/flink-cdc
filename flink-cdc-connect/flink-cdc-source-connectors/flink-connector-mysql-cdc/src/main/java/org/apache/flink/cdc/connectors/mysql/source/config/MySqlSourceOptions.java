@@ -301,20 +301,4 @@ public class MySqlSourceOptions {
                             "Whether to fail the job when binlog reader encounters reconnection errors. "
                                     + "When enabled, the job will fail after exhausting all retry attempts. "
                                     + "When disabled (default), the job will keep retrying indefinitely.");
-
-    public static final ConfigOption<Integer> BINLOG_RECONNECTION_MAX_RETRIES =
-            ConfigOptions.key("binlog.reconnection.max-retries")
-                    .intType()
-                    .defaultValue(3)
-                    .withDescription(
-                            "Maximum number of reconnection attempts when binlog reader connection fails. "
-                                    + "This option is only effective when 'binlog.fail-on-reconnection-error' is enabled.");
-
-    public static final ConfigOption<Duration> BINLOG_RECONNECTION_TIMEOUT =
-            ConfigOptions.key("binlog.reconnection.timeout")
-                    .durationType()
-                    .defaultValue(Duration.ofMinutes(5))
-                    .withDescription(
-                            "Total timeout for all reconnection attempts when binlog reader connection fails. "
-                                    + "This option is only effective when 'binlog.fail-on-reconnection-error' is enabled.");
 }
