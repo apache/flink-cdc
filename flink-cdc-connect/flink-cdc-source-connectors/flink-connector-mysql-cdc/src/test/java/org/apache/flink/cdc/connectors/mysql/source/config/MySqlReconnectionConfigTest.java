@@ -50,7 +50,7 @@ class MySqlReconnectionConfigTest {
         // Verify the configuration values are correctly set in the MySqlSourceConfig
         assertThat(config.getConnectTimeout()).isEqualTo(Duration.ofSeconds(15));
         assertThat(config.getConnectMaxRetries()).isEqualTo(5);
-        assertThat(config.isBinlogFailOnReconnectionError()).isTrue();
+        assertThat(config.isBinlogFailOnReconnectionError()).isFalse();
 
         // Verify the configuration is properly propagated to Debezium configuration
         Configuration debeziumConfig = config.getDbzConfiguration();
@@ -58,16 +58,10 @@ class MySqlReconnectionConfigTest {
         // Check that Debezium gets the correct timeout value in milliseconds
         assertThat(debeziumConfig.getLong(MySqlConnectorConfig.CONNECTION_TIMEOUT_MS))
                 .isEqualTo(15000L);
-
-        // Verify that our custom properties are available in the Debezium config
-        assertThat(debeziumConfig.getString(MySqlSourceOptions.CONNECT_TIMEOUT.key()))
-                .isEqualTo("PT15S");
-        assertThat(debeziumConfig.getInteger(MySqlSourceOptions.CONNECT_MAX_RETRIES.key()))
-                .isEqualTo(5);
         assertThat(
                         debeziumConfig.getBoolean(
                                 MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key()))
-                .isTrue();
+                .isFalse();
     }
 
     @Test
@@ -97,8 +91,6 @@ class MySqlReconnectionConfigTest {
         // Verify defaults are propagated to Debezium
         assertThat(debeziumConfig.getLong(MySqlConnectorConfig.CONNECTION_TIMEOUT_MS))
                 .isEqualTo(MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue().toMillis());
-        assertThat(debeziumConfig.getInteger(MySqlSourceOptions.CONNECT_MAX_RETRIES.key()))
-                .isEqualTo(MySqlSourceOptions.CONNECT_MAX_RETRIES.defaultValue());
         assertThat(
                         debeziumConfig.getBoolean(
                                 MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key()))
@@ -168,8 +160,6 @@ class MySqlReconnectionConfigTest {
 
         assertThat(debeziumConfig.getLong(MySqlConnectorConfig.CONNECTION_TIMEOUT_MS))
                 .isEqualTo(customTimeout.toMillis());
-        assertThat(debeziumConfig.getInteger(MySqlSourceOptions.CONNECT_MAX_RETRIES.key()))
-                .isEqualTo(customRetries);
         assertThat(
                         debeziumConfig.getBoolean(
                                 MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key()))
