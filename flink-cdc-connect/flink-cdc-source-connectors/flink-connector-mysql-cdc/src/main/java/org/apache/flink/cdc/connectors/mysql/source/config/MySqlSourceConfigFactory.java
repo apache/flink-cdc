@@ -74,6 +74,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean treatTinyInt1AsBoolean = true;
     private boolean useLegacyJsonFormat = true;
     private boolean assignUnboundedChunkFirst = false;
+    private boolean binlogFailOnReconnectionError =
+            MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.defaultValue();
 
     public MySqlSourceConfigFactory hostname(String hostname) {
         this.hostname = hostname;
@@ -324,6 +326,17 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to fail the job when binlog reader encounters reconnection errors. When enabled, the
+     * job will fail after exhausting all retry attempts. When disabled (default), the job will keep
+     * retrying indefinitely.
+     */
+    public MySqlSourceConfigFactory binlogFailOnReconnectionError(
+            boolean binlogFailOnReconnectionError) {
+        this.binlogFailOnReconnectionError = binlogFailOnReconnectionError;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -392,6 +405,13 @@ public class MySqlSourceConfigFactory implements Serializable {
             jdbcProperties = new Properties();
         }
 
+        // Add the new configs to debezium properties only if not already provided by user
+        if (!props.containsKey("binlog.fail-on-reconnection-error")) {
+            props.setProperty(
+                    "binlog.fail-on-reconnection-error",
+                    String.valueOf(binlogFailOnReconnectionError));
+        }
+
         return new MySqlSourceConfig(
                 hostname,
                 port,
@@ -421,6 +441,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                binlogFailOnReconnectionError);
     }
 }
