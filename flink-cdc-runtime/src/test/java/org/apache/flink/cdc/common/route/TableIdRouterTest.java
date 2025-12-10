@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common;
+package org.apache.flink.cdc.common.route;
 
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.runtime.operators.schema.common.SchemaTestBase;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +38,17 @@ public class TableIdRouterTest extends SchemaTestBase {
         return TABLE_ID_ROUTER.route(TableId.parse(tableId)).stream()
                 .map(TableId::toString)
                 .collect(Collectors.toList());
+    }
+
+    private static String testConvert(String input) {
+        return TableIdRouter.convertTableListToRegExpPattern(input);
+    }
+
+    @Test
+    void testConvertingDebeziumTableIdToStandardRegex() {
+        assertThat(testConvert("foo.bar")).isEqualTo("foo\\.bar");
+        assertThat(testConvert("foo.bar,foo.baz")).isEqualTo("foo\\.bar|foo\\.baz");
+        assertThat(testConvert("db.\\.*")).isEqualTo("db\\..*");
     }
 
     @Test
