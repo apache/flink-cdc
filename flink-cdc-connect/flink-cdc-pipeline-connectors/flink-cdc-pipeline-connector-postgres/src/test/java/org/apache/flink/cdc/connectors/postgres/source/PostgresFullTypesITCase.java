@@ -23,10 +23,10 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
-import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -68,6 +68,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -298,7 +299,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse("2020-07-17T18:00:22.123456")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    ZonedTimestampData.fromOffsetDateTime(
+                            OffsetDateTime.parse("2020-07-17T10:00:22Z")),
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -354,7 +356,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     TimestampData.fromLocalDateTime(
                             LocalDateTime.parse("2020-07-17T18:00:22.123456")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    ZonedTimestampData.fromOffsetDateTime(
+                            OffsetDateTime.parse("2020-07-17T10:00:22Z")),
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -409,7 +412,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22.123")),
                     TimestampData.fromLocalDateTime(LocalDateTime.parse("2020-07-17T18:00:22")),
-                    LocalZonedTimestampData.fromInstant(toInstant("2020-07-17 18:00:22")),
+                    ZonedTimestampData.fromOffsetDateTime(
+                            OffsetDateTime.parse("2020-07-17T10:00:22Z")),
                 };
 
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
@@ -1042,7 +1046,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.TIMESTAMP(3),
                     DataTypes.TIMESTAMP(6),
                     DataTypes.TIMESTAMP(),
-                    DataTypes.TIMESTAMP_LTZ(0));
+                    DataTypes.TIMESTAMP_TZ(0));
 
     private static final RowType HSTORE_TYPES_WITH_ADAPTIVE =
             RowType.of(DataTypes.INT(), DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()));

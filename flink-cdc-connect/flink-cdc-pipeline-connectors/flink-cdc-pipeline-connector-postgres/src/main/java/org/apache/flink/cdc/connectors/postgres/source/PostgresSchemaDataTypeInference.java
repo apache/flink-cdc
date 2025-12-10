@@ -25,13 +25,45 @@ import org.apache.flink.cdc.debezium.event.DebeziumSchemaDataTypeInference;
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
 import io.debezium.data.geometry.Point;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Schema;
+
+import java.time.Instant;
+import java.util.Optional;
 
 /** {@link DataType} inference for PostgresSQL debezium {@link Schema}. */
 @Internal
 public class PostgresSchemaDataTypeInference extends DebeziumSchemaDataTypeInference {
 
     private static final long serialVersionUID = 1L;
+
+    protected DataType inferString(Object value, Schema schema) {
+        // PostgreSQL TIMESTAMPTZ is encoded as ZonedTimestamp in Debezium
+        // We need to return TIMESTAMP_TZ (ZonedTimestampType) instead of TIMESTAMP_LTZ
+        if (ZonedTimestamp.SCHEMA_NAME.equals(schema.name())) {
+            int nano =
+                    Optional.ofNullable((String) value)
+                            .map(s -> ZonedTimestamp.FORMATTER.parse(s, Instant::from))
+                            .map(Instant::getNano)
+                            .orElse(0);
+
+            int precision;
+            if (nano == 0) {
+                precision = 0;
+            } else if (nano % 1000 > 0) {
+                precision = 9;
+            } else if (nano % 1000_000 > 0) {
+                precision = 6;
+            } else if (nano % 1000_000_000 > 0) {
+                precision = 3;
+            } else {
+                precision = 0;
+            }
+            // Return TIMESTAMP_TZ (ZonedTimestampType) for PostgreSQL TIMESTAMPTZ
+            return DataTypes.TIMESTAMP_TZ(precision);
+        }
+        return super.inferString(value, schema);
+    }
 
     protected DataType inferStruct(Object value, Schema schema) {
         // the Geometry datatype in PostgresSQL will be converted to
