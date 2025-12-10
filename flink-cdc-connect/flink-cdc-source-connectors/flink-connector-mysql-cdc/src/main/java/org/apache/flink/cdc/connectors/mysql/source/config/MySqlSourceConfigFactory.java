@@ -69,6 +69,11 @@ public class MySqlSourceConfigFactory implements Serializable {
     private Duration heartbeatInterval = MySqlSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
     private Properties dbzProperties;
     private Map<ObjectPath, String> chunkKeyColumns = new HashMap<>();
+    // ---------------- Parallel deserialize options ----------------
+    private boolean parallelDeserializeEnabled = false;
+    private int parallelDeserializePkWorkers = 0;
+    private int parallelDeserializeThreads = 0;
+    private int parallelDeserializeQueueCapacity = 65536;
     private boolean skipSnapshotBackfill = false;
     private boolean parseOnLineSchemaChanges = false;
     private boolean treatTinyInt1AsBoolean = true;
@@ -324,6 +329,31 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    // ---------------- scan.parallel-deserialize.* options ----------------
+    /** Enable parallel deserialization and ordered delivery to output. */
+    public MySqlSourceConfigFactory parallelDeserializeEnabled(boolean enabled) {
+        this.parallelDeserializeEnabled = enabled;
+        return this;
+    }
+
+    /** Number of per-key workers. 0 = auto from CPU. */
+    public MySqlSourceConfigFactory parallelDeserializePkWorkers(int pkWorkers) {
+        this.parallelDeserializePkWorkers = pkWorkers;
+        return this;
+    }
+
+    /** Number of shared deserialization threads. 0 = auto from CPU. */
+    public MySqlSourceConfigFactory parallelDeserializeThreads(int threads) {
+        this.parallelDeserializeThreads = threads;
+        return this;
+    }
+
+    /** Bounded capacity per-partition queue. */
+    public MySqlSourceConfigFactory parallelDeserializeQueueCapacity(int capacity) {
+        this.parallelDeserializeQueueCapacity = capacity;
+        return this;
+    }
+
     /** Creates a new {@link MySqlSourceConfig} for the given subtask {@code subtaskId}. */
     public MySqlSourceConfig createConfig(int subtaskId) {
         // hard code server name, because we don't need to distinguish it, docs:
@@ -421,6 +451,10 @@ public class MySqlSourceConfigFactory implements Serializable {
                 parseOnLineSchemaChanges,
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                parallelDeserializeEnabled,
+                parallelDeserializePkWorkers,
+                parallelDeserializeThreads,
+                parallelDeserializeQueueCapacity);
     }
 }
