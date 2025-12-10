@@ -32,6 +32,7 @@ import org.apache.flink.core.memory.DataOutputView;
 import java.io.IOException;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_POSITION;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
@@ -81,6 +82,7 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                 from,
                 AddColumnEventSerializer.INSTANCE::copy,
                 AlterColumnTypeEventSerializer.INSTANCE::copy,
+                AlterColumnPositionEventSerializer.INSTANCE::copy,
                 CreateTableEventSerializer.INSTANCE::copy,
                 DropColumnEventSerializer.INSTANCE::copy,
                 DropTableEventSerializer.INSTANCE::copy,
@@ -111,6 +113,12 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                 alterColumnTypeEvent -> {
                     enumSerializer.serialize(ALTER_COLUMN_TYPE, target);
                     AlterColumnTypeEventSerializer.INSTANCE.serialize(alterColumnTypeEvent, target);
+                    return null;
+                },
+                alterColumnPositionEvent -> {
+                    enumSerializer.serialize(ALTER_COLUMN_POSITION, target);
+                    AlterColumnPositionEventSerializer.INSTANCE.serialize(
+                            alterColumnPositionEvent, target);
                     return null;
                 },
                 createTableEvent -> {
@@ -154,6 +162,8 @@ public final class SchemaChangeEventSerializer extends TypeSerializerSingleton<S
                 return RenameColumnEventSerializer.INSTANCE.deserialize(source);
             case ALTER_COLUMN_TYPE:
                 return AlterColumnTypeEventSerializer.INSTANCE.deserialize(source);
+            case ALTER_COLUMN_POSITION:
+                return AlterColumnPositionEventSerializer.INSTANCE.deserialize(source);
             case DROP_TABLE:
                 return DropTableEventSerializer.INSTANCE.deserialize(source);
             case TRUNCATE_TABLE:
