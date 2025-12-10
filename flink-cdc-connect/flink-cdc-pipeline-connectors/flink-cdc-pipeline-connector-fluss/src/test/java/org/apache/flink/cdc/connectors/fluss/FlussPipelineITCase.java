@@ -45,10 +45,10 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import com.alibaba.fluss.config.ConfigOptions;
-import com.alibaba.fluss.config.MemorySize;
-import com.alibaba.fluss.metadata.DataLakeFormat;
-import com.alibaba.fluss.server.testutils.FlussClusterExtension;
+import org.apache.fluss.config.ConfigOptions;
+import org.apache.fluss.config.MemorySize;
+import org.apache.fluss.metadata.DataLakeFormat;
+import org.apache.fluss.server.testutils.FlussClusterExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,12 +62,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.alibaba.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
-import static com.alibaba.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
-import static com.alibaba.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
+import static org.apache.fluss.config.ConfigOptions.BOOTSTRAP_SERVERS;
+import static org.apache.fluss.flink.source.testutils.FlinkRowAssertionsUtils.assertResultsIgnoreOrder;
+import static org.apache.fluss.server.testutils.FlussClusterExtension.BUILTIN_DATABASE;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** ITCase for Fluss Pipeline. */
@@ -542,8 +542,8 @@ public class FlussPipelineITCase {
         assertResultsIgnoreOrder(rowIter, expectedRows, true);
     }
 
-    private static com.alibaba.fluss.config.Configuration initConfig() {
-        com.alibaba.fluss.config.Configuration conf = new com.alibaba.fluss.config.Configuration();
+    private static org.apache.fluss.config.Configuration initConfig() {
+        org.apache.fluss.config.Configuration conf = new org.apache.fluss.config.Configuration();
         conf.setInt(ConfigOptions.DEFAULT_REPLICATION_FACTOR, 3);
         // set a shorter interval for testing purpose
         conf.set(ConfigOptions.KV_SNAPSHOT_INTERVAL, Duration.ofSeconds(1));
@@ -560,7 +560,7 @@ public class FlussPipelineITCase {
         conf.setString("security.sasl.enabled.mechanisms", "plain");
         conf.setString(
                 "security.sasl.plain.jaas.config",
-                "com.alibaba.fluss.security.auth.sasl.plain.PlainLoginModule required "
+                "org.apache.fluss.security.auth.sasl.plain.PlainLoginModule required "
                         + "    user_root=\"password\" "
                         + "    user_guest=\"password2\";");
         return conf;
