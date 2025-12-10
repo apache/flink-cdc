@@ -62,7 +62,14 @@ public abstract class SchemaTestBase {
                     new RouteRule("db_5.table_\\.*", "db_5.prefix_<>_suffix", "<>"),
 
                     // Irrelevant routes
-                    new RouteRule("foo", "bar", null));
+                    new RouteRule("foo", "bar", null),
+
+                    // Standard RegExp capturing rules
+                    new RouteRule(
+                            "re_\\d+.table_(\\.*)",
+                            "database.another_table_with_$1$1$1_index",
+                            null),
+                    new RouteRule("(inv_\\d+).(table_\\.*)", "$2.$1", null));
 
     protected static final TableIdRouter TABLE_ID_ROUTER = new TableIdRouter(ROUTING_RULES);
 
