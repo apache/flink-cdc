@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common;
+package org.apache.flink.cdc.common.route;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.schema.Selectors;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
@@ -44,6 +45,7 @@ import java.util.stream.Collectors;
  * Calculates how upstream data change events should be dispatched to downstream tables. Returns one
  * or many destination Table IDs based on provided routing rules.
  */
+@PublicEvolving
 public class TableIdRouter {
 
     private static final Logger LOG = LoggerFactory.getLogger(TableIdRouter.class);
@@ -54,7 +56,21 @@ public class TableIdRouter {
 
     private static final String DOT_PLACEHOLDER = "_dot_placeholder_";
 
-    private static Pattern validateTableListToRegExpPattern(String tables) {
+    /**
+     * Currently, The supported regular syntax is not exactly the same in {@link Selectors}.
+     *
+     * <p>The main discrepancies are :
+     *
+     * <p>1) {@link Selectors} use {@code ,} to split table names instead of `|`.
+     *
+     * <p>2) If there is a need to use a dot ({@code .}) in a regular expression to match any
+     * character, it is necessary to escape the dot with a backslash.
+     *
+     * <p>3) The unescaped {@code .} is used as the separator of database and table name. When
+     * converting to Debezium style, it is expected to be escaped to match the dot ({@code .})
+     * literally instead of the meta-character.
+     */
+    public static String convertTableListToRegExpPattern(String tables) {
         LOG.info("Rewriting CDC style table capture list: {}", tables);
 
         // In CDC-style table matching, table names could be separated by `,` character.
@@ -86,7 +102,7 @@ public class TableIdRouter {
                 unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
         LOG.info("Final standard RegExp table capture list: {}", standardRegExpTableCaptureList);
 
-        return Pattern.compile(standardRegExpTableCaptureList);
+        return standardRegExpTableCaptureList;
     }
 
     public TableIdRouter(List<RouteRule> routingRules) {
@@ -95,7 +111,7 @@ public class TableIdRouter {
             try {
                 routes.add(
                         new Tuple3<>(
-                                validateTableListToRegExpPattern(rule.sourceTable),
+                                Pattern.compile(convertTableListToRegExpPattern(rule.sourceTable)),
                                 rule.sinkTable,
                                 rule.replaceSymbol));
             } catch (PatternSyntaxException e) {
