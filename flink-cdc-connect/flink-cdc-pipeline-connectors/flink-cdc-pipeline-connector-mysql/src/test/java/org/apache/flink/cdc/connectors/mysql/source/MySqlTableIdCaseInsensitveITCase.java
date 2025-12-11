@@ -33,19 +33,14 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -54,7 +49,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCHEMA_CHANGE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.testutils.MySqSourceTestUtils.TEST_PASSWORD;
@@ -65,28 +59,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** IT tests for {@link MySqlDataSource}. */
 class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/tablename-sensitive/my.cnf");
-
     private final UniqueDatabase inventoryDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "inventory", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
-
-    @BeforeAll
-    public static void startContainers() {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Containers are started.");
-    }
-
-    @AfterAll
-    public static void stopContainers() {
-        LOG.info("Stopping containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Containers are stopped.");
-    }
 
     @BeforeEach
     public void before() {
@@ -102,8 +79,8 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
                 new MySqlSourceConfigFactory()
-                        .hostname(MYSQL8_CONTAINER.getHost())
-                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .hostname(MYSQL_CONTAINER.getHost())
+                        .port(MYSQL_CONTAINER.getDatabasePort())
                         .username(TEST_USER)
                         .password(TEST_PASSWORD)
                         .databaseList(inventoryDatabase.getDatabaseName())

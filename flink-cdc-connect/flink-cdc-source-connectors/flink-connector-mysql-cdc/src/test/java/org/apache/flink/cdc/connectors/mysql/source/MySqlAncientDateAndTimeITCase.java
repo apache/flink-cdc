@@ -69,7 +69,7 @@ public class MySqlAncientDateAndTimeITCase extends MySqlSourceTestBase {
 
     // We need an extra "no_zero_in_date = false" config to insert malformed date and time records.
     private static final MySqlContainer MYSQL_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-allow-ancient-date-time/my.cnf");
+            createMySqlContainer(MySqlVersion.V8_0, "server-allow-ancient-date-time/my.cnf");
 
     private final UniqueDatabase ancientDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "ancient_date_and_time", TEST_USER, TEST_PASSWORD);

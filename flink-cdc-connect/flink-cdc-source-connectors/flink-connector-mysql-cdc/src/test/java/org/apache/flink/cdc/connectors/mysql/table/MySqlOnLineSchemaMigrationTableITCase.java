@@ -26,8 +26,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.utils.TestCaseUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -72,8 +70,6 @@ import static org.apache.flink.cdc.common.utils.TestCaseUtils.DEFAULT_TIMEOUT;
  * more details.
  */
 class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
@@ -84,7 +80,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
             createPerconaToolkitContainer();
 
     private final UniqueDatabase customerDatabase =
-            new UniqueDatabase(MYSQL8_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
+            new UniqueDatabase(MYSQL_CONTAINER, "customer", TEST_USER, TEST_PASSWORD);
 
     private final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
@@ -100,7 +96,6 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     @BeforeAll
     static void beforeClass() {
         LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
         Startables.deepStart(Stream.of(PERCONA_TOOLKIT_CONTAINER)).join();
         LOG.info("Containers are started.");
     }
@@ -108,7 +103,6 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     @AfterAll
     static void afterClass() {
         LOG.info("Stopping containers...");
-        MYSQL8_CONTAINER.stop();
         PERCONA_TOOLKIT_CONTAINER.close();
         LOG.info("Containers are stopped.");
     }
@@ -156,7 +150,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
     @Test
     void testGhOstSchemaMigrationFromScratch() throws Exception {
         LOG.info("Step 1: Install gh-ost command line utility");
-        installGhOstCli(MYSQL8_CONTAINER);
+        installGhOstCli(MYSQL_CONTAINER);
 
         LOG.info("Step 2: Start pipeline job");
         String sourceDDL =
@@ -179,8 +173,8 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                                 + " 'server-time-zone' = 'UTC',"
                                 + " 'server-id' = '%s'"
                                 + ")",
-                        MYSQL8_CONTAINER.getHost(),
-                        MYSQL8_CONTAINER.getDatabasePort(),
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
                         TEST_USER,
                         TEST_PASSWORD,
                         customerDatabase.getDatabaseName(),
@@ -236,7 +230,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
         {
             LOG.info("Step 3: Evolve schema with gh-ost - ADD COLUMN");
             execInContainer(
-                    MYSQL8_CONTAINER,
+                    MYSQL_CONTAINER,
                     "evolve schema",
                     "gh-ost",
                     "--user=" + TEST_USER,
@@ -267,7 +261,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
         {
             LOG.info("Step 4: Evolve schema with gh-ost - MODIFY COLUMN");
             execInContainer(
-                    MYSQL8_CONTAINER,
+                    MYSQL_CONTAINER,
                     "evolve schema",
                     "gh-ost",
                     "--user=" + TEST_USER,
@@ -297,7 +291,7 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
         {
             LOG.info("Step 5: Evolve schema with gh-ost - DROP COLUMN");
             execInContainer(
-                    MYSQL8_CONTAINER,
+                    MYSQL_CONTAINER,
                     "evolve schema",
                     "gh-ost",
                     "--user=" + TEST_USER,
@@ -346,10 +340,11 @@ class MySqlOnLineSchemaMigrationTableITCase extends MySqlSourceTestBase {
                                 + " 'table-name' = '%s',"
                                 + " 'scan.incremental.snapshot.enabled' = '%s',"
                                 + " 'server-time-zone' = 'UTC',"
-                                + " 'server-id' = '%s'"
+                                + " 'server-id' = '%s',"
+                                + " 'scan.parse.online.schema.changes.enabled' = 'true'"
                                 + ")",
-                        MYSQL8_CONTAINER.getHost(),
-                        MYSQL8_CONTAINER.getDatabasePort(),
+                        MYSQL_CONTAINER.getHost(),
+                        MYSQL_CONTAINER.getDatabasePort(),
                         TEST_USER,
                         TEST_PASSWORD,
                         customerDatabase.getDatabaseName(),

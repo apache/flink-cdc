@@ -53,7 +53,8 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     protected static final Logger LOG = LoggerFactory.getLogger(MySqlSourceTestBase.class);
 
     protected static final int DEFAULT_PARALLELISM = 4;
-    protected static final MySqlContainer MYSQL_CONTAINER = createMySqlContainer(MySqlVersion.V5_7);
+    protected static final MySqlContainer MYSQL_CONTAINER =
+            createMySqlContainer(MySqlVersion.CURRENT);
     protected InMemoryReporter metricReporter = InMemoryReporter.createWithRetainedMetrics();
     public static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
     public static final Network NETWORK = Network.newNetwork();
@@ -88,14 +89,14 @@ public abstract class MySqlSourceTestBase extends TestLogger {
     }
 
     protected static MySqlContainer createMySqlContainer(MySqlVersion version) {
-        return createMySqlContainer(version, "docker/server-gtids/my.cnf");
+        return createMySqlContainer(version, "server-gtids/my.cnf");
     }
 
     protected static MySqlContainer createMySqlContainer(MySqlVersion version, String configPath) {
         return (MySqlContainer)
                 new MySqlContainer(version)
                         .withConfigurationOverride(configPath)
-                        .withSetupSQL("docker/setup.sql")
+                        .withSetupSQL("setup.sql")
                         .withDatabaseName("flink-test")
                         .withUsername("flinkuser")
                         .withPassword("flinkpw")
