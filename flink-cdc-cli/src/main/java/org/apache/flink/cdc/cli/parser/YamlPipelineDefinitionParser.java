@@ -488,5 +488,4 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                     .orElse(Collections.emptyMap());
         }
     }
-
 }
