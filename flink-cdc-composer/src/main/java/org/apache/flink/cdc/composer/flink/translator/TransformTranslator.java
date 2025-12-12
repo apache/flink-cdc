@@ -105,17 +105,15 @@ public class TransformTranslator {
         PostTransformOperatorBuilder postTransformFunctionBuilder =
                 PostTransformOperator.newBuilder();
         for (TransformDef transform : transforms) {
-            if (transform.isValidProjection() || transform.isValidFilter()) {
-                postTransformFunctionBuilder.addTransform(
-                        transform.getSourceTable(),
-                        transform.getProjection(),
-                        transform.getFilter(),
-                        transform.getPrimaryKeys(),
-                        transform.getPartitionKeys(),
-                        transform.getTableOptions(),
-                        transform.getPostTransformConverter(),
-                        supportedMetadataColumns);
-            }
+            postTransformFunctionBuilder.addTransform(
+                    transform.getSourceTable(),
+                    transform.getProjection(),
+                    transform.getFilter(),
+                    transform.getPrimaryKeys(),
+                    transform.getPartitionKeys(),
+                    transform.getTableOptions(),
+                    transform.getPostTransformConverter(),
+                    supportedMetadataColumns);
         }
         postTransformFunctionBuilder.addTimezone(timezone);
         postTransformFunctionBuilder.addUdfFunctions(
