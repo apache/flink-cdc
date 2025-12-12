@@ -35,6 +35,7 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -55,17 +56,17 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSch
  * emit records rather than emit the records directly.
  */
 public class IncrementalSourceRecordEmitter<T>
-        implements RecordEmitter<SourceRecords, T, SourceSplitState> {
+        implements RecordEmitter<SourceRecords, T, SourceSplitState>, Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceRecordEmitter.class);
     private static final FlinkJsonTableChangeSerializer TABLE_CHANGE_SERIALIZER =
             new FlinkJsonTableChangeSerializer();
 
-    protected final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
-    protected final SourceReaderMetrics sourceReaderMetrics;
-    protected final boolean includeSchemaChanges;
-    protected final OutputCollector<T> outputCollector;
-    protected final OffsetFactory offsetFactory;
+    protected DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
+    protected SourceReaderMetrics sourceReaderMetrics;
+    protected boolean includeSchemaChanges;
+    protected OutputCollector<T> outputCollector;
+    protected OffsetFactory offsetFactory;
 
     public IncrementalSourceRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
@@ -151,6 +152,10 @@ public class IncrementalSourceRecordEmitter<T>
         return offsetFactory.newOffset(offsetStrMap);
     }
 
+    public void setSourceReaderMetrics(SourceReaderMetrics sourceReaderMetrics) {
+        this.sourceReaderMetrics = sourceReaderMetrics;
+    }
+
     protected void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
         sourceReaderMetrics.markRecord();
         sourceReaderMetrics.updateRecordCounters(element);
@@ -173,7 +178,7 @@ public class IncrementalSourceRecordEmitter<T>
     }
 
     /** An adapter between {@link SourceOutput} and {@link Collector}. */
-    protected static class OutputCollector<T> implements Collector<T> {
+    protected static class OutputCollector<T> implements Collector<T>, Serializable {
         public SourceOutput<T> output;
         public Long currentMessageTimestamp;
 

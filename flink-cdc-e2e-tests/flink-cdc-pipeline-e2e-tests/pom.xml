@@ -106,6 +106,13 @@ limitations under the License.
 
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-oracle</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-doris</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
@@ -521,6 +528,26 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
                             <version>${project.version}</version>
                             <destFileName>postgres-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-oracle</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>oracle-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.oracle.ojdbc</groupId>
+                            <artifactId>ojdbc8</artifactId>
+                            <version>19.3.0.0</version>
+                            <destFileName>oracle-ojdbc.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
