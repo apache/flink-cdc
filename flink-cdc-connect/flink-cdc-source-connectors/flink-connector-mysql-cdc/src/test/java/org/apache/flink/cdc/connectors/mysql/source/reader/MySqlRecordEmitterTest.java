@@ -96,17 +96,17 @@ class MySqlRecordEmitterTest {
 
     private MySqlRecordEmitter<Void> createRecordEmitter() {
         return new MySqlRecordEmitter<>(
-          new DebeziumDeserializationSchema<>() {
-              @Override
-              public void deserialize(SourceRecord record, Collector<Void> out) {
-                  throw new UnsupportedOperationException();
-              }
+                new DebeziumDeserializationSchema<>() {
+                    @Override
+                    public void deserialize(SourceRecord record, Collector<Void> out) {
+                        throw new UnsupportedOperationException();
+                    }
 
-              @Override
-              public TypeInformation<Void> getProducedType() {
-                  return TypeInformation.of(Void.class);
-              }
-          },
+                    @Override
+                    public TypeInformation<Void> getProducedType() {
+                        return TypeInformation.of(Void.class);
+                    }
+                },
                 new MySqlSourceReaderMetrics(
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
                 false,
@@ -115,22 +115,22 @@ class MySqlRecordEmitterTest {
 
     @Test
     void testTransactionMetadataEventsDisabledByDefault() throws Exception {
-        SourceRecord transactionBeginEvent = createTransactionMetadataEvent("BEGIN", "tx-123", 100L);
+        SourceRecord transactionBeginEvent =
+                createTransactionMetadataEvent("BEGIN", "tx-123", 100L);
 
         Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(transactionBeginEvent))
                 .isTrue();
 
         AtomicInteger emittedRecordsCount = new AtomicInteger(0);
-        MySqlRecordEmitter<String> recordEmitter = createRecordEmitterWithTransactionConfig(emittedRecordsCount, false);
+        MySqlRecordEmitter<String> recordEmitter =
+                createRecordEmitterWithTransactionConfig(emittedRecordsCount, false);
         MySqlBinlogSplitState splitState = createBinlogSplitState();
 
         BinlogOffset offsetBeforeEmit = splitState.getStartingOffset();
 
         TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(transactionBeginEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(transactionBeginEvent), readerOutput, splitState);
 
         // Verify the offset was updated (this should always happen)
         BinlogOffset expectedOffset = RecordUtils.getBinlogPosition(transactionBeginEvent);
@@ -146,22 +146,22 @@ class MySqlRecordEmitterTest {
 
     @Test
     void testTransactionMetadataEventsEnabledExplicitly() throws Exception {
-        SourceRecord transactionBeginEvent = createTransactionMetadataEvent("BEGIN", "tx-456", 150L);
+        SourceRecord transactionBeginEvent =
+                createTransactionMetadataEvent("BEGIN", "tx-456", 150L);
 
         Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(transactionBeginEvent))
                 .isTrue();
 
         AtomicInteger emittedRecordsCount = new AtomicInteger(0);
-        MySqlRecordEmitter<String> recordEmitter = createRecordEmitterWithTransactionConfig(emittedRecordsCount, true);
+        MySqlRecordEmitter<String> recordEmitter =
+                createRecordEmitterWithTransactionConfig(emittedRecordsCount, true);
         MySqlBinlogSplitState splitState = createBinlogSplitState();
 
         BinlogOffset offsetBeforeEmit = splitState.getStartingOffset();
 
         TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(transactionBeginEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(transactionBeginEvent), readerOutput, splitState);
 
         // Verify the offset was updated
         BinlogOffset expectedOffset = RecordUtils.getBinlogPosition(transactionBeginEvent);
@@ -177,22 +177,22 @@ class MySqlRecordEmitterTest {
 
     @Test
     void testTransactionBeginEventHandling() throws Exception {
-        SourceRecord transactionBeginEvent = createTransactionMetadataEvent("BEGIN", "tx-123", 100L);
+        SourceRecord transactionBeginEvent =
+                createTransactionMetadataEvent("BEGIN", "tx-123", 100L);
 
         Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(transactionBeginEvent))
                 .isTrue();
 
         AtomicInteger emittedRecordsCount = new AtomicInteger(0);
-        MySqlRecordEmitter<String> recordEmitter = createRecordEmitterWithCounter(emittedRecordsCount);
+        MySqlRecordEmitter<String> recordEmitter =
+                createRecordEmitterWithCounter(emittedRecordsCount);
         MySqlBinlogSplitState splitState = createBinlogSplitState();
 
         BinlogOffset offsetBeforeEmit = splitState.getStartingOffset();
 
         TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(transactionBeginEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(transactionBeginEvent), readerOutput, splitState);
 
         // Verify the offset was updated
         BinlogOffset expectedOffset = RecordUtils.getBinlogPosition(transactionBeginEvent);
@@ -209,18 +209,16 @@ class MySqlRecordEmitterTest {
     void testTransactionEndEventHandling() throws Exception {
         SourceRecord transactionEndEvent = createTransactionMetadataEvent("END", "tx-123", 200L);
 
-        Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(transactionEndEvent))
-                .isTrue();
+        Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(transactionEndEvent)).isTrue();
 
         AtomicInteger emittedRecordsCount = new AtomicInteger(0);
-        MySqlRecordEmitter<String> recordEmitter = createRecordEmitterWithCounter(emittedRecordsCount);
+        MySqlRecordEmitter<String> recordEmitter =
+                createRecordEmitterWithCounter(emittedRecordsCount);
         MySqlBinlogSplitState splitState = createBinlogSplitState();
 
         TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(transactionEndEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(transactionEndEvent), readerOutput, splitState);
 
         // Verify the offset was updated
         BinlogOffset expectedOffset = RecordUtils.getBinlogPosition(transactionEndEvent);
@@ -232,15 +230,10 @@ class MySqlRecordEmitterTest {
         Assertions.assertThat(emittedRecordsCount.get()).isEqualTo(1);
     }
 
-
     @Test
     void testNonTransactionEventNotDetected() {
-        Schema keySchema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .build();
-        Schema valueSchema = SchemaBuilder.struct()
-                .field("op", Schema.STRING_SCHEMA)
-                .build();
+        Schema keySchema = SchemaBuilder.struct().field("id", Schema.INT32_SCHEMA).build();
+        Schema valueSchema = SchemaBuilder.struct().field("op", Schema.STRING_SCHEMA).build();
 
         Struct key = new Struct(keySchema).put("id", 1);
         Struct value = new Struct(valueSchema).put("op", "c");
@@ -249,14 +242,15 @@ class MySqlRecordEmitterTest {
         offset.put("file", "mysql-bin.000001");
         offset.put("pos", 100L);
 
-        SourceRecord dataRecord = new SourceRecord(
-                Collections.singletonMap("server", "mysql"),
-                offset,
-                "test.table",
-                keySchema,
-                key,
-                valueSchema,
-                value);
+        SourceRecord dataRecord =
+                new SourceRecord(
+                        Collections.singletonMap("server", "mysql"),
+                        offset,
+                        "test.table",
+                        keySchema,
+                        key,
+                        valueSchema,
+                        value);
 
         // Verify it's NOT detected as a transaction metadata event
         Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(dataRecord)).isFalse();
@@ -264,10 +258,11 @@ class MySqlRecordEmitterTest {
 
     @Test
     void testTransactionEventWithoutKeySchemaNotDetected() {
-        Schema valueSchema = SchemaBuilder.struct()
-                .name(RecordUtils.SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME)
-                .field("status", Schema.STRING_SCHEMA)
-                .build();
+        Schema valueSchema =
+                SchemaBuilder.struct()
+                        .name(RecordUtils.SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME)
+                        .field("status", Schema.STRING_SCHEMA)
+                        .build();
 
         Struct value = new Struct(valueSchema).put("status", "BEGIN");
 
@@ -275,14 +270,15 @@ class MySqlRecordEmitterTest {
         offset.put("file", "mysql-bin.000001");
         offset.put("pos", 100L);
 
-        SourceRecord record = new SourceRecord(
-                Collections.singletonMap("server", "mysql"),
-                offset,
-                "transaction.topic",
-                null, // No key schema
-                null,
-                valueSchema,
-                value);
+        SourceRecord record =
+                new SourceRecord(
+                        Collections.singletonMap("server", "mysql"),
+                        offset,
+                        "transaction.topic",
+                        null, // No key schema
+                        null,
+                        valueSchema,
+                        value);
 
         // Verify it's NOT detected as a transaction metadata event
         Assertions.assertThat(RecordUtils.isTransactionMetadataEvent(record)).isFalse();
@@ -294,20 +290,17 @@ class MySqlRecordEmitterTest {
         SourceRecord endEvent = createTransactionMetadataEvent("END", "tx-789", 400L);
 
         AtomicInteger emittedRecordsCount = new AtomicInteger(0);
-        MySqlRecordEmitter<String> recordEmitter = createRecordEmitterWithTransactionConfig(emittedRecordsCount, false);
+        MySqlRecordEmitter<String> recordEmitter =
+                createRecordEmitterWithTransactionConfig(emittedRecordsCount, false);
         MySqlBinlogSplitState splitState = createBinlogSplitState();
 
         TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
-        
-        recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(beginEvent),
-                readerOutput,
-                splitState);
 
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(endEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(beginEvent), readerOutput, splitState);
+
+        recordEmitter.emitRecord(
+                SourceRecords.fromSingleRecord(endEvent), readerOutput, splitState);
 
         // Verify offsets were updated but no events were emitted
         BinlogOffset expectedOffset = RecordUtils.getBinlogPosition(endEvent);
@@ -320,26 +313,23 @@ class MySqlRecordEmitterTest {
         Assertions.assertThat(readerOutput.getEmittedRecords()).isEmpty();
     }
 
-    @Test 
+    @Test
     void testMixedEventsWithTransactionMetadataDisabled() throws Exception {
         SourceRecord transactionEvent = createTransactionMetadataEvent("BEGIN", "tx-mixed", 500L);
         SourceRecord dataEvent = createDataChangeEvent("test.table", 501L);
 
         AtomicInteger emittedRecordsCount = new AtomicInteger(0);
-        MySqlRecordEmitter<String> recordEmitter = createRecordEmitterWithTransactionConfig(emittedRecordsCount, false);
+        MySqlRecordEmitter<String> recordEmitter =
+                createRecordEmitterWithTransactionConfig(emittedRecordsCount, false);
         MySqlBinlogSplitState splitState = createBinlogSplitState();
 
         TestingReaderOutput<String> readerOutput = new TestingReaderOutput<>();
 
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(transactionEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(transactionEvent), readerOutput, splitState);
 
         recordEmitter.emitRecord(
-                SourceRecords.fromSingleRecord(dataEvent),
-                readerOutput,
-                splitState);
+                SourceRecords.fromSingleRecord(dataEvent), readerOutput, splitState);
 
         // Verify only data event was emitted (count=1, not 2)
         Assertions.assertThat(emittedRecordsCount.get()).isEqualTo(1);
@@ -348,18 +338,16 @@ class MySqlRecordEmitterTest {
 
     private MySqlBinlogSplitState createBinlogSplitState() {
         return new MySqlBinlogSplitState(
-          new MySqlBinlogSplit(
-            "binlog-split",
-            BinlogOffset.ofEarliest(),
-            BinlogOffset.ofNonStopping(),
-            Collections.emptyList(),
-            Collections.emptyMap(),
-            0));
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        BinlogOffset.ofEarliest(),
+                        BinlogOffset.ofNonStopping(),
+                        Collections.emptyList(),
+                        Collections.emptyMap(),
+                        0));
     }
 
-    /**
-     * Helper method to create a MySqlRecordEmitter that counts emitted records.
-     */
+    /** Helper method to create a MySqlRecordEmitter that counts emitted records. */
     private MySqlRecordEmitter<String> createRecordEmitterWithCounter(AtomicInteger counter) {
         return createRecordEmitterWithTransactionConfig(counter, true);
     }
@@ -367,20 +355,21 @@ class MySqlRecordEmitterTest {
     /**
      * Helper method to create a MySqlRecordEmitter with configurable transaction metadata events.
      */
-    private MySqlRecordEmitter<String> createRecordEmitterWithTransactionConfig(AtomicInteger counter, boolean includeTransactionMetadataEvents) {
+    private MySqlRecordEmitter<String> createRecordEmitterWithTransactionConfig(
+            AtomicInteger counter, boolean includeTransactionMetadataEvents) {
         return new MySqlRecordEmitter<>(
-          new DebeziumDeserializationSchema<>() {
-              @Override
-              public void deserialize(SourceRecord record, Collector<String> out) {
-                  counter.incrementAndGet();
-                  out.collect("transaction-event");
-              }
+                new DebeziumDeserializationSchema<>() {
+                    @Override
+                    public void deserialize(SourceRecord record, Collector<String> out) {
+                        counter.incrementAndGet();
+                        out.collect("transaction-event");
+                    }
 
-              @Override
-              public TypeInformation<String> getProducedType() {
-                  return TypeInformation.of(String.class);
-              }
-          },
+                    @Override
+                    public TypeInformation<String> getProducedType() {
+                        return TypeInformation.of(String.class);
+                    }
+                },
                 new MySqlSourceReaderMetrics(
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
                 false,
@@ -389,25 +378,28 @@ class MySqlRecordEmitterTest {
 
     private SourceRecord createTransactionMetadataEvent(
             String status, String transactionId, long position) {
-        Schema keySchema = SchemaBuilder.struct()
-                .name(RecordUtils.SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME)
-                .field("id", Schema.STRING_SCHEMA)
-                .build();
+        Schema keySchema =
+                SchemaBuilder.struct()
+                        .name(RecordUtils.SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME)
+                        .field("id", Schema.STRING_SCHEMA)
+                        .build();
 
-        Schema valueSchema = SchemaBuilder.struct()
-                .name("io.debezium.connector.common.TransactionMetadataValue")
-                .field("status", Schema.STRING_SCHEMA)
-                .field("id", Schema.STRING_SCHEMA)
-                .field("event_count", Schema.OPTIONAL_INT64_SCHEMA)
-                .field("ts_ms", Schema.INT64_SCHEMA)
-                .build();
+        Schema valueSchema =
+                SchemaBuilder.struct()
+                        .name("io.debezium.connector.common.TransactionMetadataValue")
+                        .field("status", Schema.STRING_SCHEMA)
+                        .field("id", Schema.STRING_SCHEMA)
+                        .field("event_count", Schema.OPTIONAL_INT64_SCHEMA)
+                        .field("ts_ms", Schema.INT64_SCHEMA)
+                        .build();
 
         Struct key = new Struct(keySchema).put("id", transactionId);
 
-        Struct value = new Struct(valueSchema)
-                .put("status", status)
-                .put("id", transactionId)
-                .put("ts_ms", System.currentTimeMillis());
+        Struct value =
+                new Struct(valueSchema)
+                        .put("status", status)
+                        .put("id", transactionId)
+                        .put("ts_ms", System.currentTimeMillis());
 
         if ("END".equals(status)) {
             value.put("event_count", 5L);
@@ -429,24 +421,22 @@ class MySqlRecordEmitterTest {
     }
 
     private SourceRecord createDataChangeEvent(String topicName, long position) {
-        Schema keySchema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .build();
-        Schema valueSchema = SchemaBuilder.struct()
-                .field("op", Schema.STRING_SCHEMA)
-                .field("after", SchemaBuilder.struct()
-                        .field("id", Schema.INT32_SCHEMA)
-                        .field("name", Schema.STRING_SCHEMA)
-                        .optional())
-                .build();
+        Schema keySchema = SchemaBuilder.struct().field("id", Schema.INT32_SCHEMA).build();
+        Schema valueSchema =
+                SchemaBuilder.struct()
+                        .field("op", Schema.STRING_SCHEMA)
+                        .field(
+                                "after",
+                                SchemaBuilder.struct()
+                                        .field("id", Schema.INT32_SCHEMA)
+                                        .field("name", Schema.STRING_SCHEMA)
+                                        .optional())
+                        .build();
 
         Struct key = new Struct(keySchema).put("id", 1);
-        Struct after = new Struct(valueSchema.field("after").schema())
-                .put("id", 1)
-                .put("name", "test");
-        Struct value = new Struct(valueSchema)
-                .put("op", "c")
-                .put("after", after);
+        Struct after =
+                new Struct(valueSchema.field("after").schema()).put("id", 1).put("name", "test");
+        Struct value = new Struct(valueSchema).put("op", "c").put("after", after);
 
         Map<String, Object> offset = new HashMap<>();
         offset.put("file", "mysql-bin.000001");
@@ -461,5 +451,4 @@ class MySqlRecordEmitterTest {
                 valueSchema,
                 value);
     }
-
 }

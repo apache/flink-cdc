@@ -348,9 +348,9 @@ public class RecordUtils {
      * provide.transaction.metadata is enabled.
      */
     public static boolean isTransactionMetadataEvent(SourceRecord record) {
-       Schema keySchema = record.keySchema();
+        Schema keySchema = record.keySchema();
         return keySchema != null
-                 && SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
+                && SCHEMA_TRANSACTION_METADATA_EVENT_KEY_NAME.equalsIgnoreCase(keySchema.name());
     }
 
     /**

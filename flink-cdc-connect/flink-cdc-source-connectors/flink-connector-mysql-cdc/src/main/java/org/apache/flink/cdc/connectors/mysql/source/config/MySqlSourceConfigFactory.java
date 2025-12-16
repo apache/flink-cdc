@@ -237,7 +237,8 @@ public class MySqlSourceConfigFactory implements Serializable {
     }
 
     /** Whether the {@link MySqlSource} should output the transaction metadata events or not. */
-    public MySqlSourceConfigFactory includeTransactionMetadataEvents(boolean includeTransactionMetadataEvents) {
+    public MySqlSourceConfigFactory includeTransactionMetadataEvents(
+            boolean includeTransactionMetadataEvents) {
         this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
         return this;
     }
@@ -367,7 +368,8 @@ public class MySqlSourceConfigFactory implements Serializable {
         // only DataStream API program need to emit the schema record, the Table API need not
         props.setProperty("include.schema.changes", String.valueOf(true));
         // enable transaction metadata if includeTransactionMetadataEvents is true
-        props.setProperty("provide.transaction.metadata", String.valueOf(includeTransactionMetadataEvents));
+        props.setProperty(
+                "provide.transaction.metadata", String.valueOf(includeTransactionMetadataEvents));
         // disable the offset flush totally
         props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones

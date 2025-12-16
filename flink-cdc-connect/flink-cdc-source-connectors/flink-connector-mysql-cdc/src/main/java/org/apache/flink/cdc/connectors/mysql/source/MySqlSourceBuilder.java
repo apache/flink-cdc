@@ -199,7 +199,8 @@ public class MySqlSourceBuilder<T> {
     }
 
     /** Whether the {@link MySqlSource} should output the transaction metadata events or not. */
-    public MySqlSourceBuilder<T> includeTransactionMetadataEvents(boolean includeTransactionMetadataEvents) {
+    public MySqlSourceBuilder<T> includeTransactionMetadataEvents(
+            boolean includeTransactionMetadataEvents) {
         this.configFactory.includeTransactionMetadataEvents(includeTransactionMetadataEvents);
         return this;
     }
