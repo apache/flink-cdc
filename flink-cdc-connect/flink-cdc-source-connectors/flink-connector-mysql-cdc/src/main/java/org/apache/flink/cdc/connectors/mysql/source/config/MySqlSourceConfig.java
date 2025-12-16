@@ -62,7 +62,6 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
-    private final boolean includeTransactionMetadataEvents;
     private final boolean includeHeartbeatEvents;
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean closeIdleReaders;
@@ -101,7 +100,6 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
-            boolean includeTransactionMetadataEvents,
             boolean includeHeartbeatEvents,
             boolean scanNewlyAddedTableEnabled,
             boolean closeIdleReaders,
@@ -132,7 +130,6 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
-        this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
         this.includeHeartbeatEvents = includeHeartbeatEvents;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
@@ -231,10 +228,6 @@ public class MySqlSourceConfig implements Serializable {
 
     public boolean isIncludeSchemaChanges() {
         return includeSchemaChanges;
-    }
-
-    public boolean isIncludeTransactionMetadataEvents() {
-        return includeTransactionMetadataEvents;
     }
 
     public boolean isIncludeHeartbeatEvents() {
