@@ -21,6 +21,7 @@ import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
+import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitState;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -159,6 +160,8 @@ public class IncrementalSourceRecordEmitter<T>
         outputCollector.currentMessageTimestamp = getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
+
+    public void applySplit(SourceSplitBase split) {}
 
     protected void reportMetrics(SourceRecord element) {
         Long messageTimestamp = getMessageTimestamp(element);
