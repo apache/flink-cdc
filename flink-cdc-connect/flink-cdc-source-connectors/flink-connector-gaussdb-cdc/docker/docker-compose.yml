@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  jobmanager:
+    image: flink:1.18.1-scala_2.12-java11
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"  # Flink Web UI
+      - "6123:6123"  # RPC port
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        jobmanager.memory.process.size: 1600m
+        parallelism.default: 2
+        state.backend: hashmap
+        state.checkpoints.dir: file:///opt/flink/checkpoints
+        state.savepoints.dir: file:///opt/flink/savepoints
+        execution.checkpointing.interval: 60000
+        execution.checkpointing.mode: EXACTLY_ONCE
+    volumes:
+      - ./flink-checkpoints:/opt/flink/checkpoints
+      - ./flink-savepoints:/opt/flink/savepoints
+      - ./jars:/opt/flink/usrlib
+      - ./log:/opt/flink/log
+    networks:
+      - flink-network
+
+  taskmanager:
+    image: flink:1.18.1-scala_2.12-java11
+    container_name: flink-taskmanager
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        taskmanager.memory.process.size: 2048m
+    volumes:
+      - ./flink-checkpoints:/opt/flink/checkpoints
+      - ./flink-savepoints:/opt/flink/savepoints
+      - ./jars:/opt/flink/usrlib
+      - ./log:/opt/flink/log
+    networks:
+      - flink-network
+
+networks:
+  flink-network:
+    driver: bridge
