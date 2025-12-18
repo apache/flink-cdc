@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.reader;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.reader.async.AsyncScheduler;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
@@ -37,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The {@link RecordEmitter} implementation for {@link MySqlSourceReader}.
@@ -54,6 +56,8 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
     private final OutputCollector<T> outputCollector;
+    /** Optional: parallel scheduler; null means parallelization is disabled. */
+    private final AsyncScheduler<T> scheduler;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
@@ -63,6 +67,20 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
         this.outputCollector = new OutputCollector<>();
+        this.scheduler = null;
+    }
+
+    /** Constructor that injects a parallel scheduler. */
+    public MySqlRecordEmitter(
+            DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
+            MySqlSourceReaderMetrics sourceReaderMetrics,
+            boolean includeSchemaChanges,
+            AsyncScheduler<T> scheduler) {
+        this.debeziumDeserializationSchema = debeziumDeserializationSchema;
+        this.sourceReaderMetrics = sourceReaderMetrics;
+        this.includeSchemaChanges = includeSchemaChanges;
+        this.outputCollector = new OutputCollector<>();
+        this.scheduler = scheduler;
     }
 
     @Override
@@ -70,9 +88,39 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             SourceRecords sourceRecords, SourceOutput<T> output, MySqlSplitState splitState)
             throws Exception {
         final Iterator<SourceRecord> elementIterator = sourceRecords.iterator();
-        while (elementIterator.hasNext()) {
-            processElement(elementIterator.next(), output, splitState);
+        if (scheduler == null || !scheduler.isEnabled()) {
+            while (elementIterator.hasNext()) {
+                processElement(elementIterator.next(), output, splitState);
+            }
+            return;
         }
+
+        // Parallel path: partitioned deserialization + source-thread replay + advance offset after
+        // replay
+        final AtomicInteger pendingPartitionTasks = new AtomicInteger(0);
+        while (elementIterator.hasNext()) {
+            SourceRecord next = elementIterator.next();
+            if (RecordUtils.isDataChangeRecord(next)) {
+                reportMetrics(next);
+                scheduler.schedulePartitioned(next, pendingPartitionTasks);
+            } else {
+                // Control / non-DML events: flush all enqueued DML first to preserve
+                // original ordering, then emit the control event inline.
+                scheduler.waitAndDrainAll(
+                        output,
+                        pendingPartitionTasks,
+                        (offset) -> updateOffsetAfterEmit(splitState, offset));
+                processElement(next, output, splitState);
+            }
+            scheduler.drainRound(
+                    output,
+                    (offset) -> updateOffsetAfterEmit(splitState, offset));
+        }
+        // wait until all scheduled work for this batch has been emitted
+        scheduler.waitAndDrainAll(
+                output,
+                pendingPartitionTasks,
+                (offset) -> updateOffsetAfterEmit(splitState, offset));
     }
 
     protected void processElement(
@@ -113,6 +161,13 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             BinlogOffset position = RecordUtils.getBinlogPosition(element);
             splitState.asBinlogSplitState().setStartingOffset(position);
         }
+    }
+
+    private static void updateOffsetAfterEmit(MySqlSplitState splitState, BinlogOffset offset) {
+        if (offset == null || !splitState.isBinlogSplitState()) {
+            return;
+        }
+        splitState.asBinlogSplitState().setStartingOffset(offset);
     }
 
     private void emitElement(SourceRecord element, SourceOutput<T> output) throws Exception {
