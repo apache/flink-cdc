@@ -124,6 +124,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
                 },
                 truncateTableEvent -> {
                     throw new UnsupportedSchemaChangeEventException(truncateTableEvent);
+                },
+                alterTableEvent -> {
+                    throw new UnsupportedSchemaChangeEventException(alterTableEvent);
                 });
     }
 
