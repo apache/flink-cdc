@@ -32,6 +32,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.lifecycle.Startables;
@@ -55,6 +56,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.lang.Thread.sleep;
+
 /**
  * Basic class for testing PostgreSQL source, this contains a PostgreSQL container which enables wal
  * log.
@@ -63,17 +66,24 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     protected static final Logger LOG = LoggerFactory.getLogger(PostgresTestBase.class);
     public static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
     public static final String DEFAULT_DB = "postgres";
+    public static final String TEST_USER = "postgres";
+    public static final String TEST_PASSWORD = "postgres";
 
     // use official postgresql image to support pgoutput plugin
     protected static final DockerImageName PG_IMAGE =
             DockerImageName.parse("postgres:14").asCompatibleSubstituteFor("postgres");
+    public static final Network NETWORK = Network.newNetwork();
+    public static final String INTER_CONTAINER_POSTGRES_ALIAS = "postgres";
 
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER =
             new PostgreSQLContainer<>(PG_IMAGE)
                     .withDatabaseName(DEFAULT_DB)
-                    .withUsername("postgres")
-                    .withPassword("postgres")
+                    .withUsername(TEST_USER)
+                    .withPassword(TEST_PASSWORD)
                     .withLogConsumer(new Slf4jLogConsumer(LOG))
+                    .withNetwork(NETWORK)
+                    .withNetworkAliases(INTER_CONTAINER_POSTGRES_ALIAS)
+                    .withReuse(false)
                     .withCommand(
                             "postgres",
                             "-c",
@@ -94,7 +104,9 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     @AfterAll
     static void stopContainers() {
         LOG.info("Stopping containers...");
-        POSTGRES_CONTAINER.stop();
+        if (POSTGRES_CONTAINER != null) {
+            POSTGRES_CONTAINER.stop();
+        }
         LOG.info("Containers are stopped.");
     }
 
@@ -160,7 +172,7 @@ public abstract class PostgresTestBase extends AbstractTestBase {
 
     protected void waitForSnapshotStarted(String sinkName) throws InterruptedException {
         while (sinkSize(sinkName) == 0) {
-            Thread.sleep(300);
+            sleep(300);
         }
     }
 
@@ -173,13 +185,13 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                     TestValuesTableFactory.getResultsAsStrings(sinkName).stream()
                             .sorted()
                             .collect(Collectors.toList());
-            Thread.sleep(1000);
+            sleep(1000);
         }
     }
 
     protected void waitForSinkSize(String sinkName, int expectedSize) throws InterruptedException {
         while (sinkSize(sinkName) < expectedSize) {
-            Thread.sleep(100);
+            sleep(100);
         }
     }
 

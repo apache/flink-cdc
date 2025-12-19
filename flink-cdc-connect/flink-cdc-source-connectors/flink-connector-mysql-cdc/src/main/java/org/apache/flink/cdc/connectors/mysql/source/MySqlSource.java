@@ -38,6 +38,7 @@ import org.apache.flink.cdc.connectors.mysql.source.assigners.state.BinlogPendin
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.HybridPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsStateSerializer;
+import org.apache.flink.cdc.connectors.mysql.source.assigners.state.SnapshotPendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.enumerator.MySqlSourceEnumerator;
@@ -48,7 +49,6 @@ import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSourceReaderCont
 import org.apache.flink.cdc.connectors.mysql.source.reader.MySqlSplitReader;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitSerializer;
-import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -252,6 +252,13 @@ public class MySqlSource<T>
                             enumContext.currentParallelism(),
                             (HybridPendingSplitsState) checkpoint,
                             enumContext);
+        } else if (checkpoint instanceof SnapshotPendingSplitsState) {
+            splitAssigner =
+                    new MySqlSnapshotSplitAssigner(
+                            sourceConfig,
+                            enumContext.currentParallelism(),
+                            (SnapshotPendingSplitsState) checkpoint,
+                            enumContext);
         } else if (checkpoint instanceof BinlogPendingSplitsState) {
             splitAssigner =
                     new MySqlBinlogSplitAssigner(
@@ -289,7 +296,6 @@ public class MySqlSource<T>
     @FunctionalInterface
     interface RecordEmitterSupplier<T> extends Serializable {
 
-        RecordEmitter<SourceRecords, T, MySqlSplitState> get(
-                MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
+        MySqlRecordEmitter<T> get(MySqlSourceReaderMetrics metrics, MySqlSourceConfig sourceConfig);
     }
 }

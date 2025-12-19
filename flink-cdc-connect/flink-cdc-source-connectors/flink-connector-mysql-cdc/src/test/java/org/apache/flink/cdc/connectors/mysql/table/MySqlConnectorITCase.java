@@ -568,6 +568,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "    multiline_c STRING,\n"
                                 + "    multipolygon_c STRING,\n"
                                 + "    geometrycollection_c STRING,\n"
+                                + "    varchar_len0_c STRING,\n"
                                 + "    primary key (`id`) not enforced"
                                 + ") WITH ("
                                 + " 'connector' = 'mysql-cdc',"
@@ -653,7 +654,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                                 + "multipoint_c, \n"
                                 + "multiline_c, \n"
                                 + "multipolygon_c, \n"
-                                + "geometrycollection_c \n"
+                                + "geometrycollection_c, \n"
+                                + "varchar_len0_c \n"
                                 + " FROM full_types");
 
         CloseableIterator<Row> iterator = result.collect();
@@ -702,6 +704,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + expectMultipolygonJsonText
                             + ", "
                             + expectGeometryCollectionJsonText
+                            + ", "
+                            + ""
                             + "]",
                     "-U[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295,"
                             + " 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102,"
@@ -725,6 +729,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + expectMultipolygonJsonText
                             + ", "
                             + expectGeometryCollectionJsonText
+                            + ", "
+                            + ""
                             + "]",
                     "+U[1, 127, 255, 255, 32767, 65535, 65535, 8388607, 16777215, 16777215, 2147483647, 4294967295, 4294967295,"
                             + " 2147483647, 9223372036854775807, 18446744073709551615, 18446744073709551615, Hello World, abc, 123.102,"
@@ -748,6 +754,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + expectMultipolygonJsonText
                             + ", "
                             + expectGeometryCollectionJsonText
+                            + ", "
+                            + ""
                             + "]",
                 };
 
@@ -1419,6 +1427,9 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Deadline.fromNow(Duration.ofSeconds(10)));
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
+        // Wait 1s until snapshot phase finished, cannot update DDL during snapshot phase.
+        List<String> actualRows = new ArrayList<>(fetchRows(iterator, 2));
+        Thread.sleep(1000L);
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("DELETE FROM default_value_test WHERE id=1;");
@@ -1503,10 +1514,11 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                             + "     double_c DOUBLE DEFAULT ' 25',\n"
                             + "     double_un_c DOUBLE UNSIGNED DEFAULT ' 26',\n"
                             + "     double_un_z_c DOUBLE UNSIGNED ZEROFILL DEFAULT ' 27',\n"
-                            + "     tiny_un_c TINYINT UNSIGNED DEFAULT ' 28 '"
+                            + "     tiny_un_c TINYINT UNSIGNED DEFAULT \" 28 \""
                             + " );");
         }
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        actualRows.addAll(fetchRows(iterator, expected.length - 2));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
         jobClient.cancel().get();
     }
 
@@ -1554,6 +1566,10 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
                 Deadline.fromNow(Duration.ofSeconds(10)));
         CloseableIterator<Row> iterator = result.collect();
         waitForSnapshotStarted(iterator);
+        // Wait 1s until snapshot phase finished, cannot update DDL during snapshot phase.
+        List<String> actualRows = new ArrayList<>(fetchRows(iterator, 2));
+        Thread.sleep(1000L);
+
         try (Connection connection = customerDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
             statement.execute("DELETE FROM default_value_test WHERE id=1;");
@@ -1572,7 +1588,8 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
             statement.execute(
                     "alter table default_value_test add column `int_test` INT DEFAULT ' 30 ';");
         }
-        assertEqualsInAnyOrder(Arrays.asList(expected), fetchRows(iterator, expected.length));
+        actualRows.addAll(fetchRows(iterator, expected.length - 2));
+        assertEqualsInAnyOrder(Arrays.asList(expected), actualRows);
         jobClient.cancel().get();
     }
 
@@ -2252,7 +2269,7 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
 
     private static void waitForSnapshotStarted(CloseableIterator<Row> iterator) throws Exception {
         while (!iterator.hasNext()) {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         }
     }
 

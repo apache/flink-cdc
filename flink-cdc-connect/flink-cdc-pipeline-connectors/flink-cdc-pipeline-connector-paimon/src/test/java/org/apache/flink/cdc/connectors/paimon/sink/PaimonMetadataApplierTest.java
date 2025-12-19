@@ -37,6 +37,7 @@ import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.DataTypes;
 import org.apache.paimon.types.RowType;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -136,12 +137,10 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "col2", DataTypes.INT()),
-                                new DataField(2, "col3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "col3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
-
-        Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).options())
-                .containsEntry("fields.col3.default-value", "col3DefValue");
 
         Map<String, String> nameMapping = new HashMap<>();
         nameMapping.put("col2", "newcol2");
@@ -154,7 +153,8 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "newcol2", DataTypes.INT()),
-                                new DataField(2, "newcol3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
@@ -168,7 +168,8 @@ class PaimonMetadataApplierTest {
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
                                 new DataField(1, "newcol2", DataTypes.STRING()),
-                                new DataField(2, "newcol3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
@@ -181,7 +182,8 @@ class PaimonMetadataApplierTest {
                 new RowType(
                         Arrays.asList(
                                 new DataField(0, "col1", DataTypes.STRING().notNull()),
-                                new DataField(2, "newcol3", DataTypes.STRING())));
+                                new DataField(
+                                        2, "newcol3", DataTypes.STRING(), null, "col3DefValue")));
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
 
@@ -529,5 +531,104 @@ class PaimonMetadataApplierTest {
 
         Assertions.assertThat(catalog.getTable(Identifier.fromString("test.table1")).rowType())
                 .isEqualTo(tableSchema);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"filesystem", "hive"})
+    public void testCreateTableWithComment(String metastore)
+            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+        initialize(metastore);
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.table_with_comment"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "col1",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING()
+                                                .notNull(),
+                                        "comment of col1")
+                                .physicalColumn(
+                                        "col2",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING(),
+                                        "comment of col2")
+                                .physicalColumn(
+                                        "col3",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING(),
+                                        "comment of col3")
+                                .physicalColumn(
+                                        "col4",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING(),
+                                        "comment of col4")
+                                .comment("comment of table_with_comment")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+        Table table = catalog.getTable(Identifier.fromString("test.table_with_comment"));
+        RowType tableSchema =
+                new RowType(
+                        Arrays.asList(
+                                new DataField(
+                                        0, "col1", DataTypes.STRING().notNull(), "comment of col1"),
+                                new DataField(1, "col2", DataTypes.STRING(), "comment of col2"),
+                                new DataField(2, "col3", DataTypes.STRING(), "comment of col3"),
+                                new DataField(3, "col4", DataTypes.STRING(), "comment of col4")));
+        Assertions.assertThat(table.rowType()).isEqualTo(tableSchema);
+        Assertions.assertThat(table.primaryKeys()).isEmpty();
+        Assertions.assertThat(table.partitionKeys()).isEmpty();
+        Assertions.assertThat(table.options()).containsEntry("bucket", "-1");
+        Assertions.assertThat(table.comment()).contains("comment of table_with_comment");
+    }
+
+    @Test
+    public void testMysqlDefaultTimestampValueConversionInAddColumn()
+            throws SchemaEvolveException, Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException {
+        initialize("filesystem");
+        Map<String, String> tableOptions = new HashMap<>();
+        tableOptions.put("bucket", "-1");
+        MetadataApplier metadataApplier =
+                new PaimonMetadataApplier(catalogOptions, tableOptions, new HashMap<>());
+
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(
+                        TableId.parse("test.timestamp_test"),
+                        org.apache.flink.cdc.common.schema.Schema.newBuilder()
+                                .physicalColumn(
+                                        "id",
+                                        org.apache.flink.cdc.common.types.DataTypes.INT().notNull())
+                                .physicalColumn(
+                                        "name",
+                                        org.apache.flink.cdc.common.types.DataTypes.STRING())
+                                .primaryKey("id")
+                                .build());
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "created_time",
+                                org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP(),
+                                null,
+                                SchemaChangeProvider.INVALID_OR_MISSING_DATATIME)));
+        addedColumns.add(
+                AddColumnEvent.last(
+                        Column.physicalColumn(
+                                "updated_time",
+                                org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_LTZ(),
+                                null,
+                                SchemaChangeProvider.INVALID_OR_MISSING_DATATIME)));
+
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(TableId.parse("test.timestamp_test"), addedColumns);
+        metadataApplier.applySchemaChange(addColumnEvent);
+
+        Table table = catalog.getTable(Identifier.fromString("test.timestamp_test"));
+
+        Assertions.assertThat(table).isNotNull();
     }
 }

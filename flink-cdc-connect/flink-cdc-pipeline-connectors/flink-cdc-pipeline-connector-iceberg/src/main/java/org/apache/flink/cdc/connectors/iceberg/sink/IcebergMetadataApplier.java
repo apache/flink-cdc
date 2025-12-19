@@ -43,6 +43,8 @@ import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.types.Type;
@@ -132,7 +134,16 @@ public class IcebergMetadataApplier implements MetadataApplier {
 
     private void applyCreateTable(CreateTableEvent event) {
         try {
+            long startTimestamp = System.currentTimeMillis();
             TableIdentifier tableIdentifier = TableIdentifier.parse(event.tableId().identifier());
+            // Step 0: Create namespace if not exists.
+            if (catalog instanceof SupportsNamespaces) {
+                SupportsNamespaces namespaceCatalog = (SupportsNamespaces) catalog;
+                Namespace namespace = Namespace.of(tableIdentifier.namespace().levels());
+                if (!namespaceCatalog.namespaceExists(namespace)) {
+                    namespaceCatalog.createNamespace(namespace);
+                }
+            }
 
             // Step1: Build Schema.
             org.apache.flink.cdc.common.schema.Schema cdcSchema = event.getSchema();
@@ -162,6 +173,10 @@ public class IcebergMetadataApplier implements MetadataApplier {
             PartitionSpec partitionSpec = builder.build();
             if (!catalog.tableExists(tableIdentifier)) {
                 catalog.createTable(tableIdentifier, icebergSchema, partitionSpec, tableOptions);
+                LOG.info(
+                        "Spend {} ms to create iceberg table {}",
+                        System.currentTimeMillis() - startTimestamp,
+                        tableIdentifier);
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);

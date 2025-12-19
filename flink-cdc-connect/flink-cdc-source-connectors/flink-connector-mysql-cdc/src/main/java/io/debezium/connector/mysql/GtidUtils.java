@@ -18,6 +18,8 @@
 package io.debezium.connector.mysql;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,34 +38,62 @@ public class GtidUtils {
     public static GtidSet fixRestoredGtidSet(GtidSet serverGtidSet, GtidSet restoredGtidSet) {
         Map<String, GtidSet.UUIDSet> newSet = new HashMap<>();
         serverGtidSet.getUUIDSets().forEach(uuidSet -> newSet.put(uuidSet.getUUID(), uuidSet));
-        for (GtidSet.UUIDSet uuidSet : restoredGtidSet.getUUIDSets()) {
-            GtidSet.UUIDSet serverUuidSet = newSet.get(uuidSet.getUUID());
+        for (GtidSet.UUIDSet restoredUuidSet : restoredGtidSet.getUUIDSets()) {
+            GtidSet.UUIDSet serverUuidSet = newSet.get(restoredUuidSet.getUUID());
             if (serverUuidSet != null) {
-                long restoredIntervalEnd = getIntervalEnd(uuidSet);
-                List<com.github.shyiko.mysql.binlog.GtidSet.Interval> newIntervals =
-                        new ArrayList<>();
-                for (GtidSet.Interval serverInterval : serverUuidSet.getIntervals()) {
-                    if (serverInterval.getEnd() <= restoredIntervalEnd) {
-                        newIntervals.add(
+                List<GtidSet.Interval> serverIntervals = serverUuidSet.getIntervals();
+                List<GtidSet.Interval> restoredIntervals = restoredUuidSet.getIntervals();
+
+                long earliestRestoredTx = getMinIntervalStart(restoredIntervals);
+
+                List<com.github.shyiko.mysql.binlog.GtidSet.Interval> merged = new ArrayList<>();
+
+                // Process each server interval
+                for (GtidSet.Interval serverInterval : serverIntervals) {
+                    // First, check if any part comes before earliest restored
+                    if (serverInterval.getStart() < earliestRestoredTx) {
+                        long end = Math.min(serverInterval.getEnd(), earliestRestoredTx - 1);
+                        merged.add(
                                 new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                        serverInterval.getStart(), serverInterval.getEnd()));
-                    } else if (serverInterval.getStart() <= restoredIntervalEnd
-                            && serverInterval.getEnd() > restoredIntervalEnd) {
-                        newIntervals.add(
-                                new com.github.shyiko.mysql.binlog.GtidSet.Interval(
-                                        serverInterval.getStart(), restoredIntervalEnd));
+                                        serverInterval.getStart(), end));
+                    }
+
+                    // Then check for overlaps with restored intervals
+                    for (GtidSet.Interval restoredInterval : restoredIntervals) {
+                        if (serverInterval.getStart() <= restoredInterval.getEnd()
+                                && serverInterval.getEnd() >= restoredInterval.getStart()) {
+                            // There's an overlap - add the intersection
+                            long intersectionStart =
+                                    Math.max(
+                                            serverInterval.getStart(), restoredInterval.getStart());
+                            long intersectionEnd =
+                                    Math.min(serverInterval.getEnd(), restoredInterval.getEnd());
+
+                            if (intersectionStart <= intersectionEnd) {
+                                merged.add(
+                                        new com.github.shyiko.mysql.binlog.GtidSet.Interval(
+                                                intersectionStart, intersectionEnd));
+                            }
+                        }
                     }
                 }
-                newSet.put(
-                        uuidSet.getUUID(),
+
+                GtidSet.UUIDSet mergedUuidSet =
                         new GtidSet.UUIDSet(
                                 new com.github.shyiko.mysql.binlog.GtidSet.UUIDSet(
-                                        uuidSet.getUUID(), newIntervals)));
+                                        restoredUuidSet.getUUID(), merged));
+
+                newSet.put(restoredUuidSet.getUUID(), mergedUuidSet);
             } else {
-                newSet.put(uuidSet.getUUID(), uuidSet);
+                newSet.put(restoredUuidSet.getUUID(), restoredUuidSet);
             }
         }
         return new GtidSet(newSet);
+    }
+
+    private static long getMinIntervalStart(List<GtidSet.Interval> intervals) {
+        return Collections.min(intervals, Comparator.comparingLong(GtidSet.Interval::getStart))
+                .getStart();
     }
 
     /**
@@ -79,12 +109,5 @@ public class GtidUtils {
             }
         }
         return new GtidSet(newSet);
-    }
-
-    private static long getIntervalEnd(GtidSet.UUIDSet uuidSet) {
-        return uuidSet.getIntervals().stream()
-                .mapToLong(GtidSet.Interval::getEnd)
-                .max()
-                .getAsLong();
     }
 }

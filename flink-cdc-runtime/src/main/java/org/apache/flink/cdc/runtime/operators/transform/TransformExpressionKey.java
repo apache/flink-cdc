@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,11 +63,11 @@ public class TransformExpressionKey implements Serializable {
     }
 
     public List<String> getArgumentNames() {
-        return argumentNames;
+        return Collections.unmodifiableList(argumentNames);
     }
 
     public List<Class<?>> getArgumentClasses() {
-        return argumentClasses;
+        return Collections.unmodifiableList(argumentClasses);
     }
 
     public Class<?> getReturnClass() {
@@ -74,7 +75,7 @@ public class TransformExpressionKey implements Serializable {
     }
 
     public Map<String, String> getColumnNameMap() {
-        return columnNameMap;
+        return Collections.unmodifiableMap(columnNameMap);
     }
 
     public static TransformExpressionKey of(

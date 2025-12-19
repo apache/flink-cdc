@@ -61,6 +61,13 @@ public class Schema implements Serializable {
     // Used to index column by name
     private transient volatile Map<String, Column> nameToColumns;
 
+    // Transiently cached fields that are lazily calculated
+    private transient List<String> columnNames;
+
+    private transient List<DataType> columnDataTypes;
+
+    private transient DataType columnRowType;
+
     /**
      * Schema might be used as a LoadingCache key frequently, and maintaining a cache of hashCode
      * would be more efficient.
@@ -104,14 +111,24 @@ public class Schema implements Serializable {
 
     /** Returns all column names. It does not distinguish between different kinds of columns. */
     public List<String> getColumnNames() {
-        return columns.stream().map(Column::getName).collect(Collectors.toList());
+        if (columnNames == null) {
+            columnNames =
+                    Collections.unmodifiableList(
+                            columns.stream().map(Column::getName).collect(Collectors.toList()));
+        }
+        return columnNames;
     }
 
     /**
      * Returns all column data types. It does not distinguish between different kinds of columns.
      */
     public List<DataType> getColumnDataTypes() {
-        return columns.stream().map(Column::getType).collect(Collectors.toList());
+        if (columnDataTypes == null) {
+            columnDataTypes =
+                    Collections.unmodifiableList(
+                            columns.stream().map(Column::getType).collect(Collectors.toList()));
+        }
+        return columnDataTypes;
     }
 
     /** Returns the primary keys of the table or data collection. */
@@ -159,10 +176,13 @@ public class Schema implements Serializable {
      * @see DataTypes#ROW(DataField...)
      */
     public DataType toRowDataType() {
-        final DataField[] fields =
-                columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
-        // the row should never be null
-        return DataTypes.ROW(fields).notNull();
+        if (columnRowType == null) {
+            final DataField[] fields =
+                    columns.stream().map(Schema::columnToField).toArray(DataField[]::new);
+            // the row should never be null
+            columnRowType = DataTypes.ROW(fields).notNull();
+        }
+        return columnRowType;
     }
 
     /** Returns a copy of the schema with a replaced list of {@link Column}. */

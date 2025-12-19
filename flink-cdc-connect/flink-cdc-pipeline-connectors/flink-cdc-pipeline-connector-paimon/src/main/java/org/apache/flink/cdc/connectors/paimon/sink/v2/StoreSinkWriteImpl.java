@@ -33,6 +33,7 @@ import org.apache.paimon.memory.HeapMemorySegmentPool;
 import org.apache.paimon.memory.MemoryPoolFactory;
 import org.apache.paimon.memory.MemorySegmentPool;
 import org.apache.paimon.operation.FileStoreWrite;
+import org.apache.paimon.operation.WriteRestore;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.sink.CommitMessage;
 import org.apache.paimon.table.sink.SinkRecord;
@@ -118,7 +119,7 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
                 "memoryPool and memoryPoolFactory cannot be set at the same time.");
 
         TableWriteImpl<?> tableWrite =
-                table.newWrite(commitUser, (part, bucket) -> true)
+                table.newWrite(commitUser)
                         .withIOManager(paimonIOManager)
                         .withIgnorePreviousFiles(ignorePreviousFiles);
 
@@ -129,12 +130,13 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
         if (memoryPoolFactory != null) {
             return tableWrite.withMemoryPoolFactory(memoryPoolFactory);
         } else {
-            return tableWrite.withMemoryPool(
-                    memoryPool != null
-                            ? memoryPool
-                            : new HeapMemorySegmentPool(
-                                    table.coreOptions().writeBufferSize(),
-                                    table.coreOptions().pageSize()));
+            return (TableWriteImpl<?>)
+                    tableWrite.withMemoryPool(
+                            memoryPool != null
+                                    ? memoryPool
+                                    : new HeapMemorySegmentPool(
+                                            table.coreOptions().writeBufferSize(),
+                                            table.coreOptions().pageSize()));
         }
     }
 
@@ -143,7 +145,9 @@ public class StoreSinkWriteImpl implements StoreSinkWrite {
     }
 
     @Override
-    public void withInsertOnly(boolean b) {}
+    public void setWriteRestore(WriteRestore writeRestore) {
+        this.write.withWriteRestore(writeRestore);
+    }
 
     @Override
     public SinkRecord write(InternalRow internalRow) throws Exception {

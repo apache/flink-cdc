@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.api.connector.sink2.Committer;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
@@ -138,7 +139,7 @@ public class CompactionOperatorTest {
                                 1.0f,
                                 1.0d,
                                 DecimalData.fromBigDecimal(new BigDecimal(1.0), 10, 2),
-                                9
+                                DateData.fromEpochDay(9)
                             });
             icebergWriter.write(DataChangeEvent.insertEvent(tableId, recordData), null);
             Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
@@ -149,7 +150,8 @@ public class CompactionOperatorTest {
         }
         CompactionOperator compactionOperator =
                 new CompactionOperator(
-                        catalogOptions, CompactionOptions.builder().commitInterval(1).build());
+                        catalogOptions,
+                        CompactionOptions.builder().commitInterval(1).parallelism(4).build());
         compactionOperator.processElement(
                 new StreamRecord<>(
                         new CommittableWithLineage<>(

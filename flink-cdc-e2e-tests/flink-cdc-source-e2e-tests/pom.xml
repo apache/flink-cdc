@@ -28,8 +28,8 @@ limitations under the License.
     <artifactId>flink-cdc-source-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.19>1.19.2</flink-1.19>
-        <flink-1.20>1.20.1</flink-1.20>
+        <flink-1.19>1.19.3</flink-1.19>
+        <flink-1.20>1.20.3</flink-1.20>
         <jdbc.version-1.19>3.2.0-1.19</jdbc.version-1.19>
         <jdbc.version-1.20>3.2.0-1.19</jdbc.version-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
@@ -82,13 +82,6 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-mongodb-cdc</artifactId>
-            <version>${project.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-connector-oceanbase-cdc</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
@@ -342,16 +335,6 @@ limitations under the License.
                             <artifactId>flink-sql-connector-vitess-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>vitess-cdc-connector.jar</destFileName>
-                            <type>jar</type>
-                            <outputDirectory>${project.build.directory}/dependencies
-                            </outputDirectory>
-                        </artifactItem>
-
-                        <artifactItem>
-                            <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-sql-connector-oceanbase-cdc</artifactId>
-                            <version>${project.version}</version>
-                            <destFileName>oceanbase-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

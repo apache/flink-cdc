@@ -17,10 +17,7 @@
 
 package org.apache.flink.cdc.pipeline.tests;
 
-import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.common.utils.Preconditions;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 
@@ -29,47 +26,24 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.junit.jupiter.Container;
 
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
-import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 /** End-to-end tests for mysql cdc pipeline job. */
 class MysqlE2eITCase extends PipelineTestEnvironment {
     private static final Logger LOG = LoggerFactory.getLogger(MysqlE2eITCase.class);
 
-    // ------------------------------------------------------------------------------------------
-    // MySQL Variables (we always use MySQL as the data source for easier verifying)
-    // ------------------------------------------------------------------------------------------
-    protected static final String MYSQL_TEST_USER = "mysqluser";
-    protected static final String MYSQL_TEST_PASSWORD = "mysqlpw";
-    protected static final String MYSQL_DRIVER_CLASS = "com.mysql.cj.jdbc.Driver";
-    protected static final String INTER_CONTAINER_MYSQL_ALIAS = "mysql";
-    protected static final long EVENT_WAITING_TIMEOUT = 60000L;
-
-    @Container
-    public static final MySqlContainer MYSQL =
-            (MySqlContainer)
-                    new MySqlContainer(
-                                    MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
-                            .withDatabaseName("flink-test")
-                            .withUsername("flinkuser")
-                            .withPassword("flinkpw")
-                            .withNetwork(NETWORK)
-                            .withNetworkAliases(INTER_CONTAINER_MYSQL_ALIAS)
-                            .withLogConsumer(new Slf4jLogConsumer(LOG));
-
     protected final UniqueDatabase mysqlInventoryDatabase =
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+
+    private final Function<String, String> dbNameFormatter =
+            (s) -> String.format(s, mysqlInventoryDatabase.getDatabaseName());
 
     @BeforeEach
     public void before() throws Exception {
@@ -107,22 +81,13 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
 
         validateResult(
+                dbNameFormatter,
                 "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3, Shanghai, 123567891234], op=INSERT, meta=()}",
@@ -175,12 +140,8 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[111, scooter, Big 2-wheel scooter , 5.17, null, null, null, 1], after=[], op=DELETE, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-
         validateResult(
+                dbNameFormatter,
                 "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[107, rocks, box of assorted rocks, 5.3, null, null, null], after=[107, rocks, box of assorted rocks, 5.1, null, null, null], op=UPDATE, meta=()}",
                 "AddColumnEvent{tableId=%s.products, addedColumns=[ColumnWithPosition{column=`new_col` INT, position=LAST, existedColumnName=null}]}",
@@ -217,22 +178,11 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
 
         validateResult(
+                dbNameFormatter,
                 "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
                 "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
@@ -275,22 +225,11 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
 
         validateResult(
+                dbNameFormatter,
                 "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512)}, primaryKeys=id, options=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3, Shanghai, 123567891234], op=INSERT, meta=()}",
@@ -307,8 +246,6 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                 "DataChangeEvent{tableId=%s.products, before=[], after=[101, scooter, Small 2-wheel scooter, 3.14, red, {\"key1\": \"value1\"}, {\"coordinates\":[1,1],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[], after=[102, car battery, 12V car battery, 8.1, white, {\"key2\": \"value2\"}, {\"coordinates\":[2,2],\"type\":\"Point\",\"srid\":0}], op=INSERT, meta=()}");
 
-        LOG.info("Begin incremental reading stage.");
-        // generate binlogs
         String mysqlJdbcUrl =
                 String.format(
                         "jdbc:mysql://%s:%s/%s",
@@ -372,12 +309,8 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DropTableEvent{tableId=%s.products}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-
         validateResult(
+                dbNameFormatter,
                 "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[107, rocks, box of assorted rocks, 5.3, null, null, null], after=[107, rocks, box of assorted rocks, 5.1, null, null, null], op=UPDATE, meta=()}",
                 "AddColumnEvent{tableId=%s.products, addedColumns=[ColumnWithPosition{column=`new_col` INT, position=LAST, existedColumnName=null}]}",
@@ -429,23 +362,12 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                         MYSQL_TEST_PASSWORD,
                         mysqlInventoryDatabase.getDatabaseName(),
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         LOG.info("Pipeline job is running");
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234, +I], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-        waitUntilSpecificEvent(
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[], after=[109, spare tire, 24 inch spare tire, 22.2, null, null, null, +I], op=INSERT, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-
         validateResult(
+                dbNameFormatter,
                 "CreateTableEvent{tableId=%s.customers, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`address` VARCHAR(1024),`phone_number` VARCHAR(512),`op_type` STRING NOT NULL}, primaryKeys=id, options=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[104, user_4, Shanghai, 123567891234, +I], op=INSERT, meta=()}",
                 "DataChangeEvent{tableId=%s.customers, before=[], after=[103, user_3, Shanghai, 123567891234, +I], op=INSERT, meta=()}",
@@ -521,12 +443,8 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
             throw e;
         }
 
-        waitUntilSpecificEvent(
-                String.format(
-                        "DropTableEvent{tableId=%s.products}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-
         validateResult(
+                dbNameFormatter,
                 "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null, -U], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null, +U], op=UPDATE, meta=()}",
                 "DataChangeEvent{tableId=%s.products, before=[107, rocks, box of assorted rocks, 5.3, null, null, null, -U], after=[107, rocks, box of assorted rocks, 5.1, null, null, null, +U], op=UPDATE, meta=()}",
                 "AddColumnEvent{tableId=%s.products, addedColumns=[ColumnWithPosition{column=`new_col` INT, position=AFTER, existedColumnName=point_c}]}",
@@ -605,10 +523,7 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                         logFileName,
                         logPosition,
                         parallelism);
-        Path mysqlCdcJar = TestUtils.getResource("mysql-cdc-pipeline-connector.jar");
-        Path valuesCdcJar = TestUtils.getResource("values-cdc-pipeline-connector.jar");
-        Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
-        submitPipelineJob(pipelineJob, mysqlCdcJar, valuesCdcJar, mysqlDriverJar);
+        submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));
         try (Connection connection = mysqlInventoryDatabase.getJdbcConnection();
                 Statement statement = connection.createStatement()) {
@@ -616,38 +531,8 @@ class MysqlE2eITCase extends PipelineTestEnvironment {
                     "UPDATE products SET description='18oz carpenter hammer' WHERE id=106;");
         }
         validateResult(
-                String.format(
-                        "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
-                        mysqlInventoryDatabase.getDatabaseName()),
-                String.format(
-                        "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}",
-                        mysqlInventoryDatabase.getDatabaseName()));
-    }
-
-    private void validateResult(String... expectedEvents) throws Exception {
-        String dbName = mysqlInventoryDatabase.getDatabaseName();
-        for (String event : expectedEvents) {
-            waitUntilSpecificEvent(String.format(event, dbName, dbName));
-        }
-    }
-
-    private void waitUntilSpecificEvent(String event) throws Exception {
-        boolean result = false;
-        long endTimeout = System.currentTimeMillis() + MysqlE2eITCase.EVENT_WAITING_TIMEOUT;
-        while (System.currentTimeMillis() < endTimeout) {
-            String stdout = taskManagerConsumer.toUtf8String();
-            if (stdout.contains(event + "\n")) {
-                result = true;
-                break;
-            }
-            Thread.sleep(1000);
-        }
-        if (!result) {
-            throw new TimeoutException(
-                    "failed to get specific event: "
-                            + event
-                            + " from stdout: "
-                            + taskManagerConsumer.toUtf8String());
-        }
+                dbNameFormatter,
+                "CreateTableEvent{tableId=%s.products, schema=columns={`id` INT NOT NULL,`name` VARCHAR(255) NOT NULL 'flink',`description` VARCHAR(512),`weight` FLOAT,`enum_c` STRING 'red',`json_c` STRING,`point_c` STRING}, primaryKeys=id, options=()}",
+                "DataChangeEvent{tableId=%s.products, before=[106, hammer, 16oz carpenter's hammer, 1.0, null, null, null], after=[106, hammer, 18oz carpenter hammer, 1.0, null, null, null], op=UPDATE, meta=()}");
     }
 }

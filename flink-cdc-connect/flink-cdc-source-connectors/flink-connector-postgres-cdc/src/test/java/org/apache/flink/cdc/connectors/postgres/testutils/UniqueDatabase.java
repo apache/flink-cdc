@@ -26,6 +26,8 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -47,6 +49,8 @@ import java.util.stream.Collectors;
  */
 public class UniqueDatabase {
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
+
+    private static final String DROP_DATABASE_DDL = "DROP SCHEMA IF EXISTS $DBNAME$;";
 
     private final PostgreSQLContainer container;
     private final String databaseName;
@@ -155,6 +159,20 @@ public class UniqueDatabase {
         }
     }
 
+    /** Drop the database if it is existing. */
+    public void dropDatabase() {
+        try {
+            try (Connection connection =
+                            PostgresTestBase.getJdbcConnection(container, databaseName);
+                    Statement statement = connection.createStatement()) {
+                final String dropDatabaseStatement = convertSQL(DROP_DATABASE_DDL);
+                statement.execute(dropDatabaseStatement);
+            }
+        } catch (final Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** Drop slot from database. */
     public boolean removeSlot(String slotName) {
         String sql = String.format("SELECT pg_drop_replication_slot('%s')", slotName);
@@ -164,6 +182,25 @@ public class UniqueDatabase {
             return true;
         } catch (Exception exception) {
             return false;
+        }
+    }
+
+    /** Drop slot from database. */
+    public String checkSlot(String slotName) {
+        String sql =
+                String.format(
+                        "SELECT slot_name from pg_replication_slots where slot_name = '%s'",
+                        slotName);
+        try (Connection connection = PostgresTestBase.getJdbcConnection(container, databaseName);
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString("slot_name");
+                }
+                return String.format("Replication slot \"%s\" does not exist", slotName);
+            }
+        } catch (Exception exception) {
+            return exception.getMessage();
         }
     }
 

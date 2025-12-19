@@ -75,7 +75,6 @@ public class IcebergTypeUtils {
             case DECIMAL:
                 return Types.DecimalType.of(precision, scale);
             case TINYINT:
-                return new Types.BooleanType();
             case SMALLINT:
             case INTEGER:
                 return new Types.IntegerType();
@@ -141,10 +140,10 @@ public class IcebergTypeUtils {
                         };
                 break;
             case TINYINT:
-                fieldGetter = row -> row.getBoolean(fieldPos);
+                fieldGetter = row -> (int) row.getByte(fieldPos);
                 break;
             case SMALLINT:
-                fieldGetter = row -> row.getInt(fieldPos);
+                fieldGetter = row -> ((Short) row.getShort(fieldPos)).intValue();
                 break;
             case BIGINT:
                 fieldGetter = row -> row.getLong(fieldPos);
@@ -156,9 +155,13 @@ public class IcebergTypeUtils {
                 fieldGetter = row -> row.getDouble(fieldPos);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = (row) -> row.getInt(fieldPos);
+                break;
+            case DATE:
+                fieldGetter = (row) -> (int) row.getDate(fieldPos).toEpochDay();
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = (row) -> (int) row.getTime(fieldPos).toMillisOfDay();
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =
@@ -179,9 +182,9 @@ public class IcebergTypeUtils {
             case TIMESTAMP_WITH_TIME_ZONE:
                 fieldGetter =
                         (row) ->
-                                TimestampData.fromTimestamp(
+                                TimestampData.fromInstant(
                                         row.getZonedTimestamp(fieldPos, getPrecision(fieldType))
-                                                .toTimestamp());
+                                                .toInstant());
                 break;
             case ROW:
                 final int rowFieldCount = getFieldCount(fieldType);

@@ -180,7 +180,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                                             column.getName(),
                                             LogicalTypeConversion.toDataType(
                                                     DataTypeUtils.toFlinkDataType(column.getType())
-                                                            .getLogicalType())));
+                                                            .getLogicalType()),
+                                            column.getComment()));
             List<String> partitionKeys = new ArrayList<>();
             List<String> primaryKeys = schema.primaryKeys();
             if (partitionMaps.containsKey(event.tableId())) {
@@ -298,9 +299,9 @@ public class PaimonMetadataApplier implements MetadataApplier {
             event.getDroppedColumnNames()
                     .forEach((column) -> tableChangeList.addAll(SchemaChangeProvider.drop(column)));
             catalog.alterTable(tableIdToIdentifier(event), tableChangeList, true);
-        } catch (Catalog.TableNotExistException
-                | Catalog.ColumnAlreadyExistException
-                | Catalog.ColumnNotExistException e) {
+        } catch (Catalog.TableNotExistException | Catalog.ColumnNotExistException e) {
+            LOG.warn("Failed to apply DropColumnEvent, skip it.", e);
+        } catch (Catalog.ColumnAlreadyExistException e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }

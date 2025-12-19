@@ -77,6 +77,9 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
     private static final int USE_PRE_HIGHWATERMARK_HOOK = 2;
     private static final int USE_POST_HIGHWATERMARK_HOOK = 3;
 
+    private static final StreamExecutionEnvironment env =
+            StreamExecutionEnvironment.getExecutionEnvironment();
+
     @Test
     void testGetMongoDBVersion() {
         MongoDBSourceConfig config =
@@ -470,7 +473,6 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                 customerDatabase);
         MONGO_CONTAINER.executeCommandFileInDatabase("customer", customerDatabase);
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(1000);
         env.setParallelism(1);
 
@@ -517,6 +519,15 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                     mongoCollection.updateOne(
                             Filters.eq("cid", 2000L), Updates.set("address", "Pittsburgh"));
                     mongoCollection.deleteOne(Filters.eq("cid", 1019L));
+
+                    // Rarely happens, but if there's no operation or heartbeat events between
+                    // watermark #a (the ChangeStream opLog caused by the last event in this hook)
+                    // and watermark #b (the calculated high watermark that limits the bounded
+                    // back-filling stream fetch task), the last event of hook will be missed since
+                    // back-filling task reads between [loW, hiW) (high watermark not included).
+                    // Workaround: insert a dummy event in another collection to forcefully push
+                    // opLog forward.
+                    database.getCollection("customers_1").insertOne(new Document());
                 };
 
         switch (hookType) {
@@ -571,7 +582,6 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                     customerDatabase);
         }
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
@@ -743,7 +753,6 @@ class MongoDBFullChangelogITCase extends MongoDBSourceTestBase {
                     customerDatabase);
         }
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);

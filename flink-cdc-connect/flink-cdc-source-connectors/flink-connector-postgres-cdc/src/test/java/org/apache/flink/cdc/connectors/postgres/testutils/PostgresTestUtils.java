@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.postgres.testutils;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.highavailability.nonha.embedded.EmbeddedHaServices;
 import org.apache.flink.runtime.highavailability.nonha.embedded.HaLeadershipControl;
 import org.apache.flink.runtime.minicluster.MiniCluster;
 import org.apache.flink.table.api.TableResult;
@@ -71,11 +72,24 @@ public class PostgresTestUtils {
         }
     }
 
-    protected static void triggerJobManagerFailover(
+    public static void ensureJmLeaderServiceExists(
+            HaLeadershipControl leadershipControl, JobID jobId) throws Exception {
+        EmbeddedHaServices control = (EmbeddedHaServices) leadershipControl;
+
+        // Make sure JM leader service has been created, or an NPE might be thrown when we're
+        // triggering JM failover later.
+        control.getJobManagerLeaderElection(jobId).close();
+    }
+
+    public static void triggerJobManagerFailover(
             JobID jobId, MiniCluster miniCluster, Runnable afterFailAction) throws Exception {
         final HaLeadershipControl haLeadershipControl = miniCluster.getHaLeadershipControl().get();
+        ensureJmLeaderServiceExists(haLeadershipControl, jobId);
         haLeadershipControl.revokeJobMasterLeadership(jobId).get();
+
         afterFailAction.run();
+
+        ensureJmLeaderServiceExists(haLeadershipControl, jobId);
         haLeadershipControl.grantJobMasterLeadership(jobId).get();
     }
 

@@ -175,7 +175,9 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                             .setColumnName(column.getName())
                             .setOrdinalPosition(-1)
                             .setColumnComment(column.getComment())
-                            .setDefaultValue(column.getDefaultValueExpression());
+                            .setDefaultValue(
+                                    StarRocksUtils.convertInvalidTimestampDefaultValue(
+                                            column.getDefaultValueExpression(), column.getType()));
             toStarRocksDataType(column, false, builder);
             addColumns.add(builder.build());
         }

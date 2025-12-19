@@ -46,6 +46,8 @@ public class DorisSchemaUtils {
     public static final String DEFAULT_DATE = "1970-01-01";
     public static final String DEFAULT_DATETIME = "1970-01-01 00:00:00";
 
+    public static final String INVALID_OR_MISSING_DATATIME = "0000-00-00 00:00:00";
+
     /**
      * Get partition info by config. Currently only supports DATE/TIMESTAMP AUTO RANGE PARTITION and
      * doris version should greater than 2.1.6
