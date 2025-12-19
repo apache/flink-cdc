@@ -108,12 +108,12 @@ class MySqlRecordEmitterTest {
 
     private MySqlBinlogSplitState createBinlogSplitState() {
         return new MySqlBinlogSplitState(
-          new MySqlBinlogSplit(
-            "binlog-split",
-            BinlogOffset.ofEarliest(),
-            BinlogOffset.ofNonStopping(),
-            Collections.emptyList(),
-            Collections.emptyMap(),
-            0));
+                new MySqlBinlogSplit(
+                        "binlog-split",
+                        BinlogOffset.ofEarliest(),
+                        BinlogOffset.ofNonStopping(),
+                        Collections.emptyList(),
+                        Collections.emptyMap(),
+                        0));
     }
 }

@@ -741,11 +741,7 @@ class MySqlSourceReaderTest extends MySqlSourceTestBase {
                 MySqlSourceReaderMetrics sourceReaderMetrics,
                 boolean includeSchemaChanges,
                 int limit) {
-            super(
-                    debeziumDeserializationSchema,
-                    sourceReaderMetrics,
-                    includeSchemaChanges,
-                    false);
+            super(debeziumDeserializationSchema, sourceReaderMetrics, includeSchemaChanges, false);
             this.debeziumDeserializationSchema = debeziumDeserializationSchema;
             this.sourceReaderMetrics = sourceReaderMetrics;
             this.includeSchemaChanges = includeSchemaChanges;
