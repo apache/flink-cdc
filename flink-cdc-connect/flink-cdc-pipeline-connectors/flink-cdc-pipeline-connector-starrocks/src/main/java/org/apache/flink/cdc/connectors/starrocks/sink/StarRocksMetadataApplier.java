@@ -130,6 +130,12 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 truncateTableEvent -> {
                     applyTruncateTable(truncateTableEvent);
                     return null;
+                },
+                alterTableCommentEvent -> {
+                    // TODO Currently, column comments cannot be modified.
+                    // See
+                    // https://docs.starrocks.io/docs/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#alter-table-comment-from-v31
+                    return null;
                 });
     }
 

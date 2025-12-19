@@ -204,6 +204,7 @@ public class SchemaMergingUtils {
 
         Map<String, DataType> oldTypeMapping = new HashMap<>();
         Map<String, DataType> newTypeMapping = new HashMap<>();
+        Map<String, String> comments = new HashMap<>();
         List<AddColumnEvent.ColumnWithPosition> appendedColumns = new ArrayList<>();
 
         String afterWhichColumnPosition = null;
@@ -231,6 +232,9 @@ public class SchemaMergingUtils {
                 }
             }
             afterWhichColumnPosition = afterColumn.getName();
+            if (afterColumn.getComment() != null) {
+                comments.put(columnName, afterColumn.getComment());
+            }
         }
 
         List<SchemaChangeEvent> schemaChangeEvents = new ArrayList<>();
@@ -240,7 +244,7 @@ public class SchemaMergingUtils {
 
         if (!newTypeMapping.isEmpty()) {
             schemaChangeEvents.add(
-                    new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping));
+                    new AlterColumnTypeEvent(tableId, newTypeMapping, oldTypeMapping, comments));
         }
 
         if (!beforeColumns.isEmpty()) {
