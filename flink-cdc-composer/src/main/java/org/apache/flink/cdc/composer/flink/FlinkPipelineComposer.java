@@ -65,20 +65,7 @@ public class FlinkPipelineComposer implements PipelineComposer {
     public static FlinkPipelineComposer ofRemoteCluster(
             org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
         StreamExecutionEnvironment env = new StreamExecutionEnvironment(flinkConfig);
-        additionalJars.forEach(
-                jarPath -> {
-                    try {
-                        FlinkEnvironmentUtils.addJar(
-                                env,
-                                jarPath.makeQualified(jarPath.getFileSystem()).toUri().toURL());
-                    } catch (Exception e) {
-                        throw new RuntimeException(
-                                String.format(
-                                        "Unable to convert JAR path \"%s\" to URL when adding JAR to Flink environment",
-                                        jarPath),
-                                e);
-                    }
-                });
+        addAdditionalJars(env, additionalJars);
         return new FlinkPipelineComposer(env, false);
     }
 
@@ -86,9 +73,24 @@ public class FlinkPipelineComposer implements PipelineComposer {
         return new FlinkPipelineComposer(env, false);
     }
 
+    public static FlinkPipelineComposer ofMiniCluster(
+            org.apache.flink.configuration.Configuration flinkConfig) {
+        return new FlinkPipelineComposer(
+                StreamExecutionEnvironment.getExecutionEnvironment(flinkConfig), true);
+    }
+
+    @VisibleForTesting
     public static FlinkPipelineComposer ofMiniCluster() {
         return new FlinkPipelineComposer(
                 StreamExecutionEnvironment.getExecutionEnvironment(), true);
+    }
+
+    public static FlinkPipelineComposer ofMiniCluster(
+            org.apache.flink.configuration.Configuration flinkConfig, List<Path> additionalJars) {
+        StreamExecutionEnvironment localEnvironment =
+                StreamExecutionEnvironment.getExecutionEnvironment(flinkConfig);
+        addAdditionalJars(localEnvironment, additionalJars);
+        return new FlinkPipelineComposer(localEnvironment, true);
     }
 
     private FlinkPipelineComposer(StreamExecutionEnvironment env, boolean isBlocking) {
@@ -293,5 +295,23 @@ public class FlinkPipelineComposer implements PipelineComposer {
     @VisibleForTesting
     public StreamExecutionEnvironment getEnv() {
         return env;
+    }
+
+    private static void addAdditionalJars(
+            StreamExecutionEnvironment env, List<Path> additionalJars) {
+        additionalJars.forEach(
+                jarPath -> {
+                    try {
+                        FlinkEnvironmentUtils.addJar(
+                                env,
+                                jarPath.makeQualified(jarPath.getFileSystem()).toUri().toURL());
+                    } catch (Exception e) {
+                        throw new RuntimeException(
+                                String.format(
+                                        "Unable to convert JAR path \"%s\" to URL when adding JAR to Flink environment",
+                                        jarPath),
+                                e);
+                    }
+                });
     }
 }
