@@ -92,7 +92,8 @@ public abstract class GaussDBTestBase extends AbstractTestBase {
         props.setProperty("password", PASSWORD);
         // Extended timeouts for high-latency network (in seconds)
         props.setProperty("connectTimeout", "60");
-        props.setProperty("socketTimeout", "60");
+        // Set socketTimeout to 0 (infinite) to prevent timeout during long-running CDC operations
+        props.setProperty("socketTimeout", "0");
         props.setProperty("loginTimeout", "60");
         props.setProperty("tcpKeepAlive", "true");
 

@@ -86,8 +86,10 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         this.messageDecoder =
                 Objects.requireNonNull(messageDecoder, "messageDecoder must not be null");
         this.typeRegistry = Objects.requireNonNull(typeRegistry, "typeRegistry must not be null");
-        // Do not use the passed-in connection: it may be created by GaussDB JDBC driver which
-        // does not support unwrap(), while this class requires PostgreSQL JDBC driver's replication
+        // Do not use the passed-in connection: it may be created by GaussDB JDBC driver
+        // which
+        // does not support unwrap(), while this class requires PostgreSQL JDBC driver's
+        // replication
         // API.
         // Let connectIfNeeded() create a PostgreSQL JDBC connection via
         // openReplicationConnection().
@@ -379,31 +381,53 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         if (c == null) {
             throw new SQLException("Replication connection is not initialized");
         }
-        final PGConnection pgConnection = c.unwrap(PGConnection.class);
 
-        ChainedLogicalStreamBuilder builder =
-                pgConnection
-                        .getReplicationAPI()
-                        .replicationStream()
-                        .logical()
-                        .withSlotName("\"" + slotName + "\"")
-                        // GaussDB-specific options from official documentation
-                        .withSlotOption("include-xids", false)
-                        .withSlotOption("skip-empty-xacts", true);
-        if (startLsn != null) {
-            builder = builder.withStartPosition(convertToGaussDBLsn(startLsn));
+        LOG.info(
+                "Starting PG replication stream with slot '{}', startLsn={}, plugin={}",
+                slotName,
+                startLsn,
+                pluginName);
+
+        try {
+            final PGConnection pgConnection = c.unwrap(PGConnection.class);
+
+            ChainedLogicalStreamBuilder builder =
+                    pgConnection
+                            .getReplicationAPI()
+                            .replicationStream()
+                            .logical()
+                            .withSlotName(slotName) // GaussDB may not need extra quotes
+                            // GaussDB-specific options from official documentation
+                            .withSlotOption("include-xids", false)
+                            .withSlotOption("skip-empty-xacts", true);
+            if (startLsn != null) {
+                builder = builder.withStartPosition(convertToGaussDBLsn(startLsn));
+                LOG.info("Replication stream will start from LSN: {}", startLsn);
+            } else {
+                LOG.info("Replication stream will start from current WAL position");
+            }
+            messageDecoder.setContainsMetadata(false);
+
+            if (statusUpdateInterval != null && statusUpdateInterval.toMillis() > 0) {
+                builder.withStatusInterval(
+                        Math.toIntExact(statusUpdateInterval.toMillis()), TimeUnit.MILLISECONDS);
+            }
+
+            LOG.info("Calling builder.start() to create replication stream...");
+            final PGReplicationStream stream = builder.start();
+            LOG.info("Replication stream started successfully");
+            // ensure server sees feedback quickly
+            stream.forceUpdateStatus();
+            LOG.info("Initial status update sent to server");
+            return stream;
+        } catch (SQLException e) {
+            LOG.error(
+                    "Failed to start replication stream for slot '{}': {}",
+                    slotName,
+                    e.getMessage(),
+                    e);
+            throw e;
         }
-        messageDecoder.setContainsMetadata(false);
-
-        if (statusUpdateInterval != null && statusUpdateInterval.toMillis() > 0) {
-            builder.withStatusInterval(
-                    Math.toIntExact(statusUpdateInterval.toMillis()), TimeUnit.MILLISECONDS);
-        }
-
-        final PGReplicationStream stream = builder.start();
-        // ensure server sees feedback quickly
-        stream.forceUpdateStatus();
-        return stream;
     }
 
     private static boolean isSlotAlreadyExists(SQLException e) {
@@ -429,6 +453,14 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         props.setProperty("assumeMinServerVersion", "9.4");
         props.setProperty("replication", "database");
         props.setProperty("preferQueryMode", "simple");
+        // Disable SSL for replication connection to avoid protocol mismatch
+        props.setProperty("sslmode", "disable");
+        // Add TCP keepalive to prevent connection drops
+        props.setProperty("tcpKeepAlive", "true");
+        // Increase socket timeout for replication streams
+        props.setProperty("socketTimeout", "0"); // 0 means infinite for replication
+        // Set connection timeout
+        props.setProperty("connectTimeout", "60");
 
         final Duration timeout =
                 connectorConfig.connectionTimeout() != null
@@ -438,9 +470,29 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         final int loginTimeoutSeconds =
                 (int) Math.min(Integer.MAX_VALUE, Math.max(0L, timeout.toSeconds()));
 
+        LOG.info(
+                "Opening replication connection to {}:{}/{} with user={}, replication={}, timeout={}s",
+                host,
+                port,
+                database,
+                props.getProperty("user"),
+                props.getProperty("replication"),
+                loginTimeoutSeconds);
+
         try {
             DriverManager.setLoginTimeout(loginTimeoutSeconds);
-            return DriverManager.getConnection(url, props);
+            Connection conn = DriverManager.getConnection(url, props);
+            LOG.info("Replication connection established successfully");
+            return conn;
+        } catch (SQLException e) {
+            LOG.error(
+                    "Failed to establish replication connection to {}:{}/{}. Error: {}",
+                    host,
+                    port,
+                    database,
+                    e.getMessage(),
+                    e);
+            throw e;
         } finally {
             DriverManager.setLoginTimeout(previousLoginTimeoutSeconds);
         }

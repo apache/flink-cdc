@@ -252,7 +252,8 @@ CREATE TABLE orders_source (
     'schema-name' = 'public',
     'table-name' = 'orders',
     'slot.name' = 'flink_cdc_orders',
-    'decoding.plugin.name' = 'mppdb_decoding'
+    'decoding.plugin.name' = 'mppdb_decoding',
+    'scan.incremental.snapshot.enabled' = 'true'
 );
 ```
 

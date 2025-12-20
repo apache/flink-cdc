@@ -80,9 +80,11 @@ public class GaussDBTypeUtils {
             case "integer":
             case "int":
             case "int4":
+            case "serial":
                 return DataTypes.INT();
             case "bigint":
             case "int8":
+            case "bigserial":
                 return DataTypes.BIGINT();
             case "smallint":
             case "int2":

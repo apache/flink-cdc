@@ -24,6 +24,9 @@ import org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceConfig
 import org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffsetFactory;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Duration;
 import java.util.Properties;
 
@@ -33,6 +36,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 @Experimental
 public class GaussDBSourceBuilder<T> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(GaussDBSourceBuilder.class);
     private final GaussDBSourceConfigFactory configFactory = new GaussDBSourceConfigFactory();
     private DebeziumDeserializationSchema<T> deserializer;
 
@@ -272,10 +276,17 @@ public class GaussDBSourceBuilder<T> {
      * @return a GaussDBIncrementalSource with the settings made for this builder.
      */
     public GaussDBIncrementalSource<T> build() {
+        LOG.info("=== GaussDBSourceBuilder.build() STARTED ===");
+        LOG.info("Building GaussDBIncrementalSource with config factory: {}", configFactory);
         GaussDBOffsetFactory offsetFactory = new GaussDBOffsetFactory();
+        LOG.info("Created GaussDBOffsetFactory");
         GaussDBDialect dialect = new GaussDBDialect(configFactory.create(0));
-        return new GaussDBIncrementalSource<>(
-                configFactory, checkNotNull(deserializer), offsetFactory, dialect);
+        LOG.info("Created GaussDBDialect");
+        GaussDBIncrementalSource<T> source =
+                new GaussDBIncrementalSource<>(
+                        configFactory, checkNotNull(deserializer), offsetFactory, dialect);
+        LOG.info("=== GaussDBIncrementalSource created successfully ===");
+        return source;
     }
 
     public GaussDBSourceConfigFactory getConfigFactory() {

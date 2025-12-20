@@ -38,6 +38,8 @@ import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -46,6 +48,7 @@ import java.util.Map;
 /** The dialect for GaussDB. */
 public class GaussDBDialect implements JdbcDataSourceDialect {
 
+    private static final Logger LOG = LoggerFactory.getLogger(GaussDBDialect.class);
     private static final long serialVersionUID = 1L;
     private static final String CONNECTION_NAME = "gaussdb-cdc-connector";
 
@@ -65,8 +68,14 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
 
     @Override
     public JdbcConnection openJdbcConnection(JdbcSourceConfig sourceConfig) {
+        LOG.info("=== GaussDBDialect.openJdbcConnection STARTED ===");
         try {
             GaussDBSourceConfig gaussDBSourceConfig = (GaussDBSourceConfig) sourceConfig;
+            LOG.info(
+                    "Creating JDBC connection to GaussDB: hostname={}, port={}, database={}",
+                    gaussDBSourceConfig.getHostname(),
+                    gaussDBSourceConfig.getPort(),
+                    gaussDBSourceConfig.getDatabaseList());
             JdbcConnection jdbcConnection =
                     new JdbcConnection(
                             gaussDBSourceConfig.getDbzConnectorConfig().getJdbcConfig(),
@@ -74,8 +83,10 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
                             "\"",
                             "\"");
             jdbcConnection.connect();
+            LOG.info("=== JDBC connection established successfully ===");
             return jdbcConnection;
         } catch (Exception e) {
+            LOG.error("=== Failed to open JDBC connection ===", e);
             throw new FlinkRuntimeException(e);
         }
     }
@@ -87,9 +98,15 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
 
     @Override
     public List<TableId> discoverDataCollections(JdbcSourceConfig sourceConfig) {
+        LOG.info("=== GaussDBDialect.discoverDataCollections STARTED ===");
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             GaussDBSourceConfig gaussDBSourceConfig = (GaussDBSourceConfig) sourceConfig;
             List<String> schemaList = gaussDBSourceConfig.getSchemaList();
+            LOG.info(
+                    "Discovering tables in database: {}, schemas: {}, table filters: {}",
+                    sourceConfig.getDatabaseList().get(0),
+                    schemaList,
+                    sourceConfig.getTableFilters());
 
             List<TableId> tables =
                     TableDiscoveryUtils.listTables(
@@ -98,21 +115,27 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
                             jdbc,
                             sourceConfig.getTableFilters(),
                             schemaList);
+            LOG.info("=== Discovered {} tables: {} ===", tables.size(), tables);
             return tables;
         } catch (SQLException e) {
+            LOG.error("=== Failed to discover tables ===", e);
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
         }
     }
 
     @Override
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
+        LOG.info("=== GaussDBDialect.discoverDataCollectionSchemas STARTED ===");
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
+        LOG.info("Fetching schemas for {} tables", capturedTableIds.size());
 
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             // fetch table schemas
             Map<TableId, TableChange> schemas = queryTableSchema(jdbc, capturedTableIds);
+            LOG.info("=== Successfully fetched {} table schemas ===", schemas.size());
             return schemas;
         } catch (Exception e) {
+            LOG.error("=== Failed to discover table schemas ===", e);
             throw new FlinkRuntimeException(
                     "Error to discover table schemas: " + e.getMessage(), e);
         }
@@ -179,9 +202,18 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
 
     @Override
     public FetchTask<SourceSplitBase> createFetchTask(SourceSplitBase sourceSplitBase) {
+        LOG.info(
+                "=== GaussDBDialect.createFetchTask STARTED for split: {} ===",
+                sourceSplitBase.splitId());
         if (sourceSplitBase.isSnapshotSplit()) {
+            LOG.info(
+                    "Creating GaussDBScanFetchTask for snapshot split: {}",
+                    sourceSplitBase.splitId());
             return new GaussDBScanFetchTask(sourceSplitBase.asSnapshotSplit());
         } else {
+            LOG.info(
+                    "Creating GaussDBStreamFetchTask for stream split: {}",
+                    sourceSplitBase.splitId());
             this.streamFetchTask = new GaussDBStreamFetchTask(sourceSplitBase.asStreamSplit());
             return this.streamFetchTask;
         }
