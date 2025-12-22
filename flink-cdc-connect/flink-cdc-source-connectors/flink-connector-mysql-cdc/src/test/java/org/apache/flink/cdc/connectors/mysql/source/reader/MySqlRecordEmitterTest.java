@@ -89,7 +89,7 @@ class MySqlRecordEmitterTest {
 
     private MySqlRecordEmitter<Void> createRecordEmitter() {
         return new MySqlRecordEmitter<>(
-                new DebeziumDeserializationSchema<>() {
+                new DebeziumDeserializationSchema<Void>() {
                     @Override
                     public void deserialize(SourceRecord record, Collector<Void> out) {
                         throw new UnsupportedOperationException();
