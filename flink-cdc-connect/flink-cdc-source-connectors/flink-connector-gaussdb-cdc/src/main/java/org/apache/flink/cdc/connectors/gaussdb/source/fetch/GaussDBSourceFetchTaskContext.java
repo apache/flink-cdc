@@ -52,7 +52,10 @@ import java.util.List;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 
-/** The context of {@link GaussDBScanFetchTask} and {@link GaussDBStreamFetchTask}. */
+/**
+ * The context of {@link GaussDBScanFetchTask} and
+ * {@link GaussDBStreamFetchTask}.
+ */
 public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(GaussDBSourceFetchTaskContext.class);
@@ -62,8 +65,9 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private AbstractMessageDecoder messageDecoder;
     private Partition partition;
     private ChangeEventQueue<DataChangeEvent> queue;
-    private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection
-            replicationConnection;
+    private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection replicationConnection;
+    // Separate replication connection for backfill tasks to avoid slot contention
+    private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection backfillReplicationConnection;
 
     public GaussDBSourceFetchTaskContext(
             JdbcSourceConfig sourceConfig, GaussDBDialect dataSourceDialect) {
@@ -82,27 +86,25 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
         setDbzConnectorConfig(dbzConfig);
 
-        // Initialize ChangeEventQueue for passing events between fetcher and source reader
+        // Initialize ChangeEventQueue for passing events between fetcher and source
+        // reader
         if (queue == null) {
-            final int queueSize =
-                    sourceSplitBase instanceof SnapshotSplit
-                            ? sourceConfig.getSplitSize()
-                            : dbzConfig.getMaxQueueSize();
-            queue =
-                    new ChangeEventQueue.Builder<DataChangeEvent>()
-                            .pollInterval(dbzConfig.getPollInterval())
-                            .maxBatchSize(dbzConfig.getMaxBatchSize())
-                            .maxQueueSize(queueSize)
-                            .maxQueueSizeInBytes(dbzConfig.getMaxQueueSizeInBytes())
-                            .loggingContextSupplier(
-                                    () ->
-                                            LoggingContext.forConnector(
-                                                    "gaussdb-cdc",
-                                                    dbzConfig.getLogicalName(),
-                                                    "gaussdb-cdc-connector-task"))
-                            // do not buffer any element, we use signal event
-                            // .buffering()
-                            .build();
+            final int queueSize = sourceSplitBase instanceof SnapshotSplit
+                    ? sourceConfig.getSplitSize()
+                    : dbzConfig.getMaxQueueSize();
+            queue = new ChangeEventQueue.Builder<DataChangeEvent>()
+                    .pollInterval(dbzConfig.getPollInterval())
+                    .maxBatchSize(dbzConfig.getMaxBatchSize())
+                    .maxQueueSize(queueSize)
+                    .maxQueueSizeInBytes(dbzConfig.getMaxQueueSizeInBytes())
+                    .loggingContextSupplier(
+                            () -> LoggingContext.forConnector(
+                                    "gaussdb-cdc",
+                                    dbzConfig.getLogicalName(),
+                                    "gaussdb-cdc-connector-task"))
+                    // do not buffer any element, we use signal event
+                    // .buffering()
+                    .build();
         }
 
         // Initialize partition
@@ -113,9 +115,8 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         // Initialize JDBC connection
         try {
             if (jdbcConnection == null) {
-                jdbcConnection =
-                        new GaussDBConnection(
-                                dbzConfig.getJdbcConfig(), "gaussdb-fetch-task-connection");
+                jdbcConnection = new GaussDBConnection(
+                        dbzConfig.getJdbcConfig(), "gaussdb-fetch-task-connection");
                 jdbcConnection.connect();
             }
         } catch (SQLException e) {
@@ -140,31 +141,74 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             messageDecoder = new MppdbDecodingMessageDecoder();
         }
 
-        // Initialize replication connection for streaming
-        if (replicationConnection == null && !(sourceSplitBase instanceof SnapshotSplit)) {
+        // Initialize replication connection for streaming (unbounded stream splits
+        // only)
+        // For bounded splits (backfill), use the separate backfill connection
+        if (replicationConnection == null && !isBoundedRead(sourceSplitBase)) {
             try {
-                replicationConnection = createReplicationConnection(dbzConfig);
+                replicationConnection = createReplicationConnection(dbzConfig, false);
             } catch (Exception e) {
                 throw new RuntimeException("Failed to create GaussDB replication connection", e);
             }
         }
+
+        // Initialize backfill replication connection for bounded reads
+        // This includes: SnapshotSplits and StreamSplits with ending offset (backfill)
+        // Uses a separate slot to avoid contention with the main streaming slot
+        if (backfillReplicationConnection == null && isBoundedRead(sourceSplitBase)) {
+            try {
+                LOG.info("Creating backfill replication connection for bounded read");
+                backfillReplicationConnection = createReplicationConnection(dbzConfig, true);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create GaussDB backfill replication connection", e);
+            }
+        }
     }
 
-    private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection
-            createReplicationConnection(GaussDBConnectorConfig config) throws Exception {
-        String slotName = ((GaussDBSourceConfig) sourceConfig).getSlotName();
-        String pluginName = ((GaussDBSourceConfig) sourceConfig).getDecodingPluginName();
-        // Don't drop slot on close by default - let the user manage slot lifecycle
-        boolean dropSlotOnClose = false;
+    /**
+     * Checks if the split represents a bounded read that requires a separate
+     * backfill connection.
+     * Bounded reads include SnapshotSplits and StreamSplits with a valid ending
+     * offset.
+     */
+    private boolean isBoundedRead(SourceSplitBase split) {
+        if (split instanceof SnapshotSplit) {
+            return true;
+        }
+        if (split instanceof StreamSplit) {
+            StreamSplit streamSplit = (StreamSplit) split;
+            org.apache.flink.cdc.connectors.base.source.meta.offset.Offset endingOffset = streamSplit.getEndingOffset();
+            if (endingOffset != null
+                    && endingOffset instanceof org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) {
+                org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset gaussDBEndOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) endingOffset;
+                return gaussDBEndOffset.getLsn() != null && gaussDBEndOffset.getLsn().isValid();
+            }
+        }
+        return false;
+    }
+
+    private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection createReplicationConnection(
+            GaussDBConnectorConfig config, boolean forBackfill) throws Exception {
+        GaussDBSourceConfig gaussDBConfig = (GaussDBSourceConfig) sourceConfig;
+        // Use separate slot for backfill to avoid contention
+        String slotName = forBackfill
+                ? gaussDBConfig.getSlotNameForBackfillTask()
+                : gaussDBConfig.getSlotName();
+        String pluginName = gaussDBConfig.getDecodingPluginName();
+        // Drop slot on close for backfill tasks (temporary slot)
+        boolean dropSlotOnClose = forBackfill;
         java.time.Duration statusUpdateInterval = java.time.Duration.ofSeconds(10);
 
-        // Create PostgresConnection for TypeRegistry using PostgreSQL JDBC (GaussDB compatible)
-        io.debezium.connector.postgresql.connection.PostgresConnection pgConnection =
-                createPostgresConnection(config);
+        LOG.info("Creating replication connection with slot: {}, forBackfill: {}, dropSlotOnClose: {}",
+                slotName, forBackfill, dropSlotOnClose);
+
+        // Create PostgresConnection for TypeRegistry using PostgreSQL JDBC (GaussDB
+        // compatible)
+        io.debezium.connector.postgresql.connection.PostgresConnection pgConnection = createPostgresConnection(config);
 
         // Create TypeRegistry with valid PostgresConnection
-        io.debezium.connector.postgresql.TypeRegistry typeRegistry =
-                new io.debezium.connector.postgresql.TypeRegistry(pgConnection);
+        io.debezium.connector.postgresql.TypeRegistry typeRegistry = new io.debezium.connector.postgresql.TypeRegistry(
+                pgConnection);
 
         return new io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection(
                 config,
@@ -178,36 +222,40 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     /**
-     * Creates a PostgresConnection using PostgreSQL JDBC driver for TypeRegistry initialization.
-     * GaussDB is compatible with PostgreSQL protocol, so we can use PostgreSQL JDBC driver.
+     * Creates a PostgresConnection using PostgreSQL JDBC driver for TypeRegistry
+     * initialization.
+     * GaussDB is compatible with PostgreSQL protocol, so we can use PostgreSQL JDBC
+     * driver.
      */
     private io.debezium.connector.postgresql.connection.PostgresConnection createPostgresConnection(
             GaussDBConnectorConfig config) {
         // Build PostgreSQL-compatible JDBC configuration
-        io.debezium.jdbc.JdbcConfiguration jdbcConfig =
-                io.debezium.jdbc.JdbcConfiguration.create()
-                        .with(
-                                io.debezium.jdbc.JdbcConfiguration.HOSTNAME,
-                                config.getJdbcConfig().getHostname())
-                        .with(
-                                io.debezium.jdbc.JdbcConfiguration.PORT,
-                                config.getJdbcConfig().getPort())
-                        .with(
-                                io.debezium.jdbc.JdbcConfiguration.USER,
-                                config.getJdbcConfig().getUser())
-                        .with(
-                                io.debezium.jdbc.JdbcConfiguration.PASSWORD,
-                                config.getJdbcConfig().getPassword())
-                        .with(
-                                io.debezium.jdbc.JdbcConfiguration.DATABASE,
-                                config.getJdbcConfig().getDatabase())
-                        .build();
+        io.debezium.jdbc.JdbcConfiguration jdbcConfig = io.debezium.jdbc.JdbcConfiguration.create()
+                .with(
+                        io.debezium.jdbc.JdbcConfiguration.HOSTNAME,
+                        config.getJdbcConfig().getHostname())
+                .with(
+                        io.debezium.jdbc.JdbcConfiguration.PORT,
+                        config.getJdbcConfig().getPort())
+                .with(
+                        io.debezium.jdbc.JdbcConfiguration.USER,
+                        config.getJdbcConfig().getUser())
+                .with(
+                        io.debezium.jdbc.JdbcConfiguration.PASSWORD,
+                        config.getJdbcConfig().getPassword())
+                .with(
+                        io.debezium.jdbc.JdbcConfiguration.DATABASE,
+                        config.getJdbcConfig().getDatabase())
+                .build();
 
         // Create a PostgresConnection for TypeRegistry initialization.
-        // Note: Debezium validates the server version (>= 9.4) during connection initialization.
-        // GaussDB may report a non-PostgreSQL version format (e.g. "gaussdb (GaussDB Kernel
+        // Note: Debezium validates the server version (>= 9.4) during connection
+        // initialization.
+        // GaussDB may report a non-PostgreSQL version format (e.g. "gaussdb (GaussDB
+        // Kernel
         // 505...)"),
-        // which makes the PostgreSQL JDBC driver report an incompatible major/minor version.
+        // which makes the PostgreSQL JDBC driver report an incompatible major/minor
+        // version.
         // Use a GaussDB-specific PostgresConnection wrapper to skip that validation.
         return new io.debezium.connector.gaussdb.connection.GaussDBPostgresConnection(
                 jdbcConfig, "gaussdb-type-registry");
@@ -269,10 +317,8 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public TableId getTableId(SourceRecord record) {
-        org.apache.kafka.connect.data.Struct value =
-                (org.apache.kafka.connect.data.Struct) record.value();
-        org.apache.kafka.connect.data.Struct source =
-                value.getStruct(io.debezium.data.Envelope.FieldName.SOURCE);
+        org.apache.kafka.connect.data.Struct value = (org.apache.kafka.connect.data.Struct) record.value();
+        org.apache.kafka.connect.data.Struct source = value.getStruct(io.debezium.data.Envelope.FieldName.SOURCE);
         String schemaName = source.getString(SCHEMA_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(null, schemaName, tableName);
@@ -301,6 +347,9 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         if (replicationConnection != null) {
             replicationConnection.close();
         }
+        if (backfillReplicationConnection != null) {
+            backfillReplicationConnection.close();
+        }
         if (jdbcConnection != null) {
             jdbcConnection.close();
         }
@@ -313,9 +362,17 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return messageDecoder;
     }
 
-    public io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection
-            getReplicationConnection() {
+    public io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection getReplicationConnection() {
         return replicationConnection;
+    }
+
+    /**
+     * Gets the backfill replication connection that uses a separate slot.
+     * Should be used for snapshot/backfill tasks to avoid contention with the main
+     * streaming slot.
+     */
+    public io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection getBackfillReplicationConnection() {
+        return backfillReplicationConnection;
     }
 
     public String getSlotName() {
@@ -327,7 +384,8 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     }
 
     /**
-     * Gets the split column for the given table. Uses the configured chunk key column if available,
+     * Gets the split column for the given table. Uses the configured chunk key
+     * column if available,
      * otherwise uses the first primary key column.
      */
     private Column getSplitColumn(Table table) {
@@ -355,8 +413,7 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     /** Converts a Debezium Column to a Flink RowType for split key handling. */
     private RowType getSplitType(Column splitColumn) {
         String typeName = splitColumn.typeName();
-        org.apache.flink.table.types.DataType flinkType =
-                GaussDBTypeUtils.convertGaussDBType(typeName);
+        org.apache.flink.table.types.DataType flinkType = GaussDBTypeUtils.convertGaussDBType(typeName);
 
         return RowType.of(flinkType.getLogicalType());
     }

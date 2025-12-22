@@ -118,6 +118,15 @@ public class GaussDBSourceConfig extends JdbcSourceConfig {
         return decodingPluginName;
     }
 
+    /**
+     * Returns the slot name for backfill tasks.
+     * Uses a separate slot to avoid contention with the main streaming slot.
+     * The backfill slot will be dropped after the backfill task completes.
+     */
+    public String getSlotNameForBackfillTask() {
+        return slotName + "_backfill";
+    }
+
     /** Returns the JDBC URL for config unique key. */
     public String getJdbcUrl() {
         return String.format(
@@ -138,15 +147,14 @@ public class GaussDBSourceConfig extends JdbcSourceConfig {
 
         private StartupOptions startupOptions = StartupOptions.initial();
         private List<String> databaseList;
-        private List<String> schemaList =
-                Collections.singletonList(GaussDBSourceOptions.SCHEMA_NAME.defaultValue());
+        private List<String> schemaList = Collections.singletonList(GaussDBSourceOptions.SCHEMA_NAME.defaultValue());
         private List<String> tableList;
         private int splitSize = SourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
         private int splitMetaGroupSize = SourceOptions.CHUNK_META_GROUP_SIZE.defaultValue();
-        private double distributionFactorUpper =
-                SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND.defaultValue();
-        private double distributionFactorLower =
-                SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
+        private double distributionFactorUpper = SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND
+                .defaultValue();
+        private double distributionFactorLower = SourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND
+                .defaultValue();
         private boolean includeSchemaChanges = false;
         private boolean closeIdleReaders = false;
         private Properties dbzProperties = new Properties();
@@ -161,17 +169,14 @@ public class GaussDBSourceConfig extends JdbcSourceConfig {
         private Duration connectTimeout = JdbcSourceOptions.CONNECT_TIMEOUT.defaultValue();
         private int connectMaxRetries = JdbcSourceOptions.CONNECT_MAX_RETRIES.defaultValue();
         private int connectionPoolSize = JdbcSourceOptions.CONNECTION_POOL_SIZE.defaultValue();
-        @Nullable private String chunkKeyColumn;
-        private boolean skipSnapshotBackfill =
-                JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
-        private boolean scanNewlyAddedTableEnabled =
-                JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
-        private boolean assignUnboundedChunkFirst =
-                JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
-                        .defaultValue();
+        @Nullable
+        private String chunkKeyColumn;
+        private boolean skipSnapshotBackfill = JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP.defaultValue();
+        private boolean scanNewlyAddedTableEnabled = JdbcSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED.defaultValue();
+        private boolean assignUnboundedChunkFirst = JdbcSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED
+                .defaultValue();
         private String slotName;
-        private String decodingPluginName =
-                GaussDBSourceOptions.DECODING_PLUGIN_NAME.defaultValue();
+        private String decodingPluginName = GaussDBSourceOptions.DECODING_PLUGIN_NAME.defaultValue();
 
         public Builder startupOptions(StartupOptions startupOptions) {
             this.startupOptions = startupOptions;
@@ -264,8 +269,8 @@ public class GaussDBSourceConfig extends JdbcSourceConfig {
             checkNotNull(decodingPluginName, "decoding.plugin.name is required");
             checkNotNull(dbzProperties, "debezium properties is required");
 
-            Configuration debeziumConfiguration =
-                    dbzConfiguration == null ? Configuration.from(dbzProperties) : dbzConfiguration;
+            Configuration debeziumConfiguration = dbzConfiguration == null ? Configuration.from(dbzProperties)
+                    : dbzConfiguration;
             return new GaussDBSourceConfig(
                     startupOptions,
                     databaseList,

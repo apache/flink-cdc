@@ -54,7 +54,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-/** A fetch task for reading streaming changes from GaussDB using logical replication. */
+/**
+ * A fetch task for reading streaming changes from GaussDB using logical
+ * replication.
+ */
 public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     private static final Logger LOG = LoggerFactory.getLogger(GaussDBStreamFetchTask.class);
@@ -153,20 +156,31 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         LOG.info("Creating replication stream with slot: {}, plugin: {}", slotName, pluginName);
 
-        // Get the replication connection from the context
-        io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection
-                replicationConnection = context.getReplicationConnection();
+        // Determine if this is a bounded read (backfill) or unbounded read (continuous
+        // streaming)
+        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
+                .getEndingOffset();
+        boolean isBoundedRead = endOffset != null && endOffset.getLsn() != null && endOffset.getLsn().isValid();
+
+        // Get the appropriate replication connection from the context
+        // Use backfill connection for bounded reads to avoid slot contention
+        io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection replicationConnection;
+        if (isBoundedRead && context.getBackfillReplicationConnection() != null) {
+            replicationConnection = context.getBackfillReplicationConnection();
+            LOG.info("Using backfill replication connection for bounded read");
+        } else {
+            replicationConnection = context.getReplicationConnection();
+            LOG.info("Using main replication connection for unbounded read");
+        }
 
         if (replicationConnection == null) {
             throw new SQLException("Replication connection is not initialized in context");
         }
 
         // Get the starting LSN from the stream split
-        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset startOffset =
-                (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset)
-                        streamSplit.getStartingOffset();
-        io.debezium.connector.gaussdb.connection.Lsn gaussdbLsn =
-                startOffset != null ? startOffset.getLsn() : null;
+        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset startOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
+                .getStartingOffset();
+        io.debezium.connector.gaussdb.connection.Lsn gaussdbLsn = startOffset != null ? startOffset.getLsn() : null;
 
         // Convert GaussDB LSN to PostgreSQL LSN for the replication API
         io.debezium.connector.postgresql.connection.Lsn startLsn = overrideStartLsn;
@@ -176,6 +190,20 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         // Start streaming from the specified LSN
         try {
+            // Set the ending position for bounded reads to avoid stream close/reopen
+            // This enables the reachEnd() check in ReplicationStream to return NoopMessage
+            // when target LSN is reached, instead of requiring stream restart
+            org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
+                    .getEndingOffset();
+            if (endOffset != null && endOffset.getLsn() != null && endOffset.getLsn().isValid()) {
+                io.debezium.connector.gaussdb.connection.Lsn endingLsn = endOffset.getLsn();
+                LOG.info("Setting ending position for bounded read: {}", endingLsn);
+                replicationConnection.setEndingPos(endingLsn);
+            } else {
+                // Clear ending position for unbounded reads
+                replicationConnection.setEndingPos(null);
+            }
+
             return replicationConnection.startStreaming(startLsn, null);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -190,52 +218,50 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         final AtomicLong messageCount = new AtomicLong(0);
         final AtomicLong emittedCount = new AtomicLong(0);
         final AtomicReference<ReplicationStream> streamRef = new AtomicReference<>(stream);
-        final AtomicReference<io.debezium.connector.postgresql.connection.Lsn> lastProcessedLsn =
-                new AtomicReference<>(stream.lastReceivedLsn());
+        final AtomicReference<io.debezium.connector.postgresql.connection.Lsn> lastProcessedLsn = new AtomicReference<>(
+                stream.lastReceivedLsn());
 
         final ChangeEventQueue<DataChangeEvent> queue = requireQueue(context);
         final GaussDBConnectorConfig connectorConfig = context.getDbzConnectorConfig();
-        final GaussDBSchema gaussDBSchema =
-                new GaussDBSchema(connectorConfig, context.getConnection());
+        final GaussDBSchema gaussDBSchema = new GaussDBSchema(connectorConfig, context.getConnection());
         this.pgConnectionSupplier = new LazyPgConnectionSupplier(connectorConfig);
 
         // Create a message processor that will be called for each message
-        io.debezium.connector.postgresql.connection.ReplicationStream.ReplicationMessageProcessor
-                processor =
-                        (message) -> {
-                            messageCount.incrementAndGet();
-                            try {
-                                processReplicationMessage(
-                                        context,
-                                        gaussDBSchema,
-                                        queue,
-                                        streamRef,
-                                        lastProcessedLsn,
-                                        message,
-                                        emittedCount);
-                            } catch (InterruptedException ie) {
-                                Thread.currentThread().interrupt();
-                                throw ie;
-                            } catch (Exception e) {
-                                handleMessageProcessingFailure(
-                                        context,
-                                        gaussDBSchema,
-                                        queue,
-                                        streamRef,
-                                        lastProcessedLsn,
-                                        message,
-                                        emittedCount,
-                                        e);
-                            }
+        io.debezium.connector.postgresql.connection.ReplicationStream.ReplicationMessageProcessor processor = (
+                message) -> {
+            messageCount.incrementAndGet();
+            try {
+                processReplicationMessage(
+                        context,
+                        gaussDBSchema,
+                        queue,
+                        streamRef,
+                        lastProcessedLsn,
+                        message,
+                        emittedCount);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw ie;
+            } catch (Exception e) {
+                handleMessageProcessingFailure(
+                        context,
+                        gaussDBSchema,
+                        queue,
+                        streamRef,
+                        lastProcessedLsn,
+                        message,
+                        emittedCount,
+                        e);
+            }
 
-                            if (messageCount.get() % DEFAULT_MESSAGE_LOG_INTERVAL == 0) {
-                                LOG.debug(
-                                        "Processed {} messages (emitted {}) for split: {}",
-                                        messageCount.get(),
-                                        emittedCount.get(),
-                                        streamSplit.splitId());
-                            }
-                        };
+            if (messageCount.get() % DEFAULT_MESSAGE_LOG_INTERVAL == 0) {
+                LOG.debug(
+                        "Processed {} messages (emitted {}) for split: {}",
+                        messageCount.get(),
+                        emittedCount.get(),
+                        streamSplit.splitId());
+            }
+        };
 
         try {
             int consecutiveFailures = 0;
@@ -259,8 +285,7 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                                 e);
                     }
 
-                    final io.debezium.connector.postgresql.connection.Lsn resumeLsn =
-                            lastProcessedLsn.get();
+                    final io.debezium.connector.postgresql.connection.Lsn resumeLsn = lastProcessedLsn.get();
                     LOG.warn(
                             "Read pending messages failed for split {} (attempt {}/{}), retrying from LSN {}",
                             streamSplit.splitId(),
@@ -402,9 +427,7 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         final Object[] beforeRow = rowSize > 0 ? new Object[rowSize] : new Object[0];
 
         final BaseConnection pgConn = pgConnectionSupplier.get();
-        final io.debezium.connector.postgresql.PostgresStreamingChangeEventSource
-                        .PgConnectionSupplier
-                pgSupplier = () -> pgConn;
+        final io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier pgSupplier = () -> pgConn;
         final boolean includeUnknownDatatypes = true;
 
         if (operation == ReplicationMessage.Operation.INSERT
@@ -424,7 +447,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                     message.getOldTupleList(),
                     pgSupplier,
                     includeUnknownDatatypes);
-            // When old tuple only contains keys, valueFromColumnData will produce a Struct with
+            // When old tuple only contains keys, valueFromColumnData will produce a Struct
+            // with
             // nulls for non-key columns. This keeps UPDATE/DELETE records deserializable.
         }
         if (operation == ReplicationMessage.Operation.DELETE
@@ -433,31 +457,26 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             System.arraycopy(afterRow, 0, beforeRow, 0, afterRow.length);
         }
         if (operation == ReplicationMessage.Operation.UPDATE && isAllNullRow(beforeRow)) {
-            // Fallback: if old tuple is missing, emit a best-effort before image from after.
+            // Fallback: if old tuple is missing, emit a best-effort before image from
+            // after.
             System.arraycopy(afterRow, 0, beforeRow, 0, afterRow.length);
         }
 
-        final Struct keyStruct =
-                !isAllNullRow(afterRow)
-                        ? tableSchema.keyFromColumnData(afterRow)
-                        : tableSchema.keyFromColumnData(beforeRow);
-        final Struct afterStruct =
-                !isAllNullRow(afterRow) ? tableSchema.valueFromColumnData(afterRow) : null;
-        final Struct beforeStruct =
-                !isAllNullRow(beforeRow) ? tableSchema.valueFromColumnData(beforeRow) : null;
+        final Struct keyStruct = !isAllNullRow(afterRow)
+                ? tableSchema.keyFromColumnData(afterRow)
+                : tableSchema.keyFromColumnData(beforeRow);
+        final Struct afterStruct = !isAllNullRow(afterRow) ? tableSchema.valueFromColumnData(afterRow) : null;
+        final Struct beforeStruct = !isAllNullRow(beforeRow) ? tableSchema.valueFromColumnData(beforeRow) : null;
 
-        final io.debezium.connector.postgresql.connection.Lsn currentLsn =
-                streamRef.get().lastReceivedLsn();
+        final io.debezium.connector.postgresql.connection.Lsn currentLsn = streamRef.get().lastReceivedLsn();
         final Map<String, Object> sourceOffset = lsnOffset(currentLsn);
         final Map<String, ?> sourcePartition = context.getPartition().getSourcePartition();
         final String topic = topicFor(context.getDbzConnectorConfig(), tableId);
 
-        final Schema sourceSchema =
-                Objects.requireNonNull(
-                        context.getDbzConnectorConfig().getSourceInfoStructMaker().schema(),
-                        "source info schema");
-        final Struct sourceStruct =
-                buildSourceStruct(sourceSchema, context.getDbzConnectorConfig(), tableId, message);
+        final Schema sourceSchema = Objects.requireNonNull(
+                context.getDbzConnectorConfig().getSourceInfoStructMaker().schema(),
+                "source info schema");
+        final Struct sourceStruct = buildSourceStruct(sourceSchema, context.getDbzConnectorConfig(), tableId, message);
 
         final Envelope envelope = tableSchema.getEnvelopeSchema();
         final Instant fetchTs = Instant.now();
@@ -478,15 +497,14 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 return;
         }
 
-        final SourceRecord record =
-                new SourceRecord(
-                        sourcePartition,
-                        sourceOffset,
-                        topic,
-                        tableSchema.keySchema(),
-                        keyStruct,
-                        envelope.schema(),
-                        valueStruct);
+        final SourceRecord record = new SourceRecord(
+                sourcePartition,
+                sourceOffset,
+                topic,
+                tableSchema.keySchema(),
+                keyStruct,
+                envelope.schema(),
+                valueStruct);
         queue.enqueue(new DataChangeEvent(record));
         emittedCount.incrementAndGet();
         updateLastProcessedLsn(streamRef, lastProcessedLsn);
@@ -534,8 +552,7 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY,
                 tableId.table());
 
-        final Instant commitTime =
-                message.getCommitTime() != null ? message.getCommitTime() : Instant.now();
+        final Instant commitTime = message.getCommitTime() != null ? message.getCommitTime() : Instant.now();
         putIfPresent(
                 sourceStruct,
                 io.debezium.connector.AbstractSourceInfo.TIMESTAMP_KEY,
@@ -557,8 +574,7 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             Table table,
             Object[] row,
             java.util.List<ReplicationMessage.Column> tuple,
-            io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier
-                    pgSupplier,
+            io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier pgSupplier,
             boolean includeUnknownDatatypes)
             throws SQLException {
         if (tuple == null || tuple.isEmpty() || table == null || row == null) {
@@ -633,10 +649,9 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     private static String topicFor(GaussDBConnectorConfig config, TableId tableId) {
-        final String prefix =
-                config != null && !Strings.isNullOrEmpty(config.getLogicalName())
-                        ? config.getLogicalName()
-                        : "gaussdb";
+        final String prefix = config != null && !Strings.isNullOrEmpty(config.getLogicalName())
+                ? config.getLogicalName()
+                : "gaussdb";
         if (tableId == null) {
             return prefix;
         }
@@ -719,13 +734,12 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             GaussDBOffset offset,
             WatermarkKind kind)
             throws InterruptedException {
-        final SourceRecord watermark =
-                WatermarkEvent.create(
-                        context.getPartition().getSourcePartition(),
-                        "gaussdb-watermark",
-                        splitId,
-                        kind,
-                        offset);
+        final SourceRecord watermark = WatermarkEvent.create(
+                context.getPartition().getSourcePartition(),
+                "gaussdb-watermark",
+                splitId,
+                kind,
+                offset);
         queue.enqueue(new DataChangeEvent(watermark));
     }
 
@@ -733,14 +747,12 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         if (stream == null) {
             return null;
         }
-        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endingOffset =
-                (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset)
-                        streamSplit.getEndingOffset();
+        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endingOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
+                .getEndingOffset();
         io.debezium.connector.postgresql.connection.Lsn last = stream.lastReceivedLsn();
         if (last != null && last.isValid()) {
-            GaussDBOffset current =
-                    new GaussDBOffset(
-                            io.debezium.connector.gaussdb.connection.Lsn.valueOf(last.asLong()));
+            GaussDBOffset current = new GaussDBOffset(
+                    io.debezium.connector.gaussdb.connection.Lsn.valueOf(last.asLong()));
             if (endingOffset != null
                     && endingOffset.getLsn() != null
                     && endingOffset.getLsn().isValid()) {
@@ -784,7 +796,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         if (timeSinceLastUpdate >= DEFAULT_STATUS_UPDATE_INTERVAL_MS) {
             try {
                 // Update replication slot status by flushing the last received LSN
-                // This acknowledges to the server that we've processed messages up to this point
+                // This acknowledges to the server that we've processed messages up to this
+                // point
                 io.debezium.connector.postgresql.connection.Lsn lastLsn = stream.lastReceivedLsn();
                 if (lastLsn != null && lastLsn.isValid()) {
                     stream.flushLsn(lastLsn);
@@ -807,14 +820,12 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     private boolean shouldStop(GaussDBSourceFetchTaskContext context, ReplicationStream stream) {
         // For unbounded streams, never stop
         // For bounded streams, check if we've reached the end offset
-        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endingOffset =
-                (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset)
-                        streamSplit.getEndingOffset();
+        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endingOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
+                .getEndingOffset();
 
         // Check if this is an unbounded stream
         if (endingOffset == null
-                || org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset
-                        .NO_STOPPING_OFFSET
+                || org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset.NO_STOPPING_OFFSET
                         .equals(endingOffset)) {
             return false;
         }
@@ -822,8 +833,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         // For bounded streams, check if we've reached or exceeded the end LSN
         io.debezium.connector.postgresql.connection.Lsn lastReceivedLsn = stream.lastReceivedLsn();
         if (lastReceivedLsn != null && lastReceivedLsn.isValid()) {
-            io.debezium.connector.gaussdb.connection.Lsn currentLsn =
-                    io.debezium.connector.gaussdb.connection.Lsn.valueOf(lastReceivedLsn.asLong());
+            io.debezium.connector.gaussdb.connection.Lsn currentLsn = io.debezium.connector.gaussdb.connection.Lsn
+                    .valueOf(lastReceivedLsn.asLong());
             io.debezium.connector.gaussdb.connection.Lsn endLsn = endingOffset.getLsn();
 
             if (endLsn != null && endLsn.isValid()) {
@@ -866,9 +877,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     private static final class LazyPgConnectionSupplier
-            implements io.debezium.connector.postgresql.PostgresStreamingChangeEventSource
-                            .PgConnectionSupplier,
-                    AutoCloseable {
+            implements io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier,
+            AutoCloseable {
         private final String url;
         private final String user;
         private final String password;
@@ -894,8 +904,7 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 if (existing != null && !existing.isClosed()) {
                     return existing;
                 }
-                java.sql.Connection created =
-                        java.sql.DriverManager.getConnection(url, user, password);
+                java.sql.Connection created = java.sql.DriverManager.getConnection(url, user, password);
                 if (!(created instanceof BaseConnection)) {
                     created.close();
                     throw new SQLException(
@@ -917,8 +926,10 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
     }
 
     /**
-     * Commits the current offset to the GaussDB replication slot. This is called when a checkpoint
-     * is completed to acknowledge that all changes up to this offset have been processed.
+     * Commits the current offset to the GaussDB replication slot. This is called
+     * when a checkpoint
+     * is completed to acknowledge that all changes up to this offset have been
+     * processed.
      */
     public void commitCurrentOffset(
             org.apache.flink.cdc.connectors.base.source.meta.offset.Offset offset) {
@@ -927,15 +938,13 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                 LOG.debug("Committing offset {} for split: {}", offset, streamSplit.splitId());
 
                 // Convert the offset to GaussDB LSN
-                org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset gaussDBOffset =
-                        (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset)
-                                offset;
+                org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset gaussDBOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) offset;
                 io.debezium.connector.gaussdb.connection.Lsn lsnToCommit = gaussDBOffset.getLsn();
 
                 if (lsnToCommit != null && lsnToCommit.isValid()) {
                     // Convert GaussDB LSN to PostgreSQL LSN for the replication stream API
-                    io.debezium.connector.postgresql.connection.Lsn pgLsn =
-                            io.debezium.connector.postgresql.connection.Lsn.valueOf(
+                    io.debezium.connector.postgresql.connection.Lsn pgLsn = io.debezium.connector.postgresql.connection.Lsn
+                            .valueOf(
                                     lsnToCommit.asLong());
 
                     // Flush the LSN to the replication slot
@@ -961,7 +970,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                         streamSplit.splitId());
             }
         } catch (Exception e) {
-            // Log warning but don't throw - checkpoint commit failures should not fail the job
+            // Log warning but don't throw - checkpoint commit failures should not fail the
+            // job
             LOG.warn("Failed to commit offset {} for split: {}", offset, streamSplit.splitId(), e);
         }
     }

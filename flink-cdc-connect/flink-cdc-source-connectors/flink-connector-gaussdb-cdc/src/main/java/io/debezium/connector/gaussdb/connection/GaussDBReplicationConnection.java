@@ -49,8 +49,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * A lightweight replication connection for GaussDB.
  *
- * <p>GaussDB exposes a PostgreSQL-compatible logical replication protocol; this class uses the
- * PostgreSQL JDBC driver replication API and Debezium's {@link ReplicationStream} contract.
+ * <p>
+ * GaussDB exposes a PostgreSQL-compatible logical replication protocol; this
+ * class uses the
+ * PostgreSQL JDBC driver replication API and Debezium's
+ * {@link ReplicationStream} contract.
  */
 public class GaussDBReplicationConnection implements ReplicationConnection {
 
@@ -66,6 +69,10 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
     private final MppdbDecodingMessageDecoder messageDecoder;
     private final TypeRegistry typeRegistry;
 
+    // Ending position for bounded reads - when reached, stream returns NoopMessage
+    // instead of closing
+    private volatile Lsn endingPos;
+
     private volatile Connection connection;
 
     public GaussDBReplicationConnection(
@@ -77,14 +84,12 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
             MppdbDecodingMessageDecoder messageDecoder,
             TypeRegistry typeRegistry,
             Connection initialConnection) {
-        this.connectorConfig =
-                Objects.requireNonNull(connectorConfig, "connectorConfig must not be null");
+        this.connectorConfig = Objects.requireNonNull(connectorConfig, "connectorConfig must not be null");
         this.slotName = Objects.requireNonNull(slotName, "slotName must not be null");
         this.pluginName = Objects.requireNonNull(pluginName, "pluginName must not be null");
         this.dropSlotOnClose = dropSlotOnClose;
         this.statusUpdateInterval = statusUpdateInterval;
-        this.messageDecoder =
-                Objects.requireNonNull(messageDecoder, "messageDecoder must not be null");
+        this.messageDecoder = Objects.requireNonNull(messageDecoder, "messageDecoder must not be null");
         this.typeRegistry = Objects.requireNonNull(typeRegistry, "typeRegistry must not be null");
         // Do not use the passed-in connection: it may be created by GaussDB JDBC driver
         // which
@@ -94,6 +99,21 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         // Let connectIfNeeded() create a PostgreSQL JDBC connection via
         // openReplicationConnection().
         this.connection = null;
+        this.endingPos = null;
+    }
+
+    /**
+     * Sets the ending position for bounded reads. When the stream reaches this LSN,
+     * it will return a NoopMessage instead of requiring stream close/reopen.
+     * This avoids slot contention issues with GaussDB.
+     */
+    public void setEndingPos(Lsn endingPos) {
+        this.endingPos = endingPos;
+        LOG.debug("Set ending position for bounded read: {}", endingPos);
+    }
+
+    public Lsn getEndingPos() {
+        return this.endingPos;
     }
 
     @Override
@@ -122,19 +142,87 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
             throws SQLException, InterruptedException {
         initConnection();
         final Lsn startLsn = offset != null && offset.isValid() ? offset : null;
-        final PGReplicationStream stream = startPgReplicationStream(startLsn);
+
+        // GaussDB may take time to release slots after connection disruption.
+        // Retry with exponential backoff to handle transient "Database connection
+        // failed" errors.
+        // This is based on GaussDB documentation recommendations for slot management.
+        final int maxRetries = 3;
+        final long initialDelayMs = 2000; // 2 seconds initial delay
+
+        SQLException lastException = null;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Ensure we have a fresh connection for retries
+                if (attempt > 1) {
+                    LOG.info("Retry attempt {} of {} for starting replication stream (slot: {})",
+                            attempt, maxRetries, slotName);
+                    // Force reconnect on retry
+                    closeConnectionQuietly();
+                    connectIfNeeded();
+                }
+
+                final PGReplicationStream stream = startPgReplicationStream(startLsn);
+                if (attempt > 1) {
+                    LOG.info("Successfully started replication stream on retry attempt {}", attempt);
+                }
+                return createReplicationStreamWrapper(stream, startLsn, walPosition);
+            } catch (SQLException e) {
+                lastException = e;
+                String message = e.getMessage();
+                boolean isRetryable = message != null && (message.contains("Database connection failed") ||
+                        message.contains("EOF Exception") ||
+                        message.contains("Connection reset") ||
+                        message.contains("starting copy"));
+
+                if (!isRetryable || attempt >= maxRetries) {
+                    LOG.error("Failed to start replication stream after {} attempts: {}",
+                            attempt, e.getMessage());
+                    throw e;
+                }
+
+                long delayMs = initialDelayMs * (1L << (attempt - 1)); // Exponential backoff
+                LOG.warn("Failed to start replication stream (attempt {}/{}): {}. Retrying in {}ms...",
+                        attempt, maxRetries, e.getMessage(), delayMs);
+                try {
+                    Thread.sleep(delayMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new SQLException("Interrupted while waiting to retry replication stream", ie);
+                }
+            }
+        }
+
+        // Should not reach here, but throw the last exception if we do
+        throw lastException != null ? lastException
+                : new SQLException("Failed to start replication stream after max retries");
+    }
+
+    private void closeConnectionQuietly() {
+        try {
+            if (connection != null && !connection.isClosed()) {
+                connection.close();
+            }
+        } catch (Exception e) {
+            LOG.debug("Error closing connection during retry: {}", e.getMessage());
+        } finally {
+            connection = null;
+        }
+    }
+
+    private ReplicationStream createReplicationStreamWrapper(PGReplicationStream stream, Lsn startLsn,
+            WalPositionLocator walPosition) {
         return new ReplicationStream() {
             private static final int CHECK_WARNINGS_AFTER_COUNT = 100;
 
             private int warningCheckCounter = CHECK_WARNINGS_AFTER_COUNT;
             private ExecutorService keepAliveExecutor = null;
             private AtomicBoolean keepAliveRunning;
-            private final Metronome metronome =
-                    Metronome.sleeper(
-                            statusUpdateInterval != null
-                                    ? statusUpdateInterval
-                                    : Duration.ofSeconds(10),
-                            Clock.SYSTEM);
+            private final Metronome metronome = Metronome.sleeper(
+                    statusUpdateInterval != null
+                            ? statusUpdateInterval
+                            : Duration.ofSeconds(10),
+                    Clock.SYSTEM);
 
             private volatile Lsn lastReceivedLsn;
 
@@ -144,6 +232,16 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                 processWarnings(false);
                 ByteBuffer read = stream.read();
                 final Lsn lastReceiveLsn = convertToLsn(stream.getLastReceiveLSN());
+
+                // Check if we've reached the ending position for bounded reads
+                if (reachEnd(lastReceiveLsn)) {
+                    lastReceivedLsn = lastReceiveLsn;
+                    LOG.trace("Reached ending position at LSN {}, returning NoopMessage", lastReceivedLsn);
+                    // Process a no-op message to indicate we've reached the end
+                    processor.process(null);
+                    return;
+                }
+
                 if (messageDecoder.shouldMessageBeSkipped(
                         read, lastReceiveLsn, startLsn, walPosition)) {
                     return;
@@ -157,6 +255,16 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                 processWarnings(false);
                 ByteBuffer read = stream.readPending();
                 final Lsn lastReceiveLsn = convertToLsn(stream.getLastReceiveLSN());
+
+                // Check if we've reached the ending position for bounded reads
+                if (reachEnd(lastReceiveLsn)) {
+                    lastReceivedLsn = lastReceiveLsn;
+                    LOG.trace("Reached ending position at LSN {}, returning NoopMessage", lastReceivedLsn);
+                    // Process a no-op message to indicate we've reached the end
+                    processor.process(null);
+                    return true;
+                }
+
                 if (read == null) {
                     return false;
                 }
@@ -166,6 +274,18 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                 }
                 deserializeMessages(read, processor);
                 return true;
+            }
+
+            /**
+             * Checks if the current LSN has reached or exceeded the ending position.
+             * Used for bounded reads to stop streaming at a specific LSN.
+             */
+            private boolean reachEnd(Lsn receivedLsn) {
+                if (receivedLsn == null) {
+                    return false;
+                }
+                Lsn ending = endingPos;
+                return ending != null && ending.compareTo(receivedLsn) <= 0;
             }
 
             private void deserializeMessages(
@@ -225,7 +345,19 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
             @Override
             public void close() throws Exception {
                 processWarnings(true);
-                stream.close();
+                // GaussDB doesn't properly handle the PostgreSQL CopyBothResponse close
+                // protocol.
+                // When closing the replication stream, GaussDB may reset the connection,
+                // causing EOFException or SocketException. We catch and log these errors
+                // rather than propagating them, since the stream is already being closed.
+                try {
+                    stream.close();
+                } catch (Exception e) {
+                    LOG.warn(
+                            "Error closing replication stream (expected with GaussDB): {}",
+                            e.getMessage());
+                    LOG.debug("Full exception during stream close", e);
+                }
             }
 
             private void processWarnings(final boolean forced) throws SQLException {
@@ -249,8 +381,8 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
     }
 
     @Override
-    public synchronized java.util.Optional<io.debezium.connector.postgresql.spi.SlotCreationResult>
-            createReplicationSlot() throws SQLException {
+    public synchronized java.util.Optional<io.debezium.connector.postgresql.spi.SlotCreationResult> createReplicationSlot()
+            throws SQLException {
         try {
             connectIfNeeded();
         } catch (InterruptedException e) {
@@ -263,9 +395,8 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         }
         try (Statement statement = conn.createStatement()) {
             try {
-                final String createCommand =
-                        String.format(
-                                "CREATE_REPLICATION_SLOT \"%s\" LOGICAL %s", slotName, pluginName);
+                final String createCommand = String.format(
+                        "CREATE_REPLICATION_SLOT \"%s\" LOGICAL %s", slotName, pluginName);
                 LOG.info("Creating replication slot with command {}", createCommand);
                 statement.execute(createCommand);
             } catch (SQLException first) {
@@ -273,11 +404,10 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                     throw first;
                 }
                 // Fallback to PostgreSQL-compatible function if supported.
-                try (ResultSet rs =
-                        statement.executeQuery(
-                                String.format(
-                                        "SELECT * FROM pg_create_logical_replication_slot('%s', '%s')",
-                                        slotName, pluginName))) {
+                try (ResultSet rs = statement.executeQuery(
+                        String.format(
+                                "SELECT * FROM pg_create_logical_replication_slot('%s', '%s')",
+                                slotName, pluginName))) {
                     if (!rs.next()) {
                         throw first;
                     }
@@ -303,8 +433,7 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
             connectIfNeeded();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            SQLException interrupted =
-                    new SQLException("Interrupted while reconnecting replication connection", e);
+            SQLException interrupted = new SQLException("Interrupted while reconnecting replication connection", e);
             throw interrupted;
         }
     }
@@ -391,15 +520,14 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         try {
             final PGConnection pgConnection = c.unwrap(PGConnection.class);
 
-            ChainedLogicalStreamBuilder builder =
-                    pgConnection
-                            .getReplicationAPI()
-                            .replicationStream()
-                            .logical()
-                            .withSlotName(slotName) // GaussDB may not need extra quotes
-                            // GaussDB-specific options from official documentation
-                            .withSlotOption("include-xids", false)
-                            .withSlotOption("skip-empty-xacts", true);
+            ChainedLogicalStreamBuilder builder = pgConnection
+                    .getReplicationAPI()
+                    .replicationStream()
+                    .logical()
+                    .withSlotName(slotName) // GaussDB may not need extra quotes
+                    // GaussDB-specific options from official documentation
+                    .withSlotOption("include-xids", false)
+                    .withSlotOption("skip-empty-xacts", true);
             if (startLsn != null) {
                 builder = builder.withStartPosition(convertToGaussDBLsn(startLsn));
                 LOG.info("Replication stream will start from LSN: {}", startLsn);
@@ -413,12 +541,21 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                         Math.toIntExact(statusUpdateInterval.toMillis()), TimeUnit.MILLISECONDS);
             }
 
-            LOG.info("Calling builder.start() to create replication stream...");
+            LOG.info(\"Calling builder.start() to create replication stream...\");
             final PGReplicationStream stream = builder.start();
-            LOG.info("Replication stream started successfully");
+            LOG.info(\"Replication stream started successfully\");
+            
+            // Small delay to stabilize connection when connections are opened/closed in fast sequence
+            // See reference implementation in GaussDB-For-Apache-Flink project
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            
             // ensure server sees feedback quickly
             stream.forceUpdateStatus();
-            LOG.info("Initial status update sent to server");
+            LOG.info(\"Initial status update sent to server\");
             return stream;
         } catch (SQLException e) {
             LOG.error(
@@ -462,13 +599,11 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
         // Set connection timeout
         props.setProperty("connectTimeout", "60");
 
-        final Duration timeout =
-                connectorConfig.connectionTimeout() != null
-                        ? connectorConfig.connectionTimeout()
-                        : Duration.ofSeconds(30);
+        final Duration timeout = connectorConfig.connectionTimeout() != null
+                ? connectorConfig.connectionTimeout()
+                : Duration.ofSeconds(30);
         final int previousLoginTimeoutSeconds = DriverManager.getLoginTimeout();
-        final int loginTimeoutSeconds =
-                (int) Math.min(Integer.MAX_VALUE, Math.max(0L, timeout.toSeconds()));
+        final int loginTimeoutSeconds = (int) Math.min(Integer.MAX_VALUE, Math.max(0L, timeout.toSeconds()));
 
         LOG.info(
                 "Opening replication connection to {}:{}/{} with user={}, replication={}, timeout={}s",
