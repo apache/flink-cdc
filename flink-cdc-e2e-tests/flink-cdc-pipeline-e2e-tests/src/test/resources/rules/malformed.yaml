@@ -1,0 +1,74 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+group: Common
+spec: Malformed Structures
+steps:
+  # Transform rules not an array
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      transform:
+        # ERROR: should be `- source-table: foo.bar`
+        source-table: foo.bar
+    error: |
+      YAML transform block is expecting an array children, but got an OBJECT ({"source-table":"foo.bar"}).
+      Perhaps you missed a dash prefix `-`?
+  # Route rules not an array
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      route:
+        source-table: foo.bar
+    error: |
+      YAML route block is expecting an array children, but got an OBJECT ({"source-table":"foo.bar"}).
+      Perhaps you missed a dash prefix `-`?
+  # UDF functions not an array
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      pipeline:
+        user-defined-function:
+          name: addone
+          classpath: org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass
+    error: |
+      YAML UDF block is expecting an array children, but got an OBJECT ({"name":"addone","classpath":"org.apache.flink.cdc.udf.examples.%s.AddOneFunctionClass"}).
+      Perhaps you missed a dash prefix `-`?
+  # Models not an array
+  - type: submit
+    yaml: |
+      source:
+        type: values
+      sink:
+        type: values
+      pipeline:
+        model:
+          model-name: GET_EMBEDDING
+          class-name: OpenAIEmbeddingModel
+          openai.model: text-embedding-3-small
+          openai.host: https://xxxx
+          openai.apikey: abcd1234
+    error: |
+      YAML model block is expecting an array children, but got an OBJECT ({"model-name":"GET_EMBEDDING","class-name":"OpenAIEmbeddingModel","openai.model":"text-embedding-3-small","openai.host":"https://xxxx","openai.apikey":"abcd1234"}).
+      Perhaps you missed a dash prefix `-`?

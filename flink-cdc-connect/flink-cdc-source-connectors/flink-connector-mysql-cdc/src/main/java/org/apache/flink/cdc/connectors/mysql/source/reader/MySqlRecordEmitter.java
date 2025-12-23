@@ -53,6 +53,7 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
+    private final boolean includeHeartbeatEvents;
     private final boolean includeTransactionMetadataEvents;
     private final OutputCollector<T> outputCollector;
 
@@ -60,10 +61,12 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
             boolean includeSchemaChanges,
+            boolean includeHeartbeatEvents,
             boolean includeTransactionMetadataEvents) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.includeHeartbeatEvents = includeHeartbeatEvents;
         this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
         this.outputCollector = new OutputCollector<>();
     }
@@ -105,6 +108,9 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             emitElement(element, output);
         } else if (RecordUtils.isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
+            if (includeHeartbeatEvents) {
+                emitElement(element, output);
+            }
         } else if (RecordUtils.isTransactionMetadataEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
             if (includeTransactionMetadataEvents) {
