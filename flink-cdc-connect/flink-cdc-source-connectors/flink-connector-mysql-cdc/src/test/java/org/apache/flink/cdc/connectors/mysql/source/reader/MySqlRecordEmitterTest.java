@@ -96,7 +96,7 @@ class MySqlRecordEmitterTest {
 
     private MySqlRecordEmitter<Void> createRecordEmitter() {
         return new MySqlRecordEmitter<>(
-                new DebeziumDeserializationSchema<>() {
+                new DebeziumDeserializationSchema<Void>() {
                     @Override
                     public void deserialize(SourceRecord record, Collector<Void> out) {
                         throw new UnsupportedOperationException();
@@ -110,7 +110,8 @@ class MySqlRecordEmitterTest {
                 new MySqlSourceReaderMetrics(
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
                 false,
-                false);
+                false,
+        false);
     }
 
     @Test
@@ -358,7 +359,7 @@ class MySqlRecordEmitterTest {
     private MySqlRecordEmitter<String> createRecordEmitterWithTransactionConfig(
             AtomicInteger counter, boolean includeTransactionMetadataEvents) {
         return new MySqlRecordEmitter<>(
-                new DebeziumDeserializationSchema<>() {
+                new DebeziumDeserializationSchema<String>() {
                     @Override
                     public void deserialize(SourceRecord record, Collector<String> out) {
                         counter.incrementAndGet();
@@ -372,6 +373,7 @@ class MySqlRecordEmitterTest {
                 },
                 new MySqlSourceReaderMetrics(
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
+                false,
                 false,
                 includeTransactionMetadataEvents);
     }

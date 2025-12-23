@@ -242,13 +242,14 @@ public class MySqlSourceConfigFactory implements Serializable {
         this.includeHeartbeatEvents = includeHeartbeatEvents;
         return this;
     }
-    
+
     /** Whether the {@link MySqlSource} should output the transaction metadata events or not. */
     public MySqlSourceConfigFactory includeTransactionMetadataEvents(
             boolean includeTransactionMetadataEvents) {
         this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
+        return this;
     }
-  
+
     /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
     public MySqlSourceConfigFactory scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;

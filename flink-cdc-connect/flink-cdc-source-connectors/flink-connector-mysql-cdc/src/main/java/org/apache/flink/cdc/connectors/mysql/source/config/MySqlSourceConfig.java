@@ -236,9 +236,10 @@ public class MySqlSourceConfig implements Serializable {
     public boolean isIncludeHeartbeatEvents() {
         return includeHeartbeatEvents;
     }
-  
+
     public boolean isIncludeTransactionMetadataEvents() {
         return includeTransactionMetadataEvents;
+    }
 
     public boolean isScanNewlyAddedTableEnabled() {
         return scanNewlyAddedTableEnabled;
