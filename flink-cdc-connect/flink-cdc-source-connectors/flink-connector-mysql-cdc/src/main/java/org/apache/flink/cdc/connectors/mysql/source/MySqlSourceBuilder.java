@@ -238,6 +238,19 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
+     * The interval of heartbeat event and whether to emit heartbeat events.
+     *
+     * @param heartbeatInterval the interval of heartbeat event
+     * @param includeHeartbeatEvents whether to emit heartbeat events
+     */
+    public MySqlSourceBuilder<T> heartbeatInterval(
+            Duration heartbeatInterval, boolean includeHeartbeatEvents) {
+        this.configFactory.heartbeatInterval(heartbeatInterval);
+        this.configFactory.includeHeartbeatEvents(includeHeartbeatEvents);
+        return this;
+    }
+
+    /**
      * Whether to skip backfill in snapshot reading phase.
      *
      * <p>If backfill is skipped, changes on captured tables during snapshot phase will be consumed
