@@ -143,7 +143,7 @@ public class RowDataUtils {
                         };
                 break;
             case TINYINT:
-                fieldGetter = row -> row.getBoolean(fieldPos);
+                fieldGetter = row -> row.getByte(fieldPos);
                 break;
             case SMALLINT:
                 fieldGetter = row -> row.getInt(fieldPos);

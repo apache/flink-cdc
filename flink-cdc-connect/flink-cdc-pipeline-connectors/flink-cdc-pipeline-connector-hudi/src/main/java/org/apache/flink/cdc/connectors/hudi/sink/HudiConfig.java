@@ -69,11 +69,6 @@ public class HudiConfig {
     public static final ConfigOption<String> PATH =
             stringOption(FlinkOptions.PATH.key(), FlinkOptions.PATH.description());
 
-    //    public static final ConfigOption<String> TABLE_TYPE =
-    //            stringOption(
-    //                    FlinkOptions.TABLE_TYPE.key(),
-    //                    FlinkOptions.TABLE_TYPE.defaultValue(),
-    //                    FlinkOptions.TABLE_TYPE.description());
     public static final ConfigOption<String> TABLE_TYPE =
             stringOption(
                     "hoodie.table.type",

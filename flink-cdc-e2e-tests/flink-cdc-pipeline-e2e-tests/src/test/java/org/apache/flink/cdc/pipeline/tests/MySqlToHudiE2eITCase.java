@@ -116,7 +116,7 @@ public class MySqlToHudiE2eITCase extends PipelineTestEnvironment {
     public void before() throws Exception {
         LOG.info("Starting containers...");
 
-        // 2. Instantiate the correct class and apply class-specific methods
+        // Instantiate the correct class and apply class-specific methods
         if (debug) {
             // Use FixedHost instead of GenericContainer to ensure that ports are fixed for easier
             // debugging during dev
