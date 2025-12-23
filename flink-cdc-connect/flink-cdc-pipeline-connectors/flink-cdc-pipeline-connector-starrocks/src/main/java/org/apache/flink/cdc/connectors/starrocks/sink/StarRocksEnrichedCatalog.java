@@ -38,12 +38,7 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
 
     public void truncateTable(String databaseName, String tableName)
             throws StarRocksCatalogException {
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(databaseName),
-                "Database name cannot be null or empty.");
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(tableName),
-                "Table name cannot be null or empty.");
+        checkTableArgument(databaseName, tableName);
         String alterSql = this.buildTruncateTableSql(databaseName, tableName);
         try {
             // TRUNCATE TABLE is not regarded as a column-based schema change for StarRocks, so
@@ -62,12 +57,7 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
     }
 
     public void dropTable(String databaseName, String tableName) throws StarRocksCatalogException {
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(databaseName),
-                "Database name cannot be null or empty.");
-        Preconditions.checkArgument(
-                !StringUtils.isNullOrWhitespaceOnly(tableName),
-                "Table name cannot be null or empty.");
+        checkTableArgument(databaseName, tableName);
         String alterSql = this.buildDropTableSql(databaseName, tableName);
         try {
             // like TRUNCATE TABLE, DROP TABLE isn't a column-affecting operation and `executeAlter`
@@ -84,12 +74,49 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
+    public void renameColumn(
+            String databaseName, String tableName, String oldColumnName, String newColumnName)
+            throws StarRocksCatalogException {
+        checkTableArgument(databaseName, tableName);
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(oldColumnName),
+                "old column name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(newColumnName),
+                "new column name cannot be null or empty.");
+        String alterSql =
+                this.buildRenameColumnSql(databaseName, tableName, oldColumnName, newColumnName);
+        try {
+            executeUpdateStatement(alterSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to alter table `{}`.`{}` rename column {} to {}. SQL executed: {}",
+                    databaseName,
+                    tableName,
+                    oldColumnName,
+                    newColumnName,
+                    alterSql);
+            throw new StarRocksCatalogException(
+                    String.format(
+                            "Failed to alter table `%s`.`%s` rename column %s to %s.",
+                            databaseName, tableName, oldColumnName, newColumnName),
+                    e);
+        }
+    }
+
     private String buildTruncateTableSql(String databaseName, String tableName) {
         return String.format("TRUNCATE TABLE `%s`.`%s`;", databaseName, tableName);
     }
 
     private String buildDropTableSql(String databaseName, String tableName) {
         return String.format("DROP TABLE `%s`.`%s`;", databaseName, tableName);
+    }
+
+    private String buildRenameColumnSql(
+            String databaseName, String tableName, String oldColumnName, String newColumnName) {
+        return String.format(
+                "ALTER TABLE `%s`.`%s` RENAME COLUMN %s TO %s;",
+                databaseName, tableName, oldColumnName, newColumnName);
     }
 
     private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
@@ -103,5 +130,14 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void checkTableArgument(String databaseName, String tableName) {
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(databaseName),
+                "Database name cannot be null or empty.");
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(tableName),
+                "Table name cannot be null or empty.");
     }
 }

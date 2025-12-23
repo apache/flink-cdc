@@ -83,7 +83,7 @@ public class StarRocksSinkTestBase extends TestLogger {
         long startWaitingTimestamp = System.currentTimeMillis();
 
         new LogMessageWaitStrategy()
-                .withRegEx(".*Enjoy the journal to StarRocks blazing-fast lake-house engine!.*\\s")
+                .withRegEx(".*Enjoy the journey to StarRocks blazing-fast lake-house engine!.*\\s")
                 .withTimes(1)
                 .withStartupTimeout(
                         Duration.of(DEFAULT_STARTUP_TIMEOUT_SECONDS, ChronoUnit.SECONDS))
