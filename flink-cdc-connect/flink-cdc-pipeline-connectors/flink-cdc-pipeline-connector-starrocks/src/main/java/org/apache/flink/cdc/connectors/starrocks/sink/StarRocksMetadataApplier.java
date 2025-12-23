@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksUtils.toStarRocksDataType;
@@ -307,9 +308,20 @@ public class StarRocksMetadataApplier implements MetadataApplier {
 
     private void applyRenameColumn(RenameColumnEvent renameColumnEvent)
             throws SchemaEvolveException {
-        // TODO StarRocks plans to support column rename since 3.3 which has not been released.
-        // Support it later.
-        throw new UnsupportedSchemaChangeEventException(renameColumnEvent);
+        try {
+            TableId tableId = renameColumnEvent.tableId();
+            Map<String, String> nameMapping = renameColumnEvent.getNameMapping();
+            for (Map.Entry<String, String> entry : nameMapping.entrySet()) {
+                catalog.renameColumn(
+                        tableId.getSchemaName(),
+                        tableId.getTableName(),
+                        entry.getKey(),
+                        entry.getValue());
+            }
+        } catch (Exception e) {
+            throw new SchemaEvolveException(
+                    renameColumnEvent, "fail to apply rename column event", e);
+        }
     }
 
     private void applyAlterColumnType(AlterColumnTypeEvent alterColumnTypeEvent)
