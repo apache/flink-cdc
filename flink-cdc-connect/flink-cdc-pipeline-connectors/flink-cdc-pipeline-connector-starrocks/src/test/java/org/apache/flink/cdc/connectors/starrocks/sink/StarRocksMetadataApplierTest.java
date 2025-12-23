@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -42,9 +41,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_CREATE_NUM_BUCKETS;
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.TABLE_SCHEMA_CHANGE_TIMEOUT;
@@ -214,65 +211,6 @@ class StarRocksMetadataApplierTest {
                         .setColumnName("col1")
                         .setOrdinalPosition(0)
                         .setDataType("int")
-                        .setNullable(true)
-                        .build());
-        StarRocksTable expectTable =
-                new StarRocksTable.Builder()
-                        .setDatabaseName(tableId.getSchemaName())
-                        .setTableName(tableId.getTableName())
-                        .setTableType(StarRocksTable.TableType.PRIMARY_KEY)
-                        .setColumns(columns)
-                        .setTableKeys(schema.primaryKeys())
-                        .setDistributionKeys(schema.primaryKeys())
-                        .setNumBuckets(10)
-                        .setTableProperties(Collections.singletonMap("replication_num", "5"))
-                        .build();
-        Assertions.assertThat(actualTable).isEqualTo(expectTable);
-    }
-
-    @Test
-    void testRenameColumn() throws Exception {
-        TableId tableId = TableId.parse("test.tbl4");
-        Schema schema =
-                Schema.newBuilder()
-                        .physicalColumn("col1", new IntType())
-                        .physicalColumn("col2", new BooleanType())
-                        .physicalColumn("col3", new TimestampType())
-                        .primaryKey("col1")
-                        .build();
-        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
-        metadataApplier.applySchemaChange(createTableEvent);
-
-        Map<String, String> nameMapping = new HashMap<>();
-        nameMapping.put("col2", "newCol2");
-        nameMapping.put("col3", "newCol3");
-        RenameColumnEvent renameColumnEvent = new RenameColumnEvent(tableId, nameMapping);
-        metadataApplier.applySchemaChange(renameColumnEvent);
-
-        StarRocksTable actualTable =
-                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
-        Assertions.assertThat(actualTable).isNotNull();
-
-        List<StarRocksColumn> columns = new ArrayList<>();
-        columns.add(
-                new StarRocksColumn.Builder()
-                        .setColumnName("col1")
-                        .setOrdinalPosition(0)
-                        .setDataType("int")
-                        .setNullable(true)
-                        .build());
-        columns.add(
-                new StarRocksColumn.Builder()
-                        .setColumnName("newCol2")
-                        .setOrdinalPosition(1)
-                        .setDataType("boolean")
-                        .setNullable(true)
-                        .build());
-        columns.add(
-                new StarRocksColumn.Builder()
-                        .setColumnName("newCol3")
-                        .setOrdinalPosition(2)
-                        .setDataType("datetime")
                         .setNullable(true)
                         .build());
         StarRocksTable expectTable =

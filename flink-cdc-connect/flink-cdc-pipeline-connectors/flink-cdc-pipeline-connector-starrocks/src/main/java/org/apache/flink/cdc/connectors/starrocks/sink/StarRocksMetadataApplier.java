@@ -90,6 +90,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.CREATE_TABLE,
                 SchemaChangeEventType.ADD_COLUMN,
                 SchemaChangeEventType.DROP_COLUMN,
+                SchemaChangeEventType.RENAME_COLUMN,
                 SchemaChangeEventType.DROP_TABLE,
                 SchemaChangeEventType.TRUNCATE_TABLE);
     }

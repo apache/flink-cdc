@@ -307,7 +307,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Rename column is not supported currently.")
     void testStarRocksRenameColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
