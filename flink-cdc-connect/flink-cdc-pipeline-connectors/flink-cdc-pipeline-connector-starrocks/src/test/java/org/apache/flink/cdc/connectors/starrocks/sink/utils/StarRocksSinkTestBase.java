@@ -39,6 +39,7 @@ import org.testcontainers.containers.Container;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.lifecycle.Startables;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -225,6 +226,33 @@ public class StarRocksSinkTestBase extends TestLogger {
             results.add(String.join(" | ", columns));
         }
         return results;
+    }
+
+    // Starrocks alter column is asynchronous and does not support Light mode.
+    public void waitAlterDone(TableId tableId, long timeout)
+            throws SQLException, InterruptedException {
+        Connection conn = STARROCKS_CONTAINER.createConnection("");
+        conn.createStatement().execute(String.format("USE `%s`", tableId.getSchemaName()));
+        long t0 = System.currentTimeMillis();
+        while (System.currentTimeMillis() - t0 < timeout) {
+            ResultSet rs =
+                    conn.createStatement()
+                            .executeQuery(
+                                    String.format(
+                                            "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY CreateTime DESC LIMIT 1",
+                                            tableId.getTableName()));
+            if (rs.next()) {
+                String state = rs.getString("State");
+                if ("FINISHED".equals(state)) {
+                    return;
+                }
+                if ("CANCELLED".equals(state)) {
+                    throw new RuntimeException("Alter failed: " + rs.getString("Msg"));
+                }
+            }
+            Thread.sleep(1000L);
+        }
+        throw new RuntimeException("Alter job timeout");
     }
 
     public static <T> void assertEqualsInAnyOrder(List<T> expected, List<T> actual) {

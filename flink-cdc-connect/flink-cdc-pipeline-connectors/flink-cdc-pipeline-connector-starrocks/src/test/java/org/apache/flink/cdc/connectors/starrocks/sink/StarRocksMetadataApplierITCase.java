@@ -313,7 +313,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         StarRocksContainer.STARROCKS_TABLE_NAME);
 
         runJobWithEvents(generateRenameColumnEvents(tableId));
-
+        waitAlterDone(tableId, 60000L);
         List<String> actual = inspectTableSchema(tableId);
 
         List<String> expected =
