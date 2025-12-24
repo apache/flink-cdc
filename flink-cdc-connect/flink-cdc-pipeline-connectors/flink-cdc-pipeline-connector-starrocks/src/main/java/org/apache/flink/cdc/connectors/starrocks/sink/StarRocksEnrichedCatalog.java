@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Optional;
 
 /** An enriched {@code StarRocksCatalog} with more schema evolution abilities. */
 public class StarRocksEnrichedCatalog extends StarRocksCatalog {
@@ -113,7 +114,13 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
                 "column name cannot be null or empty.");
         String alterSql =
                 buildAlterColumnTypeSql(
-                        databaseName, tableName, column.getColumnName(), column.getDataType());
+                        databaseName,
+                        tableName,
+                        column.getColumnName(),
+                        getFullColumnType(
+                                column.getDataType(),
+                                column.getColumnSize(),
+                                column.getDecimalDigits()));
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(alterSql);
@@ -180,5 +187,25 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(tableName),
                 "Table name cannot be null or empty.");
+    }
+
+    private String getFullColumnType(
+            String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits) {
+        String dataType = type.toUpperCase();
+        switch (dataType) {
+            case "DECIMAL":
+                Preconditions.checkArgument(
+                        columnSize.isPresent(), "DECIMAL type must have column size");
+                Preconditions.checkArgument(
+                        decimalDigits.isPresent(), "DECIMAL type must have decimal digits");
+                return String.format("DECIMAL(%d, %s)", columnSize.get(), decimalDigits.get());
+            case "CHAR":
+            case "VARCHAR":
+                Preconditions.checkArgument(
+                        columnSize.isPresent(), type + " type must have column size");
+                return String.format("%s(%d)", dataType, columnSize.get());
+            default:
+                return dataType;
+        }
     }
 }
