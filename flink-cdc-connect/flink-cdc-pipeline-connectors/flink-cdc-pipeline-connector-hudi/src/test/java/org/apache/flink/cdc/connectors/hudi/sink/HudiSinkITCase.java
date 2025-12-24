@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.hudi.sink;
 
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -59,6 +60,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.ZoneId;
@@ -147,12 +149,12 @@ public class HudiSinkITCase {
         String[] expected =
                 partitioned
                         ? new String[] {
-                            "17,par1,17,6.28,Doris Day,1623456790,par1",
-                            "21,par2,21,1.732,Disenchanted,1623456789,par2"
+                            "17,par1,17,updated,value,false,[1, 2, 4],[4, 5, 6, 8],246.80,15,150,111111111111,6.28,12.56,84,18629,7322000,1609545600000,1623456790,par1",
+                            "21,par2,21,test,data,true,[13],[14, 15],999.99,30,300,777777777777,1.41,2.82,126,18630,10983000,1609632000000,1623456789,par2"
                         }
                         : new String[] {
-                            "17,,17,6.28,Doris Day,1623456790,par1",
-                            "21,,21,1.732,Disenchanted,1623456789,par2"
+                            "17,,17,updated,value,false,[1, 2, 4],[4, 5, 6, 8],246.80,15,150,111111111111,6.28,12.56,84,18629,7322000,1609545600000,1623456790,par1",
+                            "21,,21,test,data,true,[13],[14, 15],999.99,30,300,777777777777,1.41,2.82,126,18630,10983000,1609632000000,1623456789,par2"
                         };
         while (actual.size() != expected.length) {
             if (System.currentTimeMillis() - startTime > DEFAULT_TIMEOUT_MS) {
@@ -174,8 +176,21 @@ public class HudiSinkITCase {
         Schema.Builder schemaBuilder =
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
-                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
-                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(new PhysicalColumn("f_char", DataTypes.CHAR(5), null))
+                        .column(new PhysicalColumn("f_varchar", DataTypes.VARCHAR(20), null))
+                        .column(new PhysicalColumn("f_boolean", DataTypes.BOOLEAN(), null))
+                        .column(new PhysicalColumn("f_binary", DataTypes.BINARY(10), null))
+                        .column(new PhysicalColumn("f_varbinary", DataTypes.VARBINARY(20), null))
+                        .column(new PhysicalColumn("f_decimal", DataTypes.DECIMAL(10, 2), null))
+                        .column(new PhysicalColumn("f_tinyint", DataTypes.TINYINT(), null))
+                        .column(new PhysicalColumn("f_smallint", DataTypes.SMALLINT(), null))
+                        .column(new PhysicalColumn("f_bigint", DataTypes.BIGINT(), null))
+                        .column(new PhysicalColumn("f_float", DataTypes.FLOAT(), null))
+                        .column(new PhysicalColumn("f_double", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("f_int", DataTypes.INT(), null))
+                        .column(new PhysicalColumn("f_date", DataTypes.DATE(), null))
+                        .column(new PhysicalColumn("f_time", DataTypes.TIME(), null))
+                        .column(new PhysicalColumn("f_timestamp", DataTypes.TIMESTAMP(3), null))
                         .column(new PhysicalColumn("ts", DataTypes.BIGINT(), null))
                         .column(new PhysicalColumn("par", DataTypes.STRING(), null))
                         .primaryKey("id");
@@ -190,8 +205,21 @@ public class HudiSinkITCase {
                 new BinaryRecordDataGenerator(
                         RowType.of(
                                 DataTypes.INT(),
+                                DataTypes.CHAR(5),
+                                DataTypes.VARCHAR(20),
+                                DataTypes.BOOLEAN(),
+                                DataTypes.BINARY(10),
+                                DataTypes.VARBINARY(20),
+                                DataTypes.DECIMAL(10, 2),
+                                DataTypes.TINYINT(),
+                                DataTypes.SMALLINT(),
+                                DataTypes.BIGINT(),
+                                DataTypes.FLOAT(),
                                 DataTypes.DOUBLE(),
-                                DataTypes.VARCHAR(17),
+                                DataTypes.INT(),
+                                DataTypes.DATE(),
+                                DataTypes.TIME(),
+                                DataTypes.TIMESTAMP(3),
                                 DataTypes.BIGINT(),
                                 DataTypes.STRING()));
 
@@ -202,8 +230,22 @@ public class HudiSinkITCase {
                         generator.generate(
                                 new Object[] {
                                     17,
-                                    3.14,
-                                    BinaryStringData.fromString("Doris Day"),
+                                    BinaryStringData.fromString("hello"),
+                                    BinaryStringData.fromString("world"),
+                                    true,
+                                    new byte[] {1, 2, 3},
+                                    new byte[] {4, 5, 6, 7},
+                                    org.apache.flink.cdc.common.data.DecimalData.fromBigDecimal(
+                                            java.math.BigDecimal.valueOf(123.45), 10, 2),
+                                    (byte) 10,
+                                    (short) 100,
+                                    999999999999L,
+                                    3.14f,
+                                    6.28,
+                                    42,
+                                    18628, // days since epoch for 2021-01-01
+                                    3661000, // milliseconds for 01:01:01.000
+                                    TimestampData.fromMillis(1609459200000L), // 2021-01-01 00:00:00
                                     1623456789L,
                                     BinaryStringData.fromString("par1")
                                 })),
@@ -212,8 +254,22 @@ public class HudiSinkITCase {
                         generator.generate(
                                 new Object[] {
                                     19,
-                                    2.718,
-                                    BinaryStringData.fromString("Que Sera Sera"),
+                                    BinaryStringData.fromString("foo"),
+                                    BinaryStringData.fromString("bar"),
+                                    false,
+                                    new byte[] {8, 9},
+                                    new byte[] {10, 11, 12},
+                                    org.apache.flink.cdc.common.data.DecimalData.fromBigDecimal(
+                                            java.math.BigDecimal.valueOf(678.90), 10, 2),
+                                    (byte) 20,
+                                    (short) 200,
+                                    888888888888L,
+                                    2.71f,
+                                    5.42,
+                                    84,
+                                    18629, // days since epoch for 2021-01-02
+                                    7322000, // milliseconds for 02:02:02.000
+                                    TimestampData.fromMillis(1609545600000L), // 2021-01-02 00:00:00
                                     1623456788L,
                                     BinaryStringData.fromString("par1")
                                 })),
@@ -222,8 +278,22 @@ public class HudiSinkITCase {
                         generator.generate(
                                 new Object[] {
                                     21,
-                                    1.732,
-                                    BinaryStringData.fromString("Disenchanted"),
+                                    BinaryStringData.fromString("test"),
+                                    BinaryStringData.fromString("data"),
+                                    true,
+                                    new byte[] {13},
+                                    new byte[] {14, 15},
+                                    org.apache.flink.cdc.common.data.DecimalData.fromBigDecimal(
+                                            java.math.BigDecimal.valueOf(999.99), 10, 2),
+                                    (byte) 30,
+                                    (short) 300,
+                                    777777777777L,
+                                    1.41f,
+                                    2.82,
+                                    126,
+                                    18630, // days since epoch for 2021-01-03
+                                    10983000, // milliseconds for 03:03:03.000
+                                    TimestampData.fromMillis(1609632000000L), // 2021-01-03 00:00:00
                                     1623456789L,
                                     BinaryStringData.fromString("par2")
                                 })),
@@ -232,16 +302,44 @@ public class HudiSinkITCase {
                         generator.generate(
                                 new Object[] {
                                     17,
-                                    3.14,
-                                    BinaryStringData.fromString("Doris Day"),
+                                    BinaryStringData.fromString("hello"),
+                                    BinaryStringData.fromString("world"),
+                                    true,
+                                    new byte[] {1, 2, 3},
+                                    new byte[] {4, 5, 6, 7},
+                                    org.apache.flink.cdc.common.data.DecimalData.fromBigDecimal(
+                                            java.math.BigDecimal.valueOf(123.45), 10, 2),
+                                    (byte) 10,
+                                    (short) 100,
+                                    999999999999L,
+                                    3.14f,
+                                    6.28,
+                                    42,
+                                    18628, // days since epoch for 2021-01-01
+                                    3661000, // milliseconds for 01:01:01.000
+                                    TimestampData.fromMillis(1609459200000L), // 2021-01-01 00:00:00
                                     1623456789L,
                                     BinaryStringData.fromString("par1")
                                 }),
                         generator.generate(
                                 new Object[] {
                                     17,
-                                    6.28,
-                                    BinaryStringData.fromString("Doris Day"),
+                                    BinaryStringData.fromString("updated"),
+                                    BinaryStringData.fromString("value"),
+                                    false,
+                                    new byte[] {1, 2, 4},
+                                    new byte[] {4, 5, 6, 8},
+                                    org.apache.flink.cdc.common.data.DecimalData.fromBigDecimal(
+                                            java.math.BigDecimal.valueOf(246.80), 10, 2),
+                                    (byte) 15,
+                                    (short) 150,
+                                    111111111111L,
+                                    6.28f,
+                                    12.56,
+                                    84,
+                                    18629, // days since epoch for 2021-01-02
+                                    7322000, // milliseconds for 02:02:02.000
+                                    TimestampData.fromMillis(1609545600000L), // 2021-01-02 00:00:00
                                     1623456790L,
                                     BinaryStringData.fromString("par1")
                                 })),
@@ -250,8 +348,22 @@ public class HudiSinkITCase {
                         generator.generate(
                                 new Object[] {
                                     19,
-                                    2.718,
-                                    BinaryStringData.fromString("Que Sera Sera"),
+                                    BinaryStringData.fromString("foo"),
+                                    BinaryStringData.fromString("bar"),
+                                    false,
+                                    new byte[] {8, 9},
+                                    new byte[] {10, 11, 12},
+                                    org.apache.flink.cdc.common.data.DecimalData.fromBigDecimal(
+                                            java.math.BigDecimal.valueOf(678.90), 10, 2),
+                                    (byte) 20,
+                                    (short) 200,
+                                    888888888888L,
+                                    2.71f,
+                                    5.42,
+                                    84,
+                                    18629, // days since epoch for 2021-01-02
+                                    7322000, // milliseconds for 02:02:02.000
+                                    TimestampData.fromMillis(1609545600000L), // 2021-01-02 00:00:00
                                     1623456788L,
                                     BinaryStringData.fromString("par1")
                                 })));
@@ -335,8 +447,21 @@ public class HudiSinkITCase {
         fields.add(getFieldValue(queryContext, record, "_hoodie_record_key"));
         fields.add(getFieldValue(queryContext, record, "_hoodie_partition_path"));
         fields.add(getFieldValue(queryContext, record, "id"));
-        fields.add(getFieldValue(queryContext, record, "number"));
-        fields.add(getFieldValue(queryContext, record, "name"));
+        fields.add(getFieldValue(queryContext, record, "f_char"));
+        fields.add(getFieldValue(queryContext, record, "f_varchar"));
+        fields.add(getFieldValue(queryContext, record, "f_boolean"));
+        fields.add(getFieldValue(queryContext, record, "f_binary"));
+        fields.add(getFieldValue(queryContext, record, "f_varbinary"));
+        fields.add(getFieldValue(queryContext, record, "f_decimal"));
+        fields.add(getFieldValue(queryContext, record, "f_tinyint"));
+        fields.add(getFieldValue(queryContext, record, "f_smallint"));
+        fields.add(getFieldValue(queryContext, record, "f_bigint"));
+        fields.add(getFieldValue(queryContext, record, "f_float"));
+        fields.add(getFieldValue(queryContext, record, "f_double"));
+        fields.add(getFieldValue(queryContext, record, "f_int"));
+        fields.add(getFieldValue(queryContext, record, "f_date"));
+        fields.add(getFieldValue(queryContext, record, "f_time"));
+        fields.add(getFieldValue(queryContext, record, "f_timestamp"));
         fields.add(getFieldValue(queryContext, record, "ts"));
         fields.add(getFieldValue(queryContext, record, "par"));
         return String.join(",", fields);
@@ -346,7 +471,11 @@ public class HudiSinkITCase {
             RowDataAvroQueryContexts.RowDataQueryContext queryContext,
             RowData rowData,
             String fieldName) {
-        return String.valueOf(
-                queryContext.getFieldQueryContext(fieldName).getValAsJava(rowData, true));
+        Object val = queryContext.getFieldQueryContext(fieldName).getValAsJava(rowData, true);
+        if (val instanceof ByteBuffer) {
+            byte[] bytes = ((ByteBuffer) val).array();
+            return Arrays.toString(bytes);
+        }
+        return String.valueOf(val);
     }
 }

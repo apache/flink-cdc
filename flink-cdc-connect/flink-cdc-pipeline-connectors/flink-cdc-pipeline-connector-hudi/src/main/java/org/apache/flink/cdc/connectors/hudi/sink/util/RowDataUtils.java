@@ -146,7 +146,7 @@ public class RowDataUtils {
                 fieldGetter = row -> row.getByte(fieldPos);
                 break;
             case SMALLINT:
-                fieldGetter = row -> row.getInt(fieldPos);
+                fieldGetter = row -> row.getShort(fieldPos);
                 break;
             case BIGINT:
                 fieldGetter = row -> row.getLong(fieldPos);
