@@ -24,6 +24,8 @@ services:
       - ./flink-savepoints:/opt/flink/savepoints
       - ./jars:/opt/flink/usrlib
       - ./log:/opt/flink/log
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - flink-network
 
@@ -44,9 +46,28 @@ services:
       - ./flink-savepoints:/opt/flink/savepoints
       - ./jars:/opt/flink/usrlib
       - ./log:/opt/flink/log
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - flink-network
+
+  mysql-sink:
+    image: mysql:8.0
+    container_name: mysql-sink
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: inventory
+      MYSQL_USER: flinkuser
+      MYSQL_PASSWORD: flinkpw
+    volumes:
+      - ./init-mysql:/docker-entrypoint-initdb.d
+    networks:
+      - flink-network
+    command: --default-authentication-plugin=mysql_native_password
 
 networks:
   flink-network:
     driver: bridge
+

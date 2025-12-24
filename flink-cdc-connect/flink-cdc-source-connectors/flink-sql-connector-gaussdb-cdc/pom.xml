@@ -85,22 +85,15 @@ limitations under the License.
                                 </filter>
                             </filters>
                             <relocations>
-                                <relocation>
-                                    <pattern>org.apache.kafka</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.org.apache.kafka
-                                    </shadedPattern>
-                                </relocation>
+                                <!-- Kafka and Jackson classes must NOT be shaded -->
+                                <!-- Debezium uses these APIs with original package names -->
+
                                 <relocation>
                                     <pattern>com.google.common</pattern>
                                     <shadedPattern>org.apache.flink.cdc.shaded.guava</shadedPattern>
                                 </relocation>
-                                <relocation>
-                                    <pattern>com.fasterxml</pattern>
-                                    <shadedPattern>
-                                        org.apache.flink.cdc.connectors.shaded.com.fasterxml
-                                    </shadedPattern>
-                                </relocation>
+                                <!-- Jackson classes must NOT be shaded - Debezium uses original package names -->
+
                             </relocations>
                         </configuration>
                     </execution>

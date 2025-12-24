@@ -284,7 +284,7 @@ public abstract class GaussDBTestBase extends AbstractTestBase {
             }
         }
 
-        return GaussDBSource.<T>builder()
+        return GaussDBSource.<T>incrementalBuilder()
                 .hostname(HOSTNAME)
                 .port(PORT)
                 .database(DATABASE_NAME)

@@ -41,13 +41,11 @@ public class GaussDBSourceConfigFactory extends JdbcSourceConfigFactory {
     private static final long serialVersionUID = 1L;
 
     private static final String DATABASE_SERVER_NAME = "gaussdb_cdc_source";
-    private static final String CONNECTOR_CLASS_NAME =
-            "io.debezium.connector.gaussdb.GaussDBConnector";
+    private static final String CONNECTOR_CLASS_NAME = "io.debezium.connector.gaussdb.GaussDBConnector";
     private static final String JDBC_DRIVER_CLASS_NAME = "com.huawei.gaussdb.jdbc.Driver";
 
     private Duration heartbeatInterval = GaussDBSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
-    private List<String> schemaList =
-            Collections.singletonList(GaussDBSourceOptions.SCHEMA_NAME.defaultValue());
+    private List<String> schemaList = Collections.singletonList(GaussDBSourceOptions.SCHEMA_NAME.defaultValue());
     private String slotName;
     private String decodingPluginName = GaussDBSourceOptions.DECODING_PLUGIN_NAME.defaultValue();
 
@@ -55,10 +53,17 @@ public class GaussDBSourceConfigFactory extends JdbcSourceConfigFactory {
         this.port = GaussDBSourceOptions.PORT.defaultValue();
     }
 
+    public Properties getDebeziumProperties() {
+        return this.dbzProperties;
+    }
+
     /**
-     * Creates a {@link GaussDBSourceConfigFactory} from Flink {@link ReadableConfig}.
+     * Creates a {@link GaussDBSourceConfigFactory} from Flink
+     * {@link ReadableConfig}.
      *
-     * <p>Required options: {@code hostname}, {@code username}, {@code password}, {@code
+     * <p>
+     * Required options: {@code hostname}, {@code username}, {@code password},
+     * {@code
      * database-name}, {@code slot.name}.
      */
     public static GaussDBSourceConfigFactory fromConfiguration(ReadableConfig config) {
@@ -89,12 +94,23 @@ public class GaussDBSourceConfigFactory extends JdbcSourceConfigFactory {
 
         factory.fetchSize(config.get(GaussDBSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE));
         factory.connectionPoolSize(config.get(GaussDBSourceOptions.CONNECTION_POOL_SIZE));
+
+        if (config.getOptional(GaussDBSourceOptions.HA_PORT).isPresent()) {
+            factory.dbzProperties.setProperty("ha-port", String.valueOf(config.get(GaussDBSourceOptions.HA_PORT)));
+        }
+
+        // Set scanNewlyAddedTableEnabled - default is false to allow stream events
+        // through
+        factory.scanNewlyAddedTableEnabled(config.get(GaussDBSourceOptions.SCAN_NEWLY_ADDED_TABLE_ENABLED));
+
         return factory;
+
     }
 
     /**
-     * @deprecated Prefer {@link #fromConfiguration(ReadableConfig)} and call {@link #create(int)}
-     *     with subtask id.
+     * @deprecated Prefer {@link #fromConfiguration(ReadableConfig)} and call
+     *             {@link #create(int)}
+     *             with subtask id.
      */
     @Deprecated
     public static GaussDBSourceConfig create(ReadableConfig config) {
@@ -104,8 +120,7 @@ public class GaussDBSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The name of the GaussDB schema to monitor. */
     public void schemaList(String... schemaList) {
         if (schemaList == null || schemaList.length == 0) {
-            this.schemaList =
-                    Collections.singletonList(GaussDBSourceOptions.SCHEMA_NAME.defaultValue());
+            this.schemaList = Collections.singletonList(GaussDBSourceOptions.SCHEMA_NAME.defaultValue());
         } else {
             this.schemaList = Arrays.asList(schemaList);
         }

@@ -20,8 +20,10 @@ package org.apache.flink.cdc.connectors.gaussdb.table;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.flink.cdc.connectors.gaussdb.source.GaussDBSource;
 import org.apache.flink.cdc.connectors.gaussdb.source.GaussDBSourceBuilder;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
+import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.cdc.debezium.table.MetadataConverter;
 import org.apache.flink.cdc.debezium.table.RowDataDebeziumDeserializeSchema;
@@ -29,6 +31,7 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
+import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.connector.source.SourceProvider;
 import org.apache.flink.table.connector.source.abilities.SupportsReadingMetadata;
 import org.apache.flink.table.data.RowData;
@@ -82,6 +85,7 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
     private final boolean skipSnapshotBackfill;
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean assignUnboundedChunkFirst;
+    private final Integer haPort;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -121,7 +125,8 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
             boolean closeIdleReaders,
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            @Nullable Integer haPort) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -153,6 +158,7 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
         this.skipSnapshotBackfill = skipSnapshotBackfill;
         this.scanNewlyAddedTableEnabled = isScanNewlyAddedTableEnabled;
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
+        this.haPort = haPort;
     }
 
     @Override
@@ -190,6 +196,7 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
                     GaussDBSourceBuilder.GaussDBIncrementalSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
+                            .haPort(haPort != null ? haPort : 0) // 0 means not set, will be handled in builder or connector
                             .database(database)
                             .schemaList(schemaName)
                             .tableList(schemaName + "." + tableName)
@@ -217,9 +224,26 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
                             .build();
             return SourceProvider.of(parallelSource);
         } else {
-            throw new UnsupportedOperationException(
-                    "GaussDB CDC connector currently only supports parallel read mode. "
-                            + "Please set 'scan.incremental.snapshot.enabled' = 'true'");
+            GaussDBSource.Builder<RowData> sourceBuilder =
+                    GaussDBSource.<RowData>builder()
+                            .hostname(hostname)
+                            .port(port)
+                            .database(database)
+                            .schemaList(schemaName)
+                            .tableList(schemaName + "." + tableName)
+                            .username(username)
+                            .password(password)
+                            .decodingPluginName(pluginName)
+                            .slotName(slotName)
+                            .debeziumProperties(dbzProperties)
+                            .deserializer(deserializer);
+
+            if (haPort != null) {
+                sourceBuilder.haPort(haPort);
+            }
+
+            DebeziumSourceFunction<RowData> sourceFunction = sourceBuilder.build();
+            return SourceFunctionProvider.of(sourceFunction, false);
         }
     }
 
@@ -270,7 +294,8 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
                         closeIdleReaders,
                         skipSnapshotBackfill,
                         scanNewlyAddedTableEnabled,
-                        assignUnboundedChunkFirst);
+                        assignUnboundedChunkFirst,
+                        haPort);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -314,7 +339,8 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
                 && Objects.equals(closeIdleReaders, that.closeIdleReaders)
                 && Objects.equals(skipSnapshotBackfill, that.skipSnapshotBackfill)
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
-                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst);
+                && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
+                && Objects.equals(haPort, that.haPort);
     }
 
     @Override
@@ -349,7 +375,8 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
                 closeIdleReaders,
                 skipSnapshotBackfill,
                 scanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                haPort);
     }
 
     @Override

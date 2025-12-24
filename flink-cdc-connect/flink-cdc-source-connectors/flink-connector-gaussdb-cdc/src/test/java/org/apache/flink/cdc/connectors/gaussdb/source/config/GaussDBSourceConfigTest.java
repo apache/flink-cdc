@@ -21,6 +21,7 @@ import org.apache.flink.configuration.Configuration;
 
 import org.junit.jupiter.api.Test;
 
+import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -70,6 +71,26 @@ class GaussDBSourceConfigTest {
                 GaussDBSourceConfigFactory.fromConfiguration(config).create(0);
 
         assertThat(sourceConfig.getJdbcUrl()).isEqualTo("jdbc:gaussdb://localhost:18000/mydb");
+    }
+
+    @Test
+    void scanIncrementalSnapshotEnabledDefaultsToTrue() {
+        Configuration config = requiredConfigExcept("never-missing");
+        assertThat(config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED)).isTrue();
+    }
+
+    @Test
+    void scanIncrementalSnapshotEnabledRespectsExplicitTrue() {
+        Configuration config = requiredConfigExcept("never-missing");
+        config.setBoolean(SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(), true);
+        assertThat(config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED)).isTrue();
+    }
+
+    @Test
+    void scanIncrementalSnapshotEnabledRespectsExplicitFalse() {
+        Configuration config = requiredConfigExcept("never-missing");
+        config.setBoolean(SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(), false);
+        assertThat(config.get(SCAN_INCREMENTAL_SNAPSHOT_ENABLED)).isFalse();
     }
 
     private static Configuration requiredConfigExcept(String missingKey) {

@@ -20,6 +20,8 @@ import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigDef.Importance;
 import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.config.ConfigDef.Width;
+import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.data.SchemaBuilder;
 
 import java.time.Duration;
 
@@ -191,14 +193,26 @@ public class GaussDBConnectorConfig extends RelationalDatabaseConnectorConfig {
     private static class GaussDBSourceInfoStructMaker
             extends AbstractSourceInfoStructMaker<AbstractSourceInfo> {
 
+        private final Schema schema;
+
         GaussDBSourceInfoStructMaker(
                 String connectorName, String connectorVersion, GaussDBConnectorConfig config) {
             super(connectorName, connectorVersion, config);
+            this.schema =
+                    commonSchemaBuilder()
+                            .name("io.debezium.connector.gaussdb.Source")
+                            .field(
+                                    AbstractSourceInfo.SCHEMA_NAME_KEY,
+                                    SchemaBuilder.string().optional().build())
+                            .field(
+                                    AbstractSourceInfo.TABLE_NAME_KEY,
+                                    SchemaBuilder.string().optional().build())
+                            .build();
         }
 
         @Override
         public org.apache.kafka.connect.data.Schema schema() {
-            return commonSchemaBuilder().build();
+            return schema;
         }
 
         @Override

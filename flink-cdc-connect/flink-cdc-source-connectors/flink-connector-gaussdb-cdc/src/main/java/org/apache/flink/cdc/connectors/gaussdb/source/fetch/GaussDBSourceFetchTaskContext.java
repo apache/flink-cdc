@@ -22,9 +22,11 @@ import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SnapshotSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
+import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.gaussdb.source.GaussDBDialect;
 import org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceConfig;
+import org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset;
 import org.apache.flink.cdc.connectors.gaussdb.source.utils.CustomGaussDBSchema;
 import org.apache.flink.cdc.connectors.gaussdb.source.utils.GaussDBTypeUtils;
 import org.apache.flink.table.types.logical.RowType;
@@ -32,6 +34,7 @@ import org.apache.flink.table.types.logical.RowType;
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.gaussdb.GaussDBConnectorConfig;
 import io.debezium.connector.gaussdb.connection.GaussDBConnection;
+import io.debezium.connector.gaussdb.connection.Lsn;
 import io.debezium.connector.gaussdb.decoder.MppdbDecodingMessageDecoder;
 import io.debezium.connector.postgresql.connection.AbstractMessageDecoder;
 import io.debezium.pipeline.DataChangeEvent;
@@ -48,6 +51,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
@@ -62,12 +66,16 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     private GaussDBConnection jdbcConnection;
     private CustomGaussDBSchema schema;
+    private io.debezium.connector.gaussdb.GaussDBSchema relationalSchema;
     private AbstractMessageDecoder messageDecoder;
     private Partition partition;
     private ChangeEventQueue<DataChangeEvent> queue;
     private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection replicationConnection;
     // Separate replication connection for backfill tasks to avoid slot contention
     private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection backfillReplicationConnection;
+    // Watermark dispatcher for dispatching watermark events during
+    // snapshot/backfill
+    private CDCGaussDBDispatcher watermarkDispatcher;
 
     public GaussDBSourceFetchTaskContext(
             JdbcSourceConfig sourceConfig, GaussDBDialect dataSourceDialect) {
@@ -112,6 +120,12 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             partition = new GaussDBPartition(dbzConfig.getLogicalName());
         }
 
+        // Initialize watermark dispatcher for snapshot/backfill watermark events
+        if (watermarkDispatcher == null) {
+            String topic = dbzConfig.getLogicalName();
+            watermarkDispatcher = new CDCGaussDBDispatcher(topic, queue);
+        }
+
         // Initialize JDBC connection
         try {
             if (jdbcConnection == null) {
@@ -126,6 +140,11 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         // Initialize schema cache
         if (schema == null) {
             schema = new CustomGaussDBSchema(jdbcConnection);
+        }
+
+        // Initialize relational schema for getDatabaseSchema()
+        if (relationalSchema == null) {
+            relationalSchema = new io.debezium.connector.gaussdb.GaussDBSchema(dbzConfig, jdbcConnection);
         }
 
         // Register table schemas for this split
@@ -181,7 +200,10 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             if (endingOffset != null
                     && endingOffset instanceof org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) {
                 org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset gaussDBEndOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) endingOffset;
-                return gaussDBEndOffset.getLsn() != null && gaussDBEndOffset.getLsn().isValid();
+                return gaussDBEndOffset.getLsn() != null
+                        && gaussDBEndOffset.getLsn().isValid()
+                        && !gaussDBEndOffset.getLsn()
+                                .equals(io.debezium.connector.gaussdb.connection.Lsn.NO_STOPPING_LSN);
             }
         }
         return false;
@@ -263,9 +285,7 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public RelationalDatabaseSchema getDatabaseSchema() {
-        // Return null for now as CustomGaussDBSchema is not a RelationalDatabaseSchema
-        // Full schema integration will be implemented in Sprint 3
-        return null;
+        return relationalSchema;
     }
 
     public CustomGaussDBSchema getCustomSchema() {
@@ -296,9 +316,7 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     @Override
     public WatermarkDispatcher getWaterMarkDispatcher() {
-        // Watermark dispatcher will be implemented in Sprint 3
-        // For now, return null as watermark management is not yet fully integrated
-        return null;
+        return watermarkDispatcher;
     }
 
     @Override
@@ -321,15 +339,40 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         org.apache.kafka.connect.data.Struct source = value.getStruct(io.debezium.data.Envelope.FieldName.SOURCE);
         String schemaName = source.getString(SCHEMA_NAME_KEY);
         String tableName = source.getString(TABLE_NAME_KEY);
-        return new TableId(null, schemaName, tableName);
+        // Use database name as catalog to match format in finishedSplitsInfo
+        // (db1.public.products)
+        String databaseName = source.getString("db");
+        return new TableId(databaseName, schemaName, tableName);
     }
 
     @Override
     public org.apache.flink.cdc.connectors.base.source.meta.offset.Offset getStreamOffset(
             SourceRecord sourceRecord) {
-        // Stream offset extraction will be implemented in Sprint 3
-        // For now, return null as offset management is not yet fully integrated
-        return null;
+        if (sourceRecord == null) {
+            LOG.warn("Received null SourceRecord when extracting stream offset, using initial offset.");
+            return GaussDBOffset.INITIAL_OFFSET;
+        }
+
+        Map<String, ?> sourceOffset = sourceRecord.sourceOffset();
+        if (sourceOffset == null || sourceOffset.isEmpty()) {
+            LOG.debug("SourceRecord offset is empty, using initial offset.");
+            return GaussDBOffset.INITIAL_OFFSET;
+        }
+
+        try {
+            GaussDBOffset gaussDBOffset = GaussDBOffset.of(sourceOffset);
+            Lsn lsn = gaussDBOffset.getLsn();
+            if (lsn != null && lsn.isValid()) {
+                return gaussDBOffset;
+            }
+            LOG.debug("Parsed invalid or missing LSN from source offset {}, using initial offset.", sourceOffset);
+        } catch (Exception e) {
+            LOG.warn(
+                    "Failed to parse stream offset from source offset {}, using initial offset instead.",
+                    sourceOffset,
+                    e);
+        }
+        return GaussDBOffset.INITIAL_OFFSET;
     }
 
     @Override
@@ -349,6 +392,9 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         }
         if (backfillReplicationConnection != null) {
             backfillReplicationConnection.close();
+        }
+        if (relationalSchema != null) {
+            relationalSchema.close();
         }
         if (jdbcConnection != null) {
             jdbcConnection.close();

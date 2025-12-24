@@ -4,12 +4,13 @@ GaussDB CDC Connector 是一个 Flink CDC 连接器，用于从华为 GaussDB �
 
 ## 功能特性
 
-- 支持全量快照读取和增量变更捕获
-- 基于 GaussDB 逻辑复制 (mppdb_decoding 插件)
-- 支持 DataStream API 和 Table API (Flink SQL)
-- 支持 Exactly-Once 语义
-- 支持并行快照读取
-- 支持 Checkpoint 和故障恢复
+- **全量同步**: 支持并行快照读取，极大提高海量数据初始化速度
+- **增量捕获**: 实时捕获 GaussDB 变更事件 (I/U/D)
+- **解码插件**: 深度适配 `mppdb_decoding`，支持复杂的 GaussDB 数据类型
+- **中文支持**: 原生支持 UTF-8 编码，确保中文数据无损同步至 MySQL/Kafka 等下游
+- **高可用性**: 自动修复 `TableId` 映射问题，支持 Schema 自动感知
+- ** Exactly-Once**: 确保数据不丢失不重复
+- **鲁棒验证**: 提供完善的自动化 E2E 测试框架
 
 ## 前置条件
 
@@ -179,6 +180,26 @@ CREATE TABLE orders_source (
 | JSON/JSONB | STRING |
 | UUID | STRING |
 | ARRAY | ARRAY |
+
+## 自动化测试
+
+项目提供了一套完善的自动化测试脚本，用于验证部署、同步功能和数据一致性。
+
+### 一键全流程测试
+执行以下脚本即可完成代码编译、集群部署、增量同步测试及结果验证：
+```bash
+./test_gaussdb_cdc.sh
+```
+
+### 关键测试组件
+- **`deploy_gaussdb.sh`**: 编译 Connector 并自动分发到 Flink Docker 集群，处理 JAR 冲突。
+- **`run_gaussdb_test.sh`**: 执行增量数据模拟 (INSERT/UPDATE/DELETE) 并通过**轮询机制**验证同步结果。
+- **`check_sync_result.sh`**: 深度对比源端 GaussDB 和目标端 MySQL 的数据一致性，支持中文编码验证。
+
+### 测试验证要点
+- ✅ 解决 `TableId` 缺失 database catalog 导致的事件过滤问题。
+- ✅ 解决中文同步出现的 `??` 乱码问题。
+- ✅ 解决高并发/高延迟场景下的同步稳定性。
 
 ## 故障排查
 

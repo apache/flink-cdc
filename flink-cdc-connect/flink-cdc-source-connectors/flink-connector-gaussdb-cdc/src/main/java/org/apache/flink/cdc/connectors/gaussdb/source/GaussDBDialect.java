@@ -76,12 +76,11 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
                     gaussDBSourceConfig.getHostname(),
                     gaussDBSourceConfig.getPort(),
                     gaussDBSourceConfig.getDatabaseList());
-            JdbcConnection jdbcConnection =
-                    new JdbcConnection(
-                            gaussDBSourceConfig.getDbzConnectorConfig().getJdbcConfig(),
-                            new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
-                            "\"",
-                            "\"");
+            JdbcConnection jdbcConnection = new JdbcConnection(
+                    gaussDBSourceConfig.getDbzConnectorConfig().getJdbcConfig(),
+                    new JdbcConnectionFactory(sourceConfig, getPooledDataSourceFactory()),
+                    "\"",
+                    "\"");
             jdbcConnection.connect();
             LOG.info("=== JDBC connection established successfully ===");
             return jdbcConnection;
@@ -108,13 +107,12 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
                     schemaList,
                     sourceConfig.getTableFilters());
 
-            List<TableId> tables =
-                    TableDiscoveryUtils.listTables(
-                            // there is always a single database provided
-                            sourceConfig.getDatabaseList().get(0),
-                            jdbc,
-                            sourceConfig.getTableFilters(),
-                            schemaList);
+            List<TableId> tables = TableDiscoveryUtils.listTables(
+                    // there is always a single database provided
+                    sourceConfig.getDatabaseList().get(0),
+                    jdbc,
+                    sourceConfig.getTableFilters(),
+                    schemaList);
             LOG.info("=== Discovered {} tables: {} ===", tables.size(), tables);
             return tables;
         } catch (SQLException e) {
@@ -174,18 +172,17 @@ public class GaussDBDialect implements JdbcDataSourceDialect {
                 rs -> {
                     if (rs.next()) {
                         final String lsnStr = rs.getString(1);
-                        return new org.apache.flink.cdc.connectors.gaussdb.source.offset
-                                .GaussDBOffset(
+                        return new org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset(
                                 io.debezium.connector.gaussdb.connection.Lsn.valueOf(lsnStr));
                     }
-                    return org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset
-                            .INITIAL_OFFSET;
+                    return org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset.INITIAL_OFFSET;
                 });
     }
 
     @Override
     public boolean isDataCollectionIdCaseSensitive(JdbcSourceConfig sourceConfig) {
-        // GaussDB follows PostgreSQL behavior: identifiers are case-sensitive when quoted.
+        // GaussDB follows PostgreSQL behavior: identifiers are case-sensitive when
+        // quoted.
         return true;
     }
 

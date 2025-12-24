@@ -170,6 +170,8 @@ class GaussDbE2eITCase extends FlinkContainerTestEnvironment {
                     "UPDATE public.products_gauss SET description='Heavy duty car battery' WHERE id=102;");
             statement.execute(
                     "INSERT INTO public.products_gauss VALUES (103, 'drill', 'Electric drill', 1.5);");
+            LOG.info("Deleting data from GaussDB...");
+            statement.execute("DELETE FROM public.products_gauss WHERE id=101;");
         }
 
         // Verify results
@@ -183,7 +185,6 @@ class GaussDbE2eITCase extends FlinkContainerTestEnvironment {
         List<String> expectResult =
                 new ArrayList<>(
                         Arrays.asList(
-                                "101,scooter,Small 2-wheel scooter,3.140",
                                 "102,car battery,Heavy duty car battery,8.100",
                                 "103,drill,Electric drill,1.500"));
 

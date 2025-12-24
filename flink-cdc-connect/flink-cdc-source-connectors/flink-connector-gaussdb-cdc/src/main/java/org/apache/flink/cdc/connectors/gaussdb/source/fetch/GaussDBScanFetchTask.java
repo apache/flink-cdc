@@ -140,6 +140,8 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
 
         final long startTime = System.currentTimeMillis();
         final TableId tableId = table.id();
+        final String schemaName = tableId != null ? tableId.schema() : null;
+        final String tableName = tableId != null ? tableId.table() : null;
         LOG.info("=== Starting readTableSplitData for table: {} ===", tableId);
         final ChangeEventQueue<DataChangeEvent> queue =
                 requireQueue(context, snapshotSplit.splitId());
@@ -211,7 +213,8 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
                 final org.apache.kafka.connect.data.Schema sourceSchema =
                         connectorConfig.getSourceInfoStructMaker().schema();
                 final org.apache.kafka.connect.data.Struct sourceStruct =
-                        buildSnapshotSourceStruct(sourceSchema, connectorConfig, tableId);
+                        buildSnapshotSourceStruct(
+                                sourceSchema, connectorConfig, schemaName, tableName);
 
                 final org.apache.kafka.connect.data.Struct valueStruct =
                         envelope.read(afterStruct, sourceStruct, Instant.now());
@@ -314,7 +317,8 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
     private static org.apache.kafka.connect.data.Struct buildSnapshotSourceStruct(
             org.apache.kafka.connect.data.Schema sourceSchema,
             GaussDBConnectorConfig connectorConfig,
-            TableId tableId) {
+            String schemaName,
+            String tableName) {
         final org.apache.kafka.connect.data.Struct sourceStruct =
                 new org.apache.kafka.connect.data.Struct(sourceSchema);
 
@@ -347,11 +351,11 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
         putIfPresent(
                 sourceStruct,
                 io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY,
-                tableId.schema());
+                schemaName);
         putIfPresent(
                 sourceStruct,
                 io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY,
-                tableId.table());
+                tableName);
         // Snapshot records have message timestamp 0.
         putIfPresent(sourceStruct, io.debezium.connector.AbstractSourceInfo.TIMESTAMP_KEY, 0L);
 

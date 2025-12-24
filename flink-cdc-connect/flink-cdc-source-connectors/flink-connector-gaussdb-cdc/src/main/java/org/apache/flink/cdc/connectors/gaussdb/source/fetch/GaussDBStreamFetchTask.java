@@ -46,9 +46,12 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -160,7 +163,12 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         // streaming)
         org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
                 .getEndingOffset();
-        boolean isBoundedRead = endOffset != null && endOffset.getLsn() != null && endOffset.getLsn().isValid();
+        boolean isBoundedRead =
+                endOffset != null
+                        && endOffset.getLsn() != null
+                        && endOffset.getLsn().isValid()
+                        && !endOffset.getLsn()
+                                .equals(io.debezium.connector.gaussdb.connection.Lsn.NO_STOPPING_LSN);
 
         // Get the appropriate replication connection from the context
         // Use backfill connection for bounded reads to avoid slot contention
@@ -193,12 +201,11 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             // Set the ending position for bounded reads to avoid stream close/reopen
             // This enables the reachEnd() check in ReplicationStream to return NoopMessage
             // when target LSN is reached, instead of requiring stream restart
-            org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
-                    .getEndingOffset();
             if (endOffset != null && endOffset.getLsn() != null && endOffset.getLsn().isValid()) {
                 io.debezium.connector.gaussdb.connection.Lsn endingLsn = endOffset.getLsn();
                 LOG.info("Setting ending position for bounded read: {}", endingLsn);
-                replicationConnection.setEndingPos(endingLsn);
+                replicationConnection.setEndingPos(
+                        io.debezium.connector.postgresql.connection.Lsn.valueOf(endingLsn.asLong()));
             } else {
                 // Clear ending position for unbounded reads
                 replicationConnection.setEndingPos(null);
@@ -403,117 +410,286 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             return;
         }
 
-        final TableId tableId = parseTableId(message.getTable());
+        final boolean traceDataFlow = operation == ReplicationMessage.Operation.INSERT
+                || operation == ReplicationMessage.Operation.UPDATE;
+        TableId tableId = parseTableId(message.getTable());
+        if (traceDataFlow) {
+            LOG.info(
+                    "TableId before catalog补全: catalog='{}', schema='{}', table='{}'",
+                    tableId != null ? tableId.catalog() : null,
+                    tableId != null ? tableId.schema() : null,
+                    tableId != null ? tableId.table() : null);
+        }
+        if (tableId != null && Strings.isNullOrEmpty(tableId.catalog())) {
+            String database = context.getDbzConnectorConfig().getJdbcConfig().getDatabase();
+            if (traceDataFlow) {
+                LOG.info("Database from config: '{}'", database);
+            }
+            if (!Strings.isNullOrEmpty(database)) {
+                tableId = new TableId(database, tableId.schema(), tableId.table());
+                if (traceDataFlow) {
+                    LOG.info(
+                            "TableId after catalog补全: catalog='{}', schema='{}', table='{}'",
+                            tableId.catalog(),
+                            tableId.schema(),
+                            tableId.table());
+                }
+            }
+        }
+        final TableId messageTableId = tableId;
+        if (traceDataFlow) {
+            LOG.info(
+                    "Raw replication message op={} table={} newTuple={} oldTuple={}",
+                    operation,
+                    tableId,
+                    message.getNewTupleList(),
+                    message.getOldTupleList());
+        }
         if (tableId == null) {
             updateLastProcessedLsn(streamRef, lastProcessedLsn);
             return;
         }
 
-        if (!context.getTableFilter().isIncluded(tableId)) {
+        boolean included = context.getTableFilter().isIncluded(tableId);
+        if (traceDataFlow) {
+            LOG.info("Table filter check: tableId={}, included={}", tableId, included);
+            if (!included) {
+                LOG.info("Skip message due to table filter exclusion: {}", tableId);
+            }
+        }
+        if (!included) {
             updateLastProcessedLsn(streamRef, lastProcessedLsn);
             return;
         }
 
-        final TableSchema tableSchema = gaussDBSchema.schemaFor(tableId);
-        final Table table = gaussDBSchema.tableFor(tableId);
+        if (traceDataFlow) {
+            io.debezium.connector.postgresql.connection.Lsn currentLsn = null;
+            try {
+                currentLsn = streamRef.get() != null ? streamRef.get().lastReceivedLsn() : null;
+            } catch (Exception ignored) {
+            }
+            LOG.info(
+                    "Processing replication message op={} table={} lsn={}",
+                    operation,
+                    tableId,
+                    currentLsn);
+        }
+
+        TableSchema tableSchema = gaussDBSchema.schemaFor(tableId);
+        Table table = gaussDBSchema.tableFor(tableId);
+        if ((tableSchema == null || table == null) && messageTableId != null
+                && !messageTableId.equals(tableId)) {
+            tableSchema = gaussDBSchema.schemaFor(messageTableId);
+            table = gaussDBSchema.tableFor(messageTableId);
+            if (traceDataFlow && tableSchema != null && table != null) {
+                LOG.info(
+                        "Recovered table schema using message TableId {} after filter remap {}",
+                        messageTableId,
+                        tableId);
+            }
+        }
         if (tableSchema == null || table == null) {
-            LOG.debug("Skip message for unknown/untracked table: {}", tableId);
+            LOG.info("Skip message for unknown/untracked table: {}", tableId);
             updateLastProcessedLsn(streamRef, lastProcessedLsn);
             return;
+        }
+        if (traceDataFlow) {
+            LOG.info(
+                    "Resolved table schema for {} columns={} rowSizeHint={}",
+                    tableId,
+                    table.columns().stream()
+                            .filter(Objects::nonNull)
+                            .map(io.debezium.relational.Column::name)
+                            .collect(Collectors.toList()),
+                    maxColumnPosition(table));
         }
 
         final int rowSize = maxColumnPosition(table);
         final Object[] afterRow = rowSize > 0 ? new Object[rowSize] : new Object[0];
         final Object[] beforeRow = rowSize > 0 ? new Object[rowSize] : new Object[0];
 
-        final BaseConnection pgConn = pgConnectionSupplier.get();
-        final io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier pgSupplier = () -> pgConn;
-        final boolean includeUnknownDatatypes = true;
+        try {
+            // Use null supplier to avoid connection issues in replication stream context
+            // The replication message already contains decoded values, no need for additional connection
+            final io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier pgSupplier = () -> null;
+            final boolean includeUnknownDatatypes = true;
 
-        if (operation == ReplicationMessage.Operation.INSERT
-                || operation == ReplicationMessage.Operation.UPDATE) {
-            fillRowFromTuple(
-                    table,
-                    afterRow,
-                    message.getNewTupleList(),
-                    pgSupplier,
-                    includeUnknownDatatypes);
+            if (operation == ReplicationMessage.Operation.INSERT
+                    || operation == ReplicationMessage.Operation.UPDATE) {
+                if (traceDataFlow) {
+                    LOG.info(
+                            "Before fillRowFromTuple (afterRow) op={} table={} data={}",
+                            operation,
+                            tableId,
+                            Arrays.toString(afterRow));
+                }
+                fillRowFromTuple(
+                        table,
+                        afterRow,
+                        message.getNewTupleList(),
+                        pgSupplier,
+                        includeUnknownDatatypes,
+                        traceDataFlow,
+                        "after",
+                        tableId,
+                        operation);
+                if (traceDataFlow) {
+                    LOG.info(
+                            "After fillRowFromTuple (afterRow) op={} table={} data={}",
+                            operation,
+                            tableId,
+                            Arrays.toString(afterRow));
+                }
+            }
+            if (operation == ReplicationMessage.Operation.DELETE
+                    || operation == ReplicationMessage.Operation.UPDATE) {
+                if (traceDataFlow) {
+                    LOG.info(
+                            "Before fillRowFromTuple (beforeRow) op={} table={} data={}",
+                            operation,
+                            tableId,
+                            Arrays.toString(beforeRow));
+                }
+                fillRowFromTuple(
+                        table,
+                        beforeRow,
+                        message.getOldTupleList(),
+                        pgSupplier,
+                        includeUnknownDatatypes,
+                        traceDataFlow,
+                        "before",
+                        tableId,
+                        operation);
+                // When old tuple only contains keys, valueFromColumnData will produce a Struct
+                // with
+                // nulls for non-key columns. This keeps UPDATE/DELETE records deserializable.
+                if (traceDataFlow) {
+                    LOG.info(
+                            "After fillRowFromTuple (beforeRow) op={} table={} data={}",
+                            operation,
+                            tableId,
+                            Arrays.toString(beforeRow));
+                }
+            }
+            if (operation == ReplicationMessage.Operation.DELETE
+                    && (isAllNullRow(beforeRow) && !isAllNullRow(afterRow))) {
+                // Fallback: some decoders provide DELETE values in new tuple.
+                System.arraycopy(afterRow, 0, beforeRow, 0, afterRow.length);
+                if (traceDataFlow) {
+                    LOG.info("DELETE fallback copied afterRow into beforeRow for {}", tableId);
+                }
+            }
+            if (operation == ReplicationMessage.Operation.UPDATE && isAllNullRow(beforeRow)) {
+                // Fallback: if old tuple is missing, emit a best-effort before image from
+                // after.
+                System.arraycopy(afterRow, 0, beforeRow, 0, afterRow.length);
+                if (traceDataFlow) {
+                    LOG.info("UPDATE fallback copied afterRow into beforeRow for {}", tableId);
+                }
+            }
+
+            final Struct keyStruct = !isAllNullRow(afterRow)
+                    ? tableSchema.keyFromColumnData(afterRow)
+                    : tableSchema.keyFromColumnData(beforeRow);
+            final Struct afterStruct = !isAllNullRow(afterRow) ? tableSchema.valueFromColumnData(afterRow) : null;
+            final Struct beforeStruct = !isAllNullRow(beforeRow) ? tableSchema.valueFromColumnData(beforeRow) : null;
+            if (traceDataFlow) {
+                LOG.info(
+                        "Constructed keyStruct op={} table={} struct={}",
+                        operation,
+                        tableId,
+                        keyStruct);
+                LOG.info(
+                        "Constructed beforeStruct op={} table={} struct={}",
+                        operation,
+                        tableId,
+                        beforeStruct);
+                LOG.info(
+                        "Constructed afterStruct op={} table={} struct={}",
+                        operation,
+                        tableId,
+                        afterStruct);
+            }
+
+            final io.debezium.connector.postgresql.connection.Lsn currentLsn = streamRef.get().lastReceivedLsn();
+            final Map<String, Object> sourceOffset = lsnOffset(currentLsn);
+            final Map<String, ?> sourcePartition = context.getPartition().getSourcePartition();
+            final String topic = topicFor(context.getDbzConnectorConfig(), tableId);
+            final String schemaName = tableId.schema();
+            final String tableName = tableId.table();
+
+            final Schema sourceSchema = Objects.requireNonNull(
+                    context.getDbzConnectorConfig().getSourceInfoStructMaker().schema(),
+                    "source info schema");
+            final Struct sourceStruct = buildSourceStruct(
+                    sourceSchema, context.getDbzConnectorConfig(), schemaName, tableName, message);
+
+            final Envelope envelope = tableSchema.getEnvelopeSchema();
+            final Instant fetchTs = Instant.now();
+            final Struct valueStruct;
+            switch (operation) {
+                case INSERT:
+                    valueStruct = envelope.create(afterStruct, sourceStruct, fetchTs);
+                    break;
+                case UPDATE:
+                    valueStruct = envelope.update(beforeStruct, afterStruct, sourceStruct, fetchTs);
+                    break;
+                case DELETE:
+                    valueStruct = envelope.delete(beforeStruct, sourceStruct, fetchTs);
+                    break;
+                default:
+                    // Shouldn't happen due to earlier filter.
+                    updateLastProcessedLsn(streamRef, lastProcessedLsn);
+                    return;
+            }
+
+            final SourceRecord record = new SourceRecord(
+                    sourcePartition,
+                    sourceOffset,
+                    topic,
+                    tableSchema.keySchema(),
+                    keyStruct,
+                    envelope.schema(),
+                    valueStruct);
+            if (traceDataFlow) {
+                LOG.info(
+                        "Built envelope op={} before={} after={}",
+                        operation,
+                        beforeStruct,
+                        afterStruct);
+                LOG.info(
+                        "Enqueuing SourceRecord op={} table={} topic={} partition={} offset={} key={} value={}",
+                        operation,
+                        tableId,
+                        topic,
+                        sourcePartition,
+                        sourceOffset,
+                        keyStruct,
+                        valueStruct);
+            }
+            queue.enqueue(new DataChangeEvent(record));
+            if (traceDataFlow) {
+                LOG.info(
+                        "SourceRecord enqueued op={} table={} offset={} emittedCount={}",
+                        operation,
+                        tableId,
+                        sourceOffset,
+                        emittedCount.get() + 1);
+            }
+            emittedCount.incrementAndGet();
+            updateLastProcessedLsn(streamRef, lastProcessedLsn);
+        } catch (Exception e) {
+            LOG.error("Failed to process message op={} table={}: {}", operation, tableId, e.getMessage(), e);
+            updateLastProcessedLsn(streamRef, lastProcessedLsn);
+            throw e;
         }
-        if (operation == ReplicationMessage.Operation.DELETE
-                || operation == ReplicationMessage.Operation.UPDATE) {
-            fillRowFromTuple(
-                    table,
-                    beforeRow,
-                    message.getOldTupleList(),
-                    pgSupplier,
-                    includeUnknownDatatypes);
-            // When old tuple only contains keys, valueFromColumnData will produce a Struct
-            // with
-            // nulls for non-key columns. This keeps UPDATE/DELETE records deserializable.
-        }
-        if (operation == ReplicationMessage.Operation.DELETE
-                && (isAllNullRow(beforeRow) && !isAllNullRow(afterRow))) {
-            // Fallback: some decoders provide DELETE values in new tuple.
-            System.arraycopy(afterRow, 0, beforeRow, 0, afterRow.length);
-        }
-        if (operation == ReplicationMessage.Operation.UPDATE && isAllNullRow(beforeRow)) {
-            // Fallback: if old tuple is missing, emit a best-effort before image from
-            // after.
-            System.arraycopy(afterRow, 0, beforeRow, 0, afterRow.length);
-        }
-
-        final Struct keyStruct = !isAllNullRow(afterRow)
-                ? tableSchema.keyFromColumnData(afterRow)
-                : tableSchema.keyFromColumnData(beforeRow);
-        final Struct afterStruct = !isAllNullRow(afterRow) ? tableSchema.valueFromColumnData(afterRow) : null;
-        final Struct beforeStruct = !isAllNullRow(beforeRow) ? tableSchema.valueFromColumnData(beforeRow) : null;
-
-        final io.debezium.connector.postgresql.connection.Lsn currentLsn = streamRef.get().lastReceivedLsn();
-        final Map<String, Object> sourceOffset = lsnOffset(currentLsn);
-        final Map<String, ?> sourcePartition = context.getPartition().getSourcePartition();
-        final String topic = topicFor(context.getDbzConnectorConfig(), tableId);
-
-        final Schema sourceSchema = Objects.requireNonNull(
-                context.getDbzConnectorConfig().getSourceInfoStructMaker().schema(),
-                "source info schema");
-        final Struct sourceStruct = buildSourceStruct(sourceSchema, context.getDbzConnectorConfig(), tableId, message);
-
-        final Envelope envelope = tableSchema.getEnvelopeSchema();
-        final Instant fetchTs = Instant.now();
-        final Struct valueStruct;
-        switch (operation) {
-            case INSERT:
-                valueStruct = envelope.create(afterStruct, sourceStruct, fetchTs);
-                break;
-            case UPDATE:
-                valueStruct = envelope.update(beforeStruct, afterStruct, sourceStruct, fetchTs);
-                break;
-            case DELETE:
-                valueStruct = envelope.delete(beforeStruct, sourceStruct, fetchTs);
-                break;
-            default:
-                // Shouldn't happen due to earlier filter.
-                updateLastProcessedLsn(streamRef, lastProcessedLsn);
-                return;
-        }
-
-        final SourceRecord record = new SourceRecord(
-                sourcePartition,
-                sourceOffset,
-                topic,
-                tableSchema.keySchema(),
-                keyStruct,
-                envelope.schema(),
-                valueStruct);
-        queue.enqueue(new DataChangeEvent(record));
-        emittedCount.incrementAndGet();
-        updateLastProcessedLsn(streamRef, lastProcessedLsn);
     }
 
     private static Struct buildSourceStruct(
             Schema sourceSchema,
             GaussDBConnectorConfig connectorConfig,
-            TableId tableId,
+            String schemaName,
+            String tableName,
             ReplicationMessage message) {
         final Struct sourceStruct = new Struct(sourceSchema);
 
@@ -546,11 +722,11 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         putIfPresent(
                 sourceStruct,
                 io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY,
-                tableId.schema());
+                schemaName);
         putIfPresent(
                 sourceStruct,
                 io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY,
-                tableId.table());
+                tableName);
 
         final Instant commitTime = message.getCommitTime() != null ? message.getCommitTime() : Instant.now();
         putIfPresent(
@@ -575,28 +751,104 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             Object[] row,
             java.util.List<ReplicationMessage.Column> tuple,
             io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier pgSupplier,
-            boolean includeUnknownDatatypes)
+            boolean includeUnknownDatatypes,
+            boolean logDetails,
+            String tupleLabel,
+            TableId tableId,
+            ReplicationMessage.Operation operation)
             throws SQLException {
         if (tuple == null || tuple.isEmpty() || table == null || row == null) {
+            if (logDetails) {
+                LOG.info(
+                        "fillRowFromTuple skipped due to empty input op={} table={} label={} tupleSize={}",
+                        operation,
+                        tableId,
+                        tupleLabel,
+                        tuple == null ? null : tuple.size());
+            }
             return;
         }
+        final java.util.List<io.debezium.relational.Column> tableColumns = table.columns();
+        if (tableColumns == null || tableColumns.isEmpty()) {
+            if (logDetails) {
+                LOG.info(
+                        "fillRowFromTuple skipped because table columns are empty op={} table={} label={}",
+                        operation,
+                        tableId,
+                        tupleLabel);
+            }
+            return;
+        }
+        final Map<String, Integer> tableColumnIndex = new HashMap<>();
+        for (io.debezium.relational.Column c : tableColumns) {
+            if (c == null) {
+                continue;
+            }
+            final int position = c.position();
+            if (position <= 0) {
+                continue;
+            }
+            final int index = position - 1;
+            final String normalizedTableName = normalizeColumnName(c.name());
+            if (!Strings.isNullOrEmpty(normalizedTableName)) {
+                tableColumnIndex.put(normalizedTableName.toLowerCase(Locale.ROOT), index);
+            }
+            tableColumnIndex.put(c.name().toLowerCase(Locale.ROOT), index);
+        }
+        int mappedCount = 0;
+        final java.util.List<String> mapped = logDetails ? new java.util.ArrayList<>() : null;
+        final java.util.List<String> skipped = logDetails ? new java.util.ArrayList<>() : null;
         for (ReplicationMessage.Column column : tuple) {
             if (column == null) {
                 continue;
             }
-            final String columnName = column.getName();
-            if (columnName == null) {
+            final String rawName = column.getName();
+            final String normalizedName = normalizeColumnName(rawName);
+            final String lookupKey =
+                    !Strings.isNullOrEmpty(normalizedName)
+                            ? normalizedName.toLowerCase(Locale.ROOT)
+                            : null;
+            Integer index = lookupKey != null ? tableColumnIndex.get(lookupKey) : null;
+            if (index == null && rawName != null) {
+                index = tableColumnIndex.get(rawName.toLowerCase(Locale.ROOT));
+            }
+            if (index == null || index < 0 || index >= row.length) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(
+                            "Skip column mapping for '{}' (normalized='{}') on table {} with row size {}",
+                            rawName,
+                            normalizedName,
+                            table.id(),
+                            row.length);
+                }
+                if (logDetails && skipped != null) {
+                    skipped.add(rawName + "->" + index);
+                }
                 continue;
             }
-            final io.debezium.relational.Column tableColumn = table.columnWithName(columnName);
-            if (tableColumn == null) {
-                continue;
+            final Object value = column.getValue(pgSupplier, includeUnknownDatatypes);
+            row[index] = value;
+            mappedCount++;
+            if (logDetails && mapped != null) {
+                mapped.add(rawName + "=>" + index + ":" + value);
+            } else if (LOG.isTraceEnabled()) {
+                LOG.trace(
+                        "Mapped column '{}' (normalized='{}') to index {} with value {}",
+                        rawName,
+                        normalizedName,
+                        index,
+                        value);
             }
-            final int pos = tableColumn.position();
-            if (pos <= 0 || pos > row.length) {
-                continue;
-            }
-            row[pos - 1] = column.getValue(pgSupplier, includeUnknownDatatypes);
+        }
+        if (logDetails) {
+            LOG.info(
+                    "fillRowFromTuple summary op={} table={} label={} mapped={} skipped={} finalRow={}",
+                    operation,
+                    tableId,
+                    tupleLabel,
+                    mapped != null ? mapped : mappedCount,
+                    skipped,
+                    Arrays.toString(row));
         }
     }
 
@@ -611,6 +863,23 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             }
         }
         return max;
+    }
+
+    private static String normalizeColumnName(String columnName) {
+        if (Strings.isNullOrEmpty(columnName)) {
+            return null;
+        }
+        String normalized = columnName.trim();
+        final int lastDot = normalized.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot < normalized.length() - 1) {
+            normalized = normalized.substring(lastDot + 1);
+        }
+        if ((normalized.startsWith("\"") && normalized.endsWith("\""))
+                || (normalized.startsWith("`") && normalized.endsWith("`"))
+                || (normalized.startsWith("'") && normalized.endsWith("'"))) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+        return normalized;
     }
 
     private static boolean isAllNullRow(Object[] row) {
@@ -630,20 +899,22 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             return null;
         }
         try {
-            return TableId.parse(messageTable.trim());
-        } catch (Exception ignored) {
-            // Fallback for schema.table format without quotes.
-            try {
-                String normalized = messageTable.trim().replace("\"", "");
-                String[] parts = normalized.split("\\.");
-                if (parts.length == 2) {
-                    return new TableId(null, parts[0], parts[1]);
-                }
-                if (parts.length == 1) {
-                    return new TableId(null, null, parts[0]);
-                }
-            } catch (Exception ignored2) {
+            String trimmed = messageTable.trim();
+            // GaussDB message formats: "schema"."table" or catalog."schema"."table"
+            // Strip surrounding double quotes to align with table filters.
+            String[] parts = trimmed.split("\\.");
+            for (int i = 0; i < parts.length; i++) {
+                parts[i] = parts[i].replaceAll("^\"|\"$", "");
             }
+            if (parts.length == 2) {
+                return new TableId(null, parts[0], parts[1]);
+            } else if (parts.length == 3) {
+                return new TableId(parts[0], parts[1], parts[2]);
+            } else {
+                return new TableId(null, null, trimmed.replaceAll("^\"|\"$", ""));
+            }
+        } catch (Exception e) {
+            LOG.warn("Failed to parse table name: {}", messageTable, e);
             return null;
         }
     }
@@ -886,7 +1157,7 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         private LazyPgConnectionSupplier(GaussDBConnectorConfig config) {
             String host = config.getJdbcConfig().getHostname();
-            int port = config.getJdbcConfig().getPort();
+            int port = config.getJdbcConfig().getPort() + 1; // Use HA port for replication
             String db = config.getJdbcConfig().getDatabase();
             this.url = String.format("jdbc:postgresql://%s:%d/%s", host, port, db);
             this.user = config.getJdbcConfig().getUser();

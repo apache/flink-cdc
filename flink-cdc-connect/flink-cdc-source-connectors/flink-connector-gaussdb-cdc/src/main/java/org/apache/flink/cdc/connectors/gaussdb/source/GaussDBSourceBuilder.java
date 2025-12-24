@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.gaussdb.source;
 import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
+import org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceConfig;
 import org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceConfigFactory;
 import org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffsetFactory;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -60,6 +61,19 @@ public class GaussDBSourceBuilder<T> {
     /** Integer port number of the GaussDB database server. */
     public GaussDBSourceBuilder<T> port(int port) {
         this.configFactory.port(port);
+        return this;
+    }
+
+    /** HA port number of the GaussDB database server for replication. */
+    public GaussDBSourceBuilder<T> haPort(int haPort) {
+        if (haPort > 0) {
+            if (this.configFactory.getDebeziumProperties() == null) {
+                this.configFactory.debeziumProperties(new Properties());
+            }
+            this.configFactory
+                    .getDebeziumProperties()
+                    .setProperty("ha-port", String.valueOf(haPort));
+        }
         return this;
     }
 
@@ -203,7 +217,14 @@ public class GaussDBSourceBuilder<T> {
 
     /** The Debezium GaussDB connector properties. For example, "snapshot.mode". */
     public GaussDBSourceBuilder<T> debeziumProperties(Properties properties) {
-        this.configFactory.debeziumProperties(properties);
+        if (this.configFactory.getDebeziumProperties() == null) {
+            this.configFactory.debeziumProperties(properties);
+        } else {
+            Properties merged = new Properties();
+            merged.putAll(this.configFactory.getDebeziumProperties());
+            merged.putAll(properties);
+            this.configFactory.debeziumProperties(merged);
+        }
         return this;
     }
 
@@ -277,10 +298,11 @@ public class GaussDBSourceBuilder<T> {
      */
     public GaussDBIncrementalSource<T> build() {
         LOG.info("=== GaussDBSourceBuilder.build() STARTED ===");
-        LOG.info("Building GaussDBIncrementalSource with config factory: {}", configFactory);
+        GaussDBSourceConfig config = configFactory.create(0);
+        LOG.info("Building GaussDBIncrementalSource with config: {}", config);
         GaussDBOffsetFactory offsetFactory = new GaussDBOffsetFactory();
         LOG.info("Created GaussDBOffsetFactory");
-        GaussDBDialect dialect = new GaussDBDialect(configFactory.create(0));
+        GaussDBDialect dialect = new GaussDBDialect(config);
         LOG.info("Created GaussDBDialect");
         GaussDBIncrementalSource<T> source =
                 new GaussDBIncrementalSource<>(

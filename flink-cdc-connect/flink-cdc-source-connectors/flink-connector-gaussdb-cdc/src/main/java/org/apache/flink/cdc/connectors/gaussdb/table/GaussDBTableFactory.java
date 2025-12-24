@@ -54,6 +54,7 @@ import static org.apache.flink.cdc.connectors.base.options.SourceOptions.SPLIT_K
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.CHANGELOG_MODE;
 import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.DECODING_PLUGIN_NAME;
+import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.HA_PORT;
 import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.gaussdb.source.config.GaussDBSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED;
@@ -84,6 +85,7 @@ public class GaussDBTableFactory implements DynamicTableSourceFactory {
         String schemaName = config.get(SCHEMA_NAME);
         String tableName = config.get(TABLE_NAME);
         int port = config.get(PORT);
+        Integer haPort = config.getOptional(HA_PORT).orElse(null);
         String pluginName = config.get(DECODING_PLUGIN_NAME);
         String slotName = config.get(SLOT_NAME);
         DebeziumChangelogMode changelogMode = config.get(CHANGELOG_MODE);
@@ -152,7 +154,8 @@ public class GaussDBTableFactory implements DynamicTableSourceFactory {
                 closeIdleReaders,
                 skipSnapshotBackfill,
                 isScanNewlyAddedTableEnabled,
-                assignUnboundedChunkFirst);
+                assignUnboundedChunkFirst,
+                haPort);
     }
 
     @Override
@@ -191,6 +194,7 @@ public class GaussDBTableFactory implements DynamicTableSourceFactory {
         options.add(CONNECT_MAX_RETRIES);
         options.add(CONNECTION_POOL_SIZE);
         options.add(HEARTBEAT_INTERVAL);
+        options.add(HA_PORT);
         options.add(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         options.add(SCAN_NEWLY_ADDED_TABLE_ENABLED);

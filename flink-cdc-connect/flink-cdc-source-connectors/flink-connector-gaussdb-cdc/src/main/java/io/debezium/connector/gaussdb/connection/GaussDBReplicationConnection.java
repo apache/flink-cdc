@@ -242,7 +242,8 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                     return;
                 }
 
-                if (messageDecoder.shouldMessageBeSkipped(
+                // Skip message check only if walPosition is provided
+                if (walPosition != null && messageDecoder.shouldMessageBeSkipped(
                         read, lastReceiveLsn, startLsn, walPosition)) {
                     return;
                 }
@@ -268,7 +269,8 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                 if (read == null) {
                     return false;
                 }
-                if (messageDecoder.shouldMessageBeSkipped(
+                // Skip message check only if walPosition is provided
+                if (walPosition != null && messageDecoder.shouldMessageBeSkipped(
                         read, lastReceiveLsn, startLsn, walPosition)) {
                     return true;
                 }
@@ -541,9 +543,9 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
                         Math.toIntExact(statusUpdateInterval.toMillis()), TimeUnit.MILLISECONDS);
             }
 
-            LOG.info(\"Calling builder.start() to create replication stream...\");
+            LOG.info("Calling builder.start() to create replication stream...");
             final PGReplicationStream stream = builder.start();
-            LOG.info(\"Replication stream started successfully\");
+            LOG.info("Replication stream started successfully");
             
             // Small delay to stabilize connection when connections are opened/closed in fast sequence
             // See reference implementation in GaussDB-For-Apache-Flink project
@@ -555,7 +557,7 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
             
             // ensure server sees feedback quickly
             stream.forceUpdateStatus();
-            LOG.info(\"Initial status update sent to server\");
+            LOG.info("Initial status update sent to server");
             return stream;
         } catch (SQLException e) {
             LOG.error(
@@ -578,7 +580,10 @@ public class GaussDBReplicationConnection implements ReplicationConnection {
     private static Connection openReplicationConnection(GaussDBConnectorConfig connectorConfig)
             throws SQLException, InterruptedException {
         final String host = connectorConfig.getJdbcConfig().getHostname();
-        final int port = connectorConfig.getJdbcConfig().getPort();
+        // Always use HA port (port+1) for GaussDB replication
+        int port = connectorConfig.getJdbcConfig().getPort() + 1;
+        LOG.info("Using HA port for replication: {} (standard port + 1)", port);
+
         final String database = connectorConfig.getJdbcConfig().getDatabase();
         final String url = String.format(GAUSSDB_JDBC_URL_PATTERN, host, port, database);
 
