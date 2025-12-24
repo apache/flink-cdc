@@ -55,7 +55,6 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -327,7 +326,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Alter column type is not supported currently.")
     void testStarRocksAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -348,7 +346,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Alter column type is not supported currently.")
     void testStarRocksNarrowingAlterColumnType() throws Exception {
         Assertions.assertThatThrownBy(
                 () -> {

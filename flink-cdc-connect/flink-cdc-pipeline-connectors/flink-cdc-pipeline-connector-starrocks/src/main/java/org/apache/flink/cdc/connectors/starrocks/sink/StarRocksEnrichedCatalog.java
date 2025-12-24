@@ -22,6 +22,7 @@ import org.apache.flink.util.StringUtils;
 
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
+import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,6 +105,39 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
+    public void alterColumnType(String databaseName, String tableName, StarRocksColumn column)
+            throws StarRocksCatalogException {
+        checkTableArgument(databaseName, tableName);
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(column.getColumnName()),
+                "column name cannot be null or empty.");
+        String alterSql =
+                buildAlterColumnTypeSql(
+                        databaseName, tableName, column.getColumnName(), column.getDataType());
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(alterSql);
+            LOG.info(
+                    "Success to alter table {}.{} modify column type, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to alter table {}.{} modify column type, sql: {}",
+                    databaseName,
+                    tableName,
+                    alterSql,
+                    e);
+            throw new StarRocksCatalogException(
+                    String.format(
+                            "Failed to alter table %s.%s modify column type",
+                            databaseName, tableName),
+                    e);
+        }
+    }
+
     private String buildTruncateTableSql(String databaseName, String tableName) {
         return String.format("TRUNCATE TABLE `%s`.`%s`;", databaseName, tableName);
     }
@@ -117,6 +151,13 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         return String.format(
                 "ALTER TABLE `%s`.`%s` RENAME COLUMN %s TO %s;",
                 databaseName, tableName, oldColumnName, newColumnName);
+    }
+
+    private String buildAlterColumnTypeSql(
+            String databaseName, String tableName, String columnName, String dataType) {
+        return String.format(
+                "ALTER TABLE `%s`.`%s` MODIFY COLUMN %s %s",
+                databaseName, tableName, columnName, dataType);
     }
 
     private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
