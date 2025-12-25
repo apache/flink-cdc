@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
-import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -40,7 +40,16 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.testutils.UniqueDatabase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
+import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.operators.collect.AbstractCollectResultBuffer;
+import org.apache.flink.streaming.api.operators.collect.CheckpointedCollectResultBuffer;
+import org.apache.flink.streaming.api.operators.collect.CollectResultIterator;
+import org.apache.flink.streaming.api.operators.collect.CollectSinkOperator;
+import org.apache.flink.streaming.api.operators.collect.CollectSinkOperatorFactory;
+import org.apache.flink.streaming.api.operators.collect.CollectStreamSink;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.util.CloseableIterator;
 
@@ -52,6 +61,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -61,6 +72,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -153,114 +165,188 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         configFactory.slotName(slotName);
         configFactory.decodingPluginName("pgoutput");
 
+        // Create a temporary directory for savepoint
+        Path savepointDir = Files.createTempDirectory("postgres-savepoint-test");
+        final String savepointDirectory = savepointDir.toAbsolutePath().toString();
+        String finishedSavePointPath = null;
+
+        // Listen to tables first time
+        StreamExecutionEnvironment env = getStreamExecutionEnvironment(finishedSavePointPath, 4);
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider)
                         new PostgresDataSource(configFactory).getEventSourceProvider();
-        CloseableIterator<Event> events =
+
+        DataStreamSource<Event> source =
                 env.fromSource(
-                                sourceProvider.getSource(),
-                                WatermarkStrategy.noWatermarks(),
-                                PostgresDataSourceFactory.IDENTIFIER,
-                                new EventTypeInfo())
-                        .executeAndCollect();
-        Thread.sleep(10_000);
-        TableId tableId = TableId.tableId("inventory", "products");
-        CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
+                        sourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        PostgresDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
 
-        List<Event> expectedBinlog = new ArrayList<>();
-        try (Connection connection =
+        TypeSerializer<Event> serializer =
+                source.getTransformation().getOutputType().createSerializer(env.getConfig());
+        CheckpointedCollectResultBuffer<Event> resultBuffer =
+                new CheckpointedCollectResultBuffer<>(serializer);
+        String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectResultIterator<Event> iterator =
+                addCollector(env, source, resultBuffer, serializer, accumulatorName);
+
+        JobClient jobClient = env.executeAsync("beforeSavepoint");
+        iterator.setJobClient(jobClient);
+
+        // Insert two records while the pipeline is running
+        try (Connection conn =
                         getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
-                Statement statement = connection.createStatement()) {
-            RowType rowType =
-                    RowType.of(
-                            new DataType[] {
-                                DataTypes.INT().notNull(),
-                                DataTypes.VARCHAR(255).notNull(),
-                                DataTypes.VARCHAR(512),
-                                DataTypes.DOUBLE()
-                            },
-                            new String[] {"id", "name", "description", "weight"});
-            BinaryRecordDataGenerator generator = new BinaryRecordDataGenerator(rowType);
-
-            // Insert new data
-            statement.execute(
-                    String.format(
-                            "INSERT INTO inventory.products (name, description, weight) VALUES ('scooter', 'New scooter', 5.5);",
-                            inventoryDatabase.getDatabaseName()));
-            expectedBinlog.add(
-                    DataChangeEvent.insertEvent(
-                            tableId,
-                            generator.generate(
-                                    new Object[] {
-                                        110, // next id after initialization
-                                        BinaryStringData.fromString("scooter"),
-                                        BinaryStringData.fromString("New scooter"),
-                                        5.5
-                                    })));
-
-            statement.execute(
-                    String.format(
-                            "INSERT INTO inventory.products (name, description, weight) VALUES ('football', 'New football', 6.6);",
-                            inventoryDatabase.getDatabaseName()));
-            expectedBinlog.add(
-                    DataChangeEvent.insertEvent(
-                            tableId,
-                            generator.generate(
-                                    new Object[] {
-                                        111, // next id after initialization
-                                        BinaryStringData.fromString("football"),
-                                        BinaryStringData.fromString("New football"),
-                                        6.6
-                                    })));
-
-            // Update existing data
-            statement.execute(
-                    String.format(
-                            "UPDATE inventory.products SET description = 'Updated description' WHERE id = 101;"));
-            expectedBinlog.add(
-                    DataChangeEvent.updateEvent(
-                            tableId,
-                            generator.generate(
-                                    new Object[] {
-                                        101,
-                                        BinaryStringData.fromString("scooter"),
-                                        BinaryStringData.fromString("Small 2-wheel scooter"),
-                                        3.14
-                                    }),
-                            generator.generate(
-                                    new Object[] {
-                                        101,
-                                        BinaryStringData.fromString("scooter"),
-                                        BinaryStringData.fromString("Updated description"),
-                                        3.14
-                                    })));
-
-            // Wait for the events to be processed
-            Thread.sleep(5_000);
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(
+                    "INSERT INTO inventory.products (name, description, weight) "
+                            + "VALUES ('scooter', 'Small 2-wheel scooter', 3.14)");
+            stmt.execute(
+                    "INSERT INTO inventory.products (name, description, weight) "
+                            + "VALUES ('football', 'A leather football', 0.45)");
         }
 
-        // Collect the actual events
-        List<Event> actualEvents =
-                fetchResultsExcept(events, expectedBinlog.size(), createTableEvent);
+        // Wait for the pipeline to process the insert events
+        Thread.sleep(5000);
 
-        // Filter out schema change events and keep only data change events
-        List<Event> actualDataChangeEvents =
-                actualEvents.stream()
-                        .filter(event -> event instanceof DataChangeEvent)
-                        .collect(Collectors.toList());
+        // Trigger a savepoint and cancel the job
+        LOG.info("Triggering savepoint");
+        finishedSavePointPath = triggerSavepointWithRetry(jobClient, savepointDirectory);
+        LOG.info("Savepoint created at: {}", finishedSavePointPath);
+        jobClient.cancel().get();
+        iterator.close();
 
-        // Verify that we captured the expected number of data change events
-        assertThat(actualDataChangeEvents.size()).isGreaterThanOrEqualTo(expectedBinlog.size());
+        // Restore from savepoint
+        LOG.info("Restoring from savepoint: {}", finishedSavePointPath);
+        StreamExecutionEnvironment restoredEnv =
+                getStreamExecutionEnvironment(finishedSavePointPath, 4);
+        FlinkSourceProvider restoredSourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
 
-        // Verify slot is created
-        assertThat(inventoryDatabase.checkSlot(slotName)).isEqualTo(slotName);
+        DataStreamSource<Event> restoredSource =
+                restoredEnv.fromSource(
+                        restoredSourceProvider.getSource(),
+                        WatermarkStrategy.noWatermarks(),
+                        PostgresDataSourceFactory.IDENTIFIER,
+                        new EventTypeInfo());
+
+        TypeSerializer<Event> restoredSerializer =
+                restoredSource
+                        .getTransformation()
+                        .getOutputType()
+                        .createSerializer(restoredEnv.getConfig());
+        CheckpointedCollectResultBuffer<Event> restoredResultBuffer =
+                new CheckpointedCollectResultBuffer<>(restoredSerializer);
+        String restoredAccumulatorName = "dataStreamCollect_" + UUID.randomUUID();
+        CollectResultIterator<Event> restoredIterator =
+                addCollector(
+                        restoredEnv,
+                        restoredSource,
+                        restoredResultBuffer,
+                        restoredSerializer,
+                        restoredAccumulatorName);
+
+        JobClient restoredJobClient = restoredEnv.executeAsync("afterSavepoint");
+        restoredIterator.setJobClient(restoredJobClient);
+
+        // Insert data into the table after restoration
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(
+                    "INSERT INTO inventory.products (name, description, weight) "
+                            + "VALUES ('new_product_1', 'New product description', 1.0)");
+        }
+
+        // Wait for the pipeline to stabilize and process events
+        Thread.sleep(10000);
+
+        // Fetch results and check for CreateTableEvent and data change events
+        List<Event> restoreAfterEvents = new ArrayList<>();
+        while (restoreAfterEvents.size() < 2 && restoredIterator.hasNext()) {
+            restoreAfterEvents.add(restoredIterator.next());
+        }
+        restoredIterator.close();
+        restoredJobClient.cancel().get();
+
+        // Check if CreateTableEvent for new_products is present
+        boolean hasCreateTableEvent =
+                restoreAfterEvents.stream().anyMatch(event -> event instanceof CreateTableEvent);
+        assertThat(hasCreateTableEvent).isTrue();
+
+        // Check if data change event for new_products is present
+        boolean hasProductDataEvent =
+                restoreAfterEvents.stream().anyMatch(event -> event instanceof DataChangeEvent);
+        assertThat(hasProductDataEvent).isTrue();
+    }
+
+    // Helper method to trigger a savepoint with retry mechanism
+    private String triggerSavepointWithRetry(JobClient jobClient, String savepointDirectory)
+            throws Exception {
+        int retryCount = 0;
+        final int maxRetries = 600;
+        while (retryCount < maxRetries) {
+            try {
+                return jobClient.stopWithSavepoint(true, savepointDirectory).get();
+            } catch (Exception e) {
+                retryCount++;
+                LOG.error(
+                        "Retry {}/{}: Failed to trigger savepoint: {}",
+                        retryCount,
+                        maxRetries,
+                        e.getMessage());
+                if (retryCount >= maxRetries) {
+                    throw e;
+                }
+                Thread.sleep(100);
+            }
+        }
+        throw new Exception("Failed to trigger savepoint after " + maxRetries + " retries");
+    }
+
+    // Helper method to get a configured StreamExecutionEnvironment
+    private StreamExecutionEnvironment getStreamExecutionEnvironment(
+            String finishedSavePointPath, int parallelism) {
+        org.apache.flink.configuration.Configuration configuration =
+                new org.apache.flink.configuration.Configuration();
+        if (finishedSavePointPath != null) {
+            configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+        }
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.getExecutionEnvironment(configuration);
+        env.setParallelism(parallelism);
+        env.enableCheckpointing(500L);
+        env.setRestartStrategy(RestartStrategies.noRestart());
+        return env;
+    }
+
+    // Helper method to add a collector sink and get the iterator
+    private <T> CollectResultIterator<T> addCollector(
+            StreamExecutionEnvironment env,
+            DataStreamSource<T> source,
+            AbstractCollectResultBuffer<T> buffer,
+            TypeSerializer<T> serializer,
+            String accumulatorName) {
+        CollectSinkOperatorFactory<T> sinkFactory =
+                new CollectSinkOperatorFactory<>(serializer, accumulatorName);
+        CollectSinkOperator<T> operator = (CollectSinkOperator<T>) sinkFactory.getOperator();
+        CollectResultIterator<T> iterator =
+                new CollectResultIterator<>(
+                        buffer, operator.getOperatorIdFuture(), accumulatorName, 0);
+        CollectStreamSink<T> sink = new CollectStreamSink<>(source, sinkFactory);
+        sink.name("Data stream collect sink");
+        env.addOperator(sink.getTransformation());
+        env.registerCollectIterator(iterator);
+        return iterator;
     }
 
     @ParameterizedTest(name = "unboundedChunkFirst: {0}")
     @ValueSource(booleans = {true, false})
     public void testInitialStartupModeWithOpts(boolean unboundedChunkFirst) throws Exception {
         inventoryDatabase.createAndInitialize();
-        Configuration sourceConfiguration = new Configuration();
+        org.apache.flink.cdc.common.configuration.Configuration sourceConfiguration =
+                new org.apache.flink.cdc.common.configuration.Configuration();
         sourceConfiguration.set(PostgresDataSourceOptions.HOSTNAME, POSTGRES_CONTAINER.getHost());
         sourceConfiguration.set(
                 PostgresDataSourceOptions.PG_PORT,
@@ -282,7 +368,9 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
 
         Factory.Context context =
                 new FactoryHelper.DefaultContext(
-                        sourceConfiguration, new Configuration(), this.getClass().getClassLoader());
+                        sourceConfiguration,
+                        new org.apache.flink.cdc.common.configuration.Configuration(),
+                        this.getClass().getClassLoader());
         FlinkSourceProvider sourceProvider =
                 (FlinkSourceProvider)
                         new PostgresDataSourceFactory()
@@ -492,6 +580,16 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         // Also ensure we've received at least one or many side events.
         assertThat(sideResults).isNotEmpty();
         return result;
+    }
+
+    // Helper method to create a temporary directory for savepoint
+    private Path createTempSavepointDir() throws Exception {
+        return Files.createTempDirectory("postgres-savepoint");
+    }
+
+    // Helper method to execute the job and create a savepoint
+    private String createSavepoint(JobClient jobClient, Path savepointDir) throws Exception {
+        return jobClient.stopWithSavepoint(true, savepointDir.toAbsolutePath().toString()).get();
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {

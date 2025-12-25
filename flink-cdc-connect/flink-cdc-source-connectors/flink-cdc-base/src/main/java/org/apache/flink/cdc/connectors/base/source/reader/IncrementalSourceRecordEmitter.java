@@ -161,6 +161,16 @@ public class IncrementalSourceRecordEmitter<T>
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
 
+    /**
+     * Apply the split to the record emitter.
+     *
+     * <p>This method is called when a new split is assigned to the record emitter. It allows the
+     * record emitter to perform any necessary initialization or setup based on the characteristics
+     * of the assigned split. In this implementation, we may need to handle split-specific
+     * configurations or state initialization.
+     *
+     * @param split the split to apply
+     */
     public void applySplit(SourceSplitBase split) {}
 
     protected void reportMetrics(SourceRecord element) {
