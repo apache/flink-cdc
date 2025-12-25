@@ -163,12 +163,11 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         // streaming)
         org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset endOffset = (org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset) streamSplit
                 .getEndingOffset();
-        boolean isBoundedRead =
-                endOffset != null
-                        && endOffset.getLsn() != null
-                        && endOffset.getLsn().isValid()
-                        && !endOffset.getLsn()
-                                .equals(io.debezium.connector.gaussdb.connection.Lsn.NO_STOPPING_LSN);
+        boolean isBoundedRead = endOffset != null
+                && endOffset.getLsn() != null
+                && endOffset.getLsn().isValid()
+                && !endOffset.getLsn()
+                        .equals(io.debezium.connector.gaussdb.connection.Lsn.NO_STOPPING_LSN);
 
         // Get the appropriate replication connection from the context
         // Use backfill connection for bounded reads to avoid slot contention
@@ -510,7 +509,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
 
         try {
             // Use null supplier to avoid connection issues in replication stream context
-            // The replication message already contains decoded values, no need for additional connection
+            // The replication message already contains decoded values, no need for
+            // additional connection
             final io.debezium.connector.postgresql.PostgresStreamingChangeEventSource.PgConnectionSupplier pgSupplier = () -> null;
             final boolean includeUnknownDatatypes = true;
 
@@ -804,10 +804,9 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
             }
             final String rawName = column.getName();
             final String normalizedName = normalizeColumnName(rawName);
-            final String lookupKey =
-                    !Strings.isNullOrEmpty(normalizedName)
-                            ? normalizedName.toLowerCase(Locale.ROOT)
-                            : null;
+            final String lookupKey = !Strings.isNullOrEmpty(normalizedName)
+                    ? normalizedName.toLowerCase(Locale.ROOT)
+                    : null;
             Integer index = lookupKey != null ? tableColumnIndex.get(lookupKey) : null;
             if (index == null && rawName != null) {
                 index = tableColumnIndex.get(rawName.toLowerCase(Locale.ROOT));

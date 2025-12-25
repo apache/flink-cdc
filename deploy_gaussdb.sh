@@ -20,7 +20,7 @@ SQL_CONNECTOR_MODULE="flink-cdc-connect/flink-cdc-source-connectors/flink-sql-co
 JDBC_DRIVER="$PROJECT_ROOT/$CONNECTOR_MODULE/lib/gaussdbjdbc.jar"
 MYSQL_DRIVER="$PROJECT_ROOT/$CONNECTOR_MODULE/lib/mysql-connector-java.jar"
 FLINK_JDBC_CONNECTOR="$PROJECT_ROOT/$CONNECTOR_MODULE/lib/flink-connector-jdbc.jar"
-SQL_FILE="$PROJECT_ROOT/$CONNECTOR_MODULE/docker/sql/gaussdb_to_mysql.sql"
+SQL_FILE="${SQL_FILE:-$PROJECT_ROOT/$CONNECTOR_MODULE/docker/sql/gaussdb_to_mysql.sql}"
 
 echo "🚀 Starting GaussDB CDC deployment process..."
 
