@@ -22,9 +22,31 @@
    ```
 
 2. **执行 Maven 编译**  
-   在项目根目录运行：
+   分两步编译 Connector（确保编译最新代码）：
    ```bash
-   mvn clean install -DskipTests -Drat.skip -Dspotless.skip=true
+   # 定义模块路径变量
+   CONNECTOR_MODULE="flink-cdc-connect/flink-cdc-source-connectors/flink-connector-gaussdb-cdc"
+   SQL_CONNECTOR_MODULE="flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-gaussdb-cdc"
+
+   # 步骤1：编译基础 Connector
+   mvn clean install -DskipTests \
+       -Drat.skip \
+       -Dspotless.skip=true \
+       -Dspotless.check.skip=true \
+       -Dspotless.apply.skip=true \
+       -Dcheckstyle.skip=true \
+       -pl $CONNECTOR_MODULE \
+       -am
+
+   # 步骤2：编译 SQL Connector（最终产物）
+   mvn clean install -DskipTests \
+       -Drat.skip \
+       -Dspotless.skip=true \
+       -Dspotless.check.skip=true \
+       -Dspotless.apply.skip=true \
+       -Dcheckstyle.skip=true \
+       -pl $SQL_CONNECTOR_MODULE \
+       -am
    ```
 
 3. **确认产物**  
