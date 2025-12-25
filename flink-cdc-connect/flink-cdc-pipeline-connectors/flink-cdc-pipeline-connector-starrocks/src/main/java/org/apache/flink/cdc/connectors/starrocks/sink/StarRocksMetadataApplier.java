@@ -29,9 +29,9 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.event.visitor.SchemaChangeEventVisitor;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
-import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.types.DataType;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
@@ -91,6 +91,7 @@ public class StarRocksMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.ADD_COLUMN,
                 SchemaChangeEventType.DROP_COLUMN,
                 SchemaChangeEventType.RENAME_COLUMN,
+                SchemaChangeEventType.ALTER_COLUMN_TYPE,
                 SchemaChangeEventType.DROP_TABLE,
                 SchemaChangeEventType.TRUNCATE_TABLE);
     }
@@ -325,15 +326,21 @@ public class StarRocksMetadataApplier implements MetadataApplier {
         }
     }
 
-    private void applyAlterColumnType(AlterColumnTypeEvent alterColumnTypeEvent)
-            throws SchemaEvolveException {
-        // TODO There are limitations for data type conversions. We should know the data types
-        // before and after changing so that we can make a validation. But the event only contains
-        // data
-        // types after changing. One way is that the framework delivers the old schema. We can
-        // support
-        // the alter after a discussion.
-        throw new UnsupportedSchemaChangeEventException(alterColumnTypeEvent);
+    private void applyAlterColumnType(AlterColumnTypeEvent event) throws SchemaEvolveException {
+        try {
+            TableId tableId = event.tableId();
+            Map<String, DataType> typeMapping = event.getTypeMapping();
+
+            for (Map.Entry<String, DataType> entry : typeMapping.entrySet()) {
+                StarRocksColumn.Builder builder =
+                        new StarRocksColumn.Builder().setColumnName(entry.getKey());
+                toStarRocksDataType(entry.getValue(), false, builder);
+                catalog.alterColumnType(
+                        tableId.getSchemaName(), tableId.getTableName(), builder.build());
+            }
+        } catch (Exception e) {
+            throw new SchemaEvolveException(event, "fail to apply alter column type event", e);
+        }
     }
 
     private void applyTruncateTable(TruncateTableEvent truncateTableEvent) {
