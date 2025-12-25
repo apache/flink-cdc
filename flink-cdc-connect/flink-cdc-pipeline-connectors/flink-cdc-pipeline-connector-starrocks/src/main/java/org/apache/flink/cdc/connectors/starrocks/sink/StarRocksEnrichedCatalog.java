@@ -22,11 +22,13 @@ import org.apache.flink.util.StringUtils;
 
 import com.starrocks.connector.flink.catalog.StarRocksCatalog;
 import com.starrocks.connector.flink.catalog.StarRocksCatalogException;
+import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Optional;
 
 /** An enriched {@code StarRocksCatalog} with more schema evolution abilities. */
 public class StarRocksEnrichedCatalog extends StarRocksCatalog {
@@ -104,6 +106,37 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         }
     }
 
+    public void alterColumnType(String databaseName, String tableName, StarRocksColumn column)
+            throws StarRocksCatalogException {
+        checkTableArgument(databaseName, tableName);
+        Preconditions.checkArgument(
+                !StringUtils.isNullOrWhitespaceOnly(column.getColumnName()),
+                "column name cannot be null or empty.");
+        String alterSql = buildAlterColumnTypeSql(databaseName, tableName, buildColumnStmt(column));
+        try {
+            long startTimeMillis = System.currentTimeMillis();
+            executeUpdateStatement(alterSql);
+            LOG.info(
+                    "Success to alter table {}.{} modify column type, duration: {}ms, sql: {}",
+                    databaseName,
+                    tableName,
+                    System.currentTimeMillis() - startTimeMillis,
+                    alterSql);
+        } catch (Exception e) {
+            LOG.error(
+                    "Failed to alter table {}.{} modify column type, sql: {}",
+                    databaseName,
+                    tableName,
+                    alterSql,
+                    e);
+            throw new StarRocksCatalogException(
+                    String.format(
+                            "Failed to alter table %s.%s modify column type",
+                            databaseName, tableName),
+                    e);
+        }
+    }
+
     private String buildTruncateTableSql(String databaseName, String tableName) {
         return String.format("TRUNCATE TABLE `%s`.`%s`;", databaseName, tableName);
     }
@@ -117,6 +150,12 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         return String.format(
                 "ALTER TABLE `%s`.`%s` RENAME COLUMN %s TO %s;",
                 databaseName, tableName, oldColumnName, newColumnName);
+    }
+
+    private String buildAlterColumnTypeSql(
+            String databaseName, String tableName, String columnStmt) {
+        return String.format(
+                "ALTER TABLE `%s`.`%s` MODIFY COLUMN %s", databaseName, tableName, columnStmt);
     }
 
     private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
@@ -139,5 +178,45 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(tableName),
                 "Table name cannot be null or empty.");
+    }
+
+    private String buildColumnStmt(StarRocksColumn column) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("`");
+        builder.append(column.getColumnName());
+        builder.append("` ");
+        builder.append(
+                getFullColumnType(
+                        column.getDataType(), column.getColumnSize(), column.getDecimalDigits()));
+        builder.append(" ");
+        builder.append(column.isNullable() ? "NULL" : "NOT NULL");
+        if (column.getDefaultValue().isPresent()) {
+            builder.append(String.format(" DEFAULT \"%s\"", column.getDefaultValue().get()));
+        }
+
+        if (column.getColumnComment().isPresent()) {
+            builder.append(String.format(" COMMENT \"%s\"", column.getColumnComment().get()));
+        }
+        return builder.toString();
+    }
+
+    private String getFullColumnType(
+            String type, Optional<Integer> columnSize, Optional<Integer> decimalDigits) {
+        String dataType = type.toUpperCase();
+        switch (dataType) {
+            case "DECIMAL":
+                Preconditions.checkArgument(
+                        columnSize.isPresent(), "DECIMAL type must have column size");
+                Preconditions.checkArgument(
+                        decimalDigits.isPresent(), "DECIMAL type must have decimal digits");
+                return String.format("DECIMAL(%d, %s)", columnSize.get(), decimalDigits.get());
+            case "CHAR":
+            case "VARCHAR":
+                Preconditions.checkArgument(
+                        columnSize.isPresent(), type + " type must have column size");
+                return String.format("%s(%d)", dataType, columnSize.get());
+            default:
+                return dataType;
+        }
     }
 }
