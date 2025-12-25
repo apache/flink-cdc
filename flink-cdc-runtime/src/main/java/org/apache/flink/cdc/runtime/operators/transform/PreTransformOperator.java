@@ -110,6 +110,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             String primaryKeys = transformRule.getPrimaryKey();
             String partitionKeys = transformRule.getPartitionKey();
             String tableOptions = transformRule.getTableOption();
+            String tableOptionsDelimiter = transformRule.getTableOptionsDelimiter();
             Selectors selectors =
                     new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
             transforms.add(
@@ -120,7 +121,8 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             schemaMetadataTransformers.add(
                     new Tuple2<>(
                             selectors,
-                            new SchemaMetadataTransform(primaryKeys, partitionKeys, tableOptions)));
+                            new SchemaMetadataTransform(
+                                    primaryKeys, partitionKeys, tableOptions, tableOptionsDelimiter)));
         }
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.hasAsteriskMap = new ConcurrentHashMap<>();

@@ -75,6 +75,7 @@ public class TransformTranslator {
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
                     transform.getTableOptions(),
+                    transform.getTableOptionsDelimiter(),
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
@@ -112,6 +113,7 @@ public class TransformTranslator {
                     transform.getPrimaryKeys(),
                     transform.getPartitionKeys(),
                     transform.getTableOptions(),
+                    transform.getTableOptionsDelimiter(),
                     transform.getPostTransformConverter(),
                     supportedMetadataColumns);
         }
