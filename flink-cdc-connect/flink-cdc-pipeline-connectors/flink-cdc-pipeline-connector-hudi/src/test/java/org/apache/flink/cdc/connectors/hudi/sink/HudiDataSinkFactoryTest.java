@@ -105,7 +105,7 @@ class HudiDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put(HudiConfig.PATH.key(), temporaryFolder.toString())
-                                .put(HudiConfig.RECORD_KEY_FIELD.key(), "id")
+                                .put(HudiConfig.TABLE_TYPE.key(), "MERGE_ON_READ")
                                 .put("unsupported_key", "unsupported_value")
                                 .build());
 
@@ -132,7 +132,7 @@ class HudiDataSinkFactoryTest {
                 Configuration.fromMap(
                         ImmutableMap.<String, String>builder()
                                 .put(HudiConfig.PATH.key(), temporaryFolder.toString())
-                                .put(HudiConfig.RECORD_KEY_FIELD.key(), "id")
+                                .put(HudiConfig.TABLE_TYPE.key(), "MERGE_ON_READ")
                                 .build());
 
         DataSink dataSink =

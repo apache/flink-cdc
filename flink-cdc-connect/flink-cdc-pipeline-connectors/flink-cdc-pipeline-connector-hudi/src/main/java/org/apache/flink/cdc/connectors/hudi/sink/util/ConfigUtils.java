@@ -22,7 +22,6 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.types.logical.RowType;
 
-import org.apache.hudi.common.util.Option;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.exception.HoodieValidationException;
 import org.apache.hudi.index.HoodieIndex;
@@ -75,10 +74,9 @@ public class ConfigUtils {
             conf.set(FlinkOptions.PARTITION_PATH_FIELD, String.join(",", partitionKeys));
         }
 
-        Option<String> orderingFieldsOpt =
-                Option.ofNullable(schema.options().get(FlinkOptions.ORDERING_FIELDS.key()));
-        orderingFieldsOpt.ifPresent(
-                orderingFields -> conf.set(FlinkOptions.ORDERING_FIELDS, orderingFields));
+        for (Map.Entry<String, String> kv : schema.options().entrySet()) {
+            conf.setString(kv.getKey(), kv.getValue());
+        }
 
         if (conf.get(FlinkOptions.INDEX_TYPE).equals(HoodieIndex.IndexType.BUCKET.name())) {
             if (conf.get(FlinkOptions.INDEX_KEY_FIELD).isEmpty()) {
@@ -120,10 +118,6 @@ public class ConfigUtils {
         }
 
         // setup ordering fields from schema options
-        Option<String> orderingFieldsOpt =
-                Option.ofNullable(schema.options().get(FlinkOptions.ORDERING_FIELDS.key()));
-        orderingFieldsOpt.ifPresent(
-                orderingFields ->
-                        tableOptions.put(FlinkOptions.ORDERING_FIELDS.key(), orderingFields));
+        tableOptions.putAll(schema.options());
     }
 }

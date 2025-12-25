@@ -30,6 +30,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.apache.flink.cdc.connectors.hudi.sink.HudiDataSinkOptions.PREFIX_TABLE_PROPERTIES;
 
 /**
  * A {@link DataSink} for Apache Hudi that provides the main entry point for the Flink CDC
@@ -45,7 +49,7 @@ public class HudiDataSink implements DataSink, Serializable {
 
     public HudiDataSink(Configuration config, String schemaOperatorUid) {
         LOG.info("Creating HudiDataSink with universal configuration {}", config);
-        this.config = config;
+        this.config = normalizeOptions(config);
         this.schemaOperatorUid = schemaOperatorUid;
     }
 
@@ -93,5 +97,19 @@ public class HudiDataSink implements DataSink, Serializable {
         // always enable schema evolution
         flinkConfig.setString(HoodieCommonConfig.SCHEMA_EVOLUTION_ENABLE.key(), "true");
         return flinkConfig;
+    }
+
+    private static Configuration normalizeOptions(Configuration config) {
+        Map<String, String> options = new HashMap<>();
+        config.toMap()
+                .forEach(
+                        (key, val) -> {
+                            if (key.startsWith(PREFIX_TABLE_PROPERTIES)) {
+                                options.put(key.substring(PREFIX_TABLE_PROPERTIES.length()), val);
+                            } else {
+                                options.put(key, val);
+                            }
+                        });
+        return Configuration.fromMap(options);
     }
 }

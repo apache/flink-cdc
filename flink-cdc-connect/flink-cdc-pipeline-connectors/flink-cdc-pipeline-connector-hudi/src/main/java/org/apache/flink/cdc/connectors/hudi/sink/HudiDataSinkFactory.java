@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 
+import org.apache.hudi.index.HoodieIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +60,7 @@ public class HudiDataSinkFactory implements DataSinkFactory {
 
         // Validate that only BUCKET index type is used
         String indexType = config.get(HudiConfig.INDEX_TYPE);
-        if (indexType != null && !indexType.equalsIgnoreCase("BUCKET")) {
+        if (indexType != null && !indexType.equalsIgnoreCase(HoodieIndex.IndexType.BUCKET.name())) {
             throw new IllegalArgumentException(
                     String.format(
                             "Unsupported index type '%s'. Currently only 'BUCKET' index type is supported. "
@@ -67,6 +68,7 @@ public class HudiDataSinkFactory implements DataSinkFactory {
                                     + "for multi-table CDC pipelines.",
                             indexType));
         }
+        config.set(HudiConfig.INDEX_TYPE, HoodieIndex.IndexType.BUCKET.name());
 
         String schemaOperatorUid =
                 context.getPipelineConfiguration()
@@ -85,22 +87,8 @@ public class HudiDataSinkFactory implements DataSinkFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
-        options.add(HudiConfig.RECORD_KEY_FIELD);
         options.add(HudiConfig.TABLE_TYPE);
-        options.add(HudiConfig.PARTITION_PATH_FIELD);
         options.add(HudiConfig.INDEX_TYPE);
-        options.add(HudiConfig.INDEX_BUCKET_TARGET);
-        options.add(HudiConfig.HIVE_SYNC_ENABLED);
-        options.add(HudiConfig.HIVE_SYNC_METASTORE_URIS);
-        options.add(HudiConfig.HIVE_SYNC_DB);
-        options.add(HudiConfig.HIVE_SYNC_TABLE);
-
-        options.add(HudiConfig.WRITE_TASKS);
-        options.add(HudiConfig.BUCKET_ASSIGN_TASKS);
-        options.add(HudiConfig.SCHEMA_ON_READ_ENABLE);
-
-        // Compaction settings
-        options.add(HudiConfig.COMPACTION_DELTA_COMMITS);
         return options;
     }
 }
