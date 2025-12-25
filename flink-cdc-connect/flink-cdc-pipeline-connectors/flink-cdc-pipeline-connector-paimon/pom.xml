@@ -32,7 +32,7 @@ limitations under the License.
         <paimon.version>1.3.1</paimon.version>
         <hadoop.version>2.8.5</hadoop.version>
         <hive.version>2.3.9</hive.version>
-        <mockito.version>3.4.6</mockito.version>
+        <mockito.version>3.12.4</mockito.version>
     </properties>
 
     <dependencies>

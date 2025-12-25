@@ -22,7 +22,7 @@ on:
         description: "Jdk versions to test against."
         required: false
         type: string
-        default: "['8']"
+        default: "['11']"
       flink-versions:
         description: "Flink versions to test against."
         required: false

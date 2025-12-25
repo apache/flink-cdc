@@ -308,7 +308,7 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
     }
 
     private String getFlinkDockerImageTag() {
-        return String.format("flink:%s-scala_2.12", flinkVersion);
+        return String.format("flink:%s-scala_2.12-java11", flinkVersion);
     }
 
     protected String getJdbcConnectorResourceName() {

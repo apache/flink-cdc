@@ -402,7 +402,10 @@ public class HudiSinkITCase {
                         .orElse(null);
 
         List<FileSlice> fileSlices =
-                table.getSliceView().getAllLatestFileSlicesBeforeOrOn(latestInstant).values()
+                table
+                        .getSliceView()
+                        .getAllLatestFileSlicesBeforeOrOn(latestInstant)
+                        .values()
                         .stream()
                         .flatMap(s -> s)
                         .collect(Collectors.toList());
