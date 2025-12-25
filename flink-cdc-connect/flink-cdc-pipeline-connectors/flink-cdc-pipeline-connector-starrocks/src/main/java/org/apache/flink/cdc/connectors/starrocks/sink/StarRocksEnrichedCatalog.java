@@ -112,15 +112,7 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(column.getColumnName()),
                 "column name cannot be null or empty.");
-        String alterSql =
-                buildAlterColumnTypeSql(
-                        databaseName,
-                        tableName,
-                        column.getColumnName(),
-                        getFullColumnType(
-                                column.getDataType(),
-                                column.getColumnSize(),
-                                column.getDecimalDigits()));
+        String alterSql = buildAlterColumnTypeSql(databaseName, tableName, buildColumnStmt(column));
         try {
             long startTimeMillis = System.currentTimeMillis();
             executeUpdateStatement(alterSql);
@@ -161,10 +153,9 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
     }
 
     private String buildAlterColumnTypeSql(
-            String databaseName, String tableName, String columnName, String dataType) {
+            String databaseName, String tableName, String columnStmt) {
         return String.format(
-                "ALTER TABLE `%s`.`%s` MODIFY COLUMN %s %s",
-                databaseName, tableName, columnName, dataType);
+                "ALTER TABLE `%s`.`%s` MODIFY COLUMN %s", databaseName, tableName, columnStmt);
     }
 
     private void executeUpdateStatement(String sql) throws StarRocksCatalogException {
@@ -187,6 +178,26 @@ public class StarRocksEnrichedCatalog extends StarRocksCatalog {
         Preconditions.checkArgument(
                 !StringUtils.isNullOrWhitespaceOnly(tableName),
                 "Table name cannot be null or empty.");
+    }
+
+    private String buildColumnStmt(StarRocksColumn column) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("`");
+        builder.append(column.getColumnName());
+        builder.append("` ");
+        builder.append(
+                getFullColumnType(
+                        column.getDataType(), column.getColumnSize(), column.getDecimalDigits()));
+        builder.append(" ");
+        builder.append(column.isNullable() ? "NULL" : "NOT NULL");
+        if (column.getDefaultValue().isPresent()) {
+            builder.append(String.format(" DEFAULT \"%s\"", column.getDefaultValue().get()));
+        }
+
+        if (column.getColumnComment().isPresent()) {
+            builder.append(String.format(" COMMENT \"%s\"", column.getColumnComment().get()));
+        }
+        return builder.toString();
     }
 
     private String getFullColumnType(

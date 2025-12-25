@@ -162,7 +162,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
-                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17).notNull(), null))
                         .primaryKey("id")
                         .build();
 
