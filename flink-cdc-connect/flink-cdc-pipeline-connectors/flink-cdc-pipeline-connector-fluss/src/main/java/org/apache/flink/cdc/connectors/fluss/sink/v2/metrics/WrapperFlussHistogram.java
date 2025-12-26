@@ -27,9 +27,9 @@ import org.apache.flink.metrics.HistogramStatistics;
 /** An implementation of Flink's {@link Histogram} which wraps Fluss's Histogram. */
 public class WrapperFlussHistogram implements Histogram {
 
-    private final com.alibaba.fluss.metrics.Histogram flussHistogram;
+    private final org.apache.fluss.metrics.Histogram flussHistogram;
 
-    public WrapperFlussHistogram(com.alibaba.fluss.metrics.Histogram flussHistogram) {
+    public WrapperFlussHistogram(org.apache.fluss.metrics.Histogram flussHistogram) {
         this.flussHistogram = flussHistogram;
     }
 
@@ -53,10 +53,10 @@ public class WrapperFlussHistogram implements Histogram {
 
     private static class FlinkHistogramStatistics extends HistogramStatistics {
 
-        private final com.alibaba.fluss.metrics.HistogramStatistics flussHistogramStatistics;
+        private final org.apache.fluss.metrics.HistogramStatistics flussHistogramStatistics;
 
         public FlinkHistogramStatistics(
-                com.alibaba.fluss.metrics.HistogramStatistics flussHistogramStatistics) {
+                org.apache.fluss.metrics.HistogramStatistics flussHistogramStatistics) {
             this.flussHistogramStatistics = flussHistogramStatistics;
         }
 
