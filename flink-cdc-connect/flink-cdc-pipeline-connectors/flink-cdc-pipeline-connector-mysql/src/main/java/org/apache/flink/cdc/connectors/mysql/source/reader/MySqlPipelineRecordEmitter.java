@@ -93,7 +93,8 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                 debeziumDeserializationSchema,
                 sourceReaderMetrics,
                 sourceConfig.isIncludeSchemaChanges(),
-                false); // Explicitly disable heartbeat events
+                false, // Explicitly disable heartbeat events
+                false); // Explicitly disable transaction metadata events
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceConfig = sourceConfig;
         this.alreadySendCreateTableTables = new HashSet<>();
