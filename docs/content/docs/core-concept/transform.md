@@ -315,6 +315,7 @@ transform:
     description: auto creating table options example
 ```
 Tips: The format of table-options is `key1=value1,key2=value2`.
+If option values contain commas, use semicolon delimiter like `key1=value1;key2=value2`.
 
 ## Classification mapping
 Multiple transform rules can be defined to classify input data rows and apply different processing.

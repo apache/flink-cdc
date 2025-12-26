@@ -311,7 +311,7 @@ transform:
     table-options: comment=web order
     description: auto creating table options example
 ```
-小技巧：table-options 的格式是 `key1=value1,key2=value2`。
+小技巧：table-options 的格式是 `key1=value1,key2=value2`；如果 value 中包含逗号，使用分号分隔：`key1=value1;key2=value2`。
 
 ## Classification mapping
 多个转换规则可以定义为分类映射。

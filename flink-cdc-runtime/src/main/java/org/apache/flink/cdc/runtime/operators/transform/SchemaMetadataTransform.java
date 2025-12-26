@@ -58,13 +58,17 @@ public class SchemaMetadataTransform implements Serializable {
             partitionKeys = Arrays.asList(partitionKeyArr);
         }
         if (!StringUtils.isNullOrWhitespaceOnly(tableOptionString)) {
-            for (String tableOption : tableOptionString.split(",")) {
-                String[] kv = tableOption.split("=");
+            // Use semicolon as delimiter to support multi-value options like
+            // sequence.field=jjsj,gxsj.
+            // Keep comma delimiter for backward compatibility.
+            String delimiter = tableOptionString.contains(";") ? ";" : ",";
+            for (String tableOption : tableOptionString.split(delimiter)) {
+                String[] kv = tableOption.split("=", 2);
                 if (kv.length != 2) {
                     throw new IllegalArgumentException(
                             "table option format error: "
                                     + tableOptionString
-                                    + ", it should be like `key1=value1,key2=value2`.");
+                                    + ", it should be like `key1=value1,key2=value2` or `key1=value1;key2=value2`.");
                 }
                 options.put(kv[0].trim(), kv[1].trim());
             }
