@@ -18,8 +18,10 @@
 package org.apache.flink.cdc.connectors.mysql;
 
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
+import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.test.util.AbstractTestBase;
 
+import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -40,8 +42,8 @@ public abstract class LegacyMySqlTestBase extends AbstractTestBase {
     protected static final MySqlContainer MYSQL_CONTAINER =
             (MySqlContainer)
                     new MySqlContainer()
-                            .withConfigurationOverride("docker/server/my.cnf")
-                            .withSetupSQL("docker/setup.sql")
+                            .withConfigurationOverride("server/my.cnf")
+                            .withSetupSQL("setup.sql")
                             .withDatabaseName("flink-test")
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")
@@ -49,6 +51,8 @@ public abstract class LegacyMySqlTestBase extends AbstractTestBase {
 
     @BeforeAll
     static void startContainers() {
+        // Legacy mode does not support MySQL > 8.0.x
+        Assumptions.assumeThat(MySqlVersion.CURRENT).isLessThanOrEqualTo(MySqlVersion.V8_0);
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(MYSQL_CONTAINER)).join();
         LOG.info("Containers are started.");

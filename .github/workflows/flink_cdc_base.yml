@@ -203,11 +203,17 @@ jobs:
               ("core")
                modules=${{ env.MODULES_CORE }}
               ;;
-              ("mysql-source")
-               modules=${{ env.MODULES_MYSQL_SOURCE }}
-              ;;
               ("mysql-pipeline")
                modules=${{ env.MODULES_MYSQL_PIPELINE }}
+              ;;
+              ("mysql-source-57")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("mysql-source-80")
+               modules=${{ env.MODULES_MYSQL }}
+              ;;
+              ("mysql-source-84")
+               modules=${{ env.MODULES_MYSQL }}
               ;;
               ("postgres-source")
                modules=${{ env.MODULES_POSTGRES_SOURCE }}
@@ -289,6 +295,14 @@ jobs:
             build_maven_parameter="-DspecifiedMongoVersion=7.0.24"
           elif [ ${{ matrix.module }} == "mongodb8" ]; then
             build_maven_parameter="-DspecifiedMongoVersion=8.0.14"
+          fi
+          
+          if [ ${{ inputs.module }} == "mysql-source-57" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=5.7"
+          elif [ ${{ inputs.module }} == "mysql-source-80" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=8.0"
+          elif [ ${{ inputs.module }} == "mysql-source-84" ]; then
+            build_maven_parameter="-DspecifiedMySqlVersion=8.4"
           fi
           
           if [ ! -z "${{ matrix.flink-version }}" ]; then

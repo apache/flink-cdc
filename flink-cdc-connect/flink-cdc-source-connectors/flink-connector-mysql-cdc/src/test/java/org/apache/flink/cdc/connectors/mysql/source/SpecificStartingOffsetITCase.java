@@ -89,7 +89,7 @@ class SpecificStartingOffsetITCase {
                             .withConfigurationOverride(
                                     buildMySqlConfigWithTimezone(
                                             getResourceFolder(), getSystemTimeZone()))
-                            .withSetupSQL("docker/setup.sql")
+                            .withSetupSQL("setup.sql")
                             .withDatabaseName("flink-test")
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")
@@ -459,7 +459,11 @@ class SpecificStartingOffsetITCase {
         properties.put("database.password", customDatabase.getPassword());
         io.debezium.config.Configuration configuration =
                 io.debezium.config.Configuration.from(properties);
-        return DebeziumUtils.createMySqlConnection(configuration, new Properties());
+
+        Properties jdbcProperties = new Properties();
+        jdbcProperties.put("useSSL", "false");
+        jdbcProperties.put("allowPublicKeyRetrieval", "true");
+        return DebeziumUtils.createMySqlConnection(configuration, jdbcProperties);
     }
 
     private MySqlSourceConfig getMySqlSourceConfig(Long timestamp, String serverId) {

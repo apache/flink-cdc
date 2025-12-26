@@ -81,8 +81,8 @@ public class MySqlToIcebergE2eITCase extends PipelineTestEnvironment {
             (MySqlContainer)
                     new MySqlContainer(
                                     MySqlVersion.V8_0) // v8 support both ARM and AMD architectures
-                            .withConfigurationOverride("docker/mysql/my.cnf")
-                            .withSetupSQL("docker/mysql/setup.sql")
+                            .withConfigurationOverride("my.cnf")
+                            .withSetupSQL("setup.sql")
                             .withDatabaseName("flink-test")
                             .withUsername("flinkuser")
                             .withPassword("flinkpw")

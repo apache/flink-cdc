@@ -90,7 +90,7 @@ public class MySqlValidatorTest {
                 String.format(
                         "Currently Flink MySql CDC connector only supports MySql whose version is larger or equal to 5.6, but actual is %s.",
                         version);
-        doValidate(version, "docker/server/my.cnf", message, incrementalSnapshot);
+        doValidate(version, "server/my.cnf", message, incrementalSnapshot);
     }
 
     @ParameterizedTest(name = "incrementalSnapshot: {0}")

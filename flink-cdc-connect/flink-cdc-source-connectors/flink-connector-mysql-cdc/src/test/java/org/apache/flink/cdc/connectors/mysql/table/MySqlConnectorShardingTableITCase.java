@@ -18,8 +18,6 @@
 package org.apache.flink.cdc.connectors.mysql.table;
 
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSourceTestBase;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
-import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.EnvironmentSettings;
@@ -29,13 +27,10 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.lifecycle.Startables;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -44,7 +39,6 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Stream;
 
 /** Integration tests for MySQL sharding tables. */
 public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
@@ -54,9 +48,6 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
 
     private static final String TEST_USER = "mysqluser";
     private static final String TEST_PASSWORD = "mysqlpw";
-
-    private static final MySqlContainer MYSQL8_CONTAINER =
-            createMySqlContainer(MySqlVersion.V8_0, "docker/server-gtids/expire-seconds/my.cnf");
 
     private final UniqueDatabase fullTypesMySql57Database =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", TEST_USER, TEST_PASSWORD);
@@ -71,20 +62,6 @@ public class MySqlConnectorShardingTableITCase extends MySqlSourceTestBase {
     private final StreamTableEnvironment tEnv =
             StreamTableEnvironment.create(
                     env, EnvironmentSettings.newInstance().inStreamingMode().build());
-
-    @BeforeAll
-    public static void beforeClass() {
-        LOG.info("Starting MySql8 containers...");
-        Startables.deepStart(Stream.of(MYSQL8_CONTAINER)).join();
-        LOG.info("Container MySql8 is started.");
-    }
-
-    @AfterAll
-    public static void afterClass() {
-        LOG.info("Stopping MySql8 containers...");
-        MYSQL8_CONTAINER.stop();
-        LOG.info("Container MySql8 is stopped.");
-    }
 
     public void setup(boolean incrementalSnapshot) {
         TestValuesTableFactory.clearAllData();

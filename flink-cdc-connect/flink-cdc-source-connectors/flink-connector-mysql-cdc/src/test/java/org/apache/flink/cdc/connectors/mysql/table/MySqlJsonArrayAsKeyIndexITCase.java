@@ -28,7 +28,9 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import org.assertj.core.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.testcontainers.lifecycle.Startables;
@@ -57,6 +59,13 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
 
     private MySqlContainer container;
 
+    @BeforeAll
+    static void checkVersion() {
+        // This test case is MySQL 8.0.x specific.
+        Assumptions.assumeThat(MySqlVersion.CURRENT.getVersion())
+                .isEqualTo(MySqlVersion.V8_0.getVersion());
+    }
+
     @AfterEach
     public void after() {
         if (container != null) {
@@ -67,7 +76,7 @@ public class MySqlJsonArrayAsKeyIndexITCase extends MySqlSourceTestBase {
     @ParameterizedTest
     @EnumSource(names = {"V8_0_17", "V8_0_18", "V8_0_19"})
     public void testJsonArrayAsKeyIndex(MySqlVersion version) {
-        this.container = createMySqlContainer(version, "docker/server-gtids/expire-seconds/my.cnf");
+        this.container = createMySqlContainer(version, "server-gtids/expire-seconds/my.cnf");
         Startables.deepStart(container).join();
 
         UniqueDatabase jaakiDatabase =

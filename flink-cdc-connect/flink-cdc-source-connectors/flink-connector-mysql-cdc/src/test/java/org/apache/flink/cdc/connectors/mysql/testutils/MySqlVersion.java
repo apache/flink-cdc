@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.connectors.mysql.testutils;
 
+import java.util.Optional;
+
 /** MySql version enum. */
 public enum MySqlVersion {
     V5_5("5.5"),
@@ -25,9 +27,11 @@ public enum MySqlVersion {
     V8_0_17("8.0.17"),
     V8_0_18("8.0.18"),
     V8_0_19("8.0.19"),
-    V8_0("8.0");
+    V8_0("8.0"),
+    V8_4("8.4"),
+    CURRENT(Optional.ofNullable(System.getProperty("specifiedMySqlVersion")).orElse("8.0"));
 
-    private String version;
+    private final String version;
 
     MySqlVersion(String version) {
         this.version = version;
@@ -35,6 +39,39 @@ public enum MySqlVersion {
 
     public String getVersion() {
         return version;
+    }
+
+    public String getMajorVersion() {
+        switch (this) {
+            case V5_5:
+            case V5_6:
+            case V5_7:
+            case V8_0:
+            case V8_4:
+                return getVersion();
+            case V8_0_17:
+            case V8_0_18:
+            case V8_0_19:
+                return "8.0";
+            default:
+                return getVersion().substring(0, 3);
+        }
+    }
+
+    public boolean greaterThan(MySqlVersion anotherVersion) {
+        return Double.parseDouble(version) > Double.parseDouble(anotherVersion.version);
+    }
+
+    public boolean greaterThanOrEqualTo(MySqlVersion anotherVersion) {
+        return Double.parseDouble(version) >= Double.parseDouble(anotherVersion.version);
+    }
+
+    public boolean lessThan(MySqlVersion anotherVersion) {
+        return Double.parseDouble(version) < Double.parseDouble(anotherVersion.version);
+    }
+
+    public boolean lessThanOrEqualTo(MySqlVersion anotherVersion) {
+        return Double.parseDouble(version) <= Double.parseDouble(anotherVersion.version);
     }
 
     @Override
