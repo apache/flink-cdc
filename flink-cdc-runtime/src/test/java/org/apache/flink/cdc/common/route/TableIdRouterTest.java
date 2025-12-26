@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common;
+package org.apache.flink.cdc.common.route;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.runtime.operators.schema.common.SchemaTestBase;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +27,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 
@@ -36,6 +38,17 @@ public class TableIdRouterTest extends SchemaTestBase {
         return TABLE_ID_ROUTER.route(TableId.parse(tableId)).stream()
                 .map(TableId::toString)
                 .collect(Collectors.toList());
+    }
+
+    private static String testConvert(String input) {
+        return TableIdRouter.convertTableListToRegExpPattern(input);
+    }
+
+    @Test
+    void testConvertingDebeziumTableIdToStandardRegex() {
+        assertThat(testConvert("foo.bar")).isEqualTo("foo\\.bar");
+        assertThat(testConvert("foo.bar,foo.baz")).isEqualTo("foo\\.bar|foo\\.baz");
+        assertThat(testConvert("db.\\.*")).isEqualTo("db\\..*");
     }
 
     @Test
@@ -129,6 +142,122 @@ public class TableIdRouterTest extends SchemaTestBase {
                                         TableId.parse("db_5.table_1"),
                                         TableId.parse("db_5.table_2"),
                                         TableId.parse("db_5.table_3"))),
+                        new HashSet<>(),
+                        new HashSet<>(),
                         new HashSet<>());
+    }
+
+    @Test
+    void testRegExpCapturingGroupExpression() {
+        assertThat(Stream.of("re_1.table_1", "re_22.table_22", "re_333.table_333"))
+                .map(TableIdRouterTest::testRoute)
+                .map(List::toString)
+                .containsExactly(
+                        "[database.another_table_with_111_index]",
+                        "[database.another_table_with_222222_index]",
+                        "[database.another_table_with_333333333_index]");
+
+        assertThat(Stream.of("inv_1.table_foo", "inv_22.table_bar", "inv_333.table_baz"))
+                .map(TableIdRouterTest::testRoute)
+                .map(List::toString)
+                .containsExactly("[table_foo.inv_1]", "[table_bar.inv_22]", "[table_baz.inv_333]");
+    }
+
+    private static List<String> testStdRegExpRoute(
+            String sourceRouteRule, String sinkRouteRule, List<String> sourceTables) {
+        TableIdRouter router =
+                new TableIdRouter(List.of(new RouteRule(sourceRouteRule, sinkRouteRule)));
+        return sourceTables.stream()
+                .map(TableId::parse)
+                .map(router::route)
+                .map(List::toString)
+                .collect(Collectors.toList());
+    }
+
+    @Test
+    void testRegExpComplexRouting() {
+        // Capture the entire database.
+        List<String> tablesToRoute =
+                List.of("db1.tbl1", "db1.tbl2", "db1.tbl3", "db2.tbl2", "db2.tbl3", "db3.tbl3");
+        assertThat(testStdRegExpRoute("db1.(\\.*)", "db1.combined", tablesToRoute))
+                .containsExactly(
+                        "[db1.combined]",
+                        "[db1.combined]",
+                        "[db1.combined]",
+                        "[db2.tbl2]",
+                        "[db2.tbl3]",
+                        "[db3.tbl3]");
+
+        // Capture the entire database and append prefixes.
+        assertThat(testStdRegExpRoute("db1.(\\.*)", "db1.pre_$1", tablesToRoute))
+                .containsExactly(
+                        "[db1.pre_tbl1]",
+                        "[db1.pre_tbl2]",
+                        "[db1.pre_tbl3]",
+                        "[db2.tbl2]",
+                        "[db2.tbl3]",
+                        "[db3.tbl3]");
+
+        // Capture the entire database and append suffixes.
+        assertThat(testStdRegExpRoute("db1.(\\.*)", "db1.$1_suf", tablesToRoute))
+                .containsExactly(
+                        "[db1.tbl1_suf]",
+                        "[db1.tbl2_suf]",
+                        "[db1.tbl3_suf]",
+                        "[db2.tbl2]",
+                        "[db2.tbl3]",
+                        "[db3.tbl3]");
+
+        // Capture the entire database and append extract parts.
+        assertThat(testStdRegExpRoute("db1.tbl(\\.*)", "db1.no$1", tablesToRoute))
+                .containsExactly(
+                        "[db1.no1]",
+                        "[db1.no2]",
+                        "[db1.no3]",
+                        "[db2.tbl2]",
+                        "[db2.tbl3]",
+                        "[db3.tbl3]");
+
+        // Capture databases and append database prefix.
+        assertThat(testStdRegExpRoute("(\\.*).tbl3", "pre_$1.tbl3", tablesToRoute))
+                .containsExactly(
+                        "[db1.tbl1]",
+                        "[db1.tbl2]",
+                        "[pre_db1.tbl3]",
+                        "[db2.tbl2]",
+                        "[pre_db2.tbl3]",
+                        "[pre_db3.tbl3]");
+
+        // Capture databases and append database suffix.
+        assertThat(testStdRegExpRoute("(\\.*).tbl3", "$1_suf.tbl3", tablesToRoute))
+                .containsExactly(
+                        "[db1.tbl1]",
+                        "[db1.tbl2]",
+                        "[db1_suf.tbl3]",
+                        "[db2.tbl2]",
+                        "[db2_suf.tbl3]",
+                        "[db3_suf.tbl3]");
+
+        // Capture databases and extract database parts.
+        assertThat(testStdRegExpRoute("db(\\.*).(tbl\\.*)", "no$1.$2", tablesToRoute))
+                .containsExactly(
+                        "[no1.tbl1]",
+                        "[no1.tbl2]",
+                        "[no1.tbl3]",
+                        "[no2.tbl2]",
+                        "[no2.tbl3]",
+                        "[no3.tbl3]");
+
+        // Capture multiple parts and append extra tags.
+        assertThat(
+                        testStdRegExpRoute(
+                                "db(\\.*).tbl(\\.*)", "Database$1.Collection$2", tablesToRoute))
+                .containsExactly(
+                        "[Database1.Collection1]",
+                        "[Database1.Collection2]",
+                        "[Database1.Collection3]",
+                        "[Database2.Collection2]",
+                        "[Database2.Collection3]",
+                        "[Database3.Collection3]");
     }
 }

@@ -86,3 +86,24 @@ route:
 ```
 
 然后，`source_db` 库下所有的表都会被同步到 `sink_db` 库下。
+
+## 高级：基于正则捕获组的替换规则
+
+您可以在 `source-table` 字段中定义正则表达式的捕获组：
+
+```yaml
+route:
+  - source-table: db_(\.*).(\.*)_tbl
+    sink-table: sink_db_$1.sink_table_$2
+```
+
+这里我们创建了两个捕获组，分别用来匹配数据库名 `db_` 之后的后缀和表名 `_tbl` 之前的前缀。
+
+以上游表 `db_foo.bar_tbl` 为例，我们将会从中提取出 `(foo, bar)` 作为捕获组，并且将其依次绑定到 `$1` 和 `$2` 变量中。
+因此，这张表将被路由到 `sink_db_foo.sink_table_bar` 下游表中。
+
+{{< hint info >}}
+
+注意：基于正则捕获组的替换规则无法与 `replace-symbol` 选项搭配使用。
+
+{{< /hint >}}
