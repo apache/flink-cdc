@@ -114,8 +114,8 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
             new UniqueDatabase(MYSQL, "mysql_inventory", MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
     protected Path jdbcJar;
 
-    private GenericContainer<?> jobManager;
-    private GenericContainer<?> taskManager;
+    protected GenericContainer<?> jobManager;
+    protected GenericContainer<?> taskManager;
 
     public static String getFlinkVersion() {
         String flinkVersion = System.getProperty("specifiedFlinkVersion");
@@ -183,7 +183,8 @@ public abstract class FlinkContainerTestEnvironment extends TestLogger {
                             dockerClient.removeContainerCmd(container.getId()).exec();
                         });
 
-        // List all images and remove the ones that are not Flink, MySQL, and TestContainers
+        // List all images and remove the ones that are not Flink, MySQL, and
+        // TestContainers
         // related.
         dockerClient.listImagesCmd().exec().stream()
                 .filter(

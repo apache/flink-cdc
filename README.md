@@ -112,9 +112,15 @@ SELECT * FROM test_table;
  ```
 5. View job execution status through Flink WebUI or downstream database.
 
+- **GaussDB**: Supports full snapshot and incremental CDC for Huawei GaussDB using `mppdb_decoding`.
+- **MySQL**: Supports full snapshot and incremental CDC for MySQL.
+- ... (others)
+
 Try it out yourself with our more detailed [tutorial](docs/content/docs/get-started/quickstart/mysql-to-doris.md). 
 You can also see [connector overview](docs/content/docs/connectors/pipeline-connectors/overview.md) to view a comprehensive catalog of the
 connectors currently provided and understand more detailed configurations.
+
+For GaussDB specific integration, see the [GaussDB Connector Guide](flink-cdc-connect/flink-cdc-source-connectors/flink-connector-gaussdb-cdc/README.md).
 
 ### Join the Community
 

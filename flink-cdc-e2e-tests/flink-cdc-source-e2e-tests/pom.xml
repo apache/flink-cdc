@@ -176,6 +176,29 @@ limitations under the License.
     <build>
         <plugins>
             <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-gaussdb-driver</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/dependencies</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/../../flink-cdc-connect/flink-cdc-source-connectors/flink-connector-gaussdb-cdc/lib</directory>
+                                    <includes>
+                                        <include>gaussdbjdbc.jar</include>
+                                    </includes>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <executions>
@@ -335,6 +358,16 @@ limitations under the License.
                             <artifactId>flink-sql-connector-vitess-cdc</artifactId>
                             <version>${project.version}</version>
                             <destFileName>vitess-cdc-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-sql-connector-gaussdb-cdc</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>gaussdb-cdc-connector.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

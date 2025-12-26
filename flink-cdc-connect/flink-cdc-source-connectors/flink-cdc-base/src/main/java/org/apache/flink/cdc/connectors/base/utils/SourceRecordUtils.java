@@ -38,12 +38,11 @@ import static org.apache.flink.cdc.connectors.base.relational.JdbcSourceEventDis
 /** Utility class to deal record. */
 public class SourceRecordUtils {
 
-    private SourceRecordUtils() {}
+    private SourceRecordUtils() {
+    }
 
-    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME =
-            "io.debezium.connector.*.SchemaChangeKey";
-    public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME =
-            "io.debezium.connector.common.Heartbeat";
+    public static final String SCHEMA_CHANGE_EVENT_KEY_NAME = "io.debezium.connector.*.SchemaChangeKey";
+    public static final String SCHEMA_HEARTBEAT_EVENT_KEY_NAME = "io.debezium.connector.common.Heartbeat";
 
     private static final DocumentReader DOCUMENT_READER = DocumentReader.defaultReader();
 
@@ -59,7 +58,9 @@ public class SourceRecordUtils {
     /**
      * Return the timestamp when the change event is produced in MySQL.
      *
-     * <p>The field `source.ts_ms` in {@link SourceRecord} data struct is the time when the change
+     * <p>
+     * The field `source.ts_ms` in {@link SourceRecord} data struct is the time when
+     * the change
      * event is operated in MySQL.
      */
     public static Long getMessageTimestamp(SourceRecord record) {
@@ -78,7 +79,8 @@ public class SourceRecordUtils {
     }
 
     /**
-     * The field `ts_ms` in {@link SourceRecord} data struct is the time when the record fetched by
+     * The field `ts_ms` in {@link SourceRecord} data struct is the time when the
+     * record fetched by
      * debezium reader, use it as the process time in Source.
      */
     public static Long getFetchTimestamp(SourceRecord record) {

@@ -63,8 +63,7 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
     private static final String INTER_CONTAINER_PG_ALIAS = "postgres";
     private static final Pattern COMMENT_PATTERN = Pattern.compile("^(.*)--.*$");
 
-    private static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("debezium/postgres:9.6").asCompatibleSubstituteFor("postgres");
+    private static final DockerImageName PG_IMAGE = DockerImageName.parse("postgres:15");
 
     private static final Path postgresCdcJar = TestUtils.getResource("postgres-cdc-connector.jar");
     private static final Path mysqlDriverJar = TestUtils.getResource("mysql-driver.jar");
@@ -90,7 +89,8 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                     .withCommand(
                             "postgres",
                             "-c",
-                            // default
+                            "wal_level=logical",
+                            "-c",
                             "fsync=off",
                             "-c",
                             "max_wal_senders=20",
@@ -164,6 +164,7 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                         " 'slot.name' = '" + getSlotName("flink_incremental_") + "',",
                         " 'scan.incremental.snapshot.chunk.size' = '4',",
                         " 'scan.incremental.snapshot.enabled' = 'true',",
+                        " 'decoding.plugin.name' = 'pgoutput',",
                         " 'scan.startup.mode' = 'initial'",
                         ");");
 
@@ -196,7 +197,8 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
                         " 'slot.name' = '" + getSlotName("flink_") + "',",
                         // dropping the slot allows WAL segments to be
                         // discarded by the database
-                        " 'debezium.slot.drop.on.stop' = 'true'",
+                        " 'debezium.slot.drop.on.stop' = 'true',",
+                        " 'decoding.plugin.name' = 'pgoutput'",
                         ");");
 
         List<String> sqlLines =
@@ -215,7 +217,8 @@ class PostgresE2eITCase extends FlinkContainerTestEnvironment {
         try (Connection conn = getPgJdbcConnection();
                 Statement statement = conn.createStatement()) {
 
-            // at this point, the replication slot 'flink' should already be created; otherwise, the
+            // at this point, the replication slot 'flink' should already be created;
+            // otherwise, the
             // test will fail
             statement.execute(
                     "UPDATE inventory.products SET description='18oz carpenter hammer' WHERE id=106;");

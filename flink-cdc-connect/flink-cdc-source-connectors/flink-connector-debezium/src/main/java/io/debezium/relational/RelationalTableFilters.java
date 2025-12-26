@@ -24,7 +24,8 @@ import static io.debezium.relational.RelationalDatabaseConnectorConfig.COLUMN_EX
  */
 public class RelationalTableFilters implements DataCollectionFilters {
 
-    // Filter that filters tables based only on datbase/schema/system table filters but not table
+    // Filter that filters tables based only on datbase/schema/system table filters
+    // but not table
     // filters
     // Represents the list of tables whose schema needs to be captured
     private final TableFilter eligibleTableFilter;
@@ -44,25 +45,39 @@ public class RelationalTableFilters implements DataCollectionFilters {
             Configuration config,
             TableFilter systemTablesFilter,
             TableIdToStringMapper tableIdMapper) {
-        // Define the filter that provides the list of tables that could be captured if configured
+        // Define the filter that provides the list of tables that could be captured if
+        // configured
+        String dbInclude =
+                config.getFallbackStringProperty(
+                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST,
+                        RelationalDatabaseConnectorConfig.DATABASE_WHITELIST);
+        String dbExclude =
+                config.getFallbackStringProperty(
+                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST,
+                        RelationalDatabaseConnectorConfig.DATABASE_BLACKLIST);
+        String schemaInclude =
+                config.getFallbackStringProperty(
+                        RelationalDatabaseConnectorConfig.SCHEMA_INCLUDE_LIST,
+                        RelationalDatabaseConnectorConfig.SCHEMA_WHITELIST);
+        String schemaExclude =
+                config.getFallbackStringProperty(
+                        RelationalDatabaseConnectorConfig.SCHEMA_EXCLUDE_LIST,
+                        RelationalDatabaseConnectorConfig.SCHEMA_BLACKLIST);
+        String tableInclude =
+                config.getFallbackStringProperty(
+                        RelationalDatabaseConnectorConfig.TABLE_INCLUDE_LIST,
+                        RelationalDatabaseConnectorConfig.TABLE_WHITELIST);
+        String tableExclude =
+                config.getFallbackStringProperty(
+                        RelationalDatabaseConnectorConfig.TABLE_EXCLUDE_LIST,
+                        RelationalDatabaseConnectorConfig.TABLE_BLACKLIST);
+
         final TableSelectionPredicateBuilder eligibleTables =
                 Selectors.tableSelector()
-                        .includeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_WHITELIST))
-                        .excludeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_BLACKLIST))
-                        .includeSchemas(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.SCHEMA_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.SCHEMA_WHITELIST))
-                        .excludeSchemas(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.SCHEMA_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.SCHEMA_BLACKLIST));
+                        .includeDatabases(dbInclude)
+                        .excludeDatabases(dbExclude)
+                        .includeSchemas(schemaInclude)
+                        .excludeSchemas(schemaExclude);
         final Predicate<TableId> eligibleTablePredicate = eligibleTables.build();
 
         Predicate<TableId> finalEligibleTablePredicate =
@@ -72,39 +87,29 @@ public class RelationalTableFilters implements DataCollectionFilters {
 
         this.eligibleTableFilter = finalEligibleTablePredicate::test;
 
-        // Define the filter using the include and exclude lists for tables and database names ...
+        // Define the filter using the include and exclude lists for tables and database
+        // names ...
         Predicate<TableId> tablePredicate =
                 eligibleTables
-                        .includeTables(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.TABLE_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.TABLE_WHITELIST),
-                                tableIdMapper)
-                        .excludeTables(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.TABLE_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.TABLE_BLACKLIST),
-                                tableIdMapper)
+                        .includeTables(tableInclude, tableIdMapper)
+                        .excludeTables(tableExclude, tableIdMapper)
                         .build();
 
-        Predicate<TableId> finalTablePredicate =
-                config.getBoolean(RelationalDatabaseConnectorConfig.TABLE_IGNORE_BUILTIN)
-                        ? tablePredicate.and(systemTablesFilter::isIncluded)
-                        : tablePredicate;
+        Predicate<TableId> combinedPredicate = eligibleTablePredicate.and(tablePredicate);
+        final Predicate<TableId> finalTablePredicate =
+                (systemTablesFilter != null)
+                        ? combinedPredicate.and(systemTablesFilter::isIncluded)
+                        : combinedPredicate;
 
         this.tableFilter = finalTablePredicate::test;
 
-        // Define the database filter using the include and exclude lists for database names ...
+        // Define the database filter using the include and exclude lists for database
+        // names
+        // ...
         this.databaseFilter =
                 Selectors.databaseSelector()
-                        .includeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_INCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_WHITELIST))
-                        .excludeDatabases(
-                                config.getFallbackStringProperty(
-                                        RelationalDatabaseConnectorConfig.DATABASE_EXCLUDE_LIST,
-                                        RelationalDatabaseConnectorConfig.DATABASE_BLACKLIST))
+                        .includeDatabases(dbInclude)
+                        .excludeDatabases(dbExclude)
                         .build();
 
         Predicate<TableId> eligibleSchemaPredicate =
