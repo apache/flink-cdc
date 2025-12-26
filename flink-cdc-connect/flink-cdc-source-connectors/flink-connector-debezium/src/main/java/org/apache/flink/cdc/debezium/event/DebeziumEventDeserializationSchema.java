@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
+import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -54,6 +55,7 @@ import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -65,6 +67,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -196,6 +199,8 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 return this::convertToTime;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 return this::convertToTimestamp;
+            case TIMESTAMP_WITH_TIME_ZONE:
+                return this::convertToZonedTimestamp;
             case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
                 return this::convertToLocalTimeZoneTimestamp;
             case FLOAT:
@@ -365,6 +370,35 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         + dbzObj
                         + "' of type "
                         + dbzObj.getClass().getName());
+    }
+
+    protected Object convertToZonedTimestamp(Object dbzObj, Schema schema) {
+        if (dbzObj instanceof String) {
+            String str = (String) dbzObj;
+            // ZonedTimestamp type is encoded in string type with timezone offset
+            // Format: ISO-8601 with timezone offset (e.g., "2020-07-17T18:00:22+00:00")
+            // According to Debezium documentation, PostgreSQL TIMESTAMPTZ is ALWAYS encoded as
+            // String
+            // with ZonedTimestamp.SCHEMA_NAME, regardless of time.precision.mode
+            if (ZonedTimestamp.SCHEMA_NAME.equals(schema.name())) {
+                // Parse using Debezium's ZonedTimestamp formatter
+                OffsetDateTime offsetDateTime = OffsetDateTime.parse(str, ZonedTimestamp.FORMATTER);
+                return ZonedTimestampData.fromOffsetDateTime(offsetDateTime);
+            } else {
+                // Fallback to standard ISO-8601 parsing
+                OffsetDateTime offsetDateTime = OffsetDateTime.parse(str);
+                return ZonedTimestampData.fromOffsetDateTime(offsetDateTime);
+            }
+        }
+        throw new IllegalArgumentException(
+                "Unable to convert to TIMESTAMP WITH TIME ZONE from unexpected value '"
+                        + dbzObj
+                        + "' of type "
+                        + dbzObj.getClass().getName()
+                        + " with schema name '"
+                        + (schema != null ? schema.name() : "null")
+                        + "'. PostgreSQL TIMESTAMPTZ should always be encoded as String with "
+                        + ZonedTimestamp.SCHEMA_NAME);
     }
 
     protected Object convertToLocalTimeZoneTimestamp(Object dbzObj, Schema schema) {
