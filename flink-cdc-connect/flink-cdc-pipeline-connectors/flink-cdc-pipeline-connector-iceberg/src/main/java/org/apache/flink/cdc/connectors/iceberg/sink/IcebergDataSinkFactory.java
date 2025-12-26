@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.iceberg.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -31,8 +32,10 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 import org.apache.iceberg.CatalogProperties;
 
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -86,10 +89,28 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         CompactionOptions compactionOptions =
                 getCompactionStrategy(context.getFactoryConfiguration());
 
+        Map<TableId, List<String>> partitionMaps = new HashMap<>();
+        String partitionKey =
+                context.getFactoryConfiguration().get(IcebergDataSinkOptions.PARTITION_KEY);
+        if (partitionKey != null && !partitionKey.isEmpty()) {
+            for (String tables : partitionKey.trim().split(";")) {
+                String[] splits = tables.trim().split(":");
+                if (splits.length == 2) {
+                    TableId tableId = TableId.parse(splits[0]);
+                    List<String> partitions = Arrays.asList(splits[1].split(","));
+                    partitionMaps.put(tableId, partitions);
+                } else {
+                    throw new IllegalArgumentException(
+                            IcebergDataSinkOptions.PARTITION_KEY.key()
+                                    + " is malformed, please refer to the documents");
+                }
+            }
+        }
+
         return new IcebergDataSink(
                 catalogOptions,
                 tableOptions,
-                new HashMap<>(),
+                partitionMaps,
                 zoneId,
                 schemaOperatorUid,
                 compactionOptions);
