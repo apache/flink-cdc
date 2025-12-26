@@ -23,6 +23,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.DatabaseHistory;
 import io.debezium.schema.DatabaseSchema;
 import io.debezium.util.Strings;
+import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -275,7 +276,7 @@ public class MySqlConnection extends JdbcConnection {
     public String knownGtidSet() {
         try {
             return queryAndMap(
-                    "SHOW MASTER STATUS",
+                    DebeziumUtils.getBinlogStatusCommand(this),
                     rs -> {
                         if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
                             return rs.getString(
