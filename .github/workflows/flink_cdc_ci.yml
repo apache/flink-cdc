@@ -50,7 +50,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
@@ -61,19 +61,19 @@ jobs:
     name: Common Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[8]"
+      java-versions: "[11]"
       modules: "['core']"
   pipeline-ut:
     name: Pipeline Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[8]"
+      java-versions: "[11]"
       modules: "['mysql-pipeline', 'postgres-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks', 'fluss', 'hudi']"
   source-ut:
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[8]"
+      java-versions: "[11]"
       modules: "['mysql-source', 'postgres-source', 'oracle', 'mongodb7', 'mongodb8', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
     strategy:
@@ -83,7 +83,7 @@ jobs:
     name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[8]"
+      java-versions: "[11]"
       flink-versions: "['1.19.3', '1.20.3']"
       modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
@@ -91,6 +91,6 @@ jobs:
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[8]"
+      java-versions: "[11]"
       flink-versions: "['1.19.3', '1.20.3']"
       modules: "['source_e2e']"

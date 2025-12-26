@@ -109,16 +109,17 @@ public class PaimonWriter<InputT>
     public Collection<MultiTableCommittable> prepareCommit() {
         long startTime = System.currentTimeMillis();
         List<MultiTableCommittable> committables =
-                writes.entrySet()
-                        .parallelStream()
+                writes.entrySet().parallelStream()
                         .flatMap(
                                 entry -> {
                                     try {
                                         // here we set it to lastCheckpointId+1 to
                                         // avoid prepareCommit the same checkpointId with the first
                                         // round.
-                                        return entry.getValue()
-                                                .prepareCommit(false, lastCheckpointId + 1).stream()
+                                        return entry
+                                                .getValue()
+                                                .prepareCommit(false, lastCheckpointId + 1)
+                                                .stream()
                                                 .map(
                                                         committable ->
                                                                 MultiTableCommittable

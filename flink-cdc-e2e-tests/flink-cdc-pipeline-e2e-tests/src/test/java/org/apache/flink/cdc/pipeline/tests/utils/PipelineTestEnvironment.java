@@ -137,9 +137,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
                     "parallelism.default: 4",
                     "execution.checkpointing.interval: 300",
                     "state.backend.type: hashmap",
-                    "env.java.opts.all: -Doracle.jdbc.timezoneAsRegion=false",
+                    "env.java.default-opts.all: --add-exports=java.base/sun.net.util=ALL-UNNAMED --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens=java.base/jdk.internal.loader=ALL-UNNAMED --add-opens=java.base/java.security=ALL-UNNAMED --add-exports=java.base/sun.net.www=ALL-UNNAMED -Doracle.jdbc.timezoneAsRegion=false",
                     "execution.checkpointing.savepoint-dir: file:///opt/flink",
                     "restart-strategy.type: off",
+                    "pekko.ask.timeout: 60s",
                     // Set off-heap memory explicitly to avoid "java.lang.OutOfMemoryError: Direct
                     // buffer memory" error.
                     "taskmanager.memory.task.off-heap.size: 128mb",
@@ -403,7 +404,10 @@ public abstract class PipelineTestEnvironment extends TestLogger {
     }
 
     protected String getFlinkDockerImageTag() {
-        return String.format("flink:%s-scala_2.12", flinkVersion);
+        if (System.getProperty("java.specification.version").equals("17")) {
+            return String.format("flink:%s-scala_2.12-java17", flinkVersion);
+        }
+        return String.format("flink:%s-scala_2.12-java11", flinkVersion);
     }
 
     private ExecResult executeAndCheck(GenericContainer<?> container, String... command) {
