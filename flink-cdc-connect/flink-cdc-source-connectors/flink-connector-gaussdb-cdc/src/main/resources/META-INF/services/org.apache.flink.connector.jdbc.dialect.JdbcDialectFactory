@@ -1,0 +1,1 @@
+org.apache.flink.cdc.connectors.gaussdb.jdbc.GaussDBJdbcDialectFactory
