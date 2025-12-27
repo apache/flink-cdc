@@ -1,13 +1,17 @@
 -- Flink SQL Job to sync Distributed GaussDB to GaussDB (Sink via CN)
--- 分布式 GaussDB -> GaussDB 同步任务
-
--- 设置状态保留时间为 1 小时
-SET 'table.exec.state.ttl' = '1 h';
--- 禁用 Upsert Materialize，因为数据是按 ID 分片的，不存在多节点更新同一行的乱序问题
-SET 'table.exec.sink.upsert-materialize' = 'NONE';
+-- 分布式 GaussDB -> GaussDB 同步任务 (性能优化版)
 
 -- =====================================================
--- 1. Source Table DN1 (GaussDB)
+-- Performance Tuning Settings
+-- =====================================================
+SET 'table.exec.state.ttl' = '1 h';
+SET 'table.exec.sink.upsert-materialize' = 'NONE';
+SET 'parallelism.default' = '4';
+SET 'pipeline.object-reuse' = 'true';
+SET 'execution.checkpointing.interval' = '5min';
+
+-- =====================================================
+-- 1. Source Table DN1 (GaussDB) - with performance tuning
 -- =====================================================
 CREATE TABLE products_source_dn1 (
     product_id INT NOT NULL,
@@ -27,11 +31,13 @@ CREATE TABLE products_source_dn1 (
     'table-name' = 'products',
     'slot.name' = 'flink_cdc_g2g_dn1',
     'decoding.plugin.name' = 'mppdb_decoding',
-    'scan.incremental.snapshot.enabled' = 'true'
+    'scan.incremental.snapshot.enabled' = 'true',
+    'scan.snapshot.fetch.size' = '10000',
+    'scan.incremental.snapshot.chunk.size' = '50000'
 );
 
 -- =====================================================
--- 2. Source Table DN2 (GaussDB)
+-- 2. Source Table DN2 (GaussDB) - with performance tuning
 -- =====================================================
 CREATE TABLE products_source_dn2 (
     product_id INT NOT NULL,
@@ -51,11 +57,13 @@ CREATE TABLE products_source_dn2 (
     'table-name' = 'products',
     'slot.name' = 'flink_cdc_g2g_dn2',
     'decoding.plugin.name' = 'mppdb_decoding',
-    'scan.incremental.snapshot.enabled' = 'true'
+    'scan.incremental.snapshot.enabled' = 'true',
+    'scan.snapshot.fetch.size' = '10000',
+    'scan.incremental.snapshot.chunk.size' = '50000'
 );
 
 -- =====================================================
--- 3. Source Table DN3 (GaussDB)
+-- 3. Source Table DN3 (GaussDB) - with performance tuning
 -- =====================================================
 CREATE TABLE products_source_dn3 (
     product_id INT NOT NULL,
@@ -75,13 +83,15 @@ CREATE TABLE products_source_dn3 (
     'table-name' = 'products',
     'slot.name' = 'flink_cdc_g2g_dn3',
     'decoding.plugin.name' = 'mppdb_decoding',
-    'scan.incremental.snapshot.enabled' = 'true'
+    'scan.incremental.snapshot.enabled' = 'true',
+    'scan.snapshot.fetch.size' = '10000',
+    'scan.incremental.snapshot.chunk.size' = '50000'
 );
 
 -- =====================================================
 -- 4. Sink Table (GaussDB via CN)
 -- 使用自定义 GaussDB JDBC Dialect (支持 MERGE INTO)
--- 使用 gaussdbjdbc.jar 驱动
+-- 性能优化: 批量写入配置
 -- =====================================================
 CREATE TABLE products_sink (
     product_id INT NOT NULL,
@@ -96,7 +106,12 @@ CREATE TABLE products_sink (
     'table-name' = 'products_sink',
     'username' = 'tom',
     'password' = 'Gauss_235',
-    'driver' = 'com.huawei.gaussdb.jdbc.Driver'
+    'driver' = 'com.huawei.gaussdb.jdbc.Driver',
+    -- Performance tuning: batch write settings
+    'sink.buffer-flush.max-rows' = '5000',
+    'sink.buffer-flush.interval' = '2s',
+    'sink.max-retries' = '3',
+    'sink.parallelism' = '3'
 );
 
 -- =====================================================
@@ -108,3 +123,4 @@ UNION ALL
 SELECT product_id, product_name, category, price, stock FROM products_source_dn2
 UNION ALL
 SELECT product_id, product_name, category, price, stock FROM products_source_dn3;
+
