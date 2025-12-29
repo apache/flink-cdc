@@ -53,7 +53,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlussE2eITCase.class);
     private static final Duration FLUSS_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
-    private static final String flussImageTag = "fluss/fluss:0.7.0";
+    private static final String flussImageTag = "apache/fluss:0.8.0-incubating";
     private static final String zooKeeperImageTag = "zookeeper:3.9.2";
 
     private static final List<String> flussCoordinatorProperties =
@@ -64,7 +64,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
                     "remote.data.dir: /tmp/fluss/remote-data",
                     "security.protocol.map: CLIENT:SASL, INTERNAL:PLAINTEXT",
                     "security.sasl.enabled.mechanisms: PLAIN",
-                    "security.sasl.plain.jaas.config: org.apache.fluss.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
+                    "security.sasl.plain.jaas.config: org.apache.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
                     "super.users: User:admin");
 
     private static final List<String> flussTabletServerProperties =
@@ -78,7 +78,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
                     "remote.data.dir: /tmp/fluss/remote-data",
                     "security.protocol.map: CLIENT:SASL, INTERNAL:PLAINTEXT",
                     "security.sasl.enabled.mechanisms: PLAIN",
-                    "security.sasl.plain.jaas.config: org.apache.fluss.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
+                    "security.sasl.plain.jaas.config: org.apache.fluss.security.auth.sasl.plain.PlainLoginModule required user_admin=\"admin-pass\" user_developer=\"developer-pass\";",
                     "super.users: User:admin");
 
     @Container

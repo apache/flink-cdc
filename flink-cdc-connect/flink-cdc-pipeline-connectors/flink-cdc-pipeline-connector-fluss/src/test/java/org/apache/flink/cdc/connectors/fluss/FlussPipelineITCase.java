@@ -296,7 +296,7 @@ public class FlussPipelineITCase {
                                         ValuesDataSourceHelper.singleSplitSingleTable(),
                                         sinkOption))
                 .rootCause()
-                .hasMessageContaining("'table.non-key' is not a Fluss table property");
+                .hasMessageContaining("'table.non-key' is not a recognized Fluss table property");
     }
 
     @Test
