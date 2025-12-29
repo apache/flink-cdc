@@ -54,9 +54,42 @@ echo ""
 echo -e "${YELLOW}⏱️  开始时间: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
 echo ""
 
+# ========== 步骤 0: 重置 Flink 集群 ==========
+echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${MAGENTA}║  步骤 0: 重置 Flink 集群（确保干净环境）                          ║${NC}"
+echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+DOCKER_COMPOSE_DIR="$SCRIPT_DIR/flink-cdc-connect/flink-cdc-source-connectors/flink-connector-gaussdb-cdc/docker"
+
+if [ -d "$DOCKER_COMPOSE_DIR" ]; then
+    echo -e "${CYAN}🔄 正在停止并删除旧的 Flink 集群...${NC}"
+    cd "$DOCKER_COMPOSE_DIR"
+    docker-compose down --remove-orphans 2>/dev/null || true
+    
+    # 清理旧的日志和检查点
+    echo -e "${CYAN}🧹 清理旧日志和检查点...${NC}"
+    rm -rf ./log/* ./flink-checkpoints/* ./flink-savepoints/* 2>/dev/null || true
+    
+    echo -e "${CYAN}🚀 正在启动全新的 Flink 集群...${NC}"
+    docker-compose up -d
+    
+    echo -e "${YELLOW}⏳ 等待 Flink 集群启动 (20秒)...${NC}"
+    sleep 20
+    
+    cd "$SCRIPT_DIR"
+    echo -e "${GREEN}✅ Flink 集群已重置完成${NC}"
+else
+    echo -e "${YELLOW}⚠️  未找到 docker-compose 目录，跳过集群重置${NC}"
+fi
+
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
 # ========== 步骤 1: 部署 ==========
 echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${MAGENTA}║  步骤 1/2: 部署 GaussDB -> GaussDB CDC 配置                      ║${NC}"
+echo -e "${MAGENTA}║  步骤 1/3: 部署 GaussDB -> GaussDB CDC 配置                      ║${NC}"
 echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
@@ -90,7 +123,7 @@ sleep 5
 # ========== 步骤 2: 运行分布式测试 ==========
 echo ""
 echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${MAGENTA}║  步骤 2/2: 运行 GaussDB -> GaussDB 增量同步测试                  ║${NC}"
+echo -e "${MAGENTA}║  步骤 2/3: 运行 GaussDB -> GaussDB 增量同步测试                  ║${NC}"
 echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

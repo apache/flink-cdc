@@ -95,37 +95,81 @@ function cleanup_test_data() {
 function init_test_env() {
     echo -e "${BLUE}🔧 Initializing GaussDB-to-GaussDB test environment...${NC}"
     
-    # 确保 Source 表存在 (分布式表)
-    run_sql_cn "DROP TABLE IF EXISTS $SOURCE_TABLE CASCADE;" true > /dev/null
-
-    local source_ddl="CREATE TABLE $SOURCE_TABLE (
-        product_id INTEGER PRIMARY KEY,
-        product_name VARCHAR(200) NOT NULL,
-        category VARCHAR(50),
-        price DECIMAL(10, 2) NOT NULL,
-        stock INTEGER DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) DISTRIBUTE BY HASH(product_id);"
+    # 注意：不要 DROP 表！Flink CDC Job 正在监听这些表
+    # 只检查表是否存在，如果不存在才创建
     
-    run_sql_cn "$source_ddl" true > /dev/null
+    # 检查 Source 表是否已存在
+    local source_exists=$(PGPASSWORD=$DB_PASS psql -h $CN_HOST -p $CN_PORT -U $DB_USER -d $DB_NAME -t -A -c "SELECT 1 FROM information_schema.tables WHERE table_name='$SOURCE_TABLE' AND table_schema='public';" 2>/dev/null)
     
-    # 确保 Sink 表存在 (普通表，用于接收同步数据)
-    run_sql_cn "DROP TABLE IF EXISTS $SINK_TABLE CASCADE;" true > /dev/null
-
-    local sink_ddl="CREATE TABLE $SINK_TABLE (
-        product_id INTEGER PRIMARY KEY,
-        product_name VARCHAR(200),
-        category VARCHAR(50),
-        price DECIMAL(10, 2),
-        stock INTEGER
-    );"
+    if [ -z "$source_exists" ]; then
+        echo -e "${YELLOW}  Creating source table (not exists)...${NC}"
+        local source_ddl="CREATE TABLE $SOURCE_TABLE (
+            product_id INTEGER PRIMARY KEY,
+            product_name VARCHAR(200) NOT NULL,
+            category VARCHAR(50),
+            price DECIMAL(10, 2) NOT NULL,
+            stock INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) DISTRIBUTE BY HASH(product_id);"
+        run_sql_cn "$source_ddl" true > /dev/null
+    else
+        echo -e "${GREEN}  Source table already exists${NC}"
+    fi
     
-    run_sql_cn "$sink_ddl" true > /dev/null
+    # 检查 Sink 表是否已存在
+    local sink_exists=$(PGPASSWORD=$DB_PASS psql -h $CN_HOST -p $CN_PORT -U $DB_USER -d $DB_NAME -t -A -c "SELECT 1 FROM information_schema.tables WHERE table_name='$SINK_TABLE' AND table_schema='public';" 2>/dev/null)
+    
+    if [ -z "$sink_exists" ]; then
+        echo -e "${YELLOW}  Creating sink table (not exists)...${NC}"
+        local sink_ddl="CREATE TABLE $SINK_TABLE (
+            product_id INTEGER PRIMARY KEY,
+            product_name VARCHAR(200),
+            category VARCHAR(50),
+            price DECIMAL(10, 2),
+            stock INTEGER
+        );"
+        run_sql_cn "$sink_ddl" true > /dev/null
+    else
+        echo -e "${GREEN}  Sink table already exists${NC}"
+    fi
     
     cleanup_test_data
-    echo "⏳ Waiting for environment stabilization (10s)..."
-    sleep 10
+    echo "⏳ Waiting for environment stabilization (5s)..."
+    sleep 5
     echo -e "${GREEN}✅ GaussDB-to-GaussDB test environment initialized${NC}"
+}
+
+# 等待 CDC stream 阶段就绪 (等待所有 DN 的 slot 激活)
+function wait_for_cdc_stream_ready() {
+    echo -e "${YELLOW}⏳ Waiting for CDC stream phase to be ready...${NC}"
+    local max_wait=120
+    local waited=0
+    local interval=5
+    
+    while [ $waited -lt $max_wait ]; do
+        # 检查所有3个DN上是否有活跃的CDC slot
+        local active_count=0
+        for i in "${!DN_HOSTS[@]}"; do
+            local host="${DN_HOSTS[$i]}"
+            local port="${DN_PORTS[$i]}"
+            local has_active=$(PGPASSWORD=$DB_PASS psql -h "$host" -p "$port" -U $DB_USER -d $DB_NAME -t -A -c "SELECT COUNT(*) FROM pg_replication_slots WHERE slot_name LIKE 'flink_cdc_g2g%' AND active = true;" 2>/dev/null)
+            if [[ "$has_active" =~ ^[0-9]+$ ]] && [ "$has_active" -gt 0 ]; then
+                active_count=$((active_count + 1))
+            fi
+        done
+        
+        if [ $active_count -ge 3 ]; then
+            echo -e "${GREEN}✅ All 3 DN CDC slots are active${NC}"
+            return 0
+        fi
+        
+        echo -ne "  Waiting... ($waited/${max_wait}s, active slots: $active_count/3)\r"
+        sleep $interval
+        waited=$((waited + interval))
+    done
+    
+    echo -e "\n${YELLOW}⚠️  CDC slots may not be fully ready after ${max_wait}s, continuing anyway...${NC}"
+    return 0
 }
 
 # 完整的分布测试流程
@@ -136,6 +180,9 @@ function run_distributed_test() {
     echo ""
 
     init_test_env
+    
+    # 等待 CDC stream 阶段就绪
+    wait_for_cdc_stream_ready
 
     local total_records=$((TEST_ID_END - TEST_ID_START + 1))
 

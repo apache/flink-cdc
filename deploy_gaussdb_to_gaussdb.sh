@@ -134,8 +134,55 @@ docker restart flink-jobmanager flink-taskmanager
 echo "⏳ Waiting for cluster to stabilize (25s)..."
 sleep 25
 
-# 5. Initialize GaussDB Sink Table (通过 CN 创建)
-echo "🗄️ Initializing GaussDB sink table..."
+# 5. Initialize GaussDB environment
+echo "🗄️ Initializing GaussDB environment..."
+
+# DN 连接信息
+DN_HOSTS=("10.250.0.30" "10.250.0.181" "10.250.0.157")
+DN_PORTS=("40000" "40020" "40040")
+SLOT_NAMES=("flink_cdc_g2g_dn1" "flink_cdc_g2g_dn2" "flink_cdc_g2g_dn3")
+
+# 5.1 清理各 DN 上的旧 replication slots
+echo "🧹 Cleaning old replication slots on all DNs..."
+for i in "${!DN_HOSTS[@]}"; do
+    host="${DN_HOSTS[$i]}"
+    port="${DN_PORTS[$i]}"
+    slot="${SLOT_NAMES[$i]}"
+    
+    echo "  -> DN$((i+1)) ($host:$port): Cleaning slots..."
+    PGPASSWORD=Gauss_235 psql -h "$host" -p "$port" -U tom -d db1 -c "
+        SELECT pg_drop_replication_slot(slot_name) 
+        FROM pg_replication_slots 
+        WHERE slot_name LIKE 'flink_cdc_g2g%' AND active = false;
+    " 2>/dev/null || true
+done
+echo -e "${GREEN}✅ Old replication slots cleaned${NC}"
+
+# 5.2 创建 Source 表 (分布式表，通过 CN 创建)
+echo "📋 Creating source table (distributed)..."
+PGPASSWORD=Gauss_235 psql -h 10.250.0.30 -p 8000 -U tom -d db1 <<EOF
+-- 如果表不存在则创建
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'products' AND table_schema = 'public') THEN
+        CREATE TABLE products (
+            product_id INTEGER PRIMARY KEY,
+            product_name VARCHAR(200) NOT NULL,
+            category VARCHAR(50),
+            price DECIMAL(10, 2) NOT NULL,
+            stock INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) DISTRIBUTE BY HASH(product_id);
+        RAISE NOTICE 'Source table created';
+    ELSE
+        RAISE NOTICE 'Source table already exists';
+    END IF;
+END \$\$;
+EOF
+echo -e "${GREEN}✅ Source table ready${NC}"
+
+# 5.3 创建 Sink 表 (普通表，通过 CN 创建)
+echo "📋 Creating sink table..."
 PGPASSWORD=Gauss_235 psql -h 10.250.0.30 -p 8000 -U tom -d db1 <<EOF
 DROP TABLE IF EXISTS products_sink CASCADE;
 CREATE TABLE products_sink (
@@ -146,6 +193,20 @@ CREATE TABLE products_sink (
     stock INTEGER
 );
 EOF
+echo -e "${GREEN}✅ Sink table created${NC}"
+
+# 5.4 插入种子数据 (确保快照阶段有数据，CDC 能正确进入 stream 阶段)
+echo "🌱 Inserting seed data for CDC initialization..."
+PGPASSWORD=Gauss_235 psql -h 10.250.0.30 -p 8000 -U tom -d db1 <<EOF
+-- 清除旧种子数据
+DELETE FROM products WHERE product_id BETWEEN 1 AND 10;
+-- 插入种子数据 (使用 ID 1-10，测试数据使用 2000+)
+INSERT INTO products (product_id, product_name, category, price, stock) VALUES
+(1, 'Seed Product 1', 'SEED', 10.00, 100),
+(2, 'Seed Product 2', 'SEED', 20.00, 200),
+(3, 'Seed Product 3', 'SEED', 30.00, 300);
+EOF
+echo -e "${GREEN}✅ Seed data inserted (3 records)${NC}"
 
 # 6. Submit SQL Job
 echo "🚀 Submitting SQL job to Flink..."
