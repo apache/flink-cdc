@@ -122,7 +122,10 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
                     new Tuple2<>(
                             selectors,
                             new SchemaMetadataTransform(
-                                    primaryKeys, partitionKeys, tableOptions, tableOptionsDelimiter)));
+                                    primaryKeys,
+                                    partitionKeys,
+                                    tableOptions,
+                                    tableOptionsDelimiter)));
         }
         this.preTransformProcessorMap = new ConcurrentHashMap<>();
         this.hasAsteriskMap = new ConcurrentHashMap<>();
