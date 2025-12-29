@@ -55,7 +55,6 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -163,7 +162,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
-                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17).notNull(), null))
                         .primaryKey("id")
                         .build();
 
@@ -307,7 +306,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Rename column is not supported currently.")
     void testStarRocksRenameColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -328,7 +326,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Alter column type is not supported currently.")
     void testStarRocksAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
@@ -336,7 +333,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         StarRocksContainer.STARROCKS_TABLE_NAME);
 
         runJobWithEvents(generateAlterColumnTypeEvents(tableId));
-
+        waitAlterDone(tableId, 60000L);
         List<String> actual = inspectTableSchema(tableId);
 
         List<String> expected =
@@ -349,7 +346,6 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Disabled("Alter column type is not supported currently.")
     void testStarRocksNarrowingAlterColumnType() throws Exception {
         Assertions.assertThatThrownBy(
                 () -> {

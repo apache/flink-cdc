@@ -356,6 +356,33 @@ public class PaimonSinkITCase {
                         Row.ofKind(RowKind.INSERT, "1", "1"),
                         Row.ofKind(RowKind.INSERT, "2", "2"),
                         Row.ofKind(RowKind.INSERT, "3", "3"));
+
+        // Delete
+        writeAndCommit(
+                writer,
+                committer,
+                generateDelete(
+                        table1, Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3"))));
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"));
+
+        // Update
+        writeAndCommit(
+                writer,
+                committer,
+                generateUpdate(
+                        table1,
+                        Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "3")),
+                        Arrays.asList(Tuple2.of(STRING(), "3"), Tuple2.of(STRING(), "x"))));
+        Assertions.assertThat(fetchResults(table1))
+                .containsExactlyInAnyOrder(
+                        Row.ofKind(RowKind.INSERT, "1", "1"),
+                        Row.ofKind(RowKind.INSERT, "2", "2"),
+                        Row.ofKind(RowKind.INSERT, "3", "3"),
+                        Row.ofKind(RowKind.INSERT, "3", "x"));
     }
 
     @ParameterizedTest

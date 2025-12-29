@@ -63,6 +63,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private double distributionFactorLower =
             MySqlSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND.defaultValue();
     private boolean includeSchemaChanges = false;
+    private boolean includeHeartbeatEvents = false;
     private boolean scanNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
@@ -232,6 +233,12 @@ public class MySqlSourceConfigFactory implements Serializable {
     /** Whether the {@link MySqlSource} should output the schema changes or not. */
     public MySqlSourceConfigFactory includeSchemaChanges(boolean includeSchemaChanges) {
         this.includeSchemaChanges = includeSchemaChanges;
+        return this;
+    }
+
+    /** Whether the {@link MySqlSource} should output the heartbeat events or not. */
+    public MySqlSourceConfigFactory includeHeartbeatEvents(boolean includeHeartbeatEvents) {
+        this.includeHeartbeatEvents = includeHeartbeatEvents;
         return this;
     }
 
@@ -412,6 +419,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 distributionFactorUpper,
                 distributionFactorLower,
                 includeSchemaChanges,
+                includeHeartbeatEvents,
                 scanNewlyAddedTableEnabled,
                 closeIdleReaders,
                 props,

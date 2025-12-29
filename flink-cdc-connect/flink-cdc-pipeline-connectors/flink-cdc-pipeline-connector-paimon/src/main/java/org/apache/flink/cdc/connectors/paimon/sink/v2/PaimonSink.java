@@ -20,6 +20,10 @@ package org.apache.flink.cdc.connectors.paimon.sink.v2;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
+import org.apache.flink.api.connector.sink2.SupportsWriterState;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
@@ -33,30 +37,35 @@ import org.apache.paimon.flink.sink.MultiTableCommittableSerializer;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.table.sink.CommitMessageSerializer;
 
+import java.util.Collection;
+import java.util.UUID;
+
 /**
  * A {@link Sink} for Paimon. Maintain this package until Paimon has it own sinkV2 implementation.
  */
-public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTableCommittable> {
+public class PaimonSink<InputT>
+        implements WithPreCommitTopology<InputT, MultiTableCommittable>,
+                SupportsWriterState<InputT, PaimonWriterState> {
 
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
 
     protected final Options catalogOptions;
 
+    /** The commitUser should be restored in state and restore it in writer. */
     protected final String commitUser;
 
     private final PaimonRecordSerializer<InputT> serializer;
 
     public PaimonSink(Options catalogOptions, PaimonRecordSerializer<InputT> serializer) {
-        this.catalogOptions = catalogOptions;
-        this.serializer = serializer;
-        commitUser = DEFAULT_COMMIT_USER;
+        this(catalogOptions, DEFAULT_COMMIT_USER, serializer);
     }
 
     public PaimonSink(
             Options catalogOptions, String commitUser, PaimonRecordSerializer<InputT> serializer) {
         this.catalogOptions = catalogOptions;
-        this.commitUser = commitUser;
+        // generate a random commit user to avoid conflict.
+        this.commitUser = commitUser + UUID.randomUUID();
         this.serializer = serializer;
     }
 
@@ -67,6 +76,22 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
                         .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
         return new PaimonWriter<>(
                 catalogOptions, context.metricGroup(), commitUser, serializer, lastCheckpointId);
+    }
+
+    @Override
+    public StatefulSinkWriter<InputT, PaimonWriterState> restoreWriter(
+            WriterInitContext context, Collection<PaimonWriterState> paimonWriterStates) {
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+        Preconditions.checkNotNull(paimonWriterStates);
+        String storedCommitUser = paimonWriterStates.iterator().next().getCommitUser();
+        return new PaimonWriter<>(
+                catalogOptions,
+                context.metricGroup(),
+                storedCommitUser,
+                serializer,
+                lastCheckpointId);
     }
 
     @Override
@@ -99,5 +124,10 @@ public class PaimonSink<InputT> implements WithPreCommitTopology<InputT, MultiTa
                         typeInformation,
                         new PreCommitOperator(catalogOptions, commitUser))
                 .setParallelism(committables.getParallelism());
+    }
+
+    @Override
+    public SimpleVersionedSerializer<PaimonWriterState> getWriterStateSerializer() {
+        return PaimonWriterStateSerializer.INSTANCE;
     }
 }

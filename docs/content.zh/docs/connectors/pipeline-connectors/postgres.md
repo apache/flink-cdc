@@ -31,7 +31,7 @@ Postgres CDC Pipeline 连接器允许从 Postgres 数据库读取快照数据和
 
 ## 示例
 
-从 Postgres 读取数据同步到 Doris 的 Pipeline 可以定义如下：
+从 Postgres 读取数据同步到 Fluss 的 Pipeline 可以定义如下：
 
 ```yaml
 source:
@@ -41,19 +41,23 @@ source:
    port: 5432
    username: admin
    password: pass
-   tables: adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*
+   # 需要确保所有的表来自同一个database
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
 
 sink:
-  type: doris
-  name: Doris Sink
-  fenodes: 127.0.0.1:8030
-  username: root
-  password: pass
+  type: fluss
+  name: Fluss Sink
+  bootstrap.servers: localhost:9123
+  # Security-related properties for the Fluss client
+  properties.client.security.protocol: sasl
+  properties.client.security.sasl.mechanism: PLAIN
+  properties.client.security.sasl.username: developer
+  properties.client.security.sasl.password: developer-pass
 
 pipeline:
-   name: Postgres to Doris Pipeline
+   name: Postgres to Fluss Pipeline
    parallelism: 4
 ```
 
@@ -105,8 +109,9 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要监视的 Postgres 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
-          需要注意的是，点号（.）被视为数据库和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
-          例如，adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*</td>
+          需要确保所有的表来自同一个数据库。<br>
+          需要注意的是，点号（.）被视为数据库、模式和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
+          例如，bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
       <td>slot.name</td>
@@ -417,11 +422,11 @@ pipeline:
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect
 
-注意： 受限当前CDC对时间类型的支持，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Integer类型，并精度为3，后续将进行完善。
+注意： 受限当前CDC对时间类型Time的精度为3，<code>debezium.time.precision.mode</code>为adaptive或adaptive_time_microseconds或connect Time类型都转化为Time(3)类型。
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，连接器会根据列的数据类型定义来确定字面类型和语义类型。这可以确保事件能够精确地表示数据库中的值。
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive（自适应）时，TIME的精度为3，TIMESTAMP的精度为6。
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -440,13 +445,79 @@ pipeline:
         <td>
           TIME([P])
         </td>
-        <td>INTEGER</td>
+        <td>TIME(3)</td>
       </tr>
       <tr>
         <td>
           TIMESTAMP([P])
         </td>
         <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=adaptive_time_microseconds</u>
+
+当<code>debezium.time.precision.mode</code>属性设置为默认的 adaptive_time_microseconds时，TIME的精度为3，TIMESTAMP的精度为6。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=connect</u>
+
+当<code>debezium.time.precision.mode</code>属性设置为默认的 connect时，TIME和TIMESTAMP的精度都为3。
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP(3)</td>
       </tr>
     </tbody>
 </table>

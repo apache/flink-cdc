@@ -150,7 +150,8 @@ public class CompactionOperatorTest {
         }
         CompactionOperator compactionOperator =
                 new CompactionOperator(
-                        catalogOptions, CompactionOptions.builder().commitInterval(1).build());
+                        catalogOptions,
+                        CompactionOptions.builder().commitInterval(1).parallelism(4).build());
         compactionOperator.processElement(
                 new StreamRecord<>(
                         new CommittableWithLineage<>(

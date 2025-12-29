@@ -22,6 +22,12 @@ DATABASE inventory;
 
 USE
 inventory;
+
+-- Avoid SqlServer error com.microsoft.sqlserver.jdbc.SQLServerException: Could not update the metadata that indicates,
+-- the root cause is 14258: 'Cannot perform this operation while SQLServerAgent is starting. Try again later.'. We simply
+-- wait for 10 seconds to improve the e2e test stabilises.
+WAITFOR DELAY '00:00:10';
+
 EXEC sys.sp_cdc_enable_db;
 
 -- Create and populate our products using a single insert with many rows

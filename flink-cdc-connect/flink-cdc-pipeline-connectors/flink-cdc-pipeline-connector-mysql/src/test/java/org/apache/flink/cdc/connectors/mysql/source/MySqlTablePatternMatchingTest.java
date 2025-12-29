@@ -167,6 +167,23 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
     }
 
     @Test
+    void testMatchingTablesWithSpacedRules() {
+        List<String> spacedRules =
+                Arrays.asList(
+                        "db.tbl1, db2.tbl\\.*, db3.tbl3",
+                        "db.tbl1 ,db2.tbl\\.* ,db3.tbl3",
+                        "db.tbl1 , db2.tbl\\.* , db3.tbl3");
+
+        Assertions.assertThat(spacedRules)
+                .map(rule -> testGenericTableMatching(rule, null, false))
+                .containsOnly(Arrays.asList("db.tbl1", "db2.tbl2", "db3.tbl3"));
+
+        Assertions.assertThat(spacedRules)
+                .map(rule -> testGenericTableMatching(rule, null, true))
+                .containsOnly(Arrays.asList("db\\.tbl1|db2\\.tbl.*|db3\\.tbl3"));
+    }
+
+    @Test
     void testWildcardMatchingRealTables() throws Exception {
         String[] expected =
                 new String[] {
@@ -277,6 +294,29 @@ class MySqlTablePatternMatchingTest extends MySqlSourceTestBase {
         Assertions.assertThat(
                         getRealWorldMatchedTables(
                                 "db.tbl1,db2.tbl\\.*,db3.tbl3", null, true, expected.length))
+                .containsExactlyInAnyOrder(expected);
+    }
+
+    @Test
+    void testMatchingRealTablesWithSpacedRules() throws Exception {
+        String[] expected =
+                new String[] {
+                    "CreateTableEvent{tableId=db.tbl1, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
+                    "DataChangeEvent{tableId=db.tbl1, before=[], after=[17], op=INSERT, meta=()}",
+                    "CreateTableEvent{tableId=db2.tbl2, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
+                    "DataChangeEvent{tableId=db2.tbl2, before=[], after=[17], op=INSERT, meta=()}",
+                    "CreateTableEvent{tableId=db3.tbl3, schema=columns={`id` INT NOT NULL}, primaryKeys=id, options=()}",
+                    "DataChangeEvent{tableId=db3.tbl3, before=[], after=[17], op=INSERT, meta=()}"
+                };
+
+        Assertions.assertThat(
+                        getRealWorldMatchedTables(
+                                "db.tbl1 , db2.tbl\\.* , db3.tbl3", null, false, expected.length))
+                .containsExactlyInAnyOrder(expected);
+
+        Assertions.assertThat(
+                        getRealWorldMatchedTables(
+                                "db.tbl1 , db2.tbl\\.* , db3.tbl3", null, true, expected.length))
                 .containsExactlyInAnyOrder(expected);
     }
 

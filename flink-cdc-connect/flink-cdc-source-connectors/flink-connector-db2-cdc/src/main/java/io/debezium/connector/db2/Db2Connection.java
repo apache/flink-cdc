@@ -399,7 +399,8 @@ public class Db2Connection extends JdbcConnection {
         // final List<Column> columns = columnEditors.subList(CHANGE_TABLE_DATA_COLUMN_OFFSET,
         // columnEditors.size() - 1).stream()
         final List<Column> columns =
-                columnEditors.subList(CHANGE_TABLE_DATA_COLUMN_OFFSET, columnEditors.size())
+                columnEditors
+                        .subList(CHANGE_TABLE_DATA_COLUMN_OFFSET, columnEditors.size())
                         .stream()
                         .map(
                                 c ->

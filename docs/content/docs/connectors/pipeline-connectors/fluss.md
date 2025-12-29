@@ -226,7 +226,7 @@ Data Type Mapping
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
-      <td>VARCHAR(n)</td>
+      <td>STRING</td>
       <td></td>
     </tr>
     <tr>

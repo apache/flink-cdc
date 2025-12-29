@@ -35,17 +35,19 @@ without a single line of Java/Scala code or IDE installation.
 Prepare a Linux or MacOS computer with Docker installed.
 
 ### Prepare Flink Standalone cluster
-1. Download [Flink 1.20.1](https://archive.apache.org/dist/flink/flink-1.20.1/flink-1.20.1-bin-scala_2.12.tgz) ，unzip and get flink-1.20.1 directory.   
-   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.1 is located.
+1. Download [Flink 1.20.3](https://archive.apache.org/dist/flink/flink-1.20.3/flink-1.20.3-bin-scala_2.12.tgz) ，unzip and get flink-1.20.3 directory.
+   Use the following command to navigate to the Flink directory and set FLINK_HOME to the directory where flink-1.20.3 is located.
 
    ```shell
-   cd flink-1.20.1
+   cd flink-1.20.3
    ```
 
-2. Enable checkpointing by appending the following parameters to the conf/flink-conf.yaml configuration file to perform a checkpoint every 3 seconds.
+2. Enable checkpointing by appending the following parameters to the conf/config.yaml configuration file to perform a checkpoint every 3 seconds.
 
    ```yaml
-   execution.checkpointing.interval: 3000
+   execution:
+     checkpointing:
+       interval: 3s
    ```
 
 3. Start the Flink cluster using the following command.
@@ -68,7 +70,7 @@ Create a `docker-compose.yml` file using the content provided below:
    version: '2.1'
    services:
       StarRocks:
-         image: starrocks/allin1-ubuntu:3.2.6
+         image: starrocks/allin1-ubuntu:3.5.10
          ports:
             - "8080:8080"
             - "9030:9030"

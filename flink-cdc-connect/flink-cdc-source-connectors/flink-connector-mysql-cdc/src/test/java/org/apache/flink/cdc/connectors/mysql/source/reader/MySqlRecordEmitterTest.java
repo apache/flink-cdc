@@ -102,6 +102,7 @@ class MySqlRecordEmitterTest {
                 },
                 new MySqlSourceReaderMetrics(
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
+                false,
                 false);
     }
 

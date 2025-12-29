@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -67,6 +68,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     // tableId -> the max splitHighWatermark
     private Map<TableId, Offset> maxSplitHighWatermarkMap;
     private final boolean isBackfillSkipped;
+    private final boolean supportsSplitKeyOptimization;
 
     private static final long READER_CLOSE_TIMEOUT_SECONDS = 30L;
 
@@ -78,6 +80,7 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         this.currentTaskRunning = true;
         this.pureStreamPhaseTables = new HashSet<>();
         this.isBackfillSkipped = taskContext.getSourceConfig().isSkipSnapshotBackfill();
+        this.supportsSplitKeyOptimization = taskContext.supportsSplitKeyOptimization();
     }
 
     @Override
@@ -195,13 +198,22 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 if (isBackfillSkipped) {
                     return true;
                 }
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
-                    if (taskContext.isRecordBetween(
-                                    sourceRecord,
-                                    splitInfo.getSplitStart(),
-                                    splitInfo.getSplitEnd())
-                            && position.isAfter(splitInfo.getHighWatermark())) {
-                        return true;
+                List<FinishedSnapshotSplitInfo> tableSplits = finishedSplitsInfo.get(tableId);
+                if (supportsSplitKeyOptimization) {
+                    Object[] splitKey = taskContext.getSplitKey(sourceRecord);
+                    FinishedSnapshotSplitInfo matchedSplit =
+                            SplitKeyUtils.findSplitByKeyBinary(tableSplits, splitKey);
+                    return matchedSplit != null
+                            && position.isAfter(matchedSplit.getHighWatermark());
+                } else {
+                    for (FinishedSnapshotSplitInfo splitInfo : tableSplits) {
+                        if (taskContext.isRecordBetween(
+                                        sourceRecord,
+                                        splitInfo.getSplitStart(),
+                                        splitInfo.getSplitEnd())
+                                && position.isAfter(splitInfo.getHighWatermark())) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -260,6 +272,9 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 if (maxHighWatermark == null || highWatermark.isAfter(maxHighWatermark)) {
                     tableIdOffsetPositionMap.put(tableId, highWatermark);
                 }
+            }
+            if (supportsSplitKeyOptimization) {
+                splitsInfoMap.values().forEach(SplitKeyUtils::sortFinishedSplitInfos);
             }
         }
         this.finishedSplitsInfo = splitsInfoMap;

@@ -262,4 +262,12 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     public String getPluginName() {
         return sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name());
     }
+
+    public boolean removeSlot(String slotName) {
+        try (PostgresConnection jdbc = (PostgresConnection) openJdbcConnection(sourceConfig)) {
+            return jdbc.dropReplicationSlot(slotName);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

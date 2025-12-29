@@ -17,17 +17,25 @@
 
 package org.apache.flink.cdc.composer.flink;
 
+import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
+import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
+import org.apache.flink.cdc.common.sink.EventSinkProvider;
+import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.composer.utils.factory.DataSinkFactory1;
 import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
+import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
+import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
+import org.apache.flink.configuration.DeploymentOptions;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -38,8 +46,11 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** A test for the {@link FlinkPipelineComposer}. */
@@ -70,6 +81,96 @@ class FlinkPipelineComposerTest {
         Assertions.assertThat(dataSink).isExactlyInstanceOf(DataSinkFactory1.TestDataSink.class);
         Assertions.assertThat(((DataSinkFactory1.TestDataSink) dataSink).getHost())
                 .isEqualTo("0.0.0.0");
+    }
+
+    @Test
+    void testGettingFlinkConfiguration() {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        new SourceDef(TestDataSourceFactory.IDENTIFIER, null, new Configuration()),
+                        new SinkDef(TestDataSinkFactory.IDENTIFIER, null, new Configuration()),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        new Configuration());
+
+        assertThatCode(() -> composer.compose(pipelineDef)).doesNotThrowAnyException();
+    }
+
+    /** A dummy {@link DataSinkFactory} that validates the execution target. */
+    public static class TestDataSinkFactory implements DataSinkFactory {
+
+        public static final String IDENTIFIER = "test-sink-factory";
+
+        @Override
+        public DataSink createDataSink(Context context) {
+            // This option has no default value.
+            String target = context.getFlinkConf().get(DeploymentOptions.TARGET);
+            if (!"local".equals(target)) {
+                throw new IllegalArgumentException(
+                        "The flink configuration is invalid. Please check the pipeline configuration.");
+            }
+            return new DataSink() {
+                @Override
+                public EventSinkProvider getEventSinkProvider() {
+                    return null;
+                }
+
+                @Override
+                public MetadataApplier getMetadataApplier() {
+                    return schemaChangeEvent -> {};
+                }
+            };
+        }
+
+        @Override
+        public String identifier() {
+            return IDENTIFIER;
+        }
+
+        @Override
+        public Set<ConfigOption<?>> requiredOptions() {
+            return new HashSet<>();
+        }
+
+        @Override
+        public Set<ConfigOption<?>> optionalOptions() {
+            return new HashSet<>();
+        }
+    }
+
+    /** A dummy {@link DataSourceFactory} that validates the execution target. */
+    public static class TestDataSourceFactory implements DataSourceFactory {
+
+        public static final String IDENTIFIER = "test-source-factory";
+
+        @Override
+        public DataSource createDataSource(Context context) {
+            // This option has no default value.
+            String target = context.getFlinkConf().get(DeploymentOptions.TARGET);
+            if (!"local".equals(target)) {
+                throw new IllegalArgumentException(
+                        "The flink configuration is invalid. Please check the pipeline configuration.");
+            }
+            return new ValuesDataSource(
+                    ValuesDataSourceHelper.EventSetId.SINGLE_SPLIT_SINGLE_TABLE, Integer.MAX_VALUE);
+        }
+
+        @Override
+        public String identifier() {
+            return IDENTIFIER;
+        }
+
+        @Override
+        public Set<ConfigOption<?>> requiredOptions() {
+            return new HashSet<>();
+        }
+
+        @Override
+        public Set<ConfigOption<?>> optionalOptions() {
+            return new HashSet<>();
+        }
     }
 
     @ParameterizedTest

@@ -115,6 +115,8 @@ public abstract class TarballFetcher {
         V3_2_0("3.2.0"),
         V3_2_1("3.2.1"),
         V3_3_0("3.3.0"),
+        V3_4_0("3.4.0"),
+        V3_5_0("3.5.0"),
         SNAPSHOT("SNAPSHOT");
 
         private final String version;

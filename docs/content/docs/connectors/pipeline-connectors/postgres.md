@@ -32,29 +32,33 @@ Note: Since the Postgres WAL log cannot parse table structure change records, Po
 
 ## Example
 
-An example of the pipeline for reading data from Postgres and sink to Doris can be defined as follows:
+An example of the pipeline for reading data from Postgres and sink to Fluss can be defined as follows:
 
 ```yaml
 source:
-   type: posgtres
+   type: postgres
    name: Postgres Source
    hostname: 127.0.0.1
    port: 5432
    username: admin
    password: pass
-   tables: adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*
+   # make sure all the tables share same database.
+   tables: adb.\.*.\.*
    decoding.plugin.name:  pgoutput
    slot.name: pgtest
 
 sink:
-  type: doris
-  name: Doris Sink
-  fenodes: 127.0.0.1:8030
-  username: root
-  password: pass
+  type: fluss
+  name: Fluss Sink
+  bootstrap.servers: localhost:9123
+  # Security-related properties for the Fluss client
+  properties.client.security.protocol: sasl
+  properties.client.security.sasl.mechanism: PLAIN
+  properties.client.security.sasl.username: developer
+  properties.client.security.sasl.password: developer-pass
 
 pipeline:
-   name: Postgres to Doris Pipeline
+   name: Postgres to Fluss Pipeline
    parallelism: 4
 ```
 
@@ -106,9 +110,10 @@ pipeline:
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Table name of the Postgres database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. <br>
-          It is important to note that the dot (.) is treated as a delimiter for database and table names. 
+          All the tables are required to share same database.  <br>
+          It is important to note that the dot (.) is treated as a delimiter for database, schema and table names.
           If there is a need to use a dot (.) in a regular expression to match any character, it is necessary to escape the dot with a backslash.<br>
-          例如，adb.\.*.\.*, bdb.user_schema_[0-9].user_table_[0-9]+, [app|web].schema_\.*.order_\.*</td>
+          for example:  bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
     </tr>
     <tr>
       <td>slot.name</td>
@@ -412,11 +417,11 @@ Other than PostgreSQL’s TIMESTAMPTZ data types, which contain time zone inform
 - debezium.time.precision.mode=adaptive_time_microseconds
 - debezium.time.precision.mode=connect 
 
-Note: Due to current CDC limitations in supporting time types, when <code>debezium.time.precision.mode</code> is set to "adaptive", "adaptive_time_microseconds", or when using Connect time types, all time values are converted to the Integer type with a precision of 3. This will be improved in future updates.
+Note: Due to the current CDC limitation, the precision for the TIME type is fixed at 3. Regardless of whether <code>debezium.time.precision.mode<code> is set to adaptive, adaptive_time_microseconds, or connect, the TIME type will be converted to TIME(3).
 
 <u>debezium.time.precision.mode=adaptive</u>
 
-When the <code>debezium.time.precision.mode</code> property is set to adaptive, the default, the connector determines the literal type and semantic type based on the column’s data type definition. This ensures that events exactly represent the values in the database.
+When the <code>debezium.time.precision.mode</code> property is set to the default value `adaptive_time_microseconds`, the precision of `TIME` is 3, and the precision of `TIMESTAMP` is 6.
 <div class="wy-table-responsive">
 <table class="colwidths-auto docutils">
     <thead>
@@ -435,13 +440,79 @@ When the <code>debezium.time.precision.mode</code> property is set to adaptive, 
         <td>
           TIME([P])
         </td>
-        <td>INTEGER</td>
+        <td>TIME(3)</td>
       </tr>
       <tr>
         <td>
           TIMESTAMP([P])
         </td>
         <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=adaptive_time_microseconds</u>
+
+When the `debezium.time.precision.mode` property is set to the value `adaptive_time_microseconds`, the precision of `TIME` is 3, and the precision of `TIMESTAMP` is 6.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP([P])</td>
+      </tr>
+    </tbody>
+</table>
+</div>
+
+<u>debezium.time.precision.mode=connect</u>
+
+When the <code>debezium.time.precision.mode</code> property is set to the default value connect, both TIME and TIMESTAMP have a precision of 3.
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left">PostgreSQL type<a href="https://www.postgresql.org/docs/12/datatype.html"></a></th>
+        <th class="text-left">CDC type<a href="{% link dev/table/types.md %}"></a></th>
+      </tr>
+    </thead>
+    <tbody>
+       <tr>
+        <td>
+          DATE
+        <td>DATE</td>
+      </tr>
+      <tr>
+        <td>
+          TIME([P])
+        </td>
+        <td>TIME(3)</td>
+      </tr>
+      <tr>
+        <td>
+          TIMESTAMP([P])
+        </td>
+        <td>TIMESTAMP(3)</td>
       </tr>
     </tbody>
 </table>
