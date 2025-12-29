@@ -253,10 +253,10 @@ pipeline:
     <tr>
       <td>metadata.list</td>
       <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
+      <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>
-        源记录中可读取的元数据列表，将传递给下游并在转换模块中使用，各字段以逗号分隔。可用的可读元数据包括：op_ts。
+        源记录中可读取的元数据列表，将传递给下游并在转换模块中使用，各字段以逗号分隔。可用的可读元数据包括：op_ts、table_name、database_name、schema_name。详见<a href="#支持的元数据列">支持的元数据列</a>。
       </td>
     </tr>
     <tr>
@@ -303,6 +303,74 @@ pipeline:
 
 注意:
 1. Group 名称是 `namespace.schema.table`，这里的 `namespace` 是实际的数据库名称， `schema` 是实际的 schema 名称， `table` 是实际的表名称。
+
+## 支持的元数据列
+
+PostgreSQL CDC 连接器支持从源记录中读取元数据列。这些元数据列可以在转换操作中使用或传递给下游 Sink。
+
+要启用元数据列，请使用逗号分隔的元数据列名称列表配置 `metadata.list` 选项：
+
+```yaml
+source:
+  type: postgres
+  # ... 其他配置
+  metadata.list: op_ts,table_name,database_name,schema_name
+```
+
+支持以下元数据列：
+
+<div class="wy-table-responsive">
+<table class="colwidths-auto docutils">
+    <thead>
+      <tr>
+        <th class="text-left" style="width: 20%">元数据列</th>
+        <th class="text-left" style="width: 15%">数据类型</th>
+        <th class="text-left" style="width: 65%">描述</th>
+      </tr>
+    </thead>
+    <tbody>
+    <tr>
+      <td>op_ts</td>
+      <td>BIGINT NOT NULL</td>
+      <td>数据变更事件在数据库中发生的时间戳（自纪元以来的毫秒数）。对于快照记录，此值为 0。</td>
+    </tr>
+    <tr>
+      <td>table_name</td>
+      <td>STRING NOT NULL</td>
+      <td>包含变更行的表名称。</td>
+    </tr>
+    <tr>
+      <td>database_name</td>
+      <td>STRING NOT NULL</td>
+      <td>包含变更行的数据库名称。</td>
+    </tr>
+    <tr>
+      <td>schema_name</td>
+      <td>STRING NOT NULL</td>
+      <td>包含变更行的 Schema 名称。这是 PostgreSQL 特有的。</td>
+    </tr>
+    </tbody>
+</table>
+</div>
+
+**使用示例：**
+
+```yaml
+source:
+  type: postgres
+  hostname: localhost
+  port: 5432
+  username: postgres
+  password: postgres
+  tables: mydb.public.orders
+  slot.name: flink_slot
+  metadata.list: op_ts,table_name,schema_name
+
+transform:
+  - source-table: mydb.public.orders
+    projection: order_id, customer_id, op_ts, table_name, schema_name
+    description: 在输出中包含元数据列
+```
 
 ## 数据类型映射
 

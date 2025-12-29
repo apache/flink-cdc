@@ -40,6 +40,7 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.factory.PostgresDataSourceFactory;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
@@ -818,6 +819,111 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
         RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
         Assertions.assertThat(recordFields(snapshotRecord, JSON_TYPES)).isEqualTo(expectedSnapshot);
+    }
+
+    @Test
+    public void testAllMetadataColumns() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+        List<PostgreSQLReadableMetadata> metadataList = new ArrayList<>();
+        metadataList.add(PostgreSQLReadableMetadata.OP_TS);
+        metadataList.add(PostgreSQLReadableMetadata.DATABASE_NAME);
+        metadataList.add(PostgreSQLReadableMetadata.SCHEMA_NAME);
+        metadataList.add(PostgreSQLReadableMetadata.TABLE_NAME);
+        // Note: ROW_KIND is not included because it requires RowData and cannot be read from
+        // SourceRecord
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.full_types")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory, metadataList)
+                                .getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        DataChangeEvent snapshotEvent = (DataChangeEvent) snapshotResults.get(0);
+
+        // Verify all metadata columns exist in snapshot phase
+        Map<String, String> metadata = snapshotEvent.meta();
+
+        // Verify op_ts metadata
+        // According to PostgreSQLReadableMetadata.OP_TS documentation:
+        // "If the record is read from snapshot of the table instead of the change stream,
+        // the value is always 0."
+        Assertions.assertThat(metadata).containsKey("op_ts");
+        Long opTs = Long.parseLong(metadata.get("op_ts"));
+        Assertions.assertThat(opTs).isEqualTo(0L);
+
+        // Verify database_name metadata
+        Assertions.assertThat(metadata).containsKey("database_name");
+        Assertions.assertThat(metadata.get("database_name"))
+                .isEqualTo(POSTGRES_CONTAINER.getDatabaseName());
+
+        // Verify schema_name metadata
+        Assertions.assertThat(metadata).containsKey("schema_name");
+        Assertions.assertThat(metadata.get("schema_name")).isEqualTo("inventory");
+
+        // Verify table_name metadata
+        Assertions.assertThat(metadata).containsKey("table_name");
+        Assertions.assertThat(metadata.get("table_name")).isEqualTo("full_types");
+
+        // Insert a new row to test incremental phase
+        try (Connection connection =
+                        PostgresTestBase.getJdbcConnection(POSTGIS_CONTAINER, "postgres");
+                Statement statement = connection.createStatement()) {
+            // Use a simpler INSERT statement that only includes basic required columns
+            statement.execute(
+                    "INSERT INTO inventory.full_types (id, small_c, int_c, big_c, "
+                            + "real_c, double_precision, boolean_c, text_c, username, status) VALUES ("
+                            + "2, 100, 200, 300, 1.1, 2.2, true, 'test', 'testuser', 'pending')");
+        }
+
+        // Fetch the incremental event
+        List<Event> incrementalResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        DataChangeEvent incrementalEvent = (DataChangeEvent) incrementalResults.get(0);
+
+        // Verify all metadata columns in incremental phase
+        Map<String, String> incrementalMetadata = incrementalEvent.meta();
+
+        // Verify op_ts metadata in incremental phase
+        // In incremental phase (change stream), op_ts should be a valid timestamp > 0
+        Assertions.assertThat(incrementalMetadata).containsKey("op_ts");
+        Long incrementalOpTs = Long.parseLong(incrementalMetadata.get("op_ts"));
+        Assertions.assertThat(incrementalOpTs)
+                .as("op_ts in incremental phase should be greater than 0")
+                .isGreaterThan(0L);
+
+        // Verify database_name metadata in incremental phase
+        Assertions.assertThat(incrementalMetadata).containsKey("database_name");
+        Assertions.assertThat(incrementalMetadata.get("database_name"))
+                .isEqualTo(POSTGRES_CONTAINER.getDatabaseName());
+
+        // Verify schema_name metadata in incremental phase
+        Assertions.assertThat(incrementalMetadata).containsKey("schema_name");
+        Assertions.assertThat(incrementalMetadata.get("schema_name")).isEqualTo("inventory");
+
+        // Verify table_name metadata in incremental phase
+        Assertions.assertThat(incrementalMetadata).containsKey("table_name");
+        Assertions.assertThat(incrementalMetadata.get("table_name")).isEqualTo("full_types");
     }
 
     @Test
