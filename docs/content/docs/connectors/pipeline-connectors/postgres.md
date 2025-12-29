@@ -303,6 +303,10 @@ Notice:
 
 PostgreSQL CDC connector supports reading metadata columns from source records. These metadata columns can be used in transform operations or passed to downstream sinks.
 
+**Note:** Some metadata information is also available through Transform expressions (e.g., `__namespace_name__`, `__schema_name__`, `__table_name__`). The key differences are:
+- **`op_ts`**: Only available via `metadata.list` - provides the actual operation timestamp from the database.
+- **`table_name`, `database_name`, `schema_name`**: Can be obtained via either `metadata.list` or Transform expressions. Using `metadata.list` allows you to pass these values directly to downstream sinks without writing transform rules, which is simpler for basic use cases.
+
 To enable metadata columns, configure the `metadata.list` option with a comma-separated list of metadata column names:
 
 ```yaml
@@ -332,17 +336,17 @@ The following metadata columns are supported:
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>The name of the table that contains the changed row.</td>
+      <td>The name of the table that contains the changed row. Alternative: use <code>__table_name__</code> in Transform expressions.</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>The name of the database that contains the changed row.</td>
+      <td>The name of the database that contains the changed row. Alternative: use <code>__namespace_name__</code> in Transform expressions.</td>
     </tr>
     <tr>
       <td>schema_name</td>
       <td>STRING NOT NULL</td>
-      <td>The name of the schema that contains the changed row. This is specific to PostgreSQL.</td>
+      <td>The name of the schema that contains the changed row. This is specific to PostgreSQL. Alternative: use <code>__schema_name__</code> in Transform expressions.</td>
     </tr>
     </tbody>
 </table>

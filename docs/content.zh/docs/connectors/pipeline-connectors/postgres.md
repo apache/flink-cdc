@@ -308,6 +308,10 @@ pipeline:
 
 PostgreSQL CDC 连接器支持从源记录中读取元数据列。这些元数据列可以在转换操作中使用或传递给下游 Sink。
 
+**注意：** 部分元数据信息也可以通过 Transform 表达式获取（例如 `__namespace_name__`、`__schema_name__`、`__table_name__`）。主要区别如下：
+- **`op_ts`**：仅可通过 `metadata.list` 获取 - 提供数据库中实际的操作时间戳。
+- **`table_name`、`database_name`、`schema_name`**：可通过 `metadata.list` 或 Transform 表达式获取。使用 `metadata.list` 可以直接将这些值传递给下游 Sink，无需编写转换规则，对于基本用例更加简单。
+
 要启用元数据列，请使用逗号分隔的元数据列名称列表配置 `metadata.list` 选项：
 
 ```yaml
@@ -337,17 +341,17 @@ source:
     <tr>
       <td>table_name</td>
       <td>STRING NOT NULL</td>
-      <td>包含变更行的表名称。</td>
+      <td>包含变更行的表名称。替代方案：在 Transform 表达式中使用 <code>__table_name__</code>。</td>
     </tr>
     <tr>
       <td>database_name</td>
       <td>STRING NOT NULL</td>
-      <td>包含变更行的数据库名称。</td>
+      <td>包含变更行的数据库名称。替代方案：在 Transform 表达式中使用 <code>__namespace_name__</code>。</td>
     </tr>
     <tr>
       <td>schema_name</td>
       <td>STRING NOT NULL</td>
-      <td>包含变更行的 Schema 名称。这是 PostgreSQL 特有的。</td>
+      <td>包含变更行的 Schema 名称。这是 PostgreSQL 特有的。替代方案：在 Transform 表达式中使用 <code>__schema_name__</code>。</td>
     </tr>
     </tbody>
 </table>
