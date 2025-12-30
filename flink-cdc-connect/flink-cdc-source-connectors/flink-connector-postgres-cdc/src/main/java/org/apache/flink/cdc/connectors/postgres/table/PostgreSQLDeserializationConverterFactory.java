@@ -17,8 +17,11 @@
 
 package org.apache.flink.cdc.connectors.postgres.table;
 
+import java.util.List;
+import java.util.Objects;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverter;
 import org.apache.flink.cdc.debezium.table.DeserializationRuntimeConverterFactory;
+import org.apache.flink.table.data.GenericArrayData;
 import org.apache.flink.table.data.StringData;
 import org.apache.flink.table.types.logical.LogicalType;
 
@@ -52,6 +55,8 @@ public class PostgreSQLDeserializationConverterFactory {
                 switch (logicalType.getTypeRoot()) {
                     case VARCHAR:
                         return createStringConverter();
+                    case ARRAY:
+                        return createArrayConverter();
                     default:
                         // fallback to default converter
                         return Optional.empty();
@@ -95,5 +100,37 @@ public class PostgreSQLDeserializationConverterFactory {
                         }
                     }
                 });
+    }
+
+    private static Optional<DeserializationRuntimeConverter> createArrayConverter() {
+        return Optional.of(
+            new DeserializationRuntimeConverter() {
+
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object convert(Object dbzObj, Schema schema) throws Exception {
+                    if (dbzObj == null) {
+                        return null;
+                    }
+                    if (Schema.Type.ARRAY.equals(schema.type()) && dbzObj instanceof List && schema.valueSchema() != null) {
+                        switch (schema.valueSchema().type()) {
+                            case STRING: return new GenericArrayData(
+                                ((List<?>) dbzObj).stream().map(i -> StringData.fromString(i.toString())).toArray());
+                            case INT8:
+                            case INT16:
+                            case INT32: return new GenericArrayData(
+                                ((List<?>) dbzObj).stream().mapToInt(i -> ((Integer) i)).toArray());
+                            case INT64: return new GenericArrayData(
+                                ((List<?>) dbzObj).stream().mapToLong(i -> ((Long) i)).toArray());
+                        }
+                    } else if (dbzObj instanceof List) {
+                        return new GenericArrayData(((List<?>) dbzObj).stream().filter(Objects::nonNull)
+                            .map(i -> StringData.fromString(i.toString()))
+                            .toArray());
+                    }
+                    return new GenericArrayData(new StringData[]{StringData.fromString(dbzObj.toString())});
+                }
+            });
     }
 }
