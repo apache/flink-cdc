@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.regular;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnPositionEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -347,6 +348,62 @@ class SchemaEvolveTest {
 
             harness.clearOutputRecords();
         }
+        // Test AlterColumnPositionEvent
+        {
+            List<Event> alterColumnPositionEvents =
+                    Arrays.asList(
+                            new AlterColumnPositionEvent(
+                                    tableId,
+                                    ImmutableMap.of("toshi",AlterColumnPositionEvent.ColumnPosition.after("id")),
+                                    ImmutableMap.of("toshi",2)),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 14, FLOAT, 23f, STRING, "David")),
+                            DataChangeEvent.insertEvent(
+                                    tableId,
+                                    buildRecord(INT, 15, FLOAT, 30f, STRING, "Emma")));
+
+            processEvent(schemaOperator, alterColumnPositionEvents);
+
+            List<Event> collect = harness.getOutputRecords().stream()
+                    .map(StreamRecord::getValue)
+                    .collect(Collectors.toList());
+
+
+            List union = ListUtils.union(
+                    Collections.singletonList(
+                            new FlushEvent(
+                                    0,
+                                    Collections.singletonList(tableId),
+                                    SchemaChangeEventType.ALTER_COLUMN_POSITION)),
+                    alterColumnPositionEvents);
+
+            Assertions.assertThat(
+                            harness.getOutputRecords().stream()
+                                    .map(StreamRecord::getValue)
+                                    .collect(Collectors.toList()))
+                    .isEqualTo(
+                            ListUtils.union(
+                                    Collections.singletonList(
+                                            new FlushEvent(
+                                                    0,
+                                                    Collections.singletonList(tableId),
+                                                    SchemaChangeEventType.ALTER_COLUMN_POSITION)),
+                                    alterColumnPositionEvents));
+
+            Schema schemaV6 =
+                    Schema.newBuilder()
+                            .physicalColumn("id", INT)
+                            .physicalColumn("toshi", FLOAT)
+                            .physicalColumn("namae", STRING)
+                            .primaryKey("id")
+                            .build();
+            Assertions.assertThat(harness.getLatestOriginalSchema(tableId)).isEqualTo(schemaV6);
+            Assertions.assertThat(harness.getLatestEvolvedSchema(tableId)).isEqualTo(schemaV6);
+
+            harness.clearOutputRecords();
+        }
+
         harness.close();
     }
 

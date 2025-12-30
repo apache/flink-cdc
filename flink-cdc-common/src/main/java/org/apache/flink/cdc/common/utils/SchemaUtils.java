@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnPositionEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
@@ -111,6 +112,8 @@ public class SchemaUtils {
                 event,
                 addColumnEvent -> applyAddColumnEvent(addColumnEvent, schema),
                 alterColumnTypeEvent -> applyAlterColumnTypeEvent(alterColumnTypeEvent, schema),
+                alterColumnPositionEvent ->
+                        applyAlterColumnPositionEvent(alterColumnPositionEvent, schema),
                 createTableEvent -> createTableEvent.getSchema(),
                 dropColumnEvent -> applyDropColumnEvent(dropColumnEvent, schema),
                 dropTableEvent -> schema,
@@ -208,6 +211,61 @@ public class SchemaUtils {
                                 columns.add(column);
                             }
                         });
+        return oldSchema.copy(columns);
+    }
+
+    private static Schema applyAlterColumnPositionEvent(
+            AlterColumnPositionEvent event, Schema oldSchema) {
+        List<Column> columns = new ArrayList<>(oldSchema.getColumns());
+
+        for (Map.Entry<String, AlterColumnPositionEvent.ColumnPosition> entry :
+                event.getPositionMapping().entrySet()) {
+            String columnName = entry.getKey();
+            AlterColumnPositionEvent.ColumnPosition position = entry.getValue();
+
+            // Find and remove the column to be repositioned
+            Column targetColumn = null;
+            int oldIndex = -1;
+            for (int i = 0; i < columns.size(); i++) {
+                if (columns.get(i).getName().equals(columnName)) {
+                    targetColumn = columns.get(i);
+                    oldIndex = i;
+                    break;
+                }
+            }
+
+            if (targetColumn == null) {
+                throw new IllegalArgumentException("Column " + columnName + " not found in schema");
+            }
+
+            columns.remove(oldIndex);
+
+            // Calculate new position and insert
+            int newIndex;
+            if (position.isFirst()) {
+                newIndex = 0;
+            } else if (position.getAfterColumn() != null) {
+                // Find position after specified column
+                int afterIndex = -1;
+                for (int i = 0; i < columns.size(); i++) {
+                    if (columns.get(i).getName().equals(position.getAfterColumn())) {
+                        afterIndex = i;
+                        break;
+                    }
+                }
+                if (afterIndex < 0) {
+                    throw new IllegalArgumentException(
+                            "Reference column " + position.getAfterColumn() + " not found");
+                }
+                newIndex = afterIndex + 1;
+            } else {
+                // Use absolute position
+                newIndex = Math.min(position.getAbsolutePosition(), columns.size());
+            }
+
+            columns.add(newIndex, targetColumn);
+        }
+
         return oldSchema.copy(columns);
     }
 
@@ -342,6 +400,63 @@ public class SchemaUtils {
                                                 .get()
                                                 .getType()
                                                 .equals(entry.getValue())) {
+                                    return false;
+                                }
+                            }
+                            return true;
+                        },
+                        alterColumnPositionEvent -> {
+                            // It has not been applied if schema does not even exist
+                            if (!latestSchema.isPresent()) {
+                                return false;
+                            }
+                            Schema schema = latestSchema.get();
+                            List<Column> columns = schema.getColumns();
+
+                            // Check if all columns are already in their expected positions
+                            for (Map.Entry<String, AlterColumnPositionEvent.ColumnPosition> entry :
+                                    alterColumnPositionEvent.getPositionMapping().entrySet()) {
+                                String columnName = entry.getKey();
+                                AlterColumnPositionEvent.ColumnPosition expectedPosition =
+                                        entry.getValue();
+
+                                // Find current position of the column
+                                int currentIndex = -1;
+                                for (int i = 0; i < columns.size(); i++) {
+                                    if (columns.get(i).getName().equals(columnName)) {
+                                        currentIndex = i;
+                                        break;
+                                    }
+                                }
+
+                                if (currentIndex < 0) {
+                                    return false; // Column not found
+                                }
+
+                                // Calculate expected position
+                                int expectedIndex;
+                                if (expectedPosition.isFirst()) {
+                                    expectedIndex = 0;
+                                } else if (expectedPosition.getAfterColumn() != null) {
+                                    int afterIndex = -1;
+                                    for (int i = 0; i < columns.size(); i++) {
+                                        if (columns.get(i)
+                                                .getName()
+                                                .equals(expectedPosition.getAfterColumn())) {
+                                            afterIndex = i;
+                                            break;
+                                        }
+                                    }
+                                    if (afterIndex < 0) {
+                                        return false; // Reference column not found
+                                    }
+                                    expectedIndex = afterIndex + 1;
+                                } else {
+                                    expectedIndex = expectedPosition.getAbsolutePosition();
+                                }
+
+                                // Check if column is already at expected position
+                                if (currentIndex != expectedIndex) {
                                     return false;
                                 }
                             }
