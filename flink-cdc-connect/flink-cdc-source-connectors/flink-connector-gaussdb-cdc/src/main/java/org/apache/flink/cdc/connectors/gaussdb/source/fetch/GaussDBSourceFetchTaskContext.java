@@ -73,6 +73,8 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection replicationConnection;
     // Separate replication connection for backfill tasks to avoid slot contention
     private io.debezium.connector.gaussdb.connection.GaussDBReplicationConnection backfillReplicationConnection;
+    // Current split ID for generating unique backfill slot names
+    private String currentSplitId;
     // Watermark dispatcher for dispatching watermark events during
     // snapshot/backfill
     private CDCGaussDBDispatcher watermarkDispatcher;
@@ -174,12 +176,45 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         // Initialize backfill replication connection for bounded reads
         // This includes: SnapshotSplits and StreamSplits with ending offset (backfill)
         // Uses a separate slot to avoid contention with the main streaming slot
-        if (backfillReplicationConnection == null && isBoundedRead(sourceSplitBase)) {
+        // Each split gets a unique slot name to avoid conflicts when multiple splits
+        // run concurrently
+        if (isBoundedRead(sourceSplitBase)) {
+            // Store current split ID for unique slot naming
+            this.currentSplitId = sourceSplitBase.splitId();
+
+            // Close previous backfill connection if exists (from previous split)
+            if (backfillReplicationConnection != null) {
+                try {
+                    backfillReplicationConnection.close();
+                } catch (Exception e) {
+                    LOG.warn("Failed to close previous backfill connection", e);
+                }
+                backfillReplicationConnection = null;
+            }
+
             try {
-                LOG.info("Creating backfill replication connection for bounded read");
+                LOG.info("Creating backfill replication connection for split: {}", currentSplitId);
                 backfillReplicationConnection = createReplicationConnection(dbzConfig, true);
             } catch (Exception e) {
-                throw new RuntimeException("Failed to create GaussDB backfill replication connection", e);
+                throw new RuntimeException(
+                        "Failed to create GaussDB backfill replication connection for split: " + currentSplitId, e);
+            }
+        }
+    }
+
+    /**
+     * Closes the backfill replication connection and optionally drops the
+     * replication slot.
+     */
+    public void closeBackfillConnection(boolean dropSlot) {
+        if (backfillReplicationConnection != null) {
+            try {
+                LOG.info("Closing backfill replication connection (dropSlot={})", dropSlot);
+                backfillReplicationConnection.close(dropSlot);
+            } catch (Exception e) {
+                LOG.warn("Failed to close backfill connection", e);
+            } finally {
+                backfillReplicationConnection = null;
             }
         }
     }
@@ -213,12 +248,23 @@ public class GaussDBSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
             GaussDBConnectorConfig config, boolean forBackfill) throws Exception {
         GaussDBSourceConfig gaussDBConfig = (GaussDBSourceConfig) sourceConfig;
         // Use separate slot for backfill to avoid contention
-        String slotName = forBackfill
-                ? gaussDBConfig.getSlotNameForBackfillTask()
-                : gaussDBConfig.getSlotName();
+        // For backfill, include split ID hashcode to make slot name unique per split
+        String slotName;
+        if (forBackfill && currentSplitId != null) {
+            // Use absolute value of hashcode to avoid negative numbers in slot name
+            int splitHash = Math.abs(currentSplitId.hashCode() % 10000);
+            slotName = gaussDBConfig.getSlotNameForBackfillTask() + "_" + splitHash;
+        } else if (forBackfill) {
+            slotName = gaussDBConfig.getSlotNameForBackfillTask();
+        } else {
+            slotName = gaussDBConfig.getSlotName();
+        }
         String pluginName = gaussDBConfig.getDecodingPluginName();
-        // Drop slot on close for backfill tasks (temporary slot)
-        boolean dropSlotOnClose = forBackfill;
+        // Do NOT drop slot on close for backfill tasks automatically.
+        // Reconnection logic in GaussDBReplicationConnection needs the slot to persist
+        // across transient failures.
+        // We will manually drop it when the backfill task completed.
+        boolean dropSlotOnClose = false;
         java.time.Duration statusUpdateInterval = java.time.Duration.ofSeconds(10);
 
         LOG.info("Creating replication connection with slot: {}, forBackfill: {}, dropSlotOnClose: {}",

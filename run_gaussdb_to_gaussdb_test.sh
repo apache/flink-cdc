@@ -91,6 +91,32 @@ function cleanup_test_data() {
     echo -e "${GREEN}✅ Test data cleaned${NC}"
 }
 
+# 清理 GaussDB 复制槽 (DN 节点)
+function cleanup_replication_slots() {
+    echo -e "${YELLOW}🧹 Cleaning up stale replication slots on DNs...${NC}"
+    for i in "${!DN_HOSTS[@]}"; do
+        local host="${DN_HOSTS[$i]}"
+        local port="${DN_PORTS[$i]}"
+        echo -e "  Cleaning DN$((i+1)) at $host:$port..."
+        
+        # 获取所有槽位并逐一删除
+        local slots=$(PGPASSWORD=$DB_PASS psql -h "$host" -p "$port" -U $DB_USER -d $DB_NAME -t -A -c "SELECT slot_name FROM pg_replication_slots;" 2>/dev/null)
+        
+        if [ -n "$slots" ]; then
+            for slot in $slots; do
+                echo -ne "    Dropping slot: $slot..."
+                if PGPASSWORD=$DB_PASS psql -h "$host" -p "$port" -U $DB_USER -d $DB_NAME -c "SELECT pg_drop_replication_slot('$slot');" > /dev/null 2>&1; then
+                    echo -e " ${GREEN}OK${NC}"
+                else
+                    echo -e " ${RED}FAILED (might be active)${NC}"
+                fi
+            done
+        else
+            echo -e "    No slots found."
+        fi
+    done
+}
+
 # 初始化测试环境
 function init_test_env() {
     echo -e "${BLUE}🔧 Initializing GaussDB-to-GaussDB test environment...${NC}"
@@ -112,8 +138,11 @@ function init_test_env() {
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) DISTRIBUTE BY HASH(product_id);"
         run_sql_cn "$source_ddl" true > /dev/null
+        run_sql_cn "ALTER TABLE $SOURCE_TABLE REPLICA IDENTITY FULL;" true > /dev/null
+        echo -e "${GREEN}  Source table created and REPLICA IDENTITY set to FULL${NC}"
     else
-        echo -e "${GREEN}  Source table already exists${NC}"
+        echo -e "${GREEN}  Source table already exists, ensuring REPLICA IDENTITY is FULL${NC}"
+        run_sql_cn "ALTER TABLE $SOURCE_TABLE REPLICA IDENTITY FULL;" true > /dev/null
     fi
     
     # 检查 Sink 表是否已存在
@@ -133,6 +162,7 @@ function init_test_env() {
         echo -e "${GREEN}  Sink table already exists${NC}"
     fi
     
+    # cleanup_replication_slots # 移出至独立步骤或部署前执行
     cleanup_test_data
     echo "⏳ Waiting for environment stabilization (5s)..."
     sleep 5
@@ -142,28 +172,38 @@ function init_test_env() {
 # 等待 CDC stream 阶段就绪 (等待所有 DN 的 slot 激活)
 function wait_for_cdc_stream_ready() {
     echo -e "${YELLOW}⏳ Waiting for CDC stream phase to be ready...${NC}"
+    
+    # 首先等待 10 秒，让 GaussDB 复制流有时间完成重试机制
+    # 根据日志分析，所有 DN 节点在第一次尝试时失败，然后在 2 秒后重试成功
+    echo -e "  Initial delay (10s) to allow retry mechanism to complete..."
+    sleep 10
+    
     local max_wait=120
     local waited=0
-    local interval=5
+    local interval=3  # 减少检查间隔以更快地检测到激活状态
     
     while [ $waited -lt $max_wait ]; do
         # 检查所有3个DN上是否有活跃的CDC slot
         local active_count=0
+        local slot_details=""
         for i in "${!DN_HOSTS[@]}"; do
             local host="${DN_HOSTS[$i]}"
             local port="${DN_PORTS[$i]}"
-            local has_active=$(PGPASSWORD=$DB_PASS psql -h "$host" -p "$port" -U $DB_USER -d $DB_NAME -t -A -c "SELECT COUNT(*) FROM pg_replication_slots WHERE slot_name LIKE 'flink_cdc_g2g%' AND active = true;" 2>/dev/null)
+            local has_active=$(PGPASSWORD=$DB_PASS psql -h "$host" -p "$port" -U $DB_USER -d $DB_NAME -t -A -c "SELECT COUNT(*) FROM pg_replication_slots WHERE (slot_name LIKE 'flink_cdc_g2g%' OR slot_name LIKE 'flink_cdc_simplified%') AND active = true;" 2>/dev/null)
             if [[ "$has_active" =~ ^[0-9]+$ ]] && [ "$has_active" -gt 0 ]; then
                 active_count=$((active_count + 1))
+                slot_details="$slot_details DN$((i+1)):✓"
+            else
+                slot_details="$slot_details DN$((i+1)):✗"
             fi
         done
         
         if [ $active_count -ge 3 ]; then
-            echo -e "${GREEN}✅ All 3 DN CDC slots are active${NC}"
+            echo -e "\n${GREEN}✅ All 3 DN CDC slots are active${NC}"
             return 0
         fi
         
-        echo -ne "  Waiting... ($waited/${max_wait}s, active slots: $active_count/3)\r"
+        echo -ne "  Waiting... ($waited/${max_wait}s, active: $active_count/3 [$slot_details ])\r"
         sleep $interval
         waited=$((waited + interval))
     done
@@ -171,6 +211,7 @@ function wait_for_cdc_stream_ready() {
     echo -e "\n${YELLOW}⚠️  CDC slots may not be fully ready after ${max_wait}s, continuing anyway...${NC}"
     return 0
 }
+
 
 # 完整的分布测试流程
 function run_distributed_test() {
@@ -265,6 +306,7 @@ case "$ACTION" in
         init_test_env
         ;;
     cleanup)
+        cleanup_replication_slots
         cleanup_test_data
         ;;
     *)

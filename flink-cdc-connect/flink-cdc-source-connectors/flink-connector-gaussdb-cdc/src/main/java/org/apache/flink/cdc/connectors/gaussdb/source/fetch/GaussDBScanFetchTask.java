@@ -123,11 +123,20 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
     protected void executeBackfillTask(Context context, StreamSplit backfillStreamSplit)
             throws Exception {
         LOG.info("Starting backfill for split: {}", backfillStreamSplit.splitId());
-        // Re-configure the context to initialize streaming resources (e.g. replication connection).
-        context.configure(backfillStreamSplit);
-        GaussDBStreamFetchTask backfillStreamTask = new GaussDBStreamFetchTask(backfillStreamSplit);
-        backfillStreamTask.execute(context);
-        LOG.info("Completed backfill for split: {}", backfillStreamSplit.splitId());
+        GaussDBSourceFetchTaskContext taskContext = requireGaussDbContext(context);
+        // Re-configure the context to initialize streaming resources (e.g. replication
+        // connection).
+        taskContext.configure(backfillStreamSplit);
+        try {
+            GaussDBStreamFetchTask backfillStreamTask = new GaussDBStreamFetchTask(backfillStreamSplit);
+            backfillStreamTask.execute(context);
+            LOG.info("Completed backfill for split: {}", backfillStreamSplit.splitId());
+        } finally {
+            // Explicitly close the backfill connection and drop the slot
+            // Since we set dropSlotOnClose=false in context, we must manually trigger the
+            // drop here
+            taskContext.closeBackfillConnection(true);
+        }
     }
 
     /** Reads data from a single snapshot split using JDBC. */
@@ -143,48 +152,43 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
         final String schemaName = tableId != null ? tableId.schema() : null;
         final String tableName = tableId != null ? tableId.table() : null;
         LOG.info("=== Starting readTableSplitData for table: {} ===", tableId);
-        final ChangeEventQueue<DataChangeEvent> queue =
-                requireQueue(context, snapshotSplit.splitId());
+        final ChangeEventQueue<DataChangeEvent> queue = requireQueue(context, snapshotSplit.splitId());
 
         final GaussDBConnectorConfig connectorConfig = context.getDbzConnectorConfig();
 
         final Map<String, ?> sourcePartition = context.getPartition().getSourcePartition();
         final String topic = topicFor(connectorConfig, tableId);
         final Envelope envelope = tableSchema.getEnvelopeSchema();
-        final Map<String, Object> snapshotOffset =
-                Collections.singletonMap(
-                        org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset.LSN_KEY,
-                        io.debezium.connector.gaussdb.connection.Lsn.INVALID_LSN.asLong());
+        final Map<String, Object> snapshotOffset = Collections.singletonMap(
+                org.apache.flink.cdc.connectors.gaussdb.source.offset.GaussDBOffset.LSN_KEY,
+                io.debezium.connector.gaussdb.connection.Lsn.INVALID_LSN.asLong());
 
         // Identify UUID columns for proper casting in queries
-        List<String> uuidFields =
-                snapshotSplit.getSplitKeyType().getFieldNames().stream()
-                        .filter(field -> isUuidColumn(table, field))
-                        .collect(Collectors.toList());
+        List<String> uuidFields = snapshotSplit.getSplitKeyType().getFieldNames().stream()
+                .filter(field -> isUuidColumn(table, field))
+                .collect(Collectors.toList());
 
         // Build the split scan query
 
-        final String selectSql =
-                GaussDBQueryUtils.buildSplitScanQuery(
-                        tableId,
-                        snapshotSplit.getSplitKeyType(),
-                        snapshotSplit.getSplitStart() == null,
-                        snapshotSplit.getSplitEnd() == null,
-                        uuidFields);
+        final String selectSql = GaussDBQueryUtils.buildSplitScanQuery(
+                tableId,
+                snapshotSplit.getSplitKeyType(),
+                snapshotSplit.getSplitStart() == null,
+                snapshotSplit.getSplitEnd() == null,
+                uuidFields);
 
         LOG.info("=== Split scan query: {} ===", selectSql);
         final int fetchSize = context.getSourceConfig().getSplitSize();
 
-        try (PreparedStatement statement =
-                        GaussDBQueryUtils.readTableSplitDataStatement(
-                                jdbcConnection,
-                                selectSql,
-                                snapshotSplit.getSplitStart() == null,
-                                snapshotSplit.getSplitEnd() == null,
-                                snapshotSplit.getSplitStart(),
-                                snapshotSplit.getSplitEnd(),
-                                snapshotSplit.getSplitKeyType().getFieldCount(),
-                                fetchSize);
+        try (PreparedStatement statement = GaussDBQueryUtils.readTableSplitDataStatement(
+                jdbcConnection,
+                selectSql,
+                snapshotSplit.getSplitStart() == null,
+                snapshotSplit.getSplitEnd() == null,
+                snapshotSplit.getSplitStart(),
+                snapshotSplit.getSplitEnd(),
+                snapshotSplit.getSplitKeyType().getFieldCount(),
+                fetchSize);
                 ResultSet rs = statement.executeQuery()) {
 
             final ColumnUtils.ColumnArray columnArray = ColumnUtils.toArray(rs, table);
@@ -205,28 +209,24 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
                 }
 
                 // Emit snapshot row as Debezium READ record.
-                final org.apache.kafka.connect.data.Struct keyStruct =
-                        tableSchema.keyFromColumnData(rowData);
-                final org.apache.kafka.connect.data.Struct afterStruct =
-                        tableSchema.valueFromColumnData(rowData);
+                final org.apache.kafka.connect.data.Struct keyStruct = tableSchema.keyFromColumnData(rowData);
+                final org.apache.kafka.connect.data.Struct afterStruct = tableSchema.valueFromColumnData(rowData);
 
-                final org.apache.kafka.connect.data.Schema sourceSchema =
-                        connectorConfig.getSourceInfoStructMaker().schema();
-                final org.apache.kafka.connect.data.Struct sourceStruct =
-                        buildSnapshotSourceStruct(
-                                sourceSchema, connectorConfig, schemaName, tableName);
+                final org.apache.kafka.connect.data.Schema sourceSchema = connectorConfig.getSourceInfoStructMaker()
+                        .schema();
+                final org.apache.kafka.connect.data.Struct sourceStruct = buildSnapshotSourceStruct(
+                        sourceSchema, connectorConfig, schemaName, tableName);
 
-                final org.apache.kafka.connect.data.Struct valueStruct =
-                        envelope.read(afterStruct, sourceStruct, Instant.now());
-                final org.apache.kafka.connect.source.SourceRecord snapshotRecord =
-                        new org.apache.kafka.connect.source.SourceRecord(
-                                sourcePartition,
-                                snapshotOffset,
-                                topic,
-                                tableSchema.keySchema(),
-                                keyStruct,
-                                envelope.schema(),
-                                valueStruct);
+                final org.apache.kafka.connect.data.Struct valueStruct = envelope.read(afterStruct, sourceStruct,
+                        Instant.now());
+                final org.apache.kafka.connect.source.SourceRecord snapshotRecord = new org.apache.kafka.connect.source.SourceRecord(
+                        sourcePartition,
+                        snapshotOffset,
+                        topic,
+                        tableSchema.keySchema(),
+                        keyStruct,
+                        envelope.schema(),
+                        valueStruct);
                 queue.enqueue(new DataChangeEvent(snapshotRecord));
 
                 if (rowCount == 1) {
@@ -319,8 +319,8 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
             GaussDBConnectorConfig connectorConfig,
             String schemaName,
             String tableName) {
-        final org.apache.kafka.connect.data.Struct sourceStruct =
-                new org.apache.kafka.connect.data.Struct(sourceSchema);
+        final org.apache.kafka.connect.data.Struct sourceStruct = new org.apache.kafka.connect.data.Struct(
+                sourceSchema);
 
         // Set version field (required by Debezium source info schema)
         putIfPresent(
@@ -359,7 +359,8 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
         // Snapshot records have message timestamp 0.
         putIfPresent(sourceStruct, io.debezium.connector.AbstractSourceInfo.TIMESTAMP_KEY, 0L);
 
-        // Set snapshot field to indicate this is a snapshot record (must be String, not Boolean)
+        // Set snapshot field to indicate this is a snapshot record (must be String, not
+        // Boolean)
         putIfPresent(sourceStruct, io.debezium.connector.AbstractSourceInfo.SNAPSHOT_KEY, "true");
 
         return sourceStruct;
@@ -383,10 +384,9 @@ public class GaussDBScanFetchTask extends AbstractScanFetchTask {
     }
 
     private static String topicFor(GaussDBConnectorConfig config, TableId tableId) {
-        final String prefix =
-                config != null && !Strings.isNullOrEmpty(config.getLogicalName())
-                        ? config.getLogicalName()
-                        : "gaussdb";
+        final String prefix = config != null && !Strings.isNullOrEmpty(config.getLogicalName())
+                ? config.getLogicalName()
+                : "gaussdb";
         if (tableId == null) {
             return prefix;
         }

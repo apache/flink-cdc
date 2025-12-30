@@ -125,7 +125,7 @@ done
 # 3. Copy SQL script
 echo "📜 Copying SQL script to JobManager..."
 docker exec flink-jobmanager mkdir -p /opt/flink/sql
-docker cp "$SQL_FILE" flink-jobmanager:/opt/flink/sql/gaussdb_to_gaussdb.sql
+docker cp "$SQL_FILE" flink-jobmanager:/opt/flink/sql/gaussdb_sync.sql
 
 # 4. Restart Clusters
 echo "🔄 Restarting Flink containers to apply changes..."
@@ -173,9 +173,11 @@ BEGIN
             stock INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) DISTRIBUTE BY HASH(product_id);
-        RAISE NOTICE 'Source table created';
+        ALTER TABLE products REPLICA IDENTITY FULL;
+        RAISE NOTICE 'Source table created and REPLICA IDENTITY set to FULL';
     ELSE
-        RAISE NOTICE 'Source table already exists';
+        ALTER TABLE products REPLICA IDENTITY FULL;
+        RAISE NOTICE 'Source table already exists, ensuring REPLICA IDENTITY is FULL';
     END IF;
 END \$\$;
 EOF
@@ -195,22 +197,16 @@ CREATE TABLE products_sink (
 EOF
 echo -e "${GREEN}✅ Sink table created${NC}"
 
-# 5.4 插入种子数据 (确保快照阶段有数据，CDC 能正确进入 stream 阶段)
-echo "🌱 Inserting seed data for CDC initialization..."
-PGPASSWORD=Gauss_235 psql -h 10.250.0.30 -p 8000 -U tom -d db1 <<EOF
--- 清除旧种子数据
-DELETE FROM products WHERE product_id BETWEEN 1 AND 10;
--- 插入种子数据 (使用 ID 1-10，测试数据使用 2000+)
-INSERT INTO products (product_id, product_name, category, price, stock) VALUES
-(1, 'Seed Product 1', 'SEED', 10.00, 100),
-(2, 'Seed Product 2', 'SEED', 20.00, 200),
-(3, 'Seed Product 3', 'SEED', 30.00, 300);
-EOF
-echo -e "${GREEN}✅ Seed data inserted (3 records)${NC}"
+# 5.4 跳过种子数据插入 (性能测试时会预先插入完整数据)
+# 注意：之前这里有 DELETE FROM products WHERE product_id BETWEEN 1 AND 10
+# 这会导致性能测试中的数据丢失，因此已移除
+echo "🌱 Skipping seed data insertion (data should be pre-populated by test script)..."
+echo -e "${GREEN}✅ Ready for CDC sync${NC}"
+
 
 # 6. Submit SQL Job
-echo "🚀 Submitting SQL job to Flink..."
-docker exec flink-jobmanager /opt/flink/bin/sql-client.sh -f /opt/flink/sql/gaussdb_to_gaussdb.sql
+echo "🚀 Submitting SQL job to Flink (Optimized with Dual-Sink Routing)..."
+docker exec flink-jobmanager /opt/flink/bin/sql-client.sh -f /opt/flink/sql/gaussdb_sync.sql
 
 echo ""
 echo -e "${GREEN}✅ Success! GaussDB -> GaussDB deployment complete.${NC}"

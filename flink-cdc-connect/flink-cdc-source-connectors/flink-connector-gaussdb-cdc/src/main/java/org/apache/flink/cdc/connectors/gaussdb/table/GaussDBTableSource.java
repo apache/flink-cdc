@@ -52,7 +52,8 @@ import java.util.stream.Stream;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /**
- * A {@link DynamicTableSource} that describes how to create a GaussDB source from a logical
+ * A {@link DynamicTableSource} that describes how to create a GaussDB source
+ * from a logical
  * description.
  */
 public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetadata {
@@ -166,6 +167,8 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
         switch (changelogMode) {
             case UPSERT:
                 return org.apache.flink.table.connector.ChangelogMode.upsert();
+            case INSERT_ONLY:
+                return org.apache.flink.table.connector.ChangelogMode.insertOnly();
             case ALL:
                 return org.apache.flink.table.connector.ChangelogMode.all();
             default:
@@ -176,67 +179,64 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
 
     @Override
     public ScanRuntimeProvider getScanRuntimeProvider(ScanContext scanContext) {
-        RowType physicalDataType =
-                (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
+        RowType physicalDataType = (RowType) physicalSchema.toPhysicalRowDataType().getLogicalType();
         MetadataConverter[] metadataConverters = getMetadataConverters();
         TypeInformation<RowData> typeInfo = scanContext.createTypeInformation(producedDataType);
 
-        DebeziumDeserializationSchema<RowData> deserializer =
-                RowDataDebeziumDeserializeSchema.newBuilder()
-                        .setPhysicalRowType(physicalDataType)
-                        .setMetadataConverters(metadataConverters)
-                        .setResultTypeInfo(typeInfo)
-                        .setUserDefinedConverterFactory(
-                                GaussDBDeserializationConverterFactory.instance())
-                        .setChangelogMode(changelogMode)
-                        .build();
+        DebeziumDeserializationSchema<RowData> deserializer = RowDataDebeziumDeserializeSchema.newBuilder()
+                .setPhysicalRowType(physicalDataType)
+                .setMetadataConverters(metadataConverters)
+                .setResultTypeInfo(typeInfo)
+                .setUserDefinedConverterFactory(
+                        GaussDBDeserializationConverterFactory.instance())
+                .setChangelogMode(changelogMode)
+                .build();
 
         if (enableParallelRead) {
-            JdbcIncrementalSource<RowData> parallelSource =
-                    GaussDBSourceBuilder.GaussDBIncrementalSource.<RowData>builder()
-                            .hostname(hostname)
-                            .port(port)
-                            .haPort(haPort != null ? haPort : 0) // 0 means not set, will be handled in builder or connector
-                            .database(database)
-                            .schemaList(schemaName)
-                            .tableList(schemaName + "." + tableName)
-                            .username(username)
-                            .password(password)
-                            .decodingPluginName(pluginName)
-                            .slotName(slotName)
-                            .debeziumProperties(dbzProperties)
-                            .deserializer(deserializer)
-                            .splitSize(splitSize)
-                            .splitMetaGroupSize(splitMetaGroupSize)
-                            .distributionFactorUpper(distributionFactorUpper)
-                            .distributionFactorLower(distributionFactorLower)
-                            .fetchSize(fetchSize)
-                            .connectTimeout(connectTimeout)
-                            .connectMaxRetries(connectMaxRetries)
-                            .connectionPoolSize(connectionPoolSize)
-                            .startupOptions(startupOptions)
-                            .chunkKeyColumn(chunkKeyColumn)
-                            .heartbeatInterval(heartbeatInterval)
-                            .closeIdleReaders(closeIdleReaders)
-                            .skipSnapshotBackfill(skipSnapshotBackfill)
-                            .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
-                            .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
-                            .build();
+            JdbcIncrementalSource<RowData> parallelSource = GaussDBSourceBuilder.GaussDBIncrementalSource
+                    .<RowData>builder()
+                    .hostname(hostname)
+                    .port(port)
+                    .haPort(haPort != null ? haPort : 0) // 0 means not set, will be handled in builder or connector
+                    .database(database)
+                    .schemaList(schemaName)
+                    .tableList(schemaName + "." + tableName)
+                    .username(username)
+                    .password(password)
+                    .decodingPluginName(pluginName)
+                    .slotName(slotName)
+                    .debeziumProperties(dbzProperties)
+                    .deserializer(deserializer)
+                    .splitSize(splitSize)
+                    .splitMetaGroupSize(splitMetaGroupSize)
+                    .distributionFactorUpper(distributionFactorUpper)
+                    .distributionFactorLower(distributionFactorLower)
+                    .fetchSize(fetchSize)
+                    .connectTimeout(connectTimeout)
+                    .connectMaxRetries(connectMaxRetries)
+                    .connectionPoolSize(connectionPoolSize)
+                    .startupOptions(startupOptions)
+                    .chunkKeyColumn(chunkKeyColumn)
+                    .heartbeatInterval(heartbeatInterval)
+                    .closeIdleReaders(closeIdleReaders)
+                    .skipSnapshotBackfill(skipSnapshotBackfill)
+                    .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                    .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
+                    .build();
             return SourceProvider.of(parallelSource);
         } else {
-            GaussDBSource.Builder<RowData> sourceBuilder =
-                    GaussDBSource.<RowData>builder()
-                            .hostname(hostname)
-                            .port(port)
-                            .database(database)
-                            .schemaList(schemaName)
-                            .tableList(schemaName + "." + tableName)
-                            .username(username)
-                            .password(password)
-                            .decodingPluginName(pluginName)
-                            .slotName(slotName)
-                            .debeziumProperties(dbzProperties)
-                            .deserializer(deserializer);
+            GaussDBSource.Builder<RowData> sourceBuilder = GaussDBSource.<RowData>builder()
+                    .hostname(hostname)
+                    .port(port)
+                    .database(database)
+                    .schemaList(schemaName)
+                    .tableList(schemaName + "." + tableName)
+                    .username(username)
+                    .password(password)
+                    .decodingPluginName(pluginName)
+                    .slotName(slotName)
+                    .debeziumProperties(dbzProperties)
+                    .deserializer(deserializer);
 
             if (haPort != null) {
                 sourceBuilder.haPort(haPort);
@@ -254,48 +254,46 @@ public class GaussDBTableSource implements ScanTableSource, SupportsReadingMetad
 
         return metadataKeys.stream()
                 .map(
-                        key ->
-                                Stream.of(GaussDBReadableMetadata.values())
-                                        .filter(m -> m.getKey().equals(key))
-                                        .findFirst()
-                                        .orElseThrow(IllegalStateException::new))
+                        key -> Stream.of(GaussDBReadableMetadata.values())
+                                .filter(m -> m.getKey().equals(key))
+                                .findFirst()
+                                .orElseThrow(IllegalStateException::new))
                 .map(GaussDBReadableMetadata::getConverter)
                 .toArray(MetadataConverter[]::new);
     }
 
     @Override
     public DynamicTableSource copy() {
-        GaussDBTableSource source =
-                new GaussDBTableSource(
-                        physicalSchema,
-                        port,
-                        hostname,
-                        database,
-                        schemaName,
-                        tableName,
-                        username,
-                        password,
-                        pluginName,
-                        slotName,
-                        changelogMode,
-                        dbzProperties,
-                        enableParallelRead,
-                        splitSize,
-                        splitMetaGroupSize,
-                        fetchSize,
-                        connectTimeout,
-                        connectMaxRetries,
-                        connectionPoolSize,
-                        distributionFactorUpper,
-                        distributionFactorLower,
-                        heartbeatInterval,
-                        startupOptions,
-                        chunkKeyColumn,
-                        closeIdleReaders,
-                        skipSnapshotBackfill,
-                        scanNewlyAddedTableEnabled,
-                        assignUnboundedChunkFirst,
-                        haPort);
+        GaussDBTableSource source = new GaussDBTableSource(
+                physicalSchema,
+                port,
+                hostname,
+                database,
+                schemaName,
+                tableName,
+                username,
+                password,
+                pluginName,
+                slotName,
+                changelogMode,
+                dbzProperties,
+                enableParallelRead,
+                splitSize,
+                splitMetaGroupSize,
+                fetchSize,
+                connectTimeout,
+                connectMaxRetries,
+                connectionPoolSize,
+                distributionFactorUpper,
+                distributionFactorLower,
+                heartbeatInterval,
+                startupOptions,
+                chunkKeyColumn,
+                closeIdleReaders,
+                skipSnapshotBackfill,
+                scanNewlyAddedTableEnabled,
+                assignUnboundedChunkFirst,
+                haPort);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;

@@ -17,15 +17,24 @@
 
 package org.apache.flink.cdc.debezium.table;
 
-/** Changelog modes used to encode changes from Debezium to Flink internal structure. */
+/**
+ * Changelog modes used to encode changes from Debezium to Flink internal
+ * structure.
+ */
 public enum DebeziumChangelogMode {
-    /** Encodes changes as retract stream using all RowKinds. This is the default mode. */
+    /**
+     * Encodes changes as retract stream using all RowKinds. This is the default
+     * mode.
+     */
     ALL("all"),
     /**
-     * Encodes changes as upsert stream that describes idempotent updates on a key. Primary keys
+     * Encodes changes as upsert stream that describes idempotent updates on a key.
+     * Primary keys
      * must be set in tables to use this changelog mode.
      */
-    UPSERT("upsert");
+    UPSERT("upsert"),
+    /** Encodes changes as insert-only stream. */
+    INSERT_ONLY("insert-only");
 
     private final String value;
 

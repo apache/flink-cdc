@@ -20,7 +20,7 @@ NC='\033[0m' # No Color
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 DEPLOY_SCRIPT="$SCRIPT_DIR/deploy_gaussdb_to_gaussdb.sh"
 TEST_SCRIPT="$SCRIPT_DIR/run_gaussdb_to_gaussdb_test.sh"
-DIST_SQL_FILE="$SCRIPT_DIR/flink-cdc-connect/flink-cdc-source-connectors/flink-connector-gaussdb-cdc/docker/sql/gaussdb_optimized_sync.sql"
+DIST_SQL_FILE="$SCRIPT_DIR/flink-cdc-connect/flink-cdc-source-connectors/flink-connector-gaussdb-cdc/docker/sql/gaussdb_simplified_sync.sql"
 
 # 测试结果
 DEPLOY_SUCCESS=false
@@ -34,7 +34,7 @@ clear
 echo -e "${MAGENTA}"
 echo "╔══════════════════════════════════════════════════════════════════╗"
 echo "║                                                                  ║"
-echo "║      GaussDB -> GaussDB Distributed CDC 一键测试脚本             ║"
+echo "║      GaussDB -> GaussDB Simplified CDC 一键测试脚本             ║"
 echo "║      One-Click GaussDB-to-GaussDB Distributed Test               ║"
 echo "║                                                                  ║"
 echo "╚══════════════════════════════════════════════════════════════════╝"
@@ -87,6 +87,26 @@ echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
+# ========== 步骤 0.5: 清理复制槽 ==========
+echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${MAGENTA}║  步骤 0.5: 清理 GaussDB 历史残留复制槽 (DN 节点)                  ║${NC}"
+echo -e "${MAGENTA}╚══════════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+if [ ! -f "$TEST_SCRIPT" ]; then
+    echo -e "${RED}❌ 错误: 找不到测试脚本 $TEST_SCRIPT${NC}"
+    exit 1
+fi
+
+echo -e "${CYAN}正在执行: bash $TEST_SCRIPT cleanup${NC}"
+echo ""
+bash "$TEST_SCRIPT" cleanup
+
+echo -e "${GREEN}✅ 步骤 0.5 完成: 复制槽已清理${NC}"
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
 # ========== 步骤 1: 部署 ==========
 echo -e "${MAGENTA}╔══════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${MAGENTA}║  步骤 1/3: 部署 GaussDB -> GaussDB CDC 配置                      ║${NC}"
@@ -116,9 +136,7 @@ echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# 等待集群稳定
-echo -e "${YELLOW}⏸️  部署完成，等待 5 秒让集群稳定...${NC}"
-sleep 5
+echo -e "${YELLOW}⏸️  正在准备测试环境...${NC}"
 
 # ========== 步骤 2: 运行分布式测试 ==========
 echo ""

@@ -81,7 +81,8 @@ public enum GaussDBReadableMetadata {
             }),
 
     /**
-     * It indicates the time that the change was made in the database. If the record is read from
+     * It indicates the time that the change was made in the database. If the record
+     * is read from
      * snapshot of the table instead of the change stream, the value is always 0.
      */
     OP_TS(
@@ -100,7 +101,8 @@ public enum GaussDBReadableMetadata {
             }),
 
     /**
-     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D' means DELETE
+     * It indicates the row kind of the changelog. '+I' means INSERT message, '-D'
+     * means DELETE
      * message, '-U' means UPDATE_BEFORE message and '+U' means UPDATE_AFTER message
      */
     ROW_KIND(
@@ -118,6 +120,30 @@ public enum GaussDBReadableMetadata {
                 public Object read(SourceRecord record) {
                     throw new UnsupportedOperationException(
                             "Please call read(RowData rowData) method instead.");
+                }
+            }),
+
+    /**
+     * Whether the record is from snapshot or from change stream.
+     */
+    IS_SNAPSHOT(
+            "is_snapshot",
+            DataTypes.BOOLEAN().notNull(),
+            new MetadataConverter() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public Object read(SourceRecord record) {
+                    Struct messageStruct = (Struct) record.value();
+                    Struct sourceStruct = messageStruct.getStruct(Envelope.FieldName.SOURCE);
+                    Object snapshot = sourceStruct.get(AbstractSourceInfo.SNAPSHOT_KEY);
+                    if (snapshot == null) {
+                        return false;
+                    }
+                    if (snapshot instanceof Boolean) {
+                        return snapshot;
+                    }
+                    return !"false".equalsIgnoreCase(snapshot.toString());
                 }
             });
 

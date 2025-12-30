@@ -410,7 +410,8 @@ public class GaussDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         }
 
         final boolean traceDataFlow = operation == ReplicationMessage.Operation.INSERT
-                || operation == ReplicationMessage.Operation.UPDATE;
+                || operation == ReplicationMessage.Operation.UPDATE
+                || operation == ReplicationMessage.Operation.DELETE;
         TableId tableId = parseTableId(message.getTable());
         if (traceDataFlow) {
             LOG.info(
