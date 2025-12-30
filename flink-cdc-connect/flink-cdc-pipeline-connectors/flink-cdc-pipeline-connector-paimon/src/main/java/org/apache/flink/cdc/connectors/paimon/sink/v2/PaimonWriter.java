@@ -144,6 +144,7 @@ public class PaimonWriter<InputT>
             // remove the table temporarily, then add the table with latest schema when received
             // DataChangeEvent.
             tables.remove(tableId);
+            catalog.invalidateTable(tableId);
             try {
                 if (writes.containsKey(tableId)) {
                     writes.get(tableId).replace(getTable(tableId));
