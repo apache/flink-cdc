@@ -292,4 +292,13 @@ public class MySqlSourceOptions {
                     .defaultValue(true)
                     .withDescription(
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
+
+    @Experimental
+    public static final ConfigOption<String> SCAN_SNAPSHOT_FILTER =
+            ConfigOptions.key("scan.snapshot.filter")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "When reading a table snapshot, the rows of captured tables will be filtered using the specified filter expression (AKA a SQL WHERE clause). "
+                                    + "By default, no filter is applied, meaning the entire table will be synchronized. e.g. `id > 100`");
 }
