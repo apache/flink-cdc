@@ -60,6 +60,8 @@ under the License.
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 ## 包含可选部分
@@ -106,6 +108,8 @@ under the License.
          classpath: com.example.functions.AddOneFunctionClass
        - name: format
          classpath: com.example.functions.FormatFunctionClass
+     flink-conf:
+       execution.checkpointing.interval: 2min
 ```
 
 # Pipeline 配置
@@ -118,3 +122,4 @@ under the License.
 | local-time-zone        | 作业级别的本地时区。                                                                                                | optional          |
 | execution.runtime-mode | pipeline 的运行模式，包含 STREAMING 和 BATCH，默认值是 STREAMING。                                                       | optional          |
 | operator.uid.prefix    | Pipeline 中算子 UID 的前缀。如果不设置，Flink 会为每个算子生成唯一的 UID。 建议设置这个参数以提供稳定和可识别的算子 ID，这有助于有状态升级、问题排查和在 Flink UI 上的诊断。 | optional          |
+| flink-conf             | 用于配置[Flink相关参数](https://nightlies.apache.org/flink/flink-docs-master/docs/deployment/config/)。 <br/>Flink参数优先级：config.yaml < job command-line < pipeline.yaml | optional          |
