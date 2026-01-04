@@ -28,10 +28,10 @@ import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEventSerializer;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussRowWithOp;
 
-import com.alibaba.fluss.client.Connection;
-import com.alibaba.fluss.client.table.Table;
-import com.alibaba.fluss.metadata.TablePath;
-import com.alibaba.fluss.types.DataType;
+import org.apache.fluss.client.Connection;
+import org.apache.fluss.client.table.Table;
+import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.types.DataType;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -129,12 +129,12 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
 
     private static class TableSchemaInfo {
         org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema;
-        com.alibaba.fluss.metadata.Schema downStreamFlusstreamSchema;
+        org.apache.fluss.metadata.Schema downStreamFlusstreamSchema;
         Map<Integer, Integer> indexMapping;
 
         private TableSchemaInfo(
                 org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema,
-                com.alibaba.fluss.metadata.Schema downStreamFlusstreamSchema) {
+                org.apache.fluss.metadata.Schema downStreamFlusstreamSchema) {
             this.upstreamCdcSchema = upstreamCdcSchema;
             this.downStreamFlusstreamSchema = downStreamFlusstreamSchema;
             this.indexMapping =
@@ -144,8 +144,8 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
     }
 
     static Map<Integer, Integer> sanityCheckAndGenerateIndexMapping(
-            com.alibaba.fluss.metadata.Schema inferredFlussSchema,
-            com.alibaba.fluss.metadata.Schema currentFlussnewSchema) {
+            org.apache.fluss.metadata.Schema inferredFlussSchema,
+            org.apache.fluss.metadata.Schema currentFlussnewSchema) {
         List<String> inferredSchemaColumnNames = inferredFlussSchema.getColumnNames();
         Map<String, Integer> reverseIndex = new HashMap<>();
         for (int i = 0; i < inferredSchemaColumnNames.size(); i++) {

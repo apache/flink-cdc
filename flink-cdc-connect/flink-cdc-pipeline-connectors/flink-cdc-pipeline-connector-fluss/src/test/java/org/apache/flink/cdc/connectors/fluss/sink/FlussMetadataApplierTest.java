@@ -24,15 +24,15 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
 
-import com.alibaba.fluss.client.Connection;
-import com.alibaba.fluss.client.ConnectionFactory;
-import com.alibaba.fluss.client.admin.Admin;
-import com.alibaba.fluss.exception.InvalidConfigException;
-import com.alibaba.fluss.metadata.TableDescriptor;
-import com.alibaba.fluss.metadata.TableInfo;
-import com.alibaba.fluss.metadata.TablePath;
-import com.alibaba.fluss.server.testutils.FlussClusterExtension;
-import com.alibaba.fluss.types.RowType;
+import org.apache.fluss.client.Connection;
+import org.apache.fluss.client.ConnectionFactory;
+import org.apache.fluss.client.admin.Admin;
+import org.apache.fluss.exception.InvalidConfigException;
+import org.apache.fluss.metadata.TableDescriptor;
+import org.apache.fluss.metadata.TableInfo;
+import org.apache.fluss.metadata.TablePath;
+import org.apache.fluss.server.testutils.FlussClusterExtension;
+import org.apache.fluss.types.RowType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -47,7 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-import static com.alibaba.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
+import static org.apache.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -129,28 +129,28 @@ public class FlussMetadataApplierTest {
                     DataTypes.TIMESTAMP_LTZ(6)
                 };
 
-        com.alibaba.fluss.types.DataType[] flussDataTypes =
-                new com.alibaba.fluss.types.DataType[] {
-                    com.alibaba.fluss.types.DataTypes.BINARY(10),
+        org.apache.fluss.types.DataType[] flussDataTypes =
+                new org.apache.fluss.types.DataType[] {
+                    org.apache.fluss.types.DataTypes.BINARY(10),
                     // fluss not support binary, will be mapped to bytes
-                    com.alibaba.fluss.types.DataTypes.BYTES(),
-                    com.alibaba.fluss.types.DataTypes.BYTES(),
-                    com.alibaba.fluss.types.DataTypes.BOOLEAN(),
-                    com.alibaba.fluss.types.DataTypes.TINYINT(),
-                    com.alibaba.fluss.types.DataTypes.SMALLINT(),
-                    new com.alibaba.fluss.types.IntType(false),
-                    com.alibaba.fluss.types.DataTypes.BIGINT(),
-                    com.alibaba.fluss.types.DataTypes.FLOAT(),
-                    com.alibaba.fluss.types.DataTypes.DOUBLE(),
-                    com.alibaba.fluss.types.DataTypes.DECIMAL(38, 18),
-                    com.alibaba.fluss.types.DataTypes.CHAR(10),
+                    org.apache.fluss.types.DataTypes.BYTES(),
+                    org.apache.fluss.types.DataTypes.BYTES(),
+                    org.apache.fluss.types.DataTypes.BOOLEAN(),
+                    org.apache.fluss.types.DataTypes.TINYINT(),
+                    org.apache.fluss.types.DataTypes.SMALLINT(),
+                    new org.apache.fluss.types.IntType(false),
+                    org.apache.fluss.types.DataTypes.BIGINT(),
+                    org.apache.fluss.types.DataTypes.FLOAT(),
+                    org.apache.fluss.types.DataTypes.DOUBLE(),
+                    org.apache.fluss.types.DataTypes.DECIMAL(38, 18),
+                    org.apache.fluss.types.DataTypes.CHAR(10),
                     // fluss not support varchar, will be mapped to string
-                    com.alibaba.fluss.types.DataTypes.STRING(),
-                    com.alibaba.fluss.types.DataTypes.STRING(),
-                    com.alibaba.fluss.types.DataTypes.DATE(),
-                    com.alibaba.fluss.types.DataTypes.TIME(),
-                    com.alibaba.fluss.types.DataTypes.TIMESTAMP(3),
-                    com.alibaba.fluss.types.DataTypes.TIMESTAMP_LTZ(6)
+                    org.apache.fluss.types.DataTypes.STRING(),
+                    org.apache.fluss.types.DataTypes.STRING(),
+                    org.apache.fluss.types.DataTypes.DATE(),
+                    org.apache.fluss.types.DataTypes.TIME(),
+                    org.apache.fluss.types.DataTypes.TIMESTAMP(3),
+                    org.apache.fluss.types.DataTypes.TIMESTAMP_LTZ(6)
                 };
 
         try (FlussMetaDataApplier applier =
@@ -227,10 +227,10 @@ public class FlussMetadataApplierTest {
                         tablePath,
                         TableDescriptor.builder()
                                 .schema(
-                                        com.alibaba.fluss.metadata.Schema.newBuilder()
+                                        org.apache.fluss.metadata.Schema.newBuilder()
                                                 .column(
                                                         "id",
-                                                        com.alibaba.fluss.types.DataTypes.INT())
+                                                        org.apache.fluss.types.DataTypes.INT())
                                                 .build())
                                 .build(),
                         true)

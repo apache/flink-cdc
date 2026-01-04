@@ -22,7 +22,7 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.runtime.metrics.groups.InternalSinkWriterMetricGroup;
 
-import com.alibaba.fluss.config.Configuration;
+import org.apache.fluss.config.Configuration;
 
 import java.io.IOException;
 

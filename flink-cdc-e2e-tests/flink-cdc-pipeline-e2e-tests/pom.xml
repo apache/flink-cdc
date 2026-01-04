@@ -42,7 +42,7 @@ limitations under the License.
         <maven.plugin.download.version>1.6.8</maven.plugin.download.version>
         <iceberg.version>1.6.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
-        <fluss.version>0.7.0</fluss.version>
+        <fluss.version>0.8.0-incubating</fluss.version>
         <hudi.version>1.1.0</hudi.version>
     </properties>
 
@@ -621,7 +621,7 @@ limitations under the License.
                             </outputDirectory>
                         </artifactItem>
                         <artifactItem>
-                            <groupId>com.alibaba.fluss</groupId>
+                            <groupId>org.apache.fluss</groupId>
                             <artifactId>fluss-flink-${flink.major.version}</artifactId>
                             <version>${fluss.version}</version>
                             <destFileName>fluss-sql-connector.jar</destFileName>
