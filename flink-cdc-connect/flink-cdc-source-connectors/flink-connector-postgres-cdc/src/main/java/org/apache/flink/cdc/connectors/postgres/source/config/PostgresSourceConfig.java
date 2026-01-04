@@ -39,6 +39,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     private final int subtaskId;
     private final int lsnCommitCheckpointsDelay;
     private final boolean includePartitionedTables;
+    private final boolean includeDatabaseInTableId;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -69,7 +70,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
-            boolean includePartitionedTables) {
+            boolean includePartitionedTables,
+            boolean includeDatabaseInTableId) {
         super(
                 startupOptions,
                 databaseList,
@@ -100,6 +102,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
+        this.includeDatabaseInTableId = includeDatabaseInTableId;
     }
 
     /**
@@ -147,5 +150,14 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     @Override
     public PostgresConnectorConfig getDbzConnectorConfig() {
         return new PostgresConnectorConfig(getDbzConfiguration());
+    }
+
+    /**
+     * Returns whether to include database in the generated Table ID.
+     *
+     * @return whether to include database in the generated Table ID
+     */
+    public boolean isIncludeDatabaseInTableId() {
+        return includeDatabaseInTableId;
     }
 }

@@ -365,6 +365,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         sourceConfiguration.set(
                 PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED,
                 unboundedChunkFirst);
+        sourceConfiguration.set(PostgresDataSourceOptions.TABLE_ID_INCLUDE_DATABASE, true);
 
         Factory.Context context =
                 new FactoryHelper.DefaultContext(
@@ -384,7 +385,8 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
 
-        TableId tableId = TableId.tableId("inventory", "products");
+        TableId tableId =
+                TableId.tableId(inventoryDatabase.getDatabaseName(), "inventory", "products");
         CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
 
         // generate snapshot data
@@ -580,16 +582,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         // Also ensure we've received at least one or many side events.
         assertThat(sideResults).isNotEmpty();
         return result;
-    }
-
-    // Helper method to create a temporary directory for savepoint
-    private Path createTempSavepointDir() throws Exception {
-        return Files.createTempDirectory("postgres-savepoint");
-    }
-
-    // Helper method to execute the job and create a savepoint
-    private String createSavepoint(JobClient jobClient, Path savepointDir) throws Exception {
-        return jobClient.stopWithSavepoint(true, savepointDir.toAbsolutePath().toString()).get();
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {

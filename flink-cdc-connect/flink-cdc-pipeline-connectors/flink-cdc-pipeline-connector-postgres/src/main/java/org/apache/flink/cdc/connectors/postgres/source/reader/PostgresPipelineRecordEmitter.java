@@ -61,6 +61,7 @@ import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isLowWatermarkEvent;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDataChangeRecord;
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
+import static org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils.toCdcTableId;
 
 /** The {@link RecordEmitter} implementation for PostgreSQL pipeline connector. */
 public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
@@ -73,6 +74,7 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
     // Used when startup mode is not initial
     private boolean shouldEmitAllCreateTableEventsInSnapshotMode = true;
     private boolean isBounded = false;
+    private boolean includeDatabaseInTableId = false;
 
     private final Map<TableId, CreateTableEvent> createTableEventCache;
 
@@ -88,6 +90,7 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                 sourceConfig.isIncludeSchemaChanges(),
                 offsetFactory);
         this.sourceConfig = sourceConfig;
+        this.includeDatabaseInTableId = sourceConfig.isIncludeDatabaseInTableId();
         this.postgresDialect = postgresDialect;
         this.alreadySendCreateTableTables = new HashSet<>();
         this.createTableEventCache =
@@ -103,10 +106,17 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
             // TableSchemas in SnapshotSplit only contains one table.
             createTableEventCache.putAll(generateCreateTableEvent(sourceConfig));
         } else {
-            for (TableChanges.TableChange tableChange : split.getTableSchemas().values()) {
+            for (Map.Entry<TableId, TableChanges.TableChange> entry :
+                    split.getTableSchemas().entrySet()) {
+                TableId tableId =
+                        entry.getKey(); // Use the TableId from the map key which contains full info
+                TableChanges.TableChange tableChange = entry.getValue();
                 CreateTableEvent createTableEvent =
                         new CreateTableEvent(
-                                toCdcTableId(tableChange.getId()),
+                                toCdcTableId(
+                                        tableId,
+                                        sourceConfig.getDatabaseList().get(0),
+                                        includeDatabaseInTableId),
                                 buildSchemaFromTable(tableChange.getTable()));
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
                         .applyChangeEvent(createTableEvent);
@@ -128,10 +138,8 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             TableId tableId = splitState.asSnapshotSplitState().toSourceSplit().getTableId();
             if (!alreadySendCreateTableTables.contains(tableId)) {
-                try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-                    sendCreateTableEvent(jdbc, tableId, (SourceOutput<Event>) output);
-                    alreadySendCreateTableTables.add(tableId);
-                }
+                sendCreateTableEvent(tableId, (SourceOutput<Event>) output);
+                alreadySendCreateTableTables.add(tableId);
             }
         } else {
             boolean isDataChangeRecord = isDataChangeRecord(element);
@@ -189,21 +197,8 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         return tableBuilder.build();
     }
 
-    private void sendCreateTableEvent(
-            PostgresConnection jdbc, TableId tableId, SourceOutput<Event> output) {
-        Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-        output.collect(
-                new CreateTableEvent(
-                        org.apache.flink.cdc.common.event.TableId.tableId(
-                                tableId.schema(), tableId.table()),
-                        schema));
-    }
-
-    private org.apache.flink.cdc.common.event.TableId toCdcTableId(
-            io.debezium.relational.TableId dbzTableId) {
-        String schemaName =
-                dbzTableId.catalog() == null ? dbzTableId.schema() : dbzTableId.catalog();
-        return org.apache.flink.cdc.common.event.TableId.tableId(schemaName, dbzTableId.table());
+    private void sendCreateTableEvent(TableId tableId, SourceOutput<Event> output) {
+        output.collect(getCreateTableEvent(sourceConfig, tableId));
     }
 
     private CreateTableEvent getCreateTableEvent(
@@ -211,13 +206,15 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
             Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
             return new CreateTableEvent(
-                    org.apache.flink.cdc.common.event.TableId.tableId(
-                            tableId.schema(), tableId.table()),
+                    toCdcTableId(
+                            tableId,
+                            sourceConfig.getDatabaseList().get(0),
+                            includeDatabaseInTableId),
                     schema);
         }
     }
 
-    private TableId getTableId(SourceRecord dataRecord) {
+    public static TableId getTableId(SourceRecord dataRecord) {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         Field field = source.schema().field(SCHEMA_NAME_KEY);
@@ -244,8 +241,10 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                 createTableEventCache.put(
                         tableId,
                         new CreateTableEvent(
-                                org.apache.flink.cdc.common.event.TableId.tableId(
-                                        tableId.schema(), tableId.table()),
+                                toCdcTableId(
+                                        tableId,
+                                        this.sourceConfig.getDatabaseList().get(0),
+                                        includeDatabaseInTableId),
                                 schema));
             }
             return createTableEventCache;

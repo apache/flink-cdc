@@ -97,4 +97,13 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "If enabled:\n"
                                     + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
                                     + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");
+
+    public static final ConfigOption<Boolean> TABLE_ID_INCLUDE_DATABASE =
+            ConfigOptions.key("table-id.include-database")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to include database in the generated Table ID.\n"
+                                    + "If set to true, the Table ID will be in the format (database, schema, table).\n"
+                                    + "If set to false, the Table ID will be in the format (schema, table). Defaults to false.");
 }
