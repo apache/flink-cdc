@@ -187,6 +187,151 @@ class MySqlToPaimonE2eITCase extends PipelineTestEnvironment {
     }
 
     @Test
+    public void testReadChangelogAsAppendOnlyWithPaimon() throws Exception {
+        String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
+        String database = inventoryDatabase.getDatabaseName();
+        String pipelineJob =
+                String.format(
+                        "source:\n"
+                                + "  type: mysql\n"
+                                + "  hostname: mysql\n"
+                                + "  port: 3306\n"
+                                + "  username: %s\n"
+                                + "  password: %s\n"
+                                + "  tables: %s.readChangelogAsAppendOnly\n"
+                                + "  server-id: 5400-5404\n"
+                                + "  server-time-zone: UTC\n"
+                                + "  scan.read-changelog-as-append-only.enabled: true\n"
+                                + "  use.legacy.json.format: false\n"
+                                + "  metadata.list: row_kind\n"
+                                + "\n"
+                                + "transform:\n"
+                                + "  - source-table: '^\\.+.\\.+$'\n"
+                                + "    projection: \\*, row_kind AS __internal__op_type\n"
+                                + "\n"
+                                + "sink:\n"
+                                + "  type: paimon\n"
+                                + "  catalog.properties.warehouse: %s\n"
+                                + "  catalog.properties.metastore: filesystem\n"
+                                + "  catalog.properties.cache-enabled: false\n"
+                                + "\n"
+                                + "pipeline:\n"
+                                + "  schema.change.behavior: evolve\n"
+                                + "  parallelism: 4",
+                        MYSQL_TEST_USER, MYSQL_TEST_PASSWORD, database, warehouse);
+
+        Path paimonCdcConnector = TestUtils.getResource("paimon-cdc-pipeline-connector.jar");
+        Path hadoopJar = TestUtils.getResource("flink-shade-hadoop.jar");
+
+        String mysqlJdbcUrl =
+                String.format(
+                        "jdbc:mysql://%s:%s/%s",
+                        MYSQL.getHost(), MYSQL.getDatabasePort(), database);
+
+        // Create source table and insert initial data
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+
+            stat.execute(
+                    "CREATE TABLE readChangelogAsAppendOnly (\n"
+                            + "  id INTEGER NOT NULL PRIMARY KEY,\n"
+                            + "  name VARCHAR(255) NOT NULL DEFAULT 'flink',\n"
+                            + "  description VARCHAR(512),\n"
+                            + "  weight FLOAT,\n"
+                            + "  enum_c enum('red', 'white') default 'red',\n"
+                            + "  json_c JSON,\n"
+                            + "  point_c POINT)");
+
+            stat.execute(
+                    "INSERT INTO readChangelogAsAppendOnly \n"
+                            + "VALUES (1,\"One\",   \"Alice\",   3.202, 'red', '{\"key1\": \"value1\"}', null),\n"
+                            + "       (2,\"Two\",   \"Bob\",     1.703, 'white', '{\"key2\": \"value2\"}', null),\n"
+                            + "       (3,\"Three\", \"Cecily\",  4.105, 'red', '{\"key3\": \"value3\"}', null),\n"
+                            + "       (4,\"Four\",  \"Derrida\", 1.857, 'white', '{\"key4\": \"value4\"}', null),\n"
+                            + "       (5,\"Five\",  \"Evelyn\",  5.211, 'red', '{\"K\": \"V\", \"k\": \"v\"}', null)");
+        } catch (SQLException e) {
+            LOG.error("Create table for CDC failed.", e);
+            throw e;
+        }
+
+        submitPipelineJob(pipelineJob, paimonCdcConnector, hadoopJar);
+        waitUntilJobRunning(Duration.ofSeconds(30));
+        LOG.info("Pipeline job is running");
+
+        // Validate initial snapshot data
+        validateSinkResult(
+                warehouse,
+                database,
+                "readChangelogAsAppendOnly",
+                Arrays.asList(
+                        "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null, +I",
+                        "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, +I",
+                        "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, +I",
+                        "4, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, +I",
+                        "5, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, +I"));
+
+        LOG.info("Begin incremental reading stage with append-only enabled.");
+
+        // Perform CDC operations: INSERT, UPDATE, DELETE
+        try (Connection conn =
+                        DriverManager.getConnection(
+                                mysqlJdbcUrl, MYSQL_TEST_USER, MYSQL_TEST_PASSWORD);
+                Statement stat = conn.createStatement()) {
+
+            // INSERT operations - these should appear as new records
+            stat.execute(
+                    "INSERT INTO readChangelogAsAppendOnly VALUES (6,'Six','Ferris',9.813, null, null, null);");
+            stat.execute(
+                    "INSERT INTO readChangelogAsAppendOnly VALUES (7,'Seven','Grace',2.117, null, null, null);");
+
+            // UPDATE operations - with append-only, both old and new versions should be preserved
+            stat.execute(
+                    "UPDATE readChangelogAsAppendOnly SET description='Alice Updated' WHERE id=1;");
+            stat.execute("UPDATE readChangelogAsAppendOnly SET weight=2.0 WHERE id=2;");
+
+            // DELETE operations - with append-only, delete records should be preserved with
+            // row_kind metadata
+            stat.execute("DELETE FROM readChangelogAsAppendOnly WHERE id=3;");
+
+            Thread.sleep(5000); // Wait for changes to be processed
+        } catch (SQLException e) {
+            LOG.error("Update table for CDC failed.", e);
+            throw e;
+        }
+
+        // For append-only mode, we expect to see all operations preserved as separate records
+        // This includes the original records, plus insert records, plus update records (before and
+        // after), plus delete records
+        List<String> expectedAppendOnlyRecords =
+                Arrays.asList(
+                        "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null, +I", // Original
+                        "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, +I", // Original
+                        "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, +I", // Original
+                        "4, Four, Derrida, 1.857, white, {\"key4\": \"value4\"}, null, +I", // Original
+                        "5, Five, Evelyn, 5.211, red, {\"K\": \"V\", \"k\": \"v\"}, null, +I", // Original
+                        "6, Six, Ferris, 9.813, null, null, null, +I", // Insert
+                        "7, Seven, Grace, 2.117, null, null, null, +I", // Insert
+                        "1, One, Alice, 3.202, red, {\"key1\": \"value1\"}, null, -U", // Update
+                        // id=1
+                        // (before)
+                        "1, One, Alice Updated, 3.202, red, {\"key1\": \"value1\"}, null, +U", // Update
+                        // id=1 (after)
+                        "2, Two, Bob, 1.703, white, {\"key2\": \"value2\"}, null, -U", // Update
+                        // id=2
+                        // (before)
+                        "2, Two, Bob, 2.0, white, {\"key2\": \"value2\"}, null, +U", // Update id=2
+                        // (after)
+                        "3, Three, Cecily, 4.105, red, {\"key3\": \"value3\"}, null, -D" // Delete
+                        // id=3
+                        );
+
+        validateSinkResult(
+                warehouse, database, "readChangelogAsAppendOnly", expectedAppendOnlyRecords);
+    }
+
+    @Test
     public void testSinkToAppendOnlyTable() throws Exception {
         String warehouse = sharedVolume.toString() + "/" + "paimon_" + UUID.randomUUID();
         String database = inventoryDatabase.getDatabaseName();
