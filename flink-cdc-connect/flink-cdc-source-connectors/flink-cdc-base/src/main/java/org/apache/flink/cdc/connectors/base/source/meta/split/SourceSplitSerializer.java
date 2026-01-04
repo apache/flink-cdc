@@ -26,7 +26,6 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
@@ -145,7 +144,7 @@ public abstract class SourceSplitSerializer
             }
             TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
             String splitId = in.readUTF();
-            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
+            RowType splitKeyType = null;
             Object[] splitBoundaryStart = SerializerUtils.serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = SerializerUtils.serializedStringToRow(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);

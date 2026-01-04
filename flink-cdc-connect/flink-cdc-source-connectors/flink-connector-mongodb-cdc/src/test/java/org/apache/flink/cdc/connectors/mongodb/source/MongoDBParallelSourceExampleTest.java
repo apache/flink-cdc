@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER;
 import static org.apache.flink.cdc.connectors.mongodb.utils.MongoDBContainer.FLINK_USER_PASSWORD;
-import static org.apache.flink.streaming.api.environment.ExecutionCheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH;
+import static org.apache.flink.configuration.CheckpointingOptions.ENABLE_CHECKPOINTS_AFTER_TASKS_FINISH;
 
 /** Example Tests for {@link MongoDBSource}. */
 class MongoDBParallelSourceExampleTest extends MongoDBSourceTestBase {

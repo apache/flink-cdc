@@ -34,6 +34,7 @@ limitations under the License.
 
     <properties>
         <fluss.version>0.7.0</fluss.version>
+        <flink.version>1.20.3</flink.version>
     </properties>
 
     <dependencies>

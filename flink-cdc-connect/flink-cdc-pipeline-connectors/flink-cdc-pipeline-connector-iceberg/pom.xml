@@ -30,6 +30,10 @@ limitations under the License.
 
     <name>flink-cdc-pipeline-connector-iceberg</name>
 
+    <properties>
+        <flink.version>1.20.3</flink.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.iceberg</groupId>

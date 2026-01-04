@@ -23,7 +23,6 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -44,6 +43,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+
+import static org.apache.flink.table.legacy.api.TableSchema.fromResolvedSchema;
 
 /** Test for {@link OracleTableSource} created by {@link OracleTableSourceFactory}. */
 class OracleTableSourceFactoryTest {
@@ -473,16 +474,18 @@ class OracleTableSourceFactoryTest {
 
     private static DynamicTableSource createTableSource(
             ResolvedSchema schema, Map<String, String> options) {
-        return FactoryUtil.createTableSource(
+        return FactoryUtil.createDynamicTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                Schema.newBuilder().fromResolvedSchema(schema).build(),
-                                "mock source",
-                                new ArrayList<>(),
-                                options),
+                        CatalogTable.newBuilder()
+                                .schema(fromResolvedSchema(schema).toSchema())
+                                .comment("mock source")
+                                .partitionKeys(new ArrayList<>())
+                                .options(options)
+                                .build(),
                         schema),
+                new HashMap<>(),
                 new Configuration(),
                 OracleTableSourceFactoryTest.class.getClassLoader(),
                 false);

@@ -20,7 +20,7 @@ package org.apache.flink.cdc.cli;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
-import org.apache.flink.core.execution.RestoreMode;
+import org.apache.flink.core.execution.RecoveryClaimMode;
 import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
@@ -107,7 +107,8 @@ class CliFrontendTest {
                         "-n");
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_PATH))
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getFlinkConfig().get(RESTORE_MODE)).isEqualTo(RestoreMode.NO_CLAIM);
+        assertThat(executor.getFlinkConfig().get(RESTORE_MODE))
+                .isEqualTo(RecoveryClaimMode.NO_CLAIM);
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
     }
 

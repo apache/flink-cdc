@@ -93,8 +93,7 @@ public class MySqlSourceReader<T>
             MySqlSourceReaderContext context,
             MySqlSourceConfig sourceConfig) {
         super(
-                elementQueue,
-                new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
+                new SingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
                 config,
                 context.getSourceReaderContext());

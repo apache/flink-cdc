@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -34,6 +33,7 @@ import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -265,48 +265,57 @@ class PostgresSourceITCase extends PostgresTestBase {
         if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             Assertions.assertThatThrownBy(
                             () -> {
+                                StreamExecutionEnvironment env =
+                                        StreamExecutionEnvironment.getExecutionEnvironment();
+                                RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
                                 testPostgresParallelSource(
                                         1,
                                         scanStartupMode,
                                         PostgresTestUtils.FailoverType.NONE,
                                         PostgresTestUtils.FailoverPhase.NEVER,
                                         new String[] {"customers_no_pk"},
-                                        RestartStrategies.noRestart());
+                                        env);
                             })
                     .hasStackTraceContaining(
                             "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
         } else {
+            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+            RestartStrategyUtils.configureNoRestartStrategy(env);
             testPostgresParallelSource(
                     1,
                     scanStartupMode,
                     PostgresTestUtils.FailoverType.NONE,
                     PostgresTestUtils.FailoverPhase.NEVER,
                     new String[] {"customers_no_pk"},
-                    RestartStrategies.noRestart());
+                    env);
         }
     }
 
     @Test
     void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 Collections.singletonMap("scan.incremental.snapshot.backfill.skip", "true"));
     }
 
     @Test
     void testReadSingleTableWithSingleParallelismAndUnboundedChunkFirst() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 DEFAULT_PARALLELISM,
                 DEFAULT_SCAN_STARTUP_MODE,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.SNAPSHOT,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 Collections.singletonMap(
                         "scan.incremental.snapshot.unbounded-chunk-first.enabled", "true"));
     }
@@ -317,13 +326,15 @@ class PostgresSourceITCase extends PostgresTestBase {
         Map<String, String> options = new HashMap<>();
         options.put("debezium.snapshot.fetch.size", "2");
         options.put("debezium.max.batch.size", "3");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 2,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 options,
                 this::checkStreamDataWithDDLDuringFailover);
     }
@@ -333,13 +344,15 @@ class PostgresSourceITCase extends PostgresTestBase {
         Map<String, String> options = new HashMap<>();
         options.put("debezium.snapshot.fetch.size", "2");
         options.put("debezium.max.batch.size", "3");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 1,
                 DEFAULT_SCAN_STARTUP_MODE,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 options);
     }
 
@@ -580,13 +593,15 @@ class PostgresSourceITCase extends PostgresTestBase {
         Map<String, String> options = new HashMap<>();
         options.put("scan.incremental.snapshot.backfill.skip", "false");
         options.put("connector", "postgres-cdc-mock");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 1,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.JM,
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 options,
                 this::checkStreamDataWithHook);
     }
@@ -596,13 +611,15 @@ class PostgresSourceITCase extends PostgresTestBase {
     public void testTableWithChunkColumnOfNoPrimaryKey(String scanStartupMode) throws Exception {
         Assumptions.assumeThat(scanStartupMode).isEqualTo(DEFAULT_SCAN_STARTUP_MODE);
         String chunkColumn = "Name";
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         testPostgresParallelSource(
                 1,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.noRestart(),
+                env,
                 Collections.singletonMap(
                         "scan.incremental.snapshot.chunk.key-column", chunkColumn));
 
@@ -625,13 +642,15 @@ class PostgresSourceITCase extends PostgresTestBase {
         Map<String, String> options = new HashMap<>();
         options.put("heartbeat.interval.ms", "100");
         options.put("debezium.heartbeat.action.query", "INSERT INTO heart_beat_table VALUES(1)");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         testPostgresParallelSource(
                 1,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.noRestart(),
+                env,
                 options);
         try (PostgresConnection connection = getConnection()) {
             assertThat(getCountOfTable(connection, tableId)).isGreaterThan(0);
@@ -645,13 +664,15 @@ class PostgresSourceITCase extends PostgresTestBase {
         options.put("scan.incremental.snapshot.backfill.skip", "false");
         options.put("scan.newly-added-table.enabled", "true");
         options.put("scan.lsn-commit.checkpoints-num-delay", "0");
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 1,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.TM,
                 PostgresTestUtils.FailoverPhase.STREAM,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 options,
                 this::checkStreamDataWithTestLsn);
     }
@@ -659,13 +680,15 @@ class PostgresSourceITCase extends PostgresTestBase {
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
     void testAppendOnly(String scanStartupMode) throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 1,
                 scanStartupMode,
                 PostgresTestUtils.FailoverType.NONE,
                 PostgresTestUtils.FailoverPhase.NEVER,
                 new String[] {"Customers"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 Collections.singletonMap("scan.read-changelog-as-append-only.enabled", "true"),
                 this::checkStreamDataAsAppend);
     }
@@ -776,13 +799,15 @@ class PostgresSourceITCase extends PostgresTestBase {
             String[] captureCustomerTables,
             String scanStartupMode)
             throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testPostgresParallelSource(
                 parallelism,
                 scanStartupMode,
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                RestartStrategies.fixedDelayRestart(1, 0));
+                env);
     }
 
     private void testPostgresParallelSource(
@@ -791,7 +816,7 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration)
+            StreamExecutionEnvironment env)
             throws Exception {
         testPostgresParallelSource(
                 parallelism,
@@ -799,7 +824,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                env,
                 new HashMap<>());
     }
 
@@ -809,7 +834,7 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            StreamExecutionEnvironment env,
             Map<String, String> otherOptions)
             throws Exception {
         testPostgresParallelSource(
@@ -818,7 +843,7 @@ class PostgresSourceITCase extends PostgresTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                env,
                 otherOptions,
                 this::checkStreamData);
     }
@@ -829,16 +854,14 @@ class PostgresSourceITCase extends PostgresTestBase {
             PostgresTestUtils.FailoverType failoverType,
             PostgresTestUtils.FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            StreamExecutionEnvironment env,
             Map<String, String> otherOptions,
             StreamDataChecker streamDataChecker)
             throws Exception {
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
 
         tEnv.executeSql(getSourceDDL(scanStartupMode, captureCustomerTables, otherOptions));
         TableResult tableResult = tEnv.executeSql("select * from customers");

@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.sqlserver.source;
 
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHook;
 import org.apache.flink.cdc.connectors.base.source.utils.hooks.SnapshotPhaseHooks;
@@ -27,6 +26,7 @@ import org.apache.flink.cdc.connectors.sqlserver.source.config.SqlServerSourceCo
 import org.apache.flink.cdc.connectors.sqlserver.source.dialect.SqlServerDialect;
 import org.apache.flink.cdc.connectors.sqlserver.testutils.TestTable;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.catalog.ResolvedSchema;
@@ -141,13 +141,15 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
 
     @Test
     void testReadSingleTableWithSingleParallelismAndSkipBackfill() throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testSqlServerParallelSource(
                 DEFAULT_PARALLELISM,
                 FailoverType.TM,
                 FailoverPhase.SNAPSHOT,
                 new String[] {"dbo.customers"},
                 true,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 null);
     }
 
@@ -309,13 +311,15 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
     @Test
     public void testTableWithChunkColumnOfNoPrimaryKey() throws Exception {
         String chunkColumn = "name";
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         testSqlServerParallelSource(
                 1,
                 FailoverType.NONE,
                 FailoverPhase.NEVER,
                 new String[] {"dbo.customers"},
                 false,
-                RestartStrategies.noRestart(),
+                env,
                 chunkColumn);
 
         // since `scan.incremental.snapshot.chunk.key-column` is set, an exception should not occur.
@@ -408,6 +412,8 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testSqlServerParallelSource(
                 parallelism,
                 scanStartupMode,
@@ -415,7 +421,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 false,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 null);
     }
 
@@ -425,14 +431,10 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables)
             throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testSqlServerParallelSource(
-                parallelism,
-                failoverType,
-                failoverPhase,
-                captureCustomerTables,
-                false,
-                RestartStrategies.fixedDelayRestart(1, 0),
-                null);
+                parallelism, failoverType, failoverPhase, captureCustomerTables, false, env, null);
     }
 
     private void testSqlServerParallelSource(
@@ -441,7 +443,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             boolean skipSnapshotBackfill,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            StreamExecutionEnvironment env,
             String chunkColumn)
             throws Exception {
         testSqlServerParallelSource(
@@ -451,7 +453,7 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
                 failoverPhase,
                 captureCustomerTables,
                 skipSnapshotBackfill,
-                restartStrategyConfiguration,
+                env,
                 chunkColumn);
     }
 
@@ -462,19 +464,17 @@ class SqlServerSourceITCase extends SqlServerSourceTestBase {
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
             boolean skipSnapshotBackfill,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            StreamExecutionEnvironment env,
             String chunkColumn)
             throws Exception {
 
         String databaseName = "customer";
 
         initializeSqlServerTable(databaseName);
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
 
         String sourceDDL =
                 format(

@@ -21,8 +21,8 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
 import org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.legacy.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -31,7 +31,6 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.connector.source.ScanTableSource;
-import org.apache.flink.table.connector.source.SourceFunctionProvider;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.flink.table.runtime.connector.source.ScanRuntimeProviderContext;
@@ -63,6 +62,7 @@ import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourc
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCAN_NO_CURSOR_TIMEOUT;
 import static org.apache.flink.cdc.connectors.mongodb.source.config.MongoDBSourceOptions.SCHEME;
 import static org.apache.flink.cdc.connectors.utils.AssertUtils.assertProducedTypeOfSourceFunction;
+import static org.apache.flink.table.legacy.api.TableSchema.fromResolvedSchema;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Test for {@link MongoDBTableSource} created by {@link MongoDBTableSourceFactory}. */
@@ -387,16 +387,18 @@ class MongoDBTableFactoryTest {
 
     private static DynamicTableSource createTableSource(
             ResolvedSchema schema, Map<String, String> options) {
-        return FactoryUtil.createTableSource(
+        return FactoryUtil.createDynamicTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                Schema.newBuilder().fromResolvedSchema(schema).build(),
-                                "mock source",
-                                new ArrayList<>(),
-                                options),
+                        CatalogTable.newBuilder()
+                                .schema(fromResolvedSchema(schema).toSchema())
+                                .comment("mock source")
+                                .partitionKeys(new ArrayList<>())
+                                .options(options)
+                                .build(),
                         schema),
+                new HashMap<>(),
                 new Configuration(),
                 MongoDBTableFactoryTest.class.getClassLoader(),
                 false);

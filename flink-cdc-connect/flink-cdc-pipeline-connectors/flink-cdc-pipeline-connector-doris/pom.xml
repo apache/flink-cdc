@@ -29,6 +29,7 @@ limitations under the License.
     <properties>
         <doris.connector.version>25.1.0</doris.connector.version>
         <mysql.connector.version>8.0.26</mysql.connector.version>
+        <flink.version>1.20.3</flink.version>
     </properties>
 
     <dependencies>

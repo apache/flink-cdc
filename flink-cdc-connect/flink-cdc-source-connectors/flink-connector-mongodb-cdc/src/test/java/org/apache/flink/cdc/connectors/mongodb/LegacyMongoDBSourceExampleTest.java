@@ -19,7 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb;
 
 import org.apache.flink.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.source.legacy.SourceFunction;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

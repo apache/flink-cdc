@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.connectors.postgres.source;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.data.ArrayData;
 import org.apache.flink.cdc.common.data.DateData;
@@ -42,6 +41,7 @@ import org.apache.flink.cdc.connectors.postgres.factory.PostgresDataSourceFactor
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.util.CloseableIterator;
@@ -134,7 +134,7 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         TestValuesTableFactory.clearAllData();
         env.setParallelism(4);
         env.enableCheckpointing(2000);
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         slotName = getSlotName();
     }
 

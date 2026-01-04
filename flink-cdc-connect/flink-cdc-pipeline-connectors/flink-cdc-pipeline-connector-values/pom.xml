@@ -28,6 +28,7 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-values</artifactId>
 
     <properties>
+        <flink.version>1.20.3</flink.version>
     </properties>
 
     <dependencies>

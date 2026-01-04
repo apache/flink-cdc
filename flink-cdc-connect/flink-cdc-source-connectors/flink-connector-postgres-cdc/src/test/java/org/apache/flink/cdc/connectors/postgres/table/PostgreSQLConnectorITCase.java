@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.connectors.postgres.table;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -103,7 +103,7 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     void setup(boolean parallelismSnapshot) {
         TestValuesTableFactory.clearAllData();
-        env.setRestartStrategy(RestartStrategies.noRestart());
+        RestartStrategyUtils.configureNoRestartStrategy(env);
         if (parallelismSnapshot) {
             env.setParallelism(4);
             env.enableCheckpointing(200);

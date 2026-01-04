@@ -19,7 +19,7 @@ package org.apache.flink.cdc.debezium.internal;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.source.legacy.SourceFunction;
 import org.apache.flink.util.Collector;
 
 import io.debezium.connector.SnapshotRecord;

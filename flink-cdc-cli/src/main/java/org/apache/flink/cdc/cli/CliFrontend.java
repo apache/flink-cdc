@@ -27,7 +27,6 @@ import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.configuration.DeploymentOptions;
 import org.apache.flink.core.fs.Path;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.runtime.jobgraph.SavepointRestoreSettings;
 
 import org.apache.flink.shaded.guava31.com.google.common.base.Joiner;
@@ -172,8 +171,6 @@ public class CliFrontend {
                         org.apache.flink.configuration.ConfigurationUtils.convertValue(
                                 commandLine.getOptionValue(SAVEPOINT_CLAIM_MODE),
                                 ConfigurationUtils.getClaimModeClass());
-            } else {
-                restoreMode = SavepointConfigOptions.RESTORE_MODE.defaultValue();
             }
             // allowNonRestoredState is always false because all operators are predefined.
 
@@ -191,7 +188,7 @@ public class CliFrontend {
                                                     null,
                                                     savepointPath,
                                                     allowNonRestoredState,
-                                                    restoreMode);
+                                                    null);
                                         } catch (IllegalAccessException
                                                 | InvocationTargetException e) {
                                             throw new RuntimeException(

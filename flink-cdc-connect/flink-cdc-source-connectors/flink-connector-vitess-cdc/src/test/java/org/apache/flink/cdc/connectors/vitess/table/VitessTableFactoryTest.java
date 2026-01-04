@@ -41,7 +41,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
+import static org.apache.flink.table.legacy.api.TableSchema.fromResolvedSchema;
 
 /** Test for {@link VitessTableSource} created by {@link VitessTableFactory}. */
 class VitessTableFactoryTest {
@@ -172,16 +172,18 @@ class VitessTableFactoryTest {
     }
 
     private static DynamicTableSource createTableSource(Map<String, String> options) {
-        return FactoryUtil.createTableSource(
+        return FactoryUtil.createDynamicTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                fromResolvedSchema(SCHEMA).toSchema(),
-                                "mock source",
-                                new ArrayList<>(),
-                                options),
+                        CatalogTable.newBuilder()
+                                .schema(fromResolvedSchema(SCHEMA).toSchema())
+                                .comment("mock source")
+                                .partitionKeys(new ArrayList<>())
+                                .options(options)
+                                .build(),
                         SCHEMA),
+                new HashMap<>(),
                 new Configuration(),
                 VitessTableFactoryTest.class.getClassLoader(),
                 false);

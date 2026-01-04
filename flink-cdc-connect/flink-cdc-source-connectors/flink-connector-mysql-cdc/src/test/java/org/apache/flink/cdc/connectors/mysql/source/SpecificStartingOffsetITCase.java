@@ -28,9 +28,9 @@ import org.apache.flink.cdc.connectors.mysql.testutils.TestTable;
 import org.apache.flink.cdc.connectors.mysql.testutils.TestTableSchemas;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.core.execution.SavepointFormatType;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
@@ -489,14 +489,16 @@ class SpecificStartingOffsetITCase {
     private <T> CollectResultIterator<T> addCollector(
             StreamExecutionEnvironment env, DataStream<T> stream) {
         TypeSerializer<T> serializer =
-                stream.getTransformation().getOutputType().createSerializer(env.getConfig());
+                stream.getTransformation()
+                        .getOutputType()
+                        .createSerializer(env.getConfig().getSerializerConfig());
         String accumulatorName = "dataStreamCollect_" + UUID.randomUUID();
         CollectSinkOperatorFactory<T> factory =
                 new CollectSinkOperatorFactory<>(serializer, accumulatorName);
         CollectSinkOperator<T> operator = (CollectSinkOperator<T>) factory.getOperator();
         CollectResultIterator<T> iterator =
                 new CollectResultIterator<>(
-                        operator.getOperatorIdFuture(),
+                        operator.getOperatorID().toString(),
                         serializer,
                         accumulatorName,
                         env.getCheckpointConfig(),
@@ -583,7 +585,7 @@ class SpecificStartingOffsetITCase {
         Field field = clazz.getDeclaredField("configuration");
         field.setAccessible(true);
         Configuration configuration = (Configuration) field.get(env);
-        configuration.setString(SavepointConfigOptions.SAVEPOINT_PATH, savepointPath);
+        configuration.set(StateRecoveryOptions.SAVEPOINT_PATH, savepointPath);
     }
 
     private void duplicateTransformations(

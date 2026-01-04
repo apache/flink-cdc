@@ -18,12 +18,12 @@
 package org.apache.flink.cdc.connectors.oceanbase;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
@@ -146,13 +146,15 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
     @MethodSource("parameters")
     public void testTaskManagerFailoverFromLatestOffset(String tableName, String chunkColumnName)
             throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
                 FailoverType.TM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 tableName,
                 chunkColumnName);
     }
@@ -185,13 +187,15 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
     @MethodSource("parameters")
     public void testJobManagerFailoverFromLatestOffset(String tableName, String chunkColumnName)
             throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testMySqlParallelSource(
                 DEFAULT_PARALLELISM,
                 "latest-offset",
                 FailoverType.JM,
                 FailoverPhase.BINLOG,
                 new String[] {tableName, "customers_1"},
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 tableName,
                 chunkColumnName);
     }
@@ -246,13 +250,15 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             String tableName,
             String chunkColumnName)
             throws Exception {
+        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 1, 0);
         testMySqlParallelSource(
                 parallelism,
                 DEFAULT_SCAN_STARTUP_MODE,
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                RestartStrategies.fixedDelayRestart(1, 0),
+                env,
                 tableName,
                 chunkColumnName);
     }
@@ -263,7 +269,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            StreamExecutionEnvironment env,
             String tableName,
             String chunkColumnName)
             throws Exception {
@@ -273,7 +279,7 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
                 failoverType,
                 failoverPhase,
                 captureCustomerTables,
-                restartStrategyConfiguration,
+                env,
                 false,
                 tableName,
                 chunkColumnName);
@@ -285,19 +291,17 @@ public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
             FailoverType failoverType,
             FailoverPhase failoverPhase,
             String[] captureCustomerTables,
-            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            StreamExecutionEnvironment env,
             boolean skipSnapshotBackfill,
             String tableName,
             String chunkColumnName)
             throws Exception {
         captureCustomerTables = new String[] {tableName};
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.enableCheckpointing(3000L, CheckpointingMode.EXACTLY_ONCE);
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(restartStrategyConfiguration);
         String sourceDDL =
                 format(
                         "CREATE TABLE customers ("

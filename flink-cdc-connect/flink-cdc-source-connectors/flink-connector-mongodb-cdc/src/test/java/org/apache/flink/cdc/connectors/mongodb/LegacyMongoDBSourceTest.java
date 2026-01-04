@@ -27,7 +27,6 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.connectors.utils.TestSourceContext;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.testutils.CheckedThread;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContextSynchronousImpl;
@@ -452,14 +451,11 @@ class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             throws Exception {
 
         // run setup procedure in operator life cycle
-        source.setRuntimeContext(
-                new MockStreamingRuntimeContext(
-                        isCheckpointingEnabled, totalNumSubtasks, subtaskIndex));
+        source.setRuntimeContext(new MockStreamingRuntimeContext(totalNumSubtasks, subtaskIndex));
         source.initializeState(
                 new MockFunctionInitializationContext(
                         isRestored,
                         new MockOperatorStateStore(restoredOffsetState, restoredHistoryState)));
-        source.open(new Configuration());
     }
 
     /**
@@ -506,6 +502,27 @@ class LegacyMongoDBSourceTest extends LegacyMongoDBTestBase {
             } else {
                 throw new IllegalStateException("Unknown state.");
             }
+        }
+
+        @Override
+        public <K, V> BroadcastState<K, V> getBroadcastState(
+                org.apache.flink.api.common.state.v2.MapStateDescriptor<K, V> mapStateDescriptor)
+                throws Exception {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <S> org.apache.flink.api.common.state.v2.ListState<S> getListState(
+                org.apache.flink.api.common.state.v2.ListStateDescriptor<S> listStateDescriptor)
+                throws Exception {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public <S> org.apache.flink.api.common.state.v2.ListState<S> getUnionListState(
+                org.apache.flink.api.common.state.v2.ListStateDescriptor<S> listStateDescriptor)
+                throws Exception {
+            throw new UnsupportedOperationException();
         }
 
         @Override

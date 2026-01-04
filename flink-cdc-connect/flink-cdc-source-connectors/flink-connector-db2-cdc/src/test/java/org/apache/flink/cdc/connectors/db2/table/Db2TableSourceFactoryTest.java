@@ -45,7 +45,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.flink.cdc.debezium.utils.ResolvedSchemaUtils.getPhysicalSchema;
-import static org.apache.flink.table.api.TableSchema.fromResolvedSchema;
+import static org.apache.flink.table.legacy.api.TableSchema.fromResolvedSchema;
 
 /** Test for {@link Db2TableSource} created by {@link Db2TableSourceFactory}. */
 class Db2TableSourceFactoryTest {
@@ -254,16 +254,18 @@ class Db2TableSourceFactoryTest {
 
     private static DynamicTableSource createTableSource(
             Map<String, String> options, ResolvedSchema schema) {
-        return FactoryUtil.createTableSource(
+        return FactoryUtil.createDynamicTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                fromResolvedSchema(schema).toSchema(),
-                                "mock source",
-                                new ArrayList<>(),
-                                options),
+                        CatalogTable.newBuilder()
+                                .schema(fromResolvedSchema(schema).toSchema())
+                                .comment("mock source")
+                                .partitionKeys(new ArrayList<>())
+                                .options(options)
+                                .build(),
                         schema),
+                new HashMap<>(),
                 new Configuration(),
                 Db2TableSourceFactoryTest.class.getClassLoader(),
                 false);

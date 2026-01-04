@@ -35,13 +35,16 @@ limitations under the License.
     <modules>
         <module>flink-cdc-cli</module>
         <module>flink-cdc-common</module>
+        <module>flink-cdc-common-2.x</module>
         <module>flink-cdc-composer</module>
+        <module>flink-cdc-composer-2.x</module>
         <module>flink-cdc-dist</module>
         <module>flink-cdc-connect</module>
         <module>flink-cdc-runtime</module>
         <module>flink-cdc-e2e-tests</module>
         <module>flink-cdc-pipeline-udf-examples</module>
         <module>flink-cdc-pipeline-model</module>
+        <module>flink-cdc-runtime-2.x</module>
     </modules>
 
     <licenses>
@@ -67,7 +70,7 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.3</flink.version>
+        <flink.version>2.2.0</flink.version>
         <flink.major.version>1.20</flink.major.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>

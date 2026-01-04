@@ -41,6 +41,7 @@ limitations under the License.
         <avro.version>1.11.4</avro.version>
         <httpcore.version>4.4.16</httpcore.version>
         <httpclient.version>4.5.14</httpclient.version>
+        <flink.version>1.20.3</flink.version>
     </properties>
 
     <dependencies>

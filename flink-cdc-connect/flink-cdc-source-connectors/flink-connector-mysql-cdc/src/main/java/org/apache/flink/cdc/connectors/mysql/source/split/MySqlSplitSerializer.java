@@ -22,8 +22,6 @@ import org.apache.flink.cdc.debezium.history.FlinkJsonTableChangeSerializer;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataOutputSerializer;
-import org.apache.flink.table.types.logical.RowType;
-import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
 
 import io.debezium.document.Document;
 import io.debezium.document.DocumentReader;
@@ -135,7 +133,6 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
         if (splitKind == SNAPSHOT_SPLIT_FLAG) {
             TableId tableId = TableId.parse(in.readUTF());
             String splitId = in.readUTF();
-            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
             Object[] splitBoundaryStart = serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = serializedStringToRow(in.readUTF());
             BinlogOffset highWatermark = readBinlogPosition(version, in);
@@ -144,7 +141,7 @@ public final class MySqlSplitSerializer implements SimpleVersionedSerializer<MyS
             return new MySqlSnapshotSplit(
                     tableId,
                     splitId,
-                    splitKeyType,
+                    null,
                     splitBoundaryStart,
                     splitBoundaryEnd,
                     highWatermark,

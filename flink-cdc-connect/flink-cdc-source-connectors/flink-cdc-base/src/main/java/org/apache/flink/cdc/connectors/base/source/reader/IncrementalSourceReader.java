@@ -119,8 +119,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect<C> dialect) {
         super(
-                elementQueue,
-                new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
+                new SingleThreadFetcherManager<>(splitReaderSupplier::get),
                 recordEmitter,
                 config,
                 incrementalSourceReaderContext.getSourceReaderContext());

@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.tidb.table;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectIdentifier;
@@ -37,6 +36,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.apache.flink.table.legacy.api.TableSchema.fromResolvedSchema;
 
 /** Unit tests for TiDB table source factory. */
 class TiDBTableSourceFactoryTest {
@@ -136,16 +137,18 @@ class TiDBTableSourceFactoryTest {
 
     private static DynamicTableSource createTableSource(
             ResolvedSchema schema, Map<String, String> options) {
-        return FactoryUtil.createTableSource(
+        return FactoryUtil.createDynamicTableSource(
                 null,
                 ObjectIdentifier.of("default", "default", "t1"),
                 new ResolvedCatalogTable(
-                        CatalogTable.of(
-                                Schema.newBuilder().fromResolvedSchema(schema).build(),
-                                "mock source",
-                                new ArrayList<>(),
-                                options),
+                        CatalogTable.newBuilder()
+                                .schema(fromResolvedSchema(schema).toSchema())
+                                .comment("mock source")
+                                .partitionKeys(new ArrayList<>())
+                                .options(options)
+                                .build(),
                         schema),
+                new HashMap<>(),
                 new Configuration(),
                 TiDBTableSourceFactoryTest.class.getClassLoader(),
                 false);

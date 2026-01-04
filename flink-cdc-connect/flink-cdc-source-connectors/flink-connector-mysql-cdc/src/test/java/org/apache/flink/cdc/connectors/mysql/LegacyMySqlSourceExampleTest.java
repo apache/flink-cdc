@@ -20,7 +20,7 @@ package org.apache.flink.cdc.connectors.mysql;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.StringDebeziumDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.source.legacy.SourceFunction;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

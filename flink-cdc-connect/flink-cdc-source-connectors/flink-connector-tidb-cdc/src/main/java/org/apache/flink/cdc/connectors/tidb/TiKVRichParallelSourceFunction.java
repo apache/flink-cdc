@@ -26,16 +26,12 @@ import org.apache.flink.api.java.typeutils.ResultTypeQueryable;
 import org.apache.flink.cdc.connectors.tidb.metrics.TiDBSourceMetrics;
 import org.apache.flink.cdc.connectors.tidb.table.StartupMode;
 import org.apache.flink.cdc.connectors.tidb.table.utils.TableKeyRangeUtils;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
-import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.apache.flink.streaming.api.functions.source.legacy.RichParallelSourceFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.Preconditions;
-
-import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +39,6 @@ import org.tikv.cdc.CDCClient;
 import org.tikv.common.TiConfiguration;
 import org.tikv.common.TiSession;
 import org.tikv.common.key.RowKey;
-import org.tikv.common.meta.TiTableInfo;
 import org.tikv.common.meta.TiTimestamp;
 import org.tikv.kvproto.Cdcpb;
 import org.tikv.kvproto.Coprocessor;
@@ -56,9 +51,6 @@ import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -114,45 +106,6 @@ public class TiKVRichParallelSourceFunction<T> extends RichParallelSourceFunctio
         this.startupMode = startupMode;
         this.database = database;
         this.tableName = tableName;
-    }
-
-    @Override
-    public void open(final Configuration config) throws Exception {
-        super.open(config);
-        session = TiSession.create(tiConf);
-        TiTableInfo tableInfo = session.getCatalog().getTable(database, tableName);
-        if (tableInfo == null) {
-            throw new RuntimeException(
-                    String.format("Table %s.%s does not exist.", database, tableName));
-        }
-        long tableId = tableInfo.getId();
-        keyRange =
-                TableKeyRangeUtils.getTableKeyRange(
-                        tableId,
-                        getRuntimeContext().getNumberOfParallelSubtasks(),
-                        getRuntimeContext().getIndexOfThisSubtask());
-        cdcClient = new CDCClient(session, keyRange);
-        prewrites = new TreeMap<>();
-        commits = new TreeMap<>();
-        // cdc event will lose if pull cdc event block when region split
-        // use queue to separate read and write to ensure pull event unblock.
-        // since sink jdbc is slow, 5000W queue size may be safe size.
-        committedEvents = new LinkedBlockingQueue<>();
-        outputCollector = new OutputCollector<>();
-        resolvedTs =
-                startupMode == StartupMode.INITIAL
-                        ? SNAPSHOT_VERSION_EPOCH
-                        : STREAMING_VERSION_START_EPOCH;
-        ThreadFactory threadFactory =
-                new ThreadFactoryBuilder()
-                        .setNameFormat(
-                                "tidb-source-function-"
-                                        + getRuntimeContext().getIndexOfThisSubtask())
-                        .build();
-        executorService = Executors.newSingleThreadExecutor(threadFactory);
-        final MetricGroup metricGroup = getRuntimeContext().getMetricGroup();
-        sourceMetrics = new TiDBSourceMetrics(metricGroup);
-        sourceMetrics.registerMetrics();
     }
 
     @Override

@@ -30,6 +30,7 @@ limitations under the License.
     <properties>
         <!-- TODO: Update this, when StarRocks releases a 1.20 compatible connector. -->
         <starrocks.connector.version>1.2.10_flink-1.19</starrocks.connector.version>
+        <flink.version>1.20.3</flink.version>
     </properties>
 
     <dependencies>

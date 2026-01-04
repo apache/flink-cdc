@@ -26,6 +26,10 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-maxcompute</artifactId>
     <name>flink-cdc-pipeline-connector-maxcompute</name>
 
+    <properties>
+        <flink.version>1.20.3</flink.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>

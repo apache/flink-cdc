@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.connectors.tidb;
 
 import org.apache.flink.cdc.connectors.tidb.table.StartupOptions;
-import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
+import org.apache.flink.streaming.api.functions.source.legacy.RichParallelSourceFunction;
 
 import org.tikv.common.TiConfiguration;
 

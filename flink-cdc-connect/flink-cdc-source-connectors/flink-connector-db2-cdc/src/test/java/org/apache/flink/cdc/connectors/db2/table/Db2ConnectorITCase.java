@@ -17,10 +17,11 @@
 
 package org.apache.flink.cdc.connectors.db2.table;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.db2.Db2TestBase;
 import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.cdc.connectors.utils.StaticExternalResourceProxy;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.RestartStrategyOptions;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -77,8 +78,10 @@ class Db2ConnectorITCase extends Db2TestBase {
             new StaticExternalResourceProxy<>(LegacyRowResource.INSTANCE);
 
     public void setup(boolean incrementalSnapshot) {
+        Configuration configuration = new Configuration();
+        configuration.set(RestartStrategyOptions.RESTART_STRATEGY, "disable");
+        env.configure(configuration);
         TestValuesTableFactory.clearAllData();
-        env.setRestartStrategy(RestartStrategies.noRestart());
         if (incrementalSnapshot) {
             env.setParallelism(DEFAULT_PARALLELISM);
             env.enableCheckpointing(1000);

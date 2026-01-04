@@ -17,14 +17,15 @@
 
 package org.apache.flink.cdc.connectors.mongodb.source;
 
-import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBAssertUtils;
 import org.apache.flink.cdc.connectors.mongodb.utils.MongoDBTestUtils;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.StateRecoveryOptions;
 import org.apache.flink.core.execution.JobClient;
+import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
-import org.apache.flink.runtime.jobgraph.SavepointConfigOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.util.RestartStrategyUtils;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.table.planner.factories.TestValuesTableFactory;
@@ -928,7 +929,9 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         // retry 600 times, it takes 100 milliseconds per time, at most retry 1 minute
         while (retryTimes < 600) {
             try {
-                return jobClient.triggerSavepoint(savepointDirectory).get();
+                return jobClient
+                        .triggerSavepoint(savepointDirectory, SavepointFormatType.DEFAULT)
+                        .get();
             } catch (Exception e) {
                 Optional<CheckpointException> exception =
                         ExceptionUtils.findThrowable(e, CheckpointException.class);
@@ -950,13 +953,13 @@ class NewlyAddedTableITCase extends MongoDBSourceTestBase {
         Configuration tableConfig = new Configuration();
         tableConfig.setString("table.exec.sink.upsert-materialize", "none");
         if (finishedSavePointPath != null) {
-            tableConfig.setString(SavepointConfigOptions.SAVEPOINT_PATH, finishedSavePointPath);
+            tableConfig.set(StateRecoveryOptions.SAVEPOINT_PATH, finishedSavePointPath);
         }
         StreamExecutionEnvironment env =
                 StreamExecutionEnvironment.getExecutionEnvironment(tableConfig);
         env.setParallelism(parallelism);
         env.enableCheckpointing(200L);
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100L));
+        RestartStrategyUtils.configureFixedDelayRestartStrategy(env, 3, 100L);
         return env;
     }
 
