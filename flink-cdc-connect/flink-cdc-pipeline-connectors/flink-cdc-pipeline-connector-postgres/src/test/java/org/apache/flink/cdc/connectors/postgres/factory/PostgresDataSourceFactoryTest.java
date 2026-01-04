@@ -89,7 +89,7 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
         PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
         assertThat(dataSource.getPostgresSourceConfig().getTableList())
-                .isEqualTo(Arrays.asList("postgres.inventory.products"));
+                .isEqualTo(Arrays.asList("inventory.products"));
     }
 
     @Test
@@ -131,12 +131,12 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
                 new ArrayList<>(dataSource.getPostgresSourceConfig().getTableList());
         Collections.sort(actualTableList);
         assertThat(actualTableList)
-                .isNotEqualTo(Collections.singletonList("postgres.inventory.orders"))
+                .isNotEqualTo(Collections.singletonList("inventory.orders"))
                 .isEqualTo(
                         Arrays.asList(
-                                "postgres.inventory.customers",
-                                "postgres.inventory.multi_max_table",
-                                "postgres.inventory.products"));
+                                "inventory.customers",
+                                "inventory.multi_max_table",
+                                "inventory.products"));
     }
 
     @Test
@@ -254,7 +254,7 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
         PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
         assertThat(dataSource.getPostgresSourceConfig().getTableList())
-                .isEqualTo(Arrays.asList("postgres.inventory.products"));
+                .isEqualTo(Arrays.asList("inventory.products"));
     }
 
     @Test
