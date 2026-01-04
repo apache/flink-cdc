@@ -1,4 +1,4 @@
----
+q---
 title: "Postgres"
 weight: 2
 type: docs
@@ -268,6 +268,18 @@ pipeline:
         在快照读取阶段，是否优先分配无界分块。<br>
         这有助于降低在对最大无界分块进行快照时，TaskManager 发生内存溢出（OOM）错误的风险。<br>
         此为实验性选项，默认值为 false。
+      </td>
+    </tr>
+    <tr>
+      <td>table-id.include-database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        是否在生成的 Table ID 中包含数据库名称。<br>
+        如果设置为 true，Table ID 的格式为 (数据库, 模式, 表)。<br>
+        如果设置为 false，Table ID 的格式为 (模式, 表)。<br>
+        默认值为 false。
       </td>
     </tr>
     </tbody>

@@ -208,12 +208,26 @@ public class PostgresSchemaUtils {
 
     public static io.debezium.relational.TableId toDbzTableId(TableId tableId) {
         return new io.debezium.relational.TableId(
-                tableId.getSchemaName(), null, tableId.getTableName());
+                tableId.getNamespace(), tableId.getSchemaName(), tableId.getTableName());
     }
 
     public static org.apache.flink.cdc.common.event.TableId toCdcTableId(
             io.debezium.relational.TableId dbzTableId) {
-        return org.apache.flink.cdc.common.event.TableId.tableId(
-                dbzTableId.schema(), dbzTableId.table());
+        return toCdcTableId(dbzTableId, null, false);
+    }
+
+    public static org.apache.flink.cdc.common.event.TableId toCdcTableId(
+            io.debezium.relational.TableId dbzTableId,
+            String databaseName,
+            boolean includeDatabaseInTableId) {
+        String schema = dbzTableId.schema();
+        String table = dbzTableId.table();
+        if (includeDatabaseInTableId && databaseName != null) {
+            return org.apache.flink.cdc.common.event.TableId.tableId(databaseName, schema, table);
+        } else if (schema != null) {
+            return org.apache.flink.cdc.common.event.TableId.tableId(schema, table);
+        } else {
+            return org.apache.flink.cdc.common.event.TableId.tableId(table);
+        }
     }
 }

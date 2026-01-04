@@ -65,14 +65,20 @@ public class PostgresDataSource implements DataSource {
 
     @Override
     public EventSourceProvider getEventSourceProvider() {
+        String databaseName = postgresSourceConfig.getDatabaseList().get(0);
+        boolean includeDatabaseInTableId = postgresSourceConfig.isIncludeDatabaseInTableId();
         DebeziumEventDeserializationSchema deserializer =
-                new PostgresEventDeserializer(DebeziumChangelogMode.ALL, readableMetadataList);
+                new PostgresEventDeserializer(
+                        DebeziumChangelogMode.ALL,
+                        readableMetadataList,
+                        includeDatabaseInTableId,
+                        databaseName);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);
 
         PostgresSourceBuilder.PostgresIncrementalSource<Event> source =
-                new PostgresPipelineSource<>(
+                new PostgresPipelineSource<Event>(
                         configFactory,
                         deserializer,
                         postgresOffsetFactory,
@@ -112,7 +118,7 @@ public class PostgresDataSource implements DataSource {
         @Override
         protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
                 SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
-            return new PostgresPipelineRecordEmitter<>(
+            return new PostgresPipelineRecordEmitter<T>(
                     deserializationSchema,
                     sourceReaderMetrics,
                     this.sourceConfig,
