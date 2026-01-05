@@ -58,6 +58,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     // Final fields that are set in constructor
     private final String timezone;
     private final List<RouteRule> routingRules;
+    private final RouteRule.MatchMode routeMode;
 
     // Transient fields that are set during open()
     private transient volatile Map<TableId, Schema> originalSchemaMap;
@@ -69,10 +70,14 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     private boolean alreadyMergedCreateTableTables = false;
 
     public BatchSchemaOperator(
-            List<RouteRule> routingRules, MetadataApplier metadataApplier, String timezone) {
+            List<RouteRule> routingRules,
+            RouteRule.MatchMode routeMode,
+            MetadataApplier metadataApplier,
+            String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.metadataApplier = metadataApplier;
     }
 
@@ -89,7 +94,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
         super.open();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
-        this.router = new TableIdRouter(routingRules);
+        this.router = new TableIdRouter(routingRules, routeMode);
         this.derivator = new SchemaDerivator();
         this.schemaManager = new SchemaManager(SchemaChangeBehavior.IGNORE);
     }

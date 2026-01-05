@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.composer.definition.ModelDef;
@@ -80,6 +81,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     private static final String ROUTE_REPLACE_SYMBOL = "replace-symbol";
     private static final String ROUTE_DESCRIPTION_KEY = "description";
 
+    // Pipeline keys
+    private static final String ROUTE_MODE_KEY = "route-mode";
+
     // Transform keys
     private static final String TRANSFORM_SOURCE_TABLE_KEY = "source-table";
     private static final String TRANSFORM_PROJECTION_KEY = "projection";
@@ -133,6 +137,8 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // it's not of plain data types and must be removed before calling toPipelineConfig.
         List<UdfDef> udfDefs = new ArrayList<>();
         final List<ModelDef> modelDefs = new ArrayList<>();
+        // Use default route mode if not specified
+        String routeMode = RouteRule.MatchMode.ALL_MATCH.getConfigValue();
         if (pipelineDefJsonNode.get(PIPELINE_KEY) != null) {
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
@@ -143,6 +149,13 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
                     .map(node -> validateArray("model", node))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
+
+            // Extract route-mode from pipeline if present
+            JsonNode pipelineNode = pipelineDefJsonNode.get(PIPELINE_KEY);
+            if (pipelineNode.has(ROUTE_MODE_KEY)) {
+                routeMode = pipelineNode.get(ROUTE_MODE_KEY).asText();
+                ((ObjectNode) pipelineNode).remove(ROUTE_MODE_KEY);
+            }
         }
 
         // Pipeline configs are optional
@@ -189,7 +202,14 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         pipelineConfig.addAll(userPipelineConfig);
 
         return new PipelineDef(
-                sourceDef, sinkDef, routeDefs, transformDefs, udfDefs, modelDefs, pipelineConfig);
+                sourceDef,
+                sinkDef,
+                routeDefs,
+                routeMode,
+                transformDefs,
+                udfDefs,
+                modelDefs,
+                pipelineConfig);
     }
 
     private SourceDef toSourceDef(JsonNode sourceNode) {

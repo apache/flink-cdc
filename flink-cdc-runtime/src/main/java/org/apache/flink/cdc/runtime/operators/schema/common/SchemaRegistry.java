@@ -86,6 +86,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected final MetadataApplier metadataApplier;
     protected final Duration rpcTimeout;
     protected final List<RouteRule> routingRules;
+    protected final RouteRule.MatchMode routeMode;
     protected final SchemaChangeBehavior behavior;
 
     // -------------------------
@@ -103,6 +104,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
+            RouteRule.MatchMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         this.context = context;
@@ -110,6 +112,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.coordinatorExecutor = coordinatorExecutor;
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.rpcTimeout = rpcTimeout;
         this.behavior = schemaChangeBehavior;
     }
@@ -126,7 +129,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         if (this.schemaManager == null) {
             this.schemaManager = new SchemaManager();
         }
-        this.router = new TableIdRouter(routingRules);
+        this.router = new TableIdRouter(routingRules, routeMode);
     }
 
     @Override

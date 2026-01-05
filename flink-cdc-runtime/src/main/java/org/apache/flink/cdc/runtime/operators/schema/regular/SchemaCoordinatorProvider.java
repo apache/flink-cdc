@@ -39,6 +39,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
     private final String operatorName;
     private final MetadataApplier metadataApplier;
     private final List<RouteRule> routingRules;
+    private final RouteRule.MatchMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final Duration rpcTimeout;
 
@@ -47,12 +48,14 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
             String operatorName,
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
+            RouteRule.MatchMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         this.operatorID = operatorID;
         this.operatorName = operatorName;
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.rpcTimeout = rpcTimeout;
     }
@@ -75,6 +78,7 @@ public class SchemaCoordinatorProvider implements OperatorCoordinator.Provider {
                 coordinatorExecutor,
                 metadataApplier,
                 routingRules,
+                routeMode,
                 schemaChangeBehavior,
                 rpcTimeout);
     }

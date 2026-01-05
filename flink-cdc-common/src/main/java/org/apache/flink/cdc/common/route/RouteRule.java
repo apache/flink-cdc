@@ -24,6 +24,43 @@ public class RouteRule implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /** Match mode for routing rules. */
+    public enum MatchMode {
+        /** Match all applicable routing rules. */
+        ALL_MATCH("all-match"),
+        /** Match only the first applicable routing rule. */
+        FIRST_MATCH("first-match");
+
+        private final String configValue;
+
+        MatchMode(String configValue) {
+            this.configValue = configValue;
+        }
+
+        public String getConfigValue() {
+            return configValue;
+        }
+
+        /**
+         * Parse match mode from configuration value.
+         *
+         * @param value the configuration value
+         * @return the corresponding MatchMode
+         * @throws IllegalArgumentException if the value is invalid
+         */
+        public static MatchMode fromConfigValue(String value) {
+            for (MatchMode mode : values()) {
+                if (mode.configValue.equalsIgnoreCase(value)) {
+                    return mode;
+                }
+            }
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Invalid match-mode value: %s. Allowed values are: %s, %s",
+                            value, FIRST_MATCH.configValue, ALL_MATCH.configValue));
+        }
+    }
+
     public RouteRule(String sourceTable, String sinkTable) {
         this(sourceTable, sinkTable, null);
     }

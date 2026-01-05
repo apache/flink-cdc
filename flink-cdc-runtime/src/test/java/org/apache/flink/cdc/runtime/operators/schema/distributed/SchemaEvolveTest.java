@@ -29,6 +29,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -107,6 +108,7 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                 () ->
                                         new SchemaOperator(
                                                 ROUTING_RULES,
+                                                RouteRule.MatchMode.ALL_MATCH,
                                                 Duration.ofMinutes(3),
                                                 SchemaChangeBehavior.LENIENT,
                                                 "UTC"),
@@ -247,6 +249,7 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                 () ->
                                         new SchemaOperator(
                                                 ROUTING_RULES,
+                                                RouteRule.MatchMode.ALL_MATCH,
                                                 Duration.ofMinutes(3),
                                                 SchemaChangeBehavior.IGNORE,
                                                 "UTC"),
@@ -349,6 +352,7 @@ public class SchemaEvolveTest extends SchemaTestBase {
                                         () ->
                                                 new SchemaOperator(
                                                         ROUTING_RULES,
+                                                        RouteRule.MatchMode.ALL_MATCH,
                                                         Duration.ofMinutes(3),
                                                         SchemaChangeBehavior.EXCEPTION,
                                                         "UTC"),

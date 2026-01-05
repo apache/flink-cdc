@@ -71,13 +71,16 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final String timezone;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
+    private final RouteRule.MatchMode routeMode;
 
     public SchemaOperator(
             List<RouteRule> routingRules,
+            RouteRule.MatchMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.rpcTimeOut = rpcTimeOut;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.timezone = timezone;
@@ -100,7 +103,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         subTaskId = getRuntimeContext().getIndexOfThisSubtask();
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
-        tableIdRouter = new TableIdRouter(routingRules);
+        tableIdRouter = new TableIdRouter(routingRules, routeMode);
         derivator = new SchemaDerivator();
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(

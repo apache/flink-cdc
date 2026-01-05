@@ -100,6 +100,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routes,
+            RouteRule.MatchMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         super(
@@ -108,6 +109,7 @@ public class SchemaCoordinator extends SchemaRegistry {
                 coordinatorExecutor,
                 metadataApplier,
                 routes,
+                routeMode,
                 schemaChangeBehavior,
                 rpcTimeout);
         this.schemaChangeThreadPool = Executors.newSingleThreadExecutor();

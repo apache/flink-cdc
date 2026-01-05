@@ -42,10 +42,12 @@ import java.util.stream.Collectors;
 public class TableIdRouter {
 
     private final List<Tuple3<Selectors, String, String>> routes;
+    private final RouteRule.MatchMode routeMode;
     private final LoadingCache<TableId, List<TableId>> routingCache;
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
-    public TableIdRouter(List<RouteRule> routingRules) {
+    public TableIdRouter(List<RouteRule> routingRules, RouteRule.MatchMode routeMode) {
+        this.routeMode = routeMode;
         this.routes = new ArrayList<>();
         for (RouteRule rule : routingRules) {
             try {
@@ -78,11 +80,19 @@ public class TableIdRouter {
     }
 
     private List<TableId> calculateRoute(TableId sourceTableId) {
-        List<TableId> routedTableIds =
-                routes.stream()
-                        .filter(route -> route.f0.isMatch(sourceTableId))
-                        .map(route -> resolveReplacement(sourceTableId, route))
-                        .collect(Collectors.toList());
+        List<TableId> routedTableIds = new ArrayList<>();
+
+        for (Tuple3<Selectors, String, String> route : routes) {
+            if (route.f0.isMatch(sourceTableId)) {
+                routedTableIds.add(resolveReplacement(sourceTableId, route));
+
+                // If match mode is FIRST_MATCH, stop after the first match
+                if (routeMode == RouteRule.MatchMode.FIRST_MATCH) {
+                    break;
+                }
+            }
+        }
+
         if (routedTableIds.isEmpty()) {
             routedTableIds.add(sourceTableId);
         }

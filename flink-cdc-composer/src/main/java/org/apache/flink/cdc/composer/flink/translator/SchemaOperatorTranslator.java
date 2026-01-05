@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
@@ -55,12 +56,35 @@ public class SchemaOperatorTranslator {
         this.timezone = timezone;
     }
 
+    @VisibleForTesting
     public DataStream<Event> translateRegular(
             DataStream<Event> input,
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes) {
-        return translateRegular(input, parallelism, false, metadataApplier, routes);
+        return translateRegular(
+                input,
+                parallelism,
+                false,
+                metadataApplier,
+                routes,
+                RouteRule.MatchMode.ALL_MATCH.getConfigValue());
+    }
+
+    @VisibleForTesting
+    public DataStream<Event> translateRegular(
+            DataStream<Event> input,
+            int parallelism,
+            boolean isBatchMode,
+            MetadataApplier metadataApplier,
+            List<RouteDef> routes) {
+        return translateRegular(
+                input,
+                parallelism,
+                isBatchMode,
+                metadataApplier,
+                routes,
+                RouteRule.MatchMode.ALL_MATCH.getConfigValue());
     }
 
     public DataStream<Event> translateRegular(
@@ -68,16 +92,18 @@ public class SchemaOperatorTranslator {
             int parallelism,
             boolean isBatchMode,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            String routeMode) {
 
         return isBatchMode
                 ? addRegularSchemaBatchOperator(
-                        input, parallelism, metadataApplier, routes, timezone)
+                        input, parallelism, metadataApplier, routes, routeMode, timezone)
                 : addRegularSchemaOperator(
                         input,
                         parallelism,
                         metadataApplier,
                         routes,
+                        routeMode,
                         schemaChangeBehavior,
                         timezone);
     }
@@ -86,9 +112,16 @@ public class SchemaOperatorTranslator {
             DataStream<PartitioningEvent> input,
             int parallelism,
             MetadataApplier metadataApplier,
-            List<RouteDef> routes) {
+            List<RouteDef> routes,
+            String routeMode) {
         return addDistributedSchemaOperator(
-                input, parallelism, metadataApplier, routes, schemaChangeBehavior, timezone);
+                input,
+                parallelism,
+                metadataApplier,
+                routes,
+                routeMode,
+                schemaChangeBehavior,
+                timezone);
     }
 
     @Deprecated
@@ -101,8 +134,13 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
+            String routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
+        RouteRule.MatchMode matchMode =
+                routeMode != null
+                        ? RouteRule.MatchMode.fromConfigValue(routeMode)
+                        : RouteRule.MatchMode.ALL_MATCH;
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -118,6 +156,7 @@ public class SchemaOperatorTranslator {
                         new SchemaOperatorFactory(
                                 metadataApplier,
                                 routingRules,
+                                matchMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
                                 timezone));
@@ -130,7 +169,12 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
+            String routeMatchMode,
             String timezone) {
+        RouteRule.MatchMode matchMode =
+                routeMatchMode != null
+                        ? RouteRule.MatchMode.fromConfigValue(routeMatchMode)
+                        : RouteRule.MatchMode.ALL_MATCH;
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -143,7 +187,8 @@ public class SchemaOperatorTranslator {
                 input.transform(
                         "SchemaBatchOperator",
                         new EventTypeInfo(),
-                        new BatchSchemaOperator(routingRules, metadataApplier, timezone));
+                        new BatchSchemaOperator(
+                                routingRules, matchMode, metadataApplier, timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }
@@ -153,6 +198,7 @@ public class SchemaOperatorTranslator {
             int parallelism,
             MetadataApplier metadataApplier,
             List<RouteDef> routes,
+            String routeMatchMode,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         Preconditions.checkArgument(
@@ -166,6 +212,10 @@ public class SchemaOperatorTranslator {
                         + "Use `IGNORE` to get a static schema view and ignore any upstream schema changes.\n"
                         + "Use `EXCEPTION` to report error immediately as upstream schema changes are unacceptable.",
                 schemaChangeBehavior);
+        RouteRule.MatchMode matchMode =
+                routeMatchMode != null
+                        ? RouteRule.MatchMode.fromConfigValue(routeMatchMode)
+                        : RouteRule.MatchMode.ALL_MATCH;
         List<RouteRule> routingRules = new ArrayList<>();
         for (RouteDef route : routes) {
             routingRules.add(
@@ -181,6 +231,7 @@ public class SchemaOperatorTranslator {
                                 .SchemaOperatorFactory(
                                 metadataApplier,
                                 routingRules,
+                                matchMode,
                                 rpcTimeOut,
                                 schemaChangeBehavior,
                                 timezone))

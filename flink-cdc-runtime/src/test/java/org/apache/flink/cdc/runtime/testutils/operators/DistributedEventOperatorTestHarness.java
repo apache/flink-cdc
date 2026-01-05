@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
@@ -97,6 +98,7 @@ public class DistributedEventOperatorTestHarness<
                         Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(applyDuration),
                         new ArrayList<>(),
+                        RouteRule.MatchMode.ALL_MATCH,
                         SchemaChangeBehavior.LENIENT,
                         rpcTimeout);
         this.schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaCoordinator);

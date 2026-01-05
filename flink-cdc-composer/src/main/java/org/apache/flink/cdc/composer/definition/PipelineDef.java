@@ -20,6 +20,7 @@ package org.apache.flink.cdc.composer.definition;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
+import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
@@ -56,6 +57,7 @@ public class PipelineDef {
     private final SourceDef source;
     private final SinkDef sink;
     private final List<RouteDef> routes;
+    private final String routeMode;
     private final List<TransformDef> transforms;
     private final List<UdfDef> udfs;
     private final List<ModelDef> models;
@@ -65,6 +67,7 @@ public class PipelineDef {
             SourceDef source,
             SinkDef sink,
             List<RouteDef> routes,
+            String routeMode,
             List<TransformDef> transforms,
             List<UdfDef> udfs,
             List<ModelDef> models,
@@ -72,6 +75,7 @@ public class PipelineDef {
         this.source = source;
         this.sink = sink;
         this.routes = routes;
+        this.routeMode = routeMode;
         this.transforms = transforms;
         this.udfs = udfs;
         this.models = models;
@@ -85,7 +89,34 @@ public class PipelineDef {
             List<TransformDef> transforms,
             List<UdfDef> udfs,
             Configuration config) {
-        this(source, sink, routes, transforms, udfs, new ArrayList<>(), config);
+        this(
+                source,
+                sink,
+                routes,
+                RouteRule.MatchMode.ALL_MATCH.getConfigValue(),
+                transforms,
+                udfs,
+                new ArrayList<>(),
+                config);
+    }
+
+    public PipelineDef(
+            SourceDef source,
+            SinkDef sink,
+            List<RouteDef> routes,
+            List<TransformDef> transforms,
+            List<UdfDef> udfs,
+            List<ModelDef> models,
+            Configuration config) {
+        this(
+                source,
+                sink,
+                routes,
+                RouteRule.MatchMode.ALL_MATCH.getConfigValue(),
+                transforms,
+                udfs,
+                models,
+                config);
     }
 
     public SourceDef getSource() {
@@ -98,6 +129,10 @@ public class PipelineDef {
 
     public List<RouteDef> getRoute() {
         return routes;
+    }
+
+    public String getRouteMode() {
+        return routeMode;
     }
 
     public List<TransformDef> getTransforms() {
@@ -125,6 +160,8 @@ public class PipelineDef {
                 + sink
                 + ", routes="
                 + routes
+                + ", routeMode="
+                + routeMode
                 + ", transforms="
                 + transforms
                 + ", udfs="
@@ -148,6 +185,7 @@ public class PipelineDef {
         return Objects.equals(source, that.source)
                 && Objects.equals(sink, that.sink)
                 && Objects.equals(routes, that.routes)
+                && Objects.equals(routeMode, that.routeMode)
                 && Objects.equals(transforms, that.transforms)
                 && Objects.equals(udfs, that.udfs)
                 && Objects.equals(models, that.models)
@@ -156,7 +194,7 @@ public class PipelineDef {
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, sink, routes, transforms, udfs, models, config);
+        return Objects.hash(source, sink, routes, routeMode, transforms, udfs, models, config);
     }
 
     // ------------------------------------------------------------------------

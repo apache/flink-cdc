@@ -64,7 +64,8 @@ public abstract class SchemaTestBase {
                     // Irrelevant routes
                     new RouteRule("foo", "bar", null));
 
-    protected static final TableIdRouter TABLE_ID_ROUTER = new TableIdRouter(ROUTING_RULES);
+    protected static final TableIdRouter TABLE_ID_ROUTER =
+            new TableIdRouter(ROUTING_RULES, RouteRule.MatchMode.ALL_MATCH);
 
     protected static BinaryRecordData genBinRec(String rowType, Object... fields) {
         return (new BinaryRecordDataGenerator(quickGenRow(rowType).toArray(new DataType[0])))

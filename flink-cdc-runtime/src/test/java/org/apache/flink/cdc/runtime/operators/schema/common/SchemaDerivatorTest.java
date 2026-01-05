@@ -614,7 +614,8 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                 new RouteRule("db_3.table_\\.*", "db_3.table_merged"),
                                 // Broadcast tables
                                 new RouteRule("db_4.table_1", "db_4.table_a"),
-                                new RouteRule("db_4.table_1", "db_4.table_b")));
+                                new RouteRule("db_4.table_1", "db_4.table_b")),
+                        RouteRule.MatchMode.ALL_MATCH);
         List<CreateTableEvent> createTableEvents =
                 Arrays.asList(
                         new CreateTableEvent(

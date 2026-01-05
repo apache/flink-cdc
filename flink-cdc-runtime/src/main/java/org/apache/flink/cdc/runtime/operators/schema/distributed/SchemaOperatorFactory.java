@@ -41,18 +41,23 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
 
     private final MetadataApplier metadataApplier;
     private final List<RouteRule> routingRules;
+    private final RouteRule.MatchMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final Duration rpcTimeout;
 
     public SchemaOperatorFactory(
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
+            RouteRule.MatchMode routeMode,
             Duration rpcTimeout,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
-        super(new SchemaOperator(routingRules, rpcTimeout, schemaChangeBehavior, timezone));
+        super(
+                new SchemaOperator(
+                        routingRules, routeMode, rpcTimeout, schemaChangeBehavior, timezone));
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.rpcTimeout = rpcTimeout;
     }
@@ -65,6 +70,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
                 operatorName,
                 metadataApplier,
                 routingRules,
+                routeMode,
                 schemaChangeBehavior,
                 rpcTimeout);
     }
