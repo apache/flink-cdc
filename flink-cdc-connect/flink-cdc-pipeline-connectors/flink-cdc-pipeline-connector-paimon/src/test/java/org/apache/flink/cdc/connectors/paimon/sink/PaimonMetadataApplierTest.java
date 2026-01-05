@@ -96,8 +96,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testApplySchemaChange(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         CreateTableEvent createTableEvent =
@@ -246,8 +248,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithoutPrimaryKey(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -289,8 +293,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testCreateTableWithOptions(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -335,8 +341,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testCreateTableWithAllDataTypes(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
         CreateTableEvent createTableEvent =
@@ -445,8 +453,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     void testAddColumnWithPosition(String metastore)
-            throws Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException,
-                    Catalog.TableNotExistException, SchemaEvolveException {
+            throws Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    Catalog.TableNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         MetadataApplier metadataApplier = new PaimonMetadataApplier(catalogOptions);
 
@@ -536,8 +546,10 @@ class PaimonMetadataApplierTest {
     @ParameterizedTest
     @ValueSource(strings = {"filesystem", "hive"})
     public void testCreateTableWithComment(String metastore)
-            throws Catalog.TableNotExistException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");
@@ -585,8 +597,10 @@ class PaimonMetadataApplierTest {
 
     @Test
     public void testMysqlDefaultTimestampValueConversionInAddColumn()
-            throws SchemaEvolveException, Catalog.TableNotExistException,
-                    Catalog.DatabaseNotEmptyException, Catalog.DatabaseNotExistException {
+            throws SchemaEvolveException,
+                    Catalog.TableNotExistException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException {
         initialize("filesystem");
         Map<String, String> tableOptions = new HashMap<>();
         tableOptions.put("bucket", "-1");

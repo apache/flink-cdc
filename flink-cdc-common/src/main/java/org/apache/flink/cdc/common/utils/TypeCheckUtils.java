@@ -103,7 +103,7 @@ public class TypeCheckUtils {
         switch (type.getTypeRoot()) {
             case CHAR:
             case VARCHAR: // The internal representation of String is BinaryString which is
-                // mutable
+            // mutable
             case ARRAY:
             case MAP:
             case ROW:

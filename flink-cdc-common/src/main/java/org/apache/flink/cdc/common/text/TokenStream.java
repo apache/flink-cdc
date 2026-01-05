@@ -76,6 +76,7 @@ public class TokenStream {
     private final boolean caseSensitive;
     private final Tokenizer tokenizer;
     private List<Token> tokens;
+
     /**
      * This class navigates the Token objects using this iterator. However, because it very often
      * needs to access the "current token" in the "consume(...)" and "canConsume(...)" and

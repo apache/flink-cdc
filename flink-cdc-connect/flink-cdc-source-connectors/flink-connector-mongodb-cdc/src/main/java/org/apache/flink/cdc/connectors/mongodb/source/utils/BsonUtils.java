@@ -284,7 +284,7 @@ public class BsonUtils {
         }
 
         switch (bsonValue.getBsonType()) {
-                // MinKey < Undefined == [] < Null, Missing Key
+            // MinKey < Undefined == [] < Null, Missing Key
             case MIN_KEY:
                 return 1;
             case UNDEFINED:

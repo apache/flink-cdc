@@ -47,6 +47,7 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
             new ListSerializer<>(TableIdSerializer.INSTANCE);
     private final EnumSerializer<SchemaChangeEventType> schemaChangeEventTypeEnumSerializer =
             new EnumSerializer<>(SchemaChangeEventType.class);
+
     /** Sharable instance of the TableIdSerializer. */
     public static final BucketWrapperEventSerializer INSTANCE = new BucketWrapperEventSerializer();
 
