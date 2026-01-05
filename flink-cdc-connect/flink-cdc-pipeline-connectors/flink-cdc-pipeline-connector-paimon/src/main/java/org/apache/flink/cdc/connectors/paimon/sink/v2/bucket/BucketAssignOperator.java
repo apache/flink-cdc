@@ -184,7 +184,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                         bucket = 0;
                         break;
                     }
-                case CROSS_PARTITION:
+                case KEY_DYNAMIC:
                 default:
                     {
                         throw new RuntimeException("Unsupported bucket mode: " + tuple4.f0);

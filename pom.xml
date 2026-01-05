@@ -67,7 +67,7 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.1</flink.version>
+        <flink.version>1.20.3</flink.version>
         <flink.major.version>1.20</flink.major.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
@@ -78,7 +78,7 @@ limitations under the License.
         <version.awaitility>4.2.0</version.awaitility>
         <slf4j.version>1.7.36</slf4j.version>
         <log4j.version>2.17.1</log4j.version>
-        <spotless.version>2.4.2</spotless.version>
+        <spotless.version>2.43.0</spotless.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <json-path.version>2.7.0</json-path.version>
         <jackson.version>2.13.2</jackson.version>
@@ -98,6 +98,14 @@ limitations under the License.
         <iceberg.version>1.10.0</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <hadoop.version>3.3.4</hadoop.version>
+        <java.version>11</java.version>
+        <source.java.version>11</source.java.version>
+        <target.java.version>11</target.java.version>
+        <!-- Overwrite default values from parent pom.
+             IntelliJ IDEA is (sometimes?) using those values to choose target language level
+             and thus is changing back to java 1.6 on each maven re-import -->
+        <maven.compiler.source>${source.java.version}</maven.compiler.source>
+        <maven.compiler.target>${target.java.version}</maven.compiler.target>
     </properties>
 
     <dependencyManagement>
@@ -465,7 +473,7 @@ limitations under the License.
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.7</version>
+                            <version>1.8</version>
                             <style>AOSP</style>
                         </googleJavaFormat>
 
@@ -561,6 +569,15 @@ limitations under the License.
                          does not understand some time zone which used in Ubuntu OS -->
                     <argLine>-Xms256m -Xmx2048m -Dmvn.forkNumber=${surefire.forkNumber}
                         -XX:+UseG1GC -Doracle.jdbc.timezoneAsRegion=false
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
+                        --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
+                        --add-opens=java.base/java.util=ALL-UNNAMED
+                        --add-opens=java.sql/java.sql=ALL-UNNAMED
+                        --add-opens=java.base/java.nio=ALL-UNNAMED
+                        --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+                        --add-opens java.base/java.net=ALL-UNNAMED
+                        --add-exports=java.base/sun.nio.ch=ALL-UNNAMED
                     </argLine>
                 </configuration>
             </plugin>
@@ -674,8 +691,8 @@ limitations under the License.
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>${maven.compiler.source}</source>
-                    <target>${maven.compiler.target}</target>
+                    <source>${source.java.version}</source>
+                    <target>${target.java.version}</target>
                 </configuration>
             </plugin>
 
@@ -687,6 +704,29 @@ limitations under the License.
                 <configuration>
                     <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-maven</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <!-- enforce at least mvn version 3.1.1 (see FLINK-12447) -->
+                                    <version>[3.1.1,)</version>
+                                </requireMavenVersion>
+                                <requireJavaVersion>
+                                    <version>${source.java.version}</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
@@ -774,26 +814,71 @@ limitations under the License.
             </build>
         </profile>
         <profile>
-            <id>java-8-target</id>
-            <activation>
-                <jdk>[1.8,11)</jdk>
-            </activation>
-            <properties>
-                <java.version>1.8</java.version>
-                <maven.compiler.source>${java.version}</maven.compiler.source>
-                <maven.compiler.target>${java.version}</maven.compiler.target>
-            </properties>
-        </profile>
-        <profile>
             <id>java-11-target</id>
             <activation>
-                <jdk>[11,)</jdk>
+                <jdk>[11,17)</jdk>
             </activation>
             <properties>
                 <java.version>11</java.version>
                 <maven.compiler.source>${java.version}</maven.compiler.source>
                 <maven.compiler.target>${java.version}</maven.compiler.target>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <source>11</source>
+                            <target>11</target>
+                            <compilerArgs combine.children="append">
+                                <arg>--add-exports=java.base/sun.net.util=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.management/sun.management=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>java-17-target</id>
+            <activation>
+                <jdk>[17,)</jdk>
+            </activation>
+            <properties>
+                <java.version>17</java.version>
+                <maven.compiler.source>${java.version}</maven.compiler.source>
+                <maven.compiler.target>${java.version}</maven.compiler.target>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <source>17</source>
+                            <target>17</target>
+                            <compilerArgs combine.children="append">
+                                <arg>--add-exports=java.base/sun.net.util=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.management/sun.management=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED</arg>
+                                <arg>--add-exports=java.base/java.util=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg>
+                                <arg>java.base/java.lang=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg>
+                                <arg>java.base/java.lang.reflect=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg>
+                                <arg>java.base/java.util.concurrent=ALL-UNNAMED</arg>
+                                <arg>--add-opens</arg>
+                                <arg>java.base/java.util=ALL-UNNAMED</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

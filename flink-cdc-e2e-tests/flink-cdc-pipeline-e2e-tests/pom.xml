@@ -28,8 +28,8 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-e2e-tests</artifactId>
 
     <properties>
-        <flink-1.19>1.19.2</flink-1.19>
-        <flink-1.20>1.20.1</flink-1.20>
+        <flink-1.19>1.19.3</flink-1.19>
+        <flink-1.20>1.20.3</flink-1.20>
         <flink-major-1.19>1.19</flink-major-1.19>
         <flink-major-1.20>1.20</flink-major-1.20>
         <mysql.driver.version>8.0.27</mysql.driver.version>
@@ -43,6 +43,8 @@ limitations under the License.
         <iceberg.version>1.6.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <fluss.version>0.7.0</fluss.version>
+        <jmh.version>1.37</jmh.version>
+        <hudi.version>1.1.0</hudi.version>
     </properties>
 
     <dependencies>
@@ -140,6 +142,13 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-hudi</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-kafka</artifactId>
             <version>${project.version}</version>
             <type>test-jar</type>
@@ -225,6 +234,21 @@ limitations under the License.
             <groupId>org.testcontainers</groupId>
             <artifactId>mysql</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- benchmark -->
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>${jmh.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>${jmh.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -623,9 +647,63 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-hudi</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>hudi-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.hudi</groupId>
+                            <artifactId>hudi-flink1.20-bundle</artifactId>
+                            <version>${hudi.version}</version>
+                            <destFileName>hudi-sql-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.hudi</groupId>
+                            <artifactId>hudi-hadoop-common</artifactId>
+                            <version>${hudi.version}</version>
+                            <destFileName>hudi-hadoop-common.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-parquet</artifactId>
+                            <version>${flink.version}</version>
+                            <destFileName>flink-parquet.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
                             <artifactId>flink-shaded-hadoop-2-uber</artifactId>
                             <version>2.8.3-10.0</version>
                             <destFileName>flink-shade-hadoop.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-hadoop-compatibility_2.12</artifactId>
+                            <version>${flink.version}</version>
+                            <destFileName>flink-hadoop-compatibility.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-metrics-dropwizard</artifactId>
+                            <version>${flink.version}</version>
+                            <destFileName>flink-metrics-dropwizard.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

@@ -46,7 +46,10 @@ class FactoryHelperTests {
             @Override
             public Set<ConfigOption<?>> requiredOptions() {
                 return Sets.newHashSet(
-                        ConfigOptions.key("id").intType().noDefaultValue(),
+                        ConfigOptions.key("id")
+                                .intType()
+                                .noDefaultValue()
+                                .withFallbackKeys("id_fallback"),
                         ConfigOptions.key("name").stringType().noDefaultValue(),
                         ConfigOptions.key("age").doubleType().noDefaultValue());
             }
@@ -54,7 +57,10 @@ class FactoryHelperTests {
             @Override
             public Set<ConfigOption<?>> optionalOptions() {
                 return Sets.newHashSet(
-                        ConfigOptions.key("hobby").stringType().noDefaultValue(),
+                        ConfigOptions.key("hobby")
+                                .stringType()
+                                .noDefaultValue()
+                                .withFallbackKeys("hobby_fallback"),
                         ConfigOptions.key("location").stringType().defaultValue("Everywhere"),
                         ConfigOptions.key("misc")
                                 .mapType()
@@ -78,6 +84,19 @@ class FactoryHelperTests {
                         new FactoryHelper.DefaultContext(
                                 Configuration.fromMap(configurations), null, null));
 
+        factoryHelper.validate();
+
+        // Validation for fallback keys.
+        configurations.clear();
+        configurations.put("id_fallback", "2");
+        configurations.put("name", "Bob");
+        configurations.put("age", "18");
+        configurations.put("hobby_fallback", "Swimming");
+        factoryHelper =
+                FactoryHelper.createFactoryHelper(
+                        getDummyFactory(),
+                        new FactoryHelper.DefaultContext(
+                                Configuration.fromMap(configurations), null, null));
         factoryHelper.validate();
     }
 

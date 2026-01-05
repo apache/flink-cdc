@@ -28,6 +28,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.ChunkUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
+import org.apache.flink.cdc.connectors.mysql.source.utils.SplitKeyUtils;
 import org.apache.flink.cdc.connectors.mysql.table.StartupMode;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.types.logical.RowType;
@@ -280,15 +281,14 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
 
                 Struct target = RecordUtils.getStructContainsChunkKey(sourceRecord);
                 Object[] chunkKey =
-                        RecordUtils.getSplitKey(
+                        SplitKeyUtils.getSplitKey(
                                 splitKeyType, statefulTaskContext.getSchemaNameAdjuster(), target);
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
-                    if (RecordUtils.splitKeyRangeContains(
-                                    chunkKey, splitInfo.getSplitStart(), splitInfo.getSplitEnd())
-                            && position.isAfter(splitInfo.getHighWatermark())) {
-                        return true;
-                    }
-                }
+
+                FinishedSnapshotSplitInfo matchedSplit =
+                        SplitKeyUtils.findSplitByKeyBinary(
+                                finishedSplitsInfo.get(tableId), chunkKey);
+
+                return matchedSplit != null && position.isAfter(matchedSplit.getHighWatermark());
             }
             // not in the monitored splits scope, do not emit
             return false;
@@ -349,6 +349,9 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     tableIdBinlogPositionMap.put(tableId, highWatermark);
                 }
             }
+            // Sort splits by splitStart for binary search optimization
+            // Binary search requires sorted data to work correctly
+            splitsInfoMap.values().forEach(SplitKeyUtils::sortFinishedSplitInfos);
         }
         this.finishedSplitsInfo = splitsInfoMap;
         this.maxSplitHighWatermarkMap = tableIdBinlogPositionMap;

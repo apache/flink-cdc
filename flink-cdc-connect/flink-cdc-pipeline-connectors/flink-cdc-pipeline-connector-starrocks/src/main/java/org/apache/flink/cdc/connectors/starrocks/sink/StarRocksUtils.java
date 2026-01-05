@@ -113,10 +113,15 @@ public class StarRocksUtils {
 
     /** Convert CDC data type to StarRocks data type. */
     public static void toStarRocksDataType(
-            Column cdcColumn, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+            DataType cdcDataType, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
         CdcDataTypeTransformer dataTypeTransformer =
                 new CdcDataTypeTransformer(isPrimaryKeys, builder);
-        cdcColumn.getType().accept(dataTypeTransformer);
+        cdcDataType.accept(dataTypeTransformer);
+    }
+
+    public static void toStarRocksDataType(
+            Column cdcColumn, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+        toStarRocksDataType(cdcColumn.getType(), isPrimaryKeys, builder);
     }
 
     /** Format DATE type data. */

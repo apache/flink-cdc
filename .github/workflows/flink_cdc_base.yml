@@ -22,7 +22,7 @@ on:
         description: "Jdk versions to test against."
         required: false
         type: string
-        default: "['8']"
+        default: "['11']"
       flink-versions:
         description: "Flink versions to test against."
         required: false
@@ -64,6 +64,7 @@ env:
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-fluss,\
+    flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-hudi,\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 
   MODULES_MYSQL_SOURCE: "\
@@ -134,6 +135,9 @@ env:
 
   MODULES_FLUSS: "\
   flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-fluss"
+
+  MODULES_HUDI: "\
+  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-hudi"
 
   MODULES_PIPELINE_E2E: "\
   flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
@@ -214,10 +218,10 @@ jobs:
               ("oracle")
                modules=${{ env.MODULES_ORACLE }}
               ;;
-              ("mongodb6")
+              ("mongodb7")
                modules=${{ env.MODULES_MONGODB }}
               ;;
-              ("mongodb7")
+              ("mongodb8")
                modules=${{ env.MODULES_MONGODB }}
               ;;
               ("sqlserver")
@@ -262,6 +266,9 @@ jobs:
               ("fluss")
                modules=${{ env.MODULES_FLUSS }}
               ;;
+              ("hudi")
+               modules=${{ env.MODULES_HUDI }}
+              ;;
               ("pipeline_e2e")
                compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL_SOURCE }},${{ env.MODULES_POSTGRES_SOURCE }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE_SOURCE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
                modules=${{ env.MODULES_PIPELINE_E2E }}
@@ -278,10 +285,10 @@ jobs:
           
           build_maven_parameter=""
 
-          if [ ${{ matrix.module }} == "mongodb6" ]; then
-            build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
-          elif [ ${{ matrix.module }} == "mongodb7" ]; then
-            build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
+          if [ ${{ matrix.module }} == "mongodb7" ]; then
+            build_maven_parameter="-DspecifiedMongoVersion=7.0.24"
+          elif [ ${{ matrix.module }} == "mongodb8" ]; then
+            build_maven_parameter="-DspecifiedMongoVersion=8.0.14"
           fi
           
           if [ ! -z "${{ matrix.flink-version }}" ]; then

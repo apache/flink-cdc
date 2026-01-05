@@ -40,7 +40,7 @@ jobs:
       - name: Set JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
@@ -52,22 +52,22 @@ jobs:
     name: Common Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[11]"
+      java-versions: "[17]"
       modules: "['core']"
   pipeline-ut:
     if: github.repository == 'apache/flink-cdc'
     name: Pipeline Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[11]"
-      modules: "['mysql-pipeline', 'postgres-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks', 'fluss']"
+      java-versions: "[17]"
+      modules: "['mysql-pipeline', 'postgres-pipeline', 'oceanbase-pipeline', 'doris', 'elasticsearch', 'iceberg', 'kafka', 'maxcompute', 'paimon', 'starrocks', 'fluss', 'hudi']"
   source-ut:
     if: github.repository == 'apache/flink-cdc'
     name: Source Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[11]"
-      modules: "['mysql-source', 'postgres-source', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
+      java-versions: "[17]"
+      modules: "['mysql-source', 'postgres-source', 'oracle', 'mongodb7', 'mongodb8', 'sqlserver', 'tidb', 'oceanbase-source', 'db2', 'vitess']"
   pipeline_e2e:
     if: github.repository == 'apache/flink-cdc'
     strategy:
@@ -77,8 +77,8 @@ jobs:
     name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[11]"
-      flink-versions: "['1.19.2', '1.20.1']"
+      java-versions: "[17]"
+      flink-versions: "['1.19.3', '1.20.3']"
       modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
@@ -86,6 +86,6 @@ jobs:
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-versions: "[11]"
-      flink-versions: "['1.19.2', '1.20.1']"
+      java-versions: "[17]"
+      flink-versions: "['1.19.3', '1.20.3']"
       modules: "['source_e2e']"
