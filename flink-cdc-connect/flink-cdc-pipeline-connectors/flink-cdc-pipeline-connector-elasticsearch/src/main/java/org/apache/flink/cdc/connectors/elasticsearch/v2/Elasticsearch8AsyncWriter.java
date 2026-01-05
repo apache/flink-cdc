@@ -61,11 +61,13 @@ public class Elasticsearch8AsyncWriter<InputT> extends AsyncSinkWriter<InputT, O
     private boolean close = false;
 
     private final Counter numRecordsOutErrorsCounter;
+
     /**
      * A counter to track number of records that are returned by Elasticsearch as failed and then
      * retried by this writer.
      */
     private final Counter numRecordsSendPartialFailureCounter;
+
     /** A counter to track the number of bulk requests that are sent to Elasticsearch. */
     private final Counter numRequestSubmittedCounter;
 

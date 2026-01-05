@@ -268,8 +268,11 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testSinkWithDataChange(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
@@ -326,8 +329,11 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "hive, true", "filesystem, false", "hive, false"})
     public void testSinkWithDataChangeForAppendOnlyTable(String metastore, boolean enabledBucketKey)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
@@ -388,8 +394,11 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testSinkWithSchemaChange(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
@@ -711,8 +720,11 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testSinkWithMultiTables(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(
@@ -839,8 +851,11 @@ public class PaimonSinkITCase {
     @ParameterizedTest
     @CsvSource({"filesystem, true", "filesystem, false", "hive, true", "hive, false"})
     public void testDuplicateCommitAfterRestore(String metastore, boolean enableDeleteVector)
-            throws IOException, InterruptedException, Catalog.DatabaseNotEmptyException,
-                    Catalog.DatabaseNotExistException, SchemaEvolveException {
+            throws IOException,
+                    InterruptedException,
+                    Catalog.DatabaseNotEmptyException,
+                    Catalog.DatabaseNotExistException,
+                    SchemaEvolveException {
         initialize(metastore);
         PaimonSink<Event> paimonSink =
                 new PaimonSink<>(

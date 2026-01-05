@@ -806,8 +806,8 @@ public class PostgresConnection extends JdbcConnection {
                             ? value.get()
                             : new SpecialValueDecimal(rs.getBigDecimal(columnIndex));
                 case PgOid.TIME:
-                    // To handle time 24:00:00 supported by TIME columns, read the column as a
-                    // string.
+                // To handle time 24:00:00 supported by TIME columns, read the column as a
+                // string.
                 case PgOid.TIMETZ:
                     // In order to guarantee that we resolve TIMETZ columns with proper microsecond
                     // precision,
