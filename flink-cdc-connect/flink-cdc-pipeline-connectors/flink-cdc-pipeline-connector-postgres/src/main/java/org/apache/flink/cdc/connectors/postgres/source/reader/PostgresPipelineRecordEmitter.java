@@ -214,7 +214,7 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         }
     }
 
-    public static TableId getTableId(SourceRecord dataRecord) {
+    private TableId getTableId(SourceRecord dataRecord) {
         Struct value = (Struct) dataRecord.value();
         Struct source = value.getStruct(Envelope.FieldName.SOURCE);
         Field field = source.schema().field(SCHEMA_NAME_KEY);

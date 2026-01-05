@@ -111,8 +111,6 @@ public class PostgresConnection extends JdbcConnection {
     private final TypeRegistry typeRegistry;
     private final PostgresDefaultValueConverter defaultValueConverter;
 
-    private final JdbcConfiguration config;
-
     /**
      * Creates a Postgres connection using the supplied configuration. If necessary this connection
      * is able to resolve data type mappings. Such a connection requires a {@link
@@ -154,7 +152,6 @@ public class PostgresConnection extends JdbcConnection {
                 null,
                 "\"",
                 "\"");
-        this.config = config;
 
         if (Objects.isNull(valueConverterBuilder)) {
             this.typeRegistry = null;
@@ -185,7 +182,6 @@ public class PostgresConnection extends JdbcConnection {
                 null,
                 "\"",
                 "\"");
-        this.config = config.getJdbcConfig();
         if (Objects.isNull(typeRegistry)) {
             this.typeRegistry = null;
             this.defaultValueConverter = null;

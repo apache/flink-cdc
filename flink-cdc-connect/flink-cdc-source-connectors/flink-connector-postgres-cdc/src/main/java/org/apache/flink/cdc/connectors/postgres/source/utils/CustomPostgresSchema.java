@@ -131,7 +131,7 @@ public class CustomPostgresSchema {
                             offsetContext,
                             dbzConfig.databaseName(),
                             tableId.schema(),
-                            tableId.table(),
+                            null,
                             table,
                             true);
 

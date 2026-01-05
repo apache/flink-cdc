@@ -78,7 +78,7 @@ public class PostgresDataSource implements DataSource {
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);
 
         PostgresSourceBuilder.PostgresIncrementalSource<Event> source =
-                new PostgresPipelineSource<Event>(
+                new PostgresPipelineSource<>(
                         configFactory,
                         deserializer,
                         postgresOffsetFactory,
@@ -118,7 +118,7 @@ public class PostgresDataSource implements DataSource {
         @Override
         protected RecordEmitter<SourceRecords, T, SourceSplitState> createRecordEmitter(
                 SourceConfig sourceConfig, SourceReaderMetrics sourceReaderMetrics) {
-            return new PostgresPipelineRecordEmitter<T>(
+            return new PostgresPipelineRecordEmitter<>(
                     deserializationSchema,
                     sourceReaderMetrics,
                     this.sourceConfig,
