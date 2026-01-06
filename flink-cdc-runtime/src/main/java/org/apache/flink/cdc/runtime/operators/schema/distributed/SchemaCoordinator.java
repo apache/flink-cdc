@@ -21,6 +21,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -109,7 +110,7 @@ public class SchemaCoordinator extends SchemaRegistry {
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         super(

@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -71,11 +72,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final String timezone;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
-    private final RouteRule.MatchMode routeMode;
+    private final RouteMode routeMode;
 
     public SchemaOperator(
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {

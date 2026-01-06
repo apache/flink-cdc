@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -76,7 +77,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final Duration rpcTimeout;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
-    private final RouteRule.MatchMode routeMode;
+    private final RouteMode routeMode;
 
     // Transient fields that are set during open()
     private transient int subTaskId;
@@ -89,19 +90,18 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     @VisibleForTesting
     public SchemaOperator(List<RouteRule> routingRules) {
-        this(routingRules, RouteRule.MatchMode.ALL_MATCH, DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
+        this(routingRules, RouteMode.ALL_MATCH, DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT);
     }
 
     @VisibleForTesting
-    public SchemaOperator(
-            List<RouteRule> routingRules, RouteRule.MatchMode routeMode, Duration rpcTimeOut) {
+    public SchemaOperator(List<RouteRule> routingRules, RouteMode routeMode, Duration rpcTimeOut) {
         this(routingRules, routeMode, rpcTimeOut, SchemaChangeBehavior.EVOLVE);
     }
 
     @VisibleForTesting
     public SchemaOperator(
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior) {
         this(routingRules, routeMode, rpcTimeOut, schemaChangeBehavior, "UTC");
@@ -109,7 +109,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
 
     public SchemaOperator(
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {

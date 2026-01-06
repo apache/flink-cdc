@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -58,7 +59,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     // Final fields that are set in constructor
     private final String timezone;
     private final List<RouteRule> routingRules;
-    private final RouteRule.MatchMode routeMode;
+    private final RouteMode routeMode;
 
     // Transient fields that are set during open()
     private transient volatile Map<TableId, Schema> originalSchemaMap;
@@ -71,7 +72,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
 
     public BatchSchemaOperator(
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             MetadataApplier metadataApplier,
             String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;

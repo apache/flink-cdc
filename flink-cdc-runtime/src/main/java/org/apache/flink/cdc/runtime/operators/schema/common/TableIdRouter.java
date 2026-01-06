@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.common;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Selectors;
 
@@ -42,11 +43,11 @@ import java.util.stream.Collectors;
 public class TableIdRouter {
 
     private final List<Tuple3<Selectors, String, String>> routes;
-    private final RouteRule.MatchMode routeMode;
+    private final RouteMode routeMode;
     private final LoadingCache<TableId, List<TableId>> routingCache;
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
 
-    public TableIdRouter(List<RouteRule> routingRules, RouteRule.MatchMode routeMode) {
+    public TableIdRouter(List<RouteRule> routingRules, RouteMode routeMode) {
         this.routeMode = routeMode;
         this.routes = new ArrayList<>();
         for (RouteRule rule : routingRules) {
@@ -87,7 +88,7 @@ public class TableIdRouter {
                 routedTableIds.add(resolveReplacement(sourceTableId, route));
 
                 // If match mode is FIRST_MATCH, stop after the first match
-                if (routeMode == RouteRule.MatchMode.FIRST_MATCH) {
+                if (routeMode == RouteMode.FIRST_MATCH) {
                     break;
                 }
             }

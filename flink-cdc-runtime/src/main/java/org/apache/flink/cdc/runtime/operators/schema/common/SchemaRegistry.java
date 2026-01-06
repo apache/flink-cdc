@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.common;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Schema;
@@ -86,7 +87,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected final MetadataApplier metadataApplier;
     protected final Duration rpcTimeout;
     protected final List<RouteRule> routingRules;
-    protected final RouteRule.MatchMode routeMode;
+    protected final RouteMode routeMode;
     protected final SchemaChangeBehavior behavior;
 
     // -------------------------
@@ -104,7 +105,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         this.context = context;

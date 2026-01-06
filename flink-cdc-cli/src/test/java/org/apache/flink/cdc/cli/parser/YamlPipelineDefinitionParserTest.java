@@ -725,7 +725,6 @@ class YamlPipelineDefinitionParserTest {
                                     "ods_db.ods_<>",
                                     "<>",
                                     "One-to-one mapping for other tables")),
-                    "first-match",
                     Collections.emptyList(),
                     Collections.emptyList(),
                     Collections.emptyList(),
@@ -733,5 +732,6 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "mysql_to_doris_with_route_match_mode")
                                     .put("parallelism", "2")
+                                    .put("route-mode", "first-match")
                                     .build()));
 }

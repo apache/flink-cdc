@@ -32,8 +32,8 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.exceptions.UnsupportedSchemaChangeEventException;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
@@ -89,10 +89,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndBehavior(
                         schemaOperator, 17, Duration.ofSeconds(3), behavior);
@@ -371,10 +368,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndBehavior(
                         schemaOperator, 17, Duration.ofSeconds(3), behavior);
@@ -653,10 +647,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndBehavior(
                         schemaOperator, 17, Duration.ofSeconds(3), behavior);
@@ -751,10 +742,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndBehavior(
                         schemaOperator, 17, Duration.ofSeconds(3), behavior);
@@ -1051,10 +1039,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndFineGrainedBehaviorWithError(
                         schemaOperator,
@@ -1153,10 +1138,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
 
         // All types of schema change events will be sent to the sink
         // AddColumn and RenameColumn events will always fail
@@ -1487,10 +1469,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
 
         // All types of schema change events will be sent to the sink
         // AddColumn and RenameColumn events will always fail
@@ -1825,10 +1804,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndBehavior(
                         schemaOperator, 17, Duration.ofSeconds(3), behavior);
@@ -2230,10 +2206,7 @@ class SchemaEvolveTest {
 
         SchemaOperator schemaOperator =
                 new SchemaOperator(
-                        new ArrayList<>(),
-                        RouteRule.MatchMode.ALL_MATCH,
-                        Duration.ofSeconds(30),
-                        behavior);
+                        new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30), behavior);
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDurationAndBehavior(
                         schemaOperator, 17, Duration.ofSeconds(3), behavior);

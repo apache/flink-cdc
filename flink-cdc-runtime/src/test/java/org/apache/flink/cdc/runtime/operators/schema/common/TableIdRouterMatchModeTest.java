@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.runtime.operators.schema.common;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.route.RouteRule;
 
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,7 @@ public class TableIdRouterMatchModeTest {
                         // Catch-all rule for one-to-one mapping
                         new RouteRule("mydb.\\.*", "ods_db.ods_<>", "<>"));
 
-        TableIdRouter router = new TableIdRouter(routingRules, RouteRule.MatchMode.FIRST_MATCH);
+        TableIdRouter router = new TableIdRouter(routingRules, RouteMode.FIRST_MATCH);
 
         // Test sharded order tables - should match first rule and stop
         assertThat(route(router, "mydb.order_1")).containsExactly("ods_db.ods_orders");
@@ -67,7 +68,7 @@ public class TableIdRouterMatchModeTest {
                         new RouteRule("mydb.order_\\.*", "ods_db.ods_orders"),
                         new RouteRule("mydb.\\.*", "ods_db.ods_<>", "<>"));
 
-        TableIdRouter router = new TableIdRouter(routingRules, RouteRule.MatchMode.ALL_MATCH);
+        TableIdRouter router = new TableIdRouter(routingRules, RouteMode.ALL_MATCH);
 
         // Test sharded order tables - should match BOTH rules
         assertThat(route(router, "mydb.order_1"))
@@ -86,7 +87,7 @@ public class TableIdRouterMatchModeTest {
                         new RouteRule("mydb.order_\\.*", "ods_db.ods_orders"),
                         new RouteRule("mydb.product_\\.*", "ods_db.ods_products"));
 
-        TableIdRouter router = new TableIdRouter(routingRules, RouteRule.MatchMode.FIRST_MATCH);
+        TableIdRouter router = new TableIdRouter(routingRules, RouteMode.FIRST_MATCH);
 
         // Table that doesn't match any rule should route to itself (implicit routing)
         assertThat(route(router, "otherdb.user")).containsExactly("otherdb.user");
@@ -101,46 +102,11 @@ public class TableIdRouterMatchModeTest {
                         new RouteRule("db.table_\\.*", "db.merged_2"),
                         new RouteRule("db.table_\\.*", "db.merged_3"));
 
-        TableIdRouter router = new TableIdRouter(routingRules, RouteRule.MatchMode.ALL_MATCH);
+        TableIdRouter router = new TableIdRouter(routingRules, RouteMode.ALL_MATCH);
 
         // Should match all three rules
         assertThat(route(router, "db.table_1"))
                 .containsExactlyInAnyOrder("db.merged_1", "db.merged_2", "db.merged_3");
-    }
-
-    @Test
-    void testMatchModeEnumConfigValue() {
-        // Test enum config value methods
-        assertThat(RouteRule.MatchMode.FIRST_MATCH.getConfigValue()).isEqualTo("first-match");
-        assertThat(RouteRule.MatchMode.ALL_MATCH.getConfigValue()).isEqualTo("all-match");
-    }
-
-    @Test
-    void testMatchModeFromConfigValue() {
-        // Test parsing from config value
-        assertThat(RouteRule.MatchMode.fromConfigValue("first-match"))
-                .isEqualTo(RouteRule.MatchMode.FIRST_MATCH);
-        assertThat(RouteRule.MatchMode.fromConfigValue("all-match"))
-                .isEqualTo(RouteRule.MatchMode.ALL_MATCH);
-
-        // Test case insensitivity
-        assertThat(RouteRule.MatchMode.fromConfigValue("FIRST-MATCH"))
-                .isEqualTo(RouteRule.MatchMode.FIRST_MATCH);
-        assertThat(RouteRule.MatchMode.fromConfigValue("All-Match"))
-                .isEqualTo(RouteRule.MatchMode.ALL_MATCH);
-    }
-
-    @Test
-    void testMatchModeFromConfigValueInvalid() {
-        // Test invalid config value
-        try {
-            RouteRule.MatchMode.fromConfigValue("invalid-mode");
-            assertThat(false).as("Should throw IllegalArgumentException").isTrue();
-        } catch (IllegalArgumentException e) {
-            assertThat(e.getMessage()).contains("Invalid match-mode value: invalid-mode");
-            assertThat(e.getMessage()).contains("first-match");
-            assertThat(e.getMessage()).contains("all-match");
-        }
     }
 
     private static List<String> route(TableIdRouter router, String tableId) {

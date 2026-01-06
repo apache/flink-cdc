@@ -19,6 +19,7 @@ package org.apache.flink.cdc.runtime.operators.schema.distributed;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
@@ -41,14 +42,14 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
 
     private final MetadataApplier metadataApplier;
     private final List<RouteRule> routingRules;
-    private final RouteRule.MatchMode routeMode;
+    private final RouteMode routeMode;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final Duration rpcTimeout;
 
     public SchemaOperatorFactory(
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
-            RouteRule.MatchMode routeMode,
+            RouteMode routeMode,
             Duration rpcTimeout,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {

@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Column;
@@ -615,7 +616,7 @@ public class SchemaDerivatorTest extends SchemaTestBase {
                                 // Broadcast tables
                                 new RouteRule("db_4.table_1", "db_4.table_a"),
                                 new RouteRule("db_4.table_1", "db_4.table_b")),
-                        RouteRule.MatchMode.ALL_MATCH);
+                        RouteMode.ALL_MATCH);
         List<CreateTableEvent> createTableEvents =
                 Arrays.asList(
                         new CreateTableEvent(
