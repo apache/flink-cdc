@@ -50,18 +50,37 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
 
     private static final long serialVersionUID = 1L;
     private List<PostgreSQLReadableMetadata> readableMetadataList;
+    private final boolean includeDatabaseInTableId;
+    private final String databaseName;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public PostgresEventDeserializer(DebeziumChangelogMode changelogMode) {
-        super(new PostgresSchemaDataTypeInference(), changelogMode);
+        this(changelogMode, new ArrayList<>(), false, null);
     }
 
     public PostgresEventDeserializer(
             DebeziumChangelogMode changelogMode,
             List<PostgreSQLReadableMetadata> readableMetadataList) {
+        this(changelogMode, readableMetadataList, false, null);
+    }
+
+    public PostgresEventDeserializer(
+            DebeziumChangelogMode changelogMode,
+            List<PostgreSQLReadableMetadata> readableMetadataList,
+            boolean includeDatabaseInTableId) {
+        this(changelogMode, readableMetadataList, includeDatabaseInTableId, null);
+    }
+
+    public PostgresEventDeserializer(
+            DebeziumChangelogMode changelogMode,
+            List<PostgreSQLReadableMetadata> readableMetadataList,
+            boolean includeDatabaseInTableId,
+            String databaseName) {
         super(new PostgresSchemaDataTypeInference(), changelogMode);
         this.readableMetadataList = readableMetadataList;
+        this.includeDatabaseInTableId = includeDatabaseInTableId;
+        this.databaseName = databaseName;
     }
 
     @Override
@@ -87,7 +106,11 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     @Override
     protected TableId getTableId(SourceRecord record) {
         String[] parts = record.topic().split("\\.");
-        return TableId.tableId(parts[1], parts[2]);
+        if (includeDatabaseInTableId && databaseName != null) {
+            return TableId.tableId(databaseName, parts[1], parts[2]);
+        } else {
+            return TableId.tableId(parts[1], parts[2]);
+        }
     }
 
     @Override
