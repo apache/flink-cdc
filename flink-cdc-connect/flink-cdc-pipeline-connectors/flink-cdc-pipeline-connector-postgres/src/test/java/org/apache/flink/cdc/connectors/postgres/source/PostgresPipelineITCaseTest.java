@@ -57,7 +57,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +75,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.testcontainers.containers.PostgreSQLContainer.POSTGRESQL_PORT;
@@ -101,6 +103,14 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
     @AfterEach
     public void after() throws SQLException {
         inventoryDatabase.removeSlot(slotName);
+    }
+
+    static Stream<Arguments> provideParameters() {
+        return Stream.of(
+                Arguments.of(true, true),
+                Arguments.of(false, false),
+                Arguments.of(true, false),
+                Arguments.of(false, true));
     }
 
     @Test
@@ -341,9 +351,10 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         return iterator;
     }
 
-    @ParameterizedTest(name = "unboundedChunkFirst: {0}")
-    @ValueSource(booleans = {true, false})
-    public void testInitialStartupModeWithOpts(boolean unboundedChunkFirst) throws Exception {
+    @ParameterizedTest
+    @MethodSource("provideParameters")
+    public void testInitialStartupModeWithOpts(
+            boolean unboundedChunkFirst, boolean isTableIdIncludeDatabase) throws Exception {
         inventoryDatabase.createAndInitialize();
         org.apache.flink.cdc.common.configuration.Configuration sourceConfiguration =
                 new org.apache.flink.cdc.common.configuration.Configuration();
@@ -365,6 +376,8 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         sourceConfiguration.set(
                 PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED,
                 unboundedChunkFirst);
+        sourceConfiguration.set(
+                PostgresDataSourceOptions.TABLE_ID_INCLUDE_DATABASE, isTableIdIncludeDatabase);
 
         Factory.Context context =
                 new FactoryHelper.DefaultContext(
@@ -384,7 +397,12 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
 
-        TableId tableId = TableId.tableId("inventory", "products");
+        TableId tableId;
+        if (isTableIdIncludeDatabase) {
+            tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), "inventory", "products");
+        } else {
+            tableId = TableId.tableId("inventory", "products");
+        }
         CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
 
         // generate snapshot data
@@ -580,16 +598,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         // Also ensure we've received at least one or many side events.
         assertThat(sideResults).isNotEmpty();
         return result;
-    }
-
-    // Helper method to create a temporary directory for savepoint
-    private Path createTempSavepointDir() throws Exception {
-        return Files.createTempDirectory("postgres-savepoint");
-    }
-
-    // Helper method to execute the job and create a savepoint
-    private String createSavepoint(JobClient jobClient, Path savepointDir) throws Exception {
-        return jobClient.stopWithSavepoint(true, savepointDir.toAbsolutePath().toString()).get();
     }
 
     private List<Event> getSnapshotExpected(TableId tableId) {

@@ -262,6 +262,18 @@ pipeline:
         Experimental option, defaults to false.
       </td>
     </tr>
+    <tr>
+      <td>table-id.include-database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to include database in the generated Table ID.<br>
+        If set to true, the Table ID will be in the format (database, schema, table).<br>
+        If set to false, the Table ID will be in the format (schema, table).<br>
+        Defaults to false.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
