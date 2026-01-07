@@ -45,4 +45,4 @@ route:
 pipeline:
   name: mysql_to_doris_with_route_match_mode
   parallelism: 2
-  route-mode: first-match
+  route-mode: FIRST_MATCH

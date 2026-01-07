@@ -72,10 +72,10 @@ public class PipelineOptions {
                                                             "EXCEPTION: Throw an exception to terminate the sync pipeline.")))
                                     .build());
 
-    public static final ConfigOption<String> PIPELINE_ROUTE_MODE =
+    public static final ConfigOption<RouteMode> PIPELINE_ROUTE_MODE =
             ConfigOptions.key("route-mode")
-                    .stringType()
-                    .defaultValue(RouteMode.ALL_MATCH.toString())
+                    .enumType(RouteMode.class)
+                    .defaultValue(RouteMode.ALL_MATCH)
                     .withDescription(
                             Description.builder()
                                     .text("Match mode for routing rules. ")
@@ -83,9 +83,9 @@ public class PipelineOptions {
                                     .add(
                                             ListElement.list(
                                                     text(
-                                                            "all-match: Apply all matching route rules to a table."),
+                                                            "ALL_MATCH: Apply all matching route rules to a table."),
                                                     text(
-                                                            "first-match: Apply only the first matching route rule and stop evaluation.")))
+                                                            "FIRST_MATCH: Apply only the first matching route rule and stop evaluation.")))
                                     .build());
 
     public static final ConfigOption<String> PIPELINE_LOCAL_TIME_ZONE =

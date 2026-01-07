@@ -732,6 +732,6 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableMap.<String, String>builder()
                                     .put("name", "mysql_to_doris_with_route_match_mode")
                                     .put("parallelism", "2")
-                                    .put("route-mode", "first-match")
+                                    .put("route-mode", "FIRST_MATCH")
                                     .build()));
 }

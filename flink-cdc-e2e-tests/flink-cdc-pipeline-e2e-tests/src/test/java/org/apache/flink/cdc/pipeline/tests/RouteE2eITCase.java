@@ -1216,7 +1216,7 @@ class RouteE2eITCase extends PipelineTestEnvironment {
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
                         routeTestDatabase.getDatabaseName(),
-                        isFirstMatch ? "first-match" : "all-match",
+                        isFirstMatch ? "FIRST_MATCH" : "ALL_MATCH",
                         parallelism);
         submitPipelineJob(pipelineJob);
         waitUntilJobRunning(Duration.ofSeconds(30));

@@ -23,41 +23,7 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 @PublicEvolving
 public enum RouteMode {
     /** Match all applicable routing rules. */
-    ALL_MATCH("all-match"),
+    ALL_MATCH,
     /** Match only the first applicable routing rule. */
-    FIRST_MATCH("first-match");
-
-    private final String value;
-
-    RouteMode(String value) {
-        this.value = value;
-    }
-
-    @Override
-    public String toString() {
-        return value;
-    }
-
-    /**
-     * Parse RouteMode from string. Supports both underscore (ALL_MATCH) and hyphen (all-match)
-     * formats, case-insensitive.
-     *
-     * @param value the string value to parse
-     * @return the corresponding RouteMode
-     * @throws IllegalArgumentException if the value cannot be parsed
-     */
-    public static RouteMode fromString(String value) {
-        if (value == null) {
-            throw new IllegalArgumentException("RouteMode value cannot be null");
-        }
-        for (RouteMode mode : RouteMode.values()) {
-            if (mode.value.equalsIgnoreCase(value)) {
-                return mode;
-            }
-        }
-        throw new IllegalArgumentException(
-                String.format(
-                        "Invalid RouteMode value: '%s'. Expected one of: [all-match, first-match, ALL-MATCH, FIRST-MATCH]",
-                        value));
-    }
+    FIRST_MATCH;
 }

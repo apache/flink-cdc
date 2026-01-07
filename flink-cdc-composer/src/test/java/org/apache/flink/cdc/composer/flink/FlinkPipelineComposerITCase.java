@@ -1697,7 +1697,7 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
-        pipelineConfig.set(PipelineOptions.PIPELINE_ROUTE_MODE, RouteMode.FIRST_MATCH.toString());
+        pipelineConfig.set(PipelineOptions.PIPELINE_ROUTE_MODE, RouteMode.FIRST_MATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
@@ -1766,7 +1766,7 @@ class FlinkPipelineComposerITCase {
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
         pipelineConfig.set(
                 PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
-        pipelineConfig.set(PipelineOptions.PIPELINE_ROUTE_MODE, RouteMode.ALL_MATCH.toString());
+        pipelineConfig.set(PipelineOptions.PIPELINE_ROUTE_MODE, RouteMode.ALL_MATCH);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,

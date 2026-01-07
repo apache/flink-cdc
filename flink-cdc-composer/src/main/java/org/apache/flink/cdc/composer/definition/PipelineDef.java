@@ -103,8 +103,7 @@ public class PipelineDef {
     }
 
     public RouteMode getRouteMode() {
-        String routeModeStr = config.get(PIPELINE_ROUTE_MODE);
-        return RouteMode.fromString(routeModeStr);
+        return config.get(PIPELINE_ROUTE_MODE);
     }
 
     public List<TransformDef> getTransforms() {
