@@ -941,6 +941,14 @@ Notice:
 1. The group name is `namespace.schema.table`, where `namespace` is the actual database name, `schema` is the actual schema name, and `table` is the actual table name.
 2. For MySQL, the `namespace` will be set to the default value "", and the group name will be like `test_database.test_table`.
 
+The mysql-cdc connector offers six additional metrics for each type of data change record.
+- `numRecordsOutByDataChangeRecordInsert`: The number of `INSERT` data change records.
+- `numRecordsOutByDataChangeRecordUpdate`: The number of `UPDATE` data change records.
+- `numRecordsOutByDataChangeRecordDelete`: The number of `DELETE` data change records.
+- `numRecordsOutByRateDataChangeRecordInsert`: The number of `INSERT` data change records per second.
+- `numRecordsOutByRateDataChangeRecordUpdate`: The number of `UPDATE` data change records per second.
+- `numRecordsOutByRateDataChangeRecordDelete`: The number of `DELETE` data change records per second.
+
 Data Type Mapping
 ----------------
 
