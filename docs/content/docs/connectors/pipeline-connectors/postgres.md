@@ -289,6 +289,21 @@ pipeline:
       </td>
     </tr>
     <tr>
+      <td>scan.pre-epoch-timestamp.wall-clock-conversion.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Whether to convert the values of PostgreSQL "timestamp without time zone" columns which are before 1970-01-01 (the epoch)
+        by keeping the date and time (wall clock) stored in the database.<br>
+        If enabled, such a value is not changed by the time zone of the JVM running the job, which matters in time zones which have
+        historical offsets: with the JVM time zone set to Asia/Shanghai, the stored value "1900-01-01 00:00:00.123" would otherwise
+        be read as "1900-01-01 00:05:43.123".<br>
+        If disabled (default), the previous conversion behavior is kept. Values which are not before 1970-01-01 are converted in the
+        same way whatever the value of this option is, and this option never changes the data type of a column.
+      </td>
+    </tr>
+    <tr>
       <td>schema-change.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
