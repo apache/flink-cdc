@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.tidb;
 
+import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceConfigFactory;
 import org.apache.flink.test.util.AbstractTestBase;
 
 import com.alibaba.dcm.DnsCacheManipulator;
@@ -32,7 +33,6 @@ import org.testcontainers.containers.FixedHostPortGenericContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.lifecycle.Startables;
 
 import java.net.URL;
@@ -70,7 +70,6 @@ public class TiDBTestBase extends AbstractTestBase {
 
     public static final Network NETWORK = Network.newNetwork();
 
-    @Container
     public static final GenericContainer<?> PD =
             new FixedHostPortGenericContainer<>("pingcap/pd:v6.1.0")
                     .withFileSystemBind("src/test/resources/config/pd.toml", "/pd.toml")
@@ -90,7 +89,6 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @Container
     public static final GenericContainer<?> TIKV =
             new FixedHostPortGenericContainer<>("pingcap/tikv:v6.1.0")
                     .withFixedExposedPort(TIKV_PORT_ORIGIN, TIKV_PORT_ORIGIN)
@@ -108,7 +106,6 @@ public class TiDBTestBase extends AbstractTestBase {
                     .withStartupTimeout(Duration.ofSeconds(120))
                     .withLogConsumer(new Slf4jLogConsumer(LOG));
 
-    @Container
     public static final GenericContainer<?> TIDB =
             new GenericContainer<>("pingcap/tidb:v6.1.0")
                     .withExposedPorts(TIDB_PORT)
@@ -211,5 +208,29 @@ public class TiDBTestBase extends AbstractTestBase {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    protected TiDBSourceConfigFactory getMockTiDBSourceConfigFactory(
+            String database, String schemaName, String tableName, int splitSize) {
+        return getMockTiDBSourceConfigFactory(database, schemaName, tableName, splitSize, false);
+    }
+
+    protected TiDBSourceConfigFactory getMockTiDBSourceConfigFactory(
+            String database,
+            String schemaName,
+            String tableName,
+            int splitSize,
+            boolean skipSnapshotBackfill) {
+
+        TiDBSourceConfigFactory tiDBSourceConfigFactory = new TiDBSourceConfigFactory();
+        tiDBSourceConfigFactory.hostname(TIDB.getContainerIpAddress());
+        tiDBSourceConfigFactory.port(TIDB.getMappedPort(TIDB_PORT));
+        tiDBSourceConfigFactory.username(TIDB_USER);
+        tiDBSourceConfigFactory.password(TIDB_PASSWORD);
+        tiDBSourceConfigFactory.databaseList(database);
+        tiDBSourceConfigFactory.tableList(database + "." + tableName);
+        tiDBSourceConfigFactory.splitSize(splitSize);
+        tiDBSourceConfigFactory.skipSnapshotBackfill(skipSnapshotBackfill);
+        return tiDBSourceConfigFactory;
     }
 }
