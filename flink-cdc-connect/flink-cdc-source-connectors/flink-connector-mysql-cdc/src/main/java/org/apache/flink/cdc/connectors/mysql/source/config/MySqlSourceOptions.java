@@ -291,5 +291,14 @@ public class MySqlSourceOptions {
                     .booleanType()
                     .defaultValue(true)
                     .withDescription(
+                            "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk. Defaults to false.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> IGNORE_NO_PRIMARY_KEY_TABLE =
+            ConfigOptions.key("ignore-no-primary-key-table")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to ignore tables without primary key in MySQL. When enabled, the connector will skip tables.");
                             "Whether to assign the unbounded chunks first during snapshot reading phase. This might help reduce the risk of the TaskManager experiencing an out-of-memory (OOM) error when taking a snapshot of the largest unbounded chunk.");
 }
