@@ -95,7 +95,7 @@ limitations under the License.
         <scala.version>2.12.16</scala.version>
         <!-- Maven shade plugin prior to 3.2.0 could not correctly shade nested classes with JDK 8+. -->
         <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
-        <iceberg.version>1.6.1</iceberg.version>
+        <iceberg.version>1.10.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <hadoop.version>3.3.4</hadoop.version>
         <java.version>11</java.version>
