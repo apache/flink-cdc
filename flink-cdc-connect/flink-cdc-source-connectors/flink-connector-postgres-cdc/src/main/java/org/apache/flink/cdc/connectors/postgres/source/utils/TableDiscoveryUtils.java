@@ -23,8 +23,9 @@ import io.debezium.relational.TableId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,27 +34,42 @@ import java.util.stream.Collectors;
 public class TableDiscoveryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(TableDiscoveryUtils.class);
 
+    /**
+     * Lists tables with partition-aware inclusion decisions.
+     *
+     * @param database the database name
+     * @param jdbc the JDBC connection
+     * @param tableFilters the table filters for basic filtering
+     * @param inclusionDecider the partition inclusion decider (nullable)
+     * @param includePartitionedTables whether to include partitioned tables
+     * @return list of captured table IDs
+     */
     public static List<TableId> listTables(
             String database,
             JdbcConnection jdbc,
             RelationalTableFilters tableFilters,
+            @Nullable PostgresPartitionInclusionDecider inclusionDecider,
             boolean includePartitionedTables)
             throws SQLException {
 
-        String[] tableTypes = new String[] {"TABLE"};
-        if (includePartitionedTables) {
-            tableTypes = new String[] {"TABLE", "PARTITIONED TABLE"};
-        }
+        String[] tableTypes =
+                includePartitionedTables
+                        ? new String[] {"TABLE", "PARTITIONED TABLE"}
+                        : new String[] {"TABLE"};
+
         Set<TableId> allTableIds = jdbc.readTableNames(database, null, null, tableTypes);
-
-        Set<TableId> capturedTables =
+        // Use partition-aware decider if available, otherwise fall back to standard filter
+        List<TableId> capturedTables =
                 allTableIds.stream()
-                        .filter(t -> tableFilters.dataCollectionFilter().isIncluded(t))
-                        .collect(Collectors.toSet());
+                        .filter(
+                                t ->
+                                        inclusionDecider != null
+                                                ? inclusionDecider.isIncluded(t)
+                                                : tableFilters.dataCollectionFilter().isIncluded(t))
+                        .collect(Collectors.toList());
         LOG.info(
-                "Postgres captured tables : {} .",
+                "Postgres captured tables: {}",
                 capturedTables.stream().map(TableId::toString).collect(Collectors.joining(",")));
-
-        return new ArrayList<>(capturedTables);
+        return capturedTables;
     }
 }
