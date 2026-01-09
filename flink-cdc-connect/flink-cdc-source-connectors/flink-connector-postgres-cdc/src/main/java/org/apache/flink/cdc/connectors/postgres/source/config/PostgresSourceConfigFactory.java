@@ -53,6 +53,7 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     private int lsnCommitCheckpointsDelay;
 
     private boolean includePartitionedTables;
+    private String partitionTables;
 
     private boolean includeDatabaseInTableId =
             PostgresSourceOptions.TABLE_ID_INCLUDE_DATABASE.defaultValue();
@@ -100,6 +101,11 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
             props.setProperty("table.include.list", String.join(",", tableList));
         }
 
+        // Set partition.tables for PostgresPartitionRoutingSchema to read
+        if (partitionTables != null && !partitionTables.trim().isEmpty()) {
+            props.setProperty(PostgresSourceConfig.PARTITION_TABLES_CONFIG_KEY, partitionTables);
+        }
+
         // override the user-defined debezium properties
         if (dbzProperties != null) {
             props.putAll(dbzProperties);
@@ -140,7 +146,8 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
                 includePartitionedTables,
-                includeDatabaseInTableId);
+                includeDatabaseInTableId,
+                partitionTables);
     }
 
     /**
@@ -192,6 +199,11 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** Enable include partitioned table. */
     public void setIncludePartitionedTables(boolean includePartitionedTables) {
         this.includePartitionedTables = includePartitionedTables;
+    }
+
+    /** Whether include partitioned table. */
+    public void setPartitionTables(String partitionTables) {
+        this.partitionTables = partitionTables;
     }
 
     /** Set whether to include database in the generated Table ID. */

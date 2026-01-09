@@ -31,7 +31,6 @@ import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
-import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -48,7 +47,6 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -108,13 +106,11 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         } else {
             for (Map.Entry<TableId, TableChanges.TableChange> entry :
                     split.getTableSchemas().entrySet()) {
-                TableId tableId =
-                        entry.getKey(); // Use the TableId from the map key which contains full info
                 TableChanges.TableChange tableChange = entry.getValue();
                 CreateTableEvent createTableEvent =
                         new CreateTableEvent(
                                 toCdcTableId(
-                                        tableId,
+                                        tableChange.getId(),
                                         sourceConfig.getDatabaseList().get(0),
                                         includeDatabaseInTableId),
                                 buildSchemaFromTable(tableChange.getTable()));
@@ -167,26 +163,24 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
     private Schema buildSchemaFromTable(Table table) {
         List<Column> columns = table.columns();
         Schema.Builder tableBuilder = Schema.newBuilder();
-        for (int i = 0; i < columns.size(); i++) {
-            Column column = columns.get(i);
-
-            String colName = column.name();
-            DataType dataType;
-            try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-                dataType =
+        // Reuse single connection for all columns to avoid connection storm
+        try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
+            for (Column column : columns) {
+                String colName = column.name();
+                DataType dataType =
                         PostgresTypeUtils.fromDbzColumn(
                                 column,
                                 this.sourceConfig.getDbzConnectorConfig(),
                                 jdbc.getTypeRegistry());
+                if (!column.isOptional()) {
+                    dataType = dataType.notNull();
+                }
+                tableBuilder.physicalColumn(
+                        colName,
+                        dataType,
+                        column.comment(),
+                        column.defaultValueExpression().orElse(null));
             }
-            if (!column.isOptional()) {
-                dataType = dataType.notNull();
-            }
-            tableBuilder.physicalColumn(
-                    colName,
-                    dataType,
-                    column.comment(),
-                    column.defaultValueExpression().orElse(null));
         }
         tableBuilder.comment(table.comment());
 
@@ -228,28 +222,23 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
 
     private Map<TableId, CreateTableEvent> generateCreateTableEvent(
             PostgresSourceConfig sourceConfig) {
-        try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-            Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
-            List<TableId> capturedTableIds =
-                    TableDiscoveryUtils.listTables(
-                            sourceConfig.getDatabaseList().get(0),
-                            jdbc,
-                            sourceConfig.getTableFilters(),
-                            sourceConfig.includePartitionedTables());
-            for (TableId tableId : capturedTableIds) {
-                Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-                createTableEventCache.put(
-                        tableId,
-                        new CreateTableEvent(
-                                toCdcTableId(
-                                        tableId,
-                                        this.sourceConfig.getDatabaseList().get(0),
-                                        includeDatabaseInTableId),
-                                schema));
-            }
-            return createTableEventCache;
-        } catch (SQLException e) {
-            throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
+        // Use PostgresDialect.discoverDataCollectionSchemas which handles partition routing
+        Map<TableId, TableChanges.TableChange> tableSchemas =
+                postgresDialect.discoverDataCollectionSchemas(sourceConfig);
+
+        Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
+        for (Map.Entry<TableId, TableChanges.TableChange> entry : tableSchemas.entrySet()) {
+            TableId tableId = entry.getKey();
+            TableChanges.TableChange tableChange = entry.getValue();
+            createTableEventCache.put(
+                    tableId,
+                    new CreateTableEvent(
+                            toCdcTableId(
+                                    tableId,
+                                    sourceConfig.getDatabaseList().get(0),
+                                    includeDatabaseInTableId),
+                            buildSchemaFromTable(tableChange.getTable())));
         }
+        return createTableEventCache;
     }
 }

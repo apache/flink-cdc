@@ -98,6 +98,15 @@ public class PostgresSourceOptions extends JdbcSourceOptions {
                                     + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
                                     + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");
 
+    public static final ConfigOption<String> PARTITION_TABLES =
+            ConfigOptions.key("partition.tables")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Partition table mapping patterns using colon format: parent:child_regex.\n"
+                                    + "Format: schema.parent:schema.child_regex (e.g., public.orders:public.orders_\\d{6}).\n"
+                                    + "When configured, child partition events will be routed to their parent table.");
+
     public static final ConfigOption<Boolean> TABLE_ID_INCLUDE_DATABASE =
             ConfigOptions.key("table-id.include-database")
                     .booleanType()
