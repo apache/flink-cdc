@@ -859,6 +859,19 @@ public class PostgresConnection extends JdbcConnection {
         return readTableNames(catalogName, null, null, new String[] {"TABLE", "PARTITIONED TABLE"});
     }
 
+    /**
+     * Retrieves all non-partitioned {@code TableId}s in a given database catalog. This method
+     * excludes partition parent tables and is used for PostgreSQL 10 and earlier versions where
+     * logical replication (publications) cannot be created on partition parent tables.
+     *
+     * @param catalogName the catalog/database name
+     * @return set of non-partitioned table ids (excludes PARTITIONED TABLE type)
+     * @throws SQLException if a database exception occurred
+     */
+    public Set<TableId> getAllNonPartitionedTableIds(String catalogName) throws SQLException {
+        return readTableNames(catalogName, null, null, new String[] {"TABLE"});
+    }
+
     @FunctionalInterface
     public interface PostgresValueConverterBuilder {
         PostgresValueConverter build(TypeRegistry registry);

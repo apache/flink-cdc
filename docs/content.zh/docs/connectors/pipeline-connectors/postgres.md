@@ -104,11 +104,32 @@ pipeline:
       <td>连接 Postgres 数据库服务器时使用的密码。</td>
     </tr>
     <tr>
+      <td>database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>
+        连接的 Postgres 数据库名称。设置该项后，<code>tables</code> 与 <code>partition.tables</code> 中的表模式可以省略数据库前缀（例如使用 <code>public.my_table</code> 而不是 <code>db.public.my_table</code>）。<br>
+        若同时在 <code>database</code> 与 <code>tables</code> 中提供了数据库名称，则两者必须一致。
+      </td>
+    </tr>
+    <tr>
+      <td>schema</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>
+        默认 Schema 名称。设置该项后，<code>tables</code> 与 <code>partition.tables</code> 中未显式带 schema 的项将自动补全为 <code>schema.table</code>（例如 <code>orders</code> 将补全为 <code>public.orders</code>）。<br>
+        若在 <code>tables</code> 中显式写了其他 schema，将按显式值匹配，不受该选项影响。
+      </td>
+    </tr>
+    <tr>
       <td>tables</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>需要监视的 Postgres 数据库的表名。表名支持正则表达式，以监视满足正则表达式的多个表。<br>
+          <b>注意：'tables' 和 'partition.tables' 至少需要配置一个。</b><br>
           需要确保所有的表来自同一个数据库。<br>
           需要注意的是，点号（.）被视为数据库、模式和表名的分隔符。 如果需要在正则表达式中使用点（.）来匹配任何字符，必须使用反斜杠对点进行转义。<br>
           例如，bdb.user_schema_[0-9].user_table_[0-9]+, bdb.schema_\.*.order_\.*</td>
@@ -282,9 +303,68 @@ pipeline:
         默认值为 false。
       </td>
     </tr>
+    <tr>
+      <td>scan.include-partitioned-tables.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        启用 PostgreSQL 分区表支持。<br>
+        <b>PostgreSQL 11+：</b> 单独使用此选项，配合 PUBLICATION 中的 <code>publish_via_partition_root=true</code>，无需配置 <code>partition.tables</code>。<br>
+        <b>PostgreSQL 10：</b> 必须与 <code>partition.tables</code> 一起使用来定义父子表映射。
+      </td>
+    </tr>
+    <tr>
+      <td>partition.tables</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>
+        <b>PostgreSQL 10 分区表必需。</b> 使用冒号格式定义父子表映射：<code>parent:child_regex</code>。<br>
+        格式：<code>schema.parent:schema.child_regex</code>（例如：<code>public.orders:public.orders_\d{6}</code>）。<br>
+        配置此选项后，<code>scan.include-partitioned-tables.enabled</code> 会自动启用。<br>
+        子分区表的事件将自动路由到父表，减少 CreateTableEvent 请求数量。
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
+
+## 分区表支持
+
+### PostgreSQL 11+（推荐）
+
+使用 PUBLICATION 中的 `publish_via_partition_root=true`，只需配置 `scan.include-partitioned-tables.enabled`：
+
+```yaml
+source:
+  type: postgres
+  tables: db.public.orders
+  scan.include-partitioned-tables.enabled: true
+```
+
+### PostgreSQL 10
+
+需要配置 `partition.tables` 来定义父子表映射：
+
+```yaml
+source:
+  type: postgres
+  tables: db.public.orders
+  partition.tables: public.orders:public.orders_\d{6}
+```
+
+### partition.tables 格式
+
+使用冒号格式：`parent:child_regex`
+
+- 两段式：`schema.parent:schema.child_regex`
+- 仅表名：`parent:child_regex`（运行时继承子表的 schema）
+
+```text
+public.orders:public.orders_\d{6}    # 父表=public.orders，子表匹配 orders_YYYYMM
+orders:orders_\d{6}                  # 仅表名，schema 在运行时继承
+```
 
 注意：
 1. 配置选项`tables`指定 Postgres CDC 需要采集的表，格式为`db.schema1.tabe1,db.schema2.table2`,其中所有的db需要为同一个db，这是因为postgres链接url中需要指定dbname，目前cdc只支持链接一个db。

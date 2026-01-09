@@ -31,7 +31,7 @@ import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
-import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRouter;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresTypeUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -48,7 +48,8 @@ import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
-import java.sql.SQLException;
+import javax.annotation.Nullable;
+
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,6 +68,7 @@ import static org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils
 public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmitter<T> {
     private final PostgresSourceConfig sourceConfig;
     private final PostgresDialect postgresDialect;
+    @Nullable private final PostgresPartitionRouter partitionRouter;
 
     // Used when startup mode is initial
     private Set<TableId> alreadySendCreateTableTables;
@@ -92,6 +94,7 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         this.sourceConfig = sourceConfig;
         this.includeDatabaseInTableId = sourceConfig.isIncludeDatabaseInTableId();
         this.postgresDialect = postgresDialect;
+        this.partitionRouter = postgresDialect.getPartitionRouter();
         this.alreadySendCreateTableTables = new HashSet<>();
         this.createTableEventCache =
                 ((DebeziumEventDeserializationSchema) debeziumDeserializationSchema)
@@ -108,13 +111,13 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         } else {
             for (Map.Entry<TableId, TableChanges.TableChange> entry :
                     split.getTableSchemas().entrySet()) {
-                TableId tableId =
-                        entry.getKey(); // Use the TableId from the map key which contains full info
                 TableChanges.TableChange tableChange = entry.getValue();
+                // Route child partition table to parent table
+                TableId routedTableId = routeTableId(tableChange.getId());
                 CreateTableEvent createTableEvent =
                         new CreateTableEvent(
                                 toCdcTableId(
-                                        tableId,
+                                        routedTableId,
                                         sourceConfig.getDatabaseList().get(0),
                                         includeDatabaseInTableId),
                                 buildSchemaFromTable(tableChange.getTable()));
@@ -137,27 +140,32 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
             shouldEmitAllCreateTableEventsInSnapshotMode = false;
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             TableId tableId = splitState.asSnapshotSplitState().toSourceSplit().getTableId();
-            if (!alreadySendCreateTableTables.contains(tableId)) {
-                sendCreateTableEvent(tableId, (SourceOutput<Event>) output);
-                alreadySendCreateTableTables.add(tableId);
+            // Route child partition table to parent table
+            TableId routedTableId = routeTableId(tableId);
+            if (!alreadySendCreateTableTables.contains(routedTableId)) {
+                sendCreateTableEvent(routedTableId, (SourceOutput<Event>) output);
+                alreadySendCreateTableTables.add(routedTableId);
             }
         } else {
             boolean isDataChangeRecord = isDataChangeRecord(element);
             if (isDataChangeRecord || isSchemaChangeEvent(element)) {
                 TableId tableId = getTableId(element);
-                if (!alreadySendCreateTableTables.contains(tableId)) {
-                    CreateTableEvent createTableEvent = createTableEventCache.get(tableId);
+                // Route child partition table to parent table
+                TableId routedTableId = routeTableId(tableId);
+                if (!alreadySendCreateTableTables.contains(routedTableId)) {
+                    CreateTableEvent createTableEvent = createTableEventCache.get(routedTableId);
                     if (createTableEvent != null) {
                         output.collect((T) createTableEvent);
                     }
-                    alreadySendCreateTableTables.add(tableId);
+                    alreadySendCreateTableTables.add(routedTableId);
                 }
                 // In rare case, we may miss some CreateTableEvents before DataChangeEvents.
                 // Don't send CreateTableEvent for SchemaChangeEvents as it's the latest schema.
-                if (isDataChangeRecord && !createTableEventCache.containsKey(tableId)) {
-                    CreateTableEvent createTableEvent = getCreateTableEvent(sourceConfig, tableId);
+                if (isDataChangeRecord && !createTableEventCache.containsKey(routedTableId)) {
+                    CreateTableEvent createTableEvent =
+                            getCreateTableEvent(sourceConfig, routedTableId);
                     output.collect((T) createTableEvent);
-                    createTableEventCache.put(tableId, createTableEvent);
+                    createTableEventCache.put(routedTableId, createTableEvent);
                 }
             }
         }
@@ -167,26 +175,24 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
     private Schema buildSchemaFromTable(Table table) {
         List<Column> columns = table.columns();
         Schema.Builder tableBuilder = Schema.newBuilder();
-        for (int i = 0; i < columns.size(); i++) {
-            Column column = columns.get(i);
-
-            String colName = column.name();
-            DataType dataType;
-            try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-                dataType =
+        // Reuse single connection for all columns to avoid connection storm
+        try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
+            for (Column column : columns) {
+                String colName = column.name();
+                DataType dataType =
                         PostgresTypeUtils.fromDbzColumn(
                                 column,
                                 this.sourceConfig.getDbzConnectorConfig(),
                                 jdbc.getTypeRegistry());
+                if (!column.isOptional()) {
+                    dataType = dataType.notNull();
+                }
+                tableBuilder.physicalColumn(
+                        colName,
+                        dataType,
+                        column.comment(),
+                        column.defaultValueExpression().orElse(null));
             }
-            if (!column.isOptional()) {
-                dataType = dataType.notNull();
-            }
-            tableBuilder.physicalColumn(
-                    colName,
-                    dataType,
-                    column.comment(),
-                    column.defaultValueExpression().orElse(null));
         }
         tableBuilder.comment(table.comment());
 
@@ -228,28 +234,36 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
 
     private Map<TableId, CreateTableEvent> generateCreateTableEvent(
             PostgresSourceConfig sourceConfig) {
-        try (PostgresConnection jdbc = postgresDialect.openJdbcConnection()) {
-            Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
-            List<TableId> capturedTableIds =
-                    TableDiscoveryUtils.listTables(
-                            sourceConfig.getDatabaseList().get(0),
-                            jdbc,
-                            sourceConfig.getTableFilters(),
-                            sourceConfig.includePartitionedTables());
-            for (TableId tableId : capturedTableIds) {
-                Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
-                createTableEventCache.put(
-                        tableId,
-                        new CreateTableEvent(
-                                toCdcTableId(
-                                        tableId,
-                                        this.sourceConfig.getDatabaseList().get(0),
-                                        includeDatabaseInTableId),
-                                schema));
-            }
-            return createTableEventCache;
-        } catch (SQLException e) {
-            throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
+        // Use PostgresDialect.discoverDataCollectionSchemas which handles partition routing
+        Map<TableId, TableChanges.TableChange> tableSchemas =
+                postgresDialect.discoverDataCollectionSchemas(sourceConfig);
+
+        Map<TableId, CreateTableEvent> createTableEventCache = new HashMap<>();
+        for (Map.Entry<TableId, TableChanges.TableChange> entry : tableSchemas.entrySet()) {
+            TableId tableId = entry.getKey();
+            TableChanges.TableChange tableChange = entry.getValue();
+            createTableEventCache.put(
+                    tableId,
+                    new CreateTableEvent(
+                            toCdcTableId(
+                                    tableId,
+                                    sourceConfig.getDatabaseList().get(0),
+                                    includeDatabaseInTableId),
+                            buildSchemaFromTable(tableChange.getTable())));
         }
+        return createTableEventCache;
+    }
+
+    /**
+     * Routes a child partition table ID to its parent table ID.
+     *
+     * @param tableId the original table ID
+     * @return the parent table ID if this is a child partition, otherwise the original table ID
+     */
+    private TableId routeTableId(TableId tableId) {
+        if (partitionRouter == null) {
+            return tableId;
+        }
+        return partitionRouter.route(tableId);
     }
 }

@@ -54,6 +54,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSou
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.CONNECT_TIMEOUT;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.DECODING_PLUGIN_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.HEARTBEAT_INTERVAL;
+import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.PARTITION_TABLES;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.PG_PORT;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
@@ -118,7 +119,11 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         boolean isScanNewlyAddedTableEnabled = config.get(SCAN_NEWLY_ADDED_TABLE_ENABLED);
         int lsnCommitCheckpointsDelay = config.get(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
-        boolean includePartitionedTables = config.get(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
+        String partitionTables = config.getOptional(PARTITION_TABLES).orElse(null);
+        // Auto-enable includePartitionedTables when partition.tables is configured
+        boolean includePartitionedTables =
+                config.get(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED)
+                        || (partitionTables != null && !partitionTables.isEmpty());
         boolean assignUnboundedChunkFirst =
                 config.get(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         boolean appendOnly = config.get(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
@@ -170,7 +175,8 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
                 appendOnly,
-                includePartitionedTables);
+                includePartitionedTables,
+                partitionTables);
     }
 
     @Override
@@ -216,6 +222,7 @@ public class PostgreSQLTableFactory implements DynamicTableSourceFactory {
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
         options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
+        options.add(PARTITION_TABLES);
         return options;
     }
 

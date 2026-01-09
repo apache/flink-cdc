@@ -17,6 +17,7 @@
 
 package io.debezium.connector.postgresql;
 
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRoutingSchema;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -41,23 +42,30 @@ import java.time.Duration;
 public class PostgresObjectUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(PostgresObjectUtils.class);
 
-    /** Create a new PostgresSchema and initialize the content of the schema. */
-    public static PostgresSchema newSchema(
+    /**
+     * Create a new PostgresPartitionRoutingSchema and initialize the content of the schema.
+     *
+     * @param connection the PostgreSQL JDBC connection
+     * @param config the PostgreSQL connector configuration
+     * @param typeRegistry the type registry for PostgreSQL types
+     * @param topicSelector the topic selector for routing events
+     * @param valueConverter the value converter for PostgreSQL values
+     * @param externalRouter optional external partition router with pre-loaded child-to-parent
+     *     mappings. If null, a new router will be created internally.
+     * @return initialized PostgresPartitionRoutingSchema
+     * @throws SQLException if schema initialization fails
+     */
+    public static PostgresPartitionRoutingSchema newSchema(
             PostgresConnection connection,
             PostgresConnectorConfig config,
             TypeRegistry typeRegistry,
             TopicSelector<TableId> topicSelector,
-            PostgresValueConverter valueConverter)
+            PostgresValueConverter valueConverter,
+            org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRouter
+                    externalRouter)
             throws SQLException {
-        PostgresSchema schema =
-                new PostgresSchema(
-                        config,
-                        typeRegistry,
-                        connection.getDefaultValueConverter(),
-                        topicSelector,
-                        valueConverter);
-        schema.refresh(connection, false);
-        return schema;
+        return new PostgresPartitionRoutingSchema(
+                connection, config, typeRegistry, topicSelector, valueConverter, externalRouter);
     }
 
     public static PostgresTaskContext newTaskContext(
