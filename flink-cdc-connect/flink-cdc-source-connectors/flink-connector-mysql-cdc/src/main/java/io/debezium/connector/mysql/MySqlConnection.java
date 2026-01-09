@@ -233,7 +233,7 @@ public class MySqlConnection extends JdbcConnection {
      *
      * @return the session variables that are related to sessions ssl version
      */
-    protected String getSessionVariableForSslVersion() {
+    public String getSessionVariableForSslVersion() {
         final String sslVersion = "Ssl_version";
         LOGGER.debug("Reading MySQL Session variable for Ssl Version");
         Map<String, String> sessionVariables =
