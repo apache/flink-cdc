@@ -274,7 +274,16 @@ public class PostgresReplicationConnection extends JdbcConnection implements Rep
     }
 
     private Set<TableId> determineCapturedTables() throws Exception {
-        Set<TableId> allTableIds = jdbcConnection.getAllTableIds(connectorConfig.databaseName());
+        // In PostgreSQL 10 and earlier, logical replication cannot be created on partition parent
+        // tables, so we must exclude them and only capture the actual partition child tables.
+        // PostgreSQL 11+ supports replication on partition parent tables properly.
+        Set<TableId> allTableIds;
+        if (PostgresConnectionUtils.shouldExcludePartitionTables(jdbcConnection)) {
+            allTableIds =
+                    jdbcConnection.getAllNonPartitionedTableIds(connectorConfig.databaseName());
+        } else {
+            allTableIds = jdbcConnection.getAllTableIds(connectorConfig.databaseName());
+        }
 
         Set<TableId> capturedTables = new HashSet<>();
 

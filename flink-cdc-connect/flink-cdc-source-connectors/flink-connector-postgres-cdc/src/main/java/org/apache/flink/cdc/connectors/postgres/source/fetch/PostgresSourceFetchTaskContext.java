@@ -31,6 +31,7 @@ import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffset;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetUtils;
 import org.apache.flink.cdc.connectors.postgres.source.utils.ChunkUtils;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRoutingSchema;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.DebeziumException;
@@ -92,7 +93,7 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
     private ReplicationConnection replicationConnection;
     private PostgresOffsetContext offsetContext;
     private PostgresPartition partition;
-    private PostgresSchema schema;
+    private PostgresPartitionRoutingSchema schema;
     private ErrorHandler errorHandler;
     private CDCPostgresDispatcher postgresDispatcher;
     private EventMetadataProvider metadataProvider;
@@ -192,7 +193,9 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                             dbzConfig,
                             jdbcConnection.getTypeRegistry(),
                             topicSelector,
-                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
+                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()),
+                            ((PostgresDialect) dataSourceDialect).getPartitionRouter());
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to initialize PostgresSchema", e);
         }
@@ -236,7 +239,6 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
                         topicSelector,
                         schema,
                         queue,
-                        finalDbzConfig.getTableFilters().dataCollectionFilter(),
                         DataChangeEvent::new,
                         metadataProvider,
                         new HeartbeatFactory<>(

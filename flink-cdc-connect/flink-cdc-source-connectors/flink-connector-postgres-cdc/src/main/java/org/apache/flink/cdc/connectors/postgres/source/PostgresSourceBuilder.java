@@ -311,6 +311,11 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    public PostgresSourceBuilder<T> partitionTables(String partitionTables) {
+        this.configFactory.setPartitionTables(partitionTables);
+        return this;
+    }
+
     /**
      * Build the {@link PostgresIncrementalSource}.
      *
