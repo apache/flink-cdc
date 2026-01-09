@@ -39,6 +39,7 @@ under the License.
 | primary-keys              | Sink table primary keys, separated by commas                                      | optional          |
 | partition-keys            | Sink table partition keys, separated by commas                                    | optional          |
 | table-options             | used to the configure table creation statement when automatically creating tables | optional          |
+| table-options.delimiter   | delimiter for table-options key-value pairs, default is `,`                       | optional          |
 | converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
 | description               | Transform rule description                                                        | optional          |
 
@@ -311,7 +312,13 @@ transform:
     table-options: comment=web order
     description: auto creating table options example
 ```
-小技巧：table-options 的格式是 `key1=value1,key2=value2`。
+小技巧：table-options 的格式是 `key1=value1,key2=value2`；如果 value 中包含逗号或其他特殊字符，可以使用 `table-options.delimiter` 指定自定义分隔符（如 `;`、`|`、`$` 等）：
+```yaml
+transform:
+  - source-table: mydb.web_order
+    table-options: sequence.field=gxsj,jjsj;file-index.bloom-filter.columns=jjdbh
+    table-options.delimiter: ";"
+```
 
 ## Classification mapping
 多个转换规则可以定义为分类映射。
