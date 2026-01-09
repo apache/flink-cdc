@@ -124,7 +124,12 @@ public class SchemaEvolutionUtils {
                         .append(" ")
                         .append(string(addColumn.getAddColumn().getType()))
                         .append(" comment '")
-                        .append(addColumn.getAddColumn().getType().asSummaryString())
+                        // Use column comment if available, otherwise use type description as
+                        // fallback
+                        .append(
+                                addColumn.getAddColumn().getComment() != null
+                                        ? addColumn.getAddColumn().getComment()
+                                        : addColumn.getAddColumn().getType().asSummaryString())
                         .append("',");
             } else {
                 throw new UnsupportedOperationException(
