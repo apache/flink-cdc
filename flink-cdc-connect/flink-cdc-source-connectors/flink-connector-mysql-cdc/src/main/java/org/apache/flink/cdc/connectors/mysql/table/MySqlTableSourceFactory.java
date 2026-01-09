@@ -109,6 +109,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
 
         boolean appendOnly =
                 config.get(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        String snapshotFilter = config.get(MySqlSourceOptions.SCAN_SNAPSHOT_FILTER);
 
         if (enableParallelRead) {
             validatePrimaryKeyIfEnableParallel(physicalSchema, chunkKeyColumn);
@@ -156,7 +157,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                 parseOnLineSchemaChanges,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst,
-                appendOnly);
+                appendOnly,
+                snapshotFilter);
     }
 
     @Override
@@ -206,6 +208,7 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
         options.add(MySqlSourceOptions.USE_LEGACY_JSON_FORMAT);
         options.add(MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST);
         options.add(MySqlSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
+        options.add(MySqlSourceOptions.SCAN_SNAPSHOT_FILTER);
         return options;
     }
 
