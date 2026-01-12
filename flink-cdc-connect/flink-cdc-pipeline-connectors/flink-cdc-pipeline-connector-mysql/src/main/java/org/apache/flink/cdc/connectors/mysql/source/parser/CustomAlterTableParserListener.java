@@ -50,6 +50,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils.removeQuotes;
 import static org.apache.flink.cdc.connectors.mysql.utils.MySqlTypeUtils.fromDbzColumn;
 
 /** Copied from {@link AlterTableParserListener} in Debezium 1.9.8.Final. */
@@ -478,8 +479,7 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
             parser.runIfNotNull(
                     () -> {
                         if (ctx.COMMENT() != null) {
-                            tableEditor.setComment(
-                                    parser.withoutQuotes(ctx.STRING_LITERAL().getText()));
+                            tableEditor.setComment(removeQuotes(ctx.STRING_LITERAL().getText()));
                         }
                     },
                     tableEditor);

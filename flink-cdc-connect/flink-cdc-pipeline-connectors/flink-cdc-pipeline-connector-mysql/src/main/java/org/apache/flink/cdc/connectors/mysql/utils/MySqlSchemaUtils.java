@@ -166,5 +166,32 @@ public class MySqlSchemaUtils {
         }
     }
 
+    /**
+     * Removes surrounding quotes from a string. Supports both single quotes (') and double quotes
+     * ("). This is useful for parsing MySQL DDL statements where comments or default values may use
+     * either type of quote.
+     *
+     * <p>MySQL normalizes double quotes to single quotes in SHOW CREATE TABLE output, but binlog
+     * events may contain either. This method handles both cases to ensure robust parsing.
+     *
+     * @param text the text to remove quotes from
+     * @return the text without surrounding quotes, or the original text if no quotes are present
+     */
+    public static String removeQuotes(String text) {
+        if (text == null || text.length() < 2) {
+            return text;
+        }
+
+        char firstChar = text.charAt(0);
+        char lastChar = text.charAt(text.length() - 1);
+
+        // Check if the string is surrounded by matching quotes (single or double)
+        if ((firstChar == '\'' && lastChar == '\'') || (firstChar == '"' && lastChar == '"')) {
+            return text.substring(1, text.length() - 1);
+        }
+
+        return text;
+    }
+
     private MySqlSchemaUtils() {}
 }

@@ -94,10 +94,28 @@ public class DefaultValueParserListener extends MySqlParserBaseListener {
         }
     }
 
+    /**
+     * Removes surrounding quotes from a string. Supports both single quotes (') and double quotes
+     * ("). MySQL normalizes double quotes to single quotes in SHOW CREATE TABLE output, but binlog
+     * events may contain either. This method handles both cases to ensure robust parsing.
+     *
+     * @param stringLiteral the string to remove quotes from
+     * @return the string without surrounding quotes, or the original string if no quotes are
+     *     present
+     */
     private String unquote(String stringLiteral) {
-        if (stringLiteral != null && stringLiteral.startsWith("'") && stringLiteral.endsWith("'")) {
+        if (stringLiteral == null || stringLiteral.length() < 2) {
+            return stringLiteral;
+        }
+
+        char firstChar = stringLiteral.charAt(0);
+        char lastChar = stringLiteral.charAt(stringLiteral.length() - 1);
+
+        // Check if the string is surrounded by matching quotes (single or double)
+        if ((firstChar == '\'' && lastChar == '\'') || (firstChar == '"' && lastChar == '"')) {
             return stringLiteral.substring(1, stringLiteral.length() - 1);
         }
+
         return stringLiteral;
     }
 

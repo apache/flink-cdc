@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.mysql.utils.MySqlSchemaUtils.removeQuotes;
+
 /** Parser listener that is parsing column definition part of MySQL statements. */
 public class CustomColumnDefinitionParserListener extends MySqlParserBaseListener {
 
@@ -119,7 +121,7 @@ public class CustomColumnDefinitionParserListener extends MySqlParserBaseListene
     public void enterCommentColumnConstraint(MySqlParser.CommentColumnConstraintContext ctx) {
         if (!parser.skipComments()) {
             if (ctx.STRING_LITERAL() != null) {
-                columnEditor.comment(parser.withoutQuotes(ctx.STRING_LITERAL().getText()));
+                columnEditor.comment(removeQuotes(ctx.STRING_LITERAL().getText()));
             }
         }
         super.enterCommentColumnConstraint(ctx);
