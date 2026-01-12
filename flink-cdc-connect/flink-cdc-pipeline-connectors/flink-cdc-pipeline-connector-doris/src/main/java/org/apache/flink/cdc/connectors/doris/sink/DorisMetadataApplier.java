@@ -121,6 +121,9 @@ public class DorisMetadataApplier implements MetadataApplier {
                     applyAlterColumnTypeEvent(alterColumnTypeEvent);
                     return null;
                 },
+                alterColumnPositionEvent -> {
+                    return null;
+                },
                 createTableEvent -> {
                     applyCreateTableEvent(createTableEvent);
                     return null;
