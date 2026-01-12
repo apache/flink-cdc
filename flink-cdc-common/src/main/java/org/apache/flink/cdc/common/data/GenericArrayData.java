@@ -341,4 +341,9 @@ public final class GenericArrayData implements ArrayData {
         checkNoNull();
         return ArrayUtils.toPrimitive((Double[]) array);
     }
+
+    @Override
+    public String toString() {
+        return Arrays.asList(toObjectArray()).toString();
+    }
 }
