@@ -42,7 +42,6 @@ import org.apache.flink.streaming.runtime.operators.sink.committables.CommitRequ
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
-import org.apache.iceberg.DataFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
@@ -180,7 +179,7 @@ public class IcebergWriterTest {
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
-        List<String> result = fetchTableContent(catalog, tableId);
+        List<String> result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
                         "1, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10",
@@ -256,7 +255,7 @@ public class IcebergWriterTest {
         collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
-        result = fetchTableContent(catalog, tableId);
+        result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
                         "1, Mark, 10, test, true, 1.0, 1.0, 1.00, 1970-01-10, null",
@@ -347,7 +346,7 @@ public class IcebergWriterTest {
         Collection<Committer.CommitRequest<WriteResultWrapper>> collection =
                 writeResults.stream().map(MockCommitRequestImpl::new).collect(Collectors.toList());
         icebergCommitter.commit(collection);
-        List<String> result = fetchTableContent(catalog, tableId);
+        List<String> result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result)
                 .containsExactlyInAnyOrder(
                         "char, varchar, string, false, [1,2,3,4,5,], [1,2,3,4,5,6,7,8,9,10,], 0.00, 1, -1, 2, -2, 12345, 12345, 123.456, 123456.789, 00:00:12.345, 2003-10-20, 1970-01-01T00:00, 1970-01-01T00:00Z, 1970-01-01T00:00Z");
@@ -355,17 +354,16 @@ public class IcebergWriterTest {
 
     @Test
     public void testWriteWithPartitionTypes() throws Exception {
-        // all target value is from 1970-01-01 00:00:00
+        // all target value is from 1970-01-01 00:00:00 -> 1971-01-01 12:00:01
         Map<String, Expression> testcases = new HashMap<>();
-        testcases.put("year(create_time)", Expressions.equal(Expressions.year("create_time"), 56));
+        testcases.put("year(create_time)", Expressions.equal(Expressions.year("create_time"), 1));
         testcases.put(
-                "month(create_time)", Expressions.equal(Expressions.month("create_time"), 672));
-        testcases.put("day(create_time)", Expressions.equal(Expressions.day("create_time"), 20465));
+                "month(create_time)", Expressions.equal(Expressions.month("create_time"), 12));
+        testcases.put("day(create_time)", Expressions.equal(Expressions.day("create_time"), 365));
         testcases.put(
-                "hour(create_time)", Expressions.equal(Expressions.hour("create_time"), 491172));
-        testcases.put(
-                "bucket[8](create_time)",
-                Expressions.equal(Expressions.bucket("create_time", 8), 0));
+                "hour(create_time)",
+                Expressions.equal(Expressions.hour("create_time"), 365 * 24 + 12));
+        testcases.put("bucket[8](id)", Expressions.equal(Expressions.bucket("id", 8), 1));
         testcases.put("truncate[8](id)", Expressions.equal(Expressions.truncate("id", 8), 12344));
 
         for (Map.Entry<String, Expression> entry : testcases.entrySet()) {
@@ -419,7 +417,7 @@ public class IcebergWriterTest {
                 binaryRecordDataGenerator.generate(
                         new Object[] {
                             12345L,
-                            TimestampData.fromTimestamp(Timestamp.valueOf("2026-01-12 12:00:00")),
+                            TimestampData.fromTimestamp(Timestamp.valueOf("1971-01-01 12:00:01")),
                         });
         DataChangeEvent dataChangeEvent = DataChangeEvent.insertEvent(tableId, recordData);
         icebergWriter.write(dataChangeEvent, null);
@@ -427,7 +425,7 @@ public class IcebergWriterTest {
                 binaryRecordDataGenerator.generate(
                         new Object[] {
                             1L,
-                            TimestampData.fromTimestamp(Timestamp.valueOf("2025-01-12 12:00:00")),
+                            TimestampData.fromTimestamp(Timestamp.valueOf("2026-01-12 12:00:01")),
                         });
         DataChangeEvent dataChangeEvent2 = DataChangeEvent.insertEvent(tableId, recordData2);
         icebergWriter.write(dataChangeEvent2, null);
@@ -441,27 +439,22 @@ public class IcebergWriterTest {
                 catalog.loadTable(
                         TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
 
+        // test filter files
         CloseableIterable<FileScanTask> tasks = table.newScan().filter(expression).planFiles();
-
-        int count = 0;
-        int recordCount = 0;
+        int fileCount = 0;
         for (FileScanTask task : tasks) {
-            DataFile file = task.file();
-            count++;
-            recordCount += file.recordCount();
+            fileCount++;
+            Assertions.assertThat(task.file().partition().toString()).contains("PartitionData{");
         }
-        Assertions.assertThat(count).isEqualTo(1);
-        Assertions.assertThat(recordCount).isEqualTo(1);
+        Assertions.assertThat(fileCount).isEqualTo(1);
 
-        //  test without filter
-        tasks = table.newScan().planFiles();
+        // test filter records
+        List<String> result = fetchTableContent(catalog, tableId, expression);
+        Assertions.assertThat(result.size()).isEqualTo(1);
+        Assertions.assertThat(result).containsExactlyInAnyOrder("12345, 1971-01-01T12:00:01");
 
-        recordCount = 0;
-        for (FileScanTask task : tasks) {
-            DataFile file = task.file();
-            recordCount += file.recordCount();
-        }
-        Assertions.assertThat(recordCount).isEqualTo(2);
+        result = fetchTableContent(catalog, tableId, null);
+        Assertions.assertThat(result.size()).isEqualTo(2);
     }
 
     /** Mock CommitRequestImpl. */
@@ -475,13 +468,18 @@ public class IcebergWriterTest {
         }
     }
 
-    private List<String> fetchTableContent(Catalog catalog, TableId tableId) {
+    private List<String> fetchTableContent(
+            Catalog catalog, TableId tableId, Expression expression) {
         List<String> results = new ArrayList<>();
         Table table =
                 catalog.loadTable(
                         TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
         org.apache.iceberg.Schema schema = table.schema();
-        CloseableIterable<Record> records = IcebergGenerics.read(table).project(schema).build();
+        IcebergGenerics.ScanBuilder scanbuilder = IcebergGenerics.read(table);
+        if (expression != null) {
+            scanbuilder = scanbuilder.where(expression);
+        }
+        CloseableIterable<Record> records = scanbuilder.project(schema).build();
         for (Record record : records) {
             List<String> fieldValues = new ArrayList<>();
             for (Types.NestedField field : schema.columns()) {
