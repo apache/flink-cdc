@@ -42,17 +42,18 @@ import java.util.Map;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getPrecision;
 import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
 
-/** Utility class for converting CDC RecordData to Flink SQL RowData. */
+/** Utility class for converting CDC {@link RecordData} to Flink SQL {@link RowData}. */
 public class RecordDataConverter {
 
-    /**
-     * Convert CDC RecordData to Flink Table RowData.
-     *
-     * @param recordData CDC record data
-     * @param rowType row type information
-     * @param zoneId time zone for temporal type conversion
-     * @return Flink Table RowData
-     */
+    /** Create {@link RecordData.FieldGetter}s from given CDC {@link Schema}. */
+    public static List<RecordData.FieldGetter> createFieldGetters(Schema schema, ZoneId zoneId) {
+        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>();
+        for (int i = 0; i < schema.getColumnCount(); i++) {
+            fieldGetters.add(createFieldGetter(schema.getColumns().get(i).getType(), i, zoneId));
+        }
+        return fieldGetters;
+    }
+
     private static RowData convertRowData(RecordData recordData, RowType rowType, ZoneId zoneId) {
         if (recordData == null) {
             return null;
@@ -72,15 +73,6 @@ public class RecordDataConverter {
         return rowData;
     }
 
-    /**
-     * Convert a field from CDC RecordData to Flink Table format.
-     *
-     * @param recordData CDC record data
-     * @param pos field position
-     * @param fieldType field data type
-     * @param zoneId time zone for temporal type conversion
-     * @return converted field value
-     */
     private static Object convertField(
             RecordData recordData, int pos, DataType fieldType, ZoneId zoneId) {
         if (recordData.isNullAt(pos)) {
@@ -145,15 +137,7 @@ public class RecordDataConverter {
         }
     }
 
-    /**
-     * Convert CDC ArrayData to Flink Table ArrayData.
-     *
-     * @param arrayData CDC array data
-     * @param arrayType array type information
-     * @param zoneId time zone for temporal type conversion
-     * @return Flink Table ArrayData
-     */
-    public static org.apache.flink.table.data.ArrayData convertArrayData(
+    private static org.apache.flink.table.data.ArrayData convertArrayData(
             ArrayData arrayData, ArrayType arrayType, ZoneId zoneId) {
         if (arrayData == null) {
             return null;
@@ -170,15 +154,7 @@ public class RecordDataConverter {
         return new org.apache.flink.table.data.GenericArrayData(result);
     }
 
-    /**
-     * Convert CDC MapData to Flink Table MapData.
-     *
-     * @param mapData CDC map data
-     * @param mapType map type information
-     * @param zoneId time zone for temporal type conversion
-     * @return Flink Table MapData
-     */
-    public static org.apache.flink.table.data.MapData convertMapData(
+    private static org.apache.flink.table.data.MapData convertMapData(
             MapData mapData, MapType mapType, ZoneId zoneId) {
         if (mapData == null) {
             return null;
@@ -202,15 +178,6 @@ public class RecordDataConverter {
         return new org.apache.flink.table.data.GenericMapData(result);
     }
 
-    /**
-     * Convert an element from CDC ArrayData to Flink Table format.
-     *
-     * @param arrayData CDC array data
-     * @param pos element position
-     * @param elementType element data type
-     * @param zoneId time zone for temporal type conversion
-     * @return converted element value
-     */
     private static Object convertElement(
             ArrayData arrayData, int pos, DataType elementType, ZoneId zoneId) {
         if (arrayData.isNullAt(pos)) {
@@ -274,29 +241,6 @@ public class RecordDataConverter {
         }
     }
 
-    /**
-     * Create field getters for converting CDC RecordData to Flink Table RowData.
-     *
-     * @param schema CDC schema
-     * @param zoneId time zone for temporal type conversion
-     * @return list of field getters
-     */
-    public static List<RecordData.FieldGetter> createFieldGetters(Schema schema, ZoneId zoneId) {
-        List<RecordData.FieldGetter> fieldGetters = new ArrayList<>();
-        for (int i = 0; i < schema.getColumnCount(); i++) {
-            fieldGetters.add(createFieldGetter(schema.getColumns().get(i).getType(), i, zoneId));
-        }
-        return fieldGetters;
-    }
-
-    /**
-     * Create a field getter for a specific field.
-     *
-     * @param fieldType field data type
-     * @param fieldPos field position
-     * @param zoneId time zone for temporal type conversion
-     * @return field getter
-     */
     private static RecordData.FieldGetter createFieldGetter(
             DataType fieldType, int fieldPos, ZoneId zoneId) {
         final RecordData.FieldGetter fieldGetter;
