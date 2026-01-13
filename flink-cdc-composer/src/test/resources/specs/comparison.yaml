@@ -1,0 +1,285 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Equality Comparison
+  projection: |-
+    id_
+    tinyint_ = CAST(2 AS TINYINT) AS comp_1
+    smallint_ = CAST(3 AS SMALLINT) AS comp_2
+    int_ = 4 AS comp_3
+    bigint_ = CAST(5 AS BIGINT) AS comp_4
+    float_ = CAST('7.7' AS FLOAT) AS comp_5
+    double_ = CAST('88.88' AS DOUBLE) AS comp_6
+    decimal_10_0_ = CAST('1234567890' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ = CAST('123456789012345678.90' AS DECIMAL(20, 2)) AS comp_8
+    char_ = 'Alice' AS comp_9
+    varchar_ = 'Zorro' AS comp_10
+    string_ = 'From A to Z is Lie' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, true, true, true, true, true, true, true, true], after=[-1, false, false, false, false, false, false, false, false, false, false, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: Inequality Comparison
+  projection: |-
+    id_
+    tinyint_ <> CAST(2 AS TINYINT) AS comp_1
+    smallint_ <> CAST(3 AS SMALLINT) AS comp_2
+    int_ <> 4 AS comp_3
+    bigint_ <> CAST(5 AS BIGINT) AS comp_4
+    float_ <> CAST('7.7' AS FLOAT) AS comp_5
+    double_ <> CAST('88.88' AS DOUBLE) AS comp_6
+    decimal_10_0_ <> CAST('1234567890' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ <> CAST('123456789012345678.90' AS DECIMAL(20, 2)) AS comp_8
+    char_ <> 'Alice' AS comp_9
+    varchar_ <> 'Zorro' AS comp_10
+    string_ <> 'From A to Z is Lie' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, false, false, false, false, false, false, false, false], after=[-1, true, true, true, true, true, true, true, true, true, true, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
+- do: Greater Op
+  projection: |-
+    id_
+    tinyint_ > CAST(2 AS TINYINT) AS comp_1
+    smallint_ > CAST(3 AS SMALLINT) AS comp_2
+    int_ > 4 AS comp_3
+    bigint_ > CAST(5 AS BIGINT) AS comp_4
+    float_ > CAST('7.7' AS FLOAT) AS comp_5
+    double_ > CAST('88.88' AS DOUBLE) AS comp_6
+    decimal_10_0_ > CAST('1234567890' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ > CAST('123456789012345678.90' AS DECIMAL(20, 2)) AS comp_8
+    char_ > 'Alice' AS comp_9
+    varchar_ > 'Zorro' AS comp_10
+    string_ > 'From A to Z is Lie' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, false, false, false, false, false, false, false, false], after=[-1, false, false, false, false, false, false, false, false, true, true, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, false, false, false, false, false, false, true, true, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: GreaterEq Op
+  projection: |-
+    id_
+    tinyint_ >= CAST(2 AS TINYINT) AS comp_1
+    smallint_ >= CAST(3 AS SMALLINT) AS comp_2
+    int_ >= 4 AS comp_3
+    bigint_ >= CAST(5 AS BIGINT) AS comp_4
+    float_ >= CAST('7.7' AS FLOAT) AS comp_5
+    double_ >= CAST('88.88' AS DOUBLE) AS comp_6
+    decimal_10_0_ >= CAST('1234567890' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ >= CAST('123456789012345678.90' AS DECIMAL(20, 2)) AS comp_8
+    char_ >= 'Alice' AS comp_9
+    varchar_ >= 'Zorro' AS comp_10
+    string_ >= 'From A to Z is Lie' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, true, true, true, true, true, true, true, true], after=[-1, false, false, false, false, false, false, false, false, true, true, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, false, false, false, false, false, false, true, true, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: Less Op
+  projection: |-
+    id_
+    tinyint_ < CAST(2 AS TINYINT) AS comp_1
+    smallint_ < CAST(3 AS SMALLINT) AS comp_2
+    int_ < 4 AS comp_3
+    bigint_ < CAST(5 AS BIGINT) AS comp_4
+    float_ < CAST('7.7' AS FLOAT) AS comp_5
+    double_ < CAST('88.88' AS DOUBLE) AS comp_6
+    decimal_10_0_ < CAST('1234567890' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ < CAST('123456789012345678.90' AS DECIMAL(20, 2)) AS comp_8
+    char_ < 'Alice' AS comp_9
+    varchar_ < 'Zorro' AS comp_10
+    string_ < 'From A to Z is Lie' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, false, false, false, false, false, false, false, false], after=[-1, true, true, true, true, true, true, true, true, false, false, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true, true, true, true, true, true, false, false, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: LessEq Op
+  projection: |-
+    id_
+    tinyint_ <= CAST(2 AS TINYINT) AS comp_1
+    smallint_ <= CAST(3 AS SMALLINT) AS comp_2
+    int_ <= 4 AS comp_3
+    bigint_ <= CAST(5 AS BIGINT) AS comp_4
+    float_ <= CAST('7.7' AS FLOAT) AS comp_5
+    double_ <= CAST('88.88' AS DOUBLE) AS comp_6
+    decimal_10_0_ <= CAST('1234567890' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ <= CAST('123456789012345678.90' AS DECIMAL(20, 2)) AS comp_8
+    char_ <= 'Alice' AS comp_9
+    varchar_ <= 'Zorro' AS comp_10
+    string_ <= 'From A to Z is Lie' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, true, true, true, true, true, true, true, true], after=[-1, true, true, true, true, true, true, true, true, false, false, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true, true, true, true, true, true, false, false, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: IsNull Op
+  projection: id_, string_, id_ IS NULL AS comp_1, string_ IS NULL AS comp_2, 'A' IS NULL AS comp_3, CAST(NULL AS INT) IS NULL AS comp_4
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, false, false, false, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie, false, false, false, true], after=[-1, 天地玄黄宇宙洪荒, false, false, false, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒, false, false, false, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, false, true, false, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, false, true, false, true], after=[], op=DELETE, meta=()}
+- do: IsNotNull Op
+  projection: id_, string_, id_ IS NOT NULL AS comp_1, string_ IS NOT NULL AS comp_2, 'A' IS NOT NULL AS comp_3, CAST(NULL AS INT) IS NOT NULL AS comp_4
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, true, true, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie, true, true, true, false], after=[-1, 天地玄黄宇宙洪荒, true, true, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒, true, true, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, true, false, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, true, false, true, false], after=[], op=DELETE, meta=()}
+- do: Between Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    tinyint_ BETWEEN CAST(1 AS TINYINT) AND CAST(3 AS TINYINT) AS comp_1
+    smallint_ BETWEEN CAST(2 AS SMALLINT) AND CAST(4 AS SMALLINT) AS comp_2
+    int_ BETWEEN 3 AND 5 AS comp_3
+    bigint_ BETWEEN CAST(4 AS BIGINT) AND CAST(6 AS BIGINT) AS comp_4
+    float_ BETWEEN CAST('5.5' AS FLOAT) AND CAST('7.7' AS FLOAT) AS comp_5
+    double_ BETWEEN CAST('77.77' AS DOUBLE) AND CAST('99.99' AS DOUBLE) AS comp_6
+    decimal_10_0_ BETWEEN CAST('10' AS DECIMAL(10, 0)) AND CAST('9999999999' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ BETWEEN CAST('1.45' AS DECIMAL(20, 2)) AND CAST('999999999999999999.99' AS DECIMAL(20, 2)) AS comp_8
+    char_ BETWEEN 'A' AND 'Z' AS comp_9
+    varchar_ BETWEEN 'Aaa' AND 'Zzz' AS comp_10
+    string_ BETWEEN 'Alice' AND 'Zorro' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, true, true, true, true, true, true, true, true], after=[-1, false, false, false, false, false, false, false, false, false, false, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: Not Between Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    tinyint_ NOT BETWEEN CAST(1 AS TINYINT) AND CAST(3 AS TINYINT) AS comp_1
+    smallint_ NOT BETWEEN CAST(2 AS SMALLINT) AND CAST(4 AS SMALLINT) AS comp_2
+    int_ NOT BETWEEN 3 AND 5 AS comp_3
+    bigint_ NOT BETWEEN CAST(4 AS BIGINT) AND CAST(6 AS BIGINT) AS comp_4
+    float_ NOT BETWEEN CAST('5.5' AS FLOAT) AND CAST('7.7' AS FLOAT) AS comp_5
+    double_ NOT BETWEEN CAST('77.77' AS DOUBLE) AND CAST('99.99' AS DOUBLE) AS comp_6
+    decimal_10_0_ NOT BETWEEN CAST('10' AS DECIMAL(10, 0)) AND CAST('9999999999' AS DECIMAL(10, 0)) AS comp_7
+    decimal_20_2_ NOT BETWEEN CAST('1.45' AS DECIMAL(20, 2)) AND CAST('999999999999999999.99' AS DECIMAL(20, 2)) AS comp_8
+    char_ NOT BETWEEN 'A' AND 'Z' AS comp_9
+    varchar_ NOT BETWEEN 'Aaa' AND 'Zzz' AS comp_10
+    string_ NOT BETWEEN 'Alice' AND 'Zorro' AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, false, false, false, false, false, false, false, false], after=[-1, true, true, true, true, true, true, true, true, true, true, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
+- do: String Like Op
+  non-null: 'true'
+  projection: id_, char_ LIKE 'A.*' AS comp_1, varchar_ LIKE '.*rro' AS comp_2, string_ LIKE 'From [A-Z] to [A-Z] is Lie' AS comp_3
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true], after=[-1, false, false, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, false], after=[], op=DELETE, meta=()}
+- do: String Like Op (With NULL)
+  ignore: FLINK-38905
+  projection: id_, char_ LIKE 'A.*' AS comp_1, varchar_ LIKE '.*rro' AS comp_2, string_ LIKE 'From [A-Z] to [A-Z] is Lie' AS comp_3
+  primary-key: id_
+- do: String Not Like Op
+  non-null: 'true'
+  projection: id_, char_ NOT LIKE 'A.*' AS comp_1, varchar_ NOT LIKE '.*rro' AS comp_2, string_ NOT LIKE 'From [A-Z] to [A-Z] is Lie' AS comp_3
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false], after=[-1, true, true, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true], after=[], op=DELETE, meta=()}
+- do: String Not Like Op (With NULL)
+  ignore: FLINK-38905
+  projection: id_, char_ NOT LIKE 'A.*' AS comp_1, varchar_ NOT LIKE '.*rro' AS comp_2, string_ NOT LIKE 'From [A-Z] to [A-Z] is Lie' AS comp_3
+  primary-key: id_
+- do: In Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    tinyint_ IN (CAST(2 AS TINYINT)) AS comp_1
+    smallint_ IN (CAST(3 AS SMALLINT)) AS comp_2
+    int_ IN (4) AS comp_3
+    bigint_ IN (CAST(5 AS BIGINT)) AS comp_4
+    float_ IN (CAST('7.7' AS FLOAT)) AS comp_5
+    double_ IN (CAST('88.88' AS DOUBLE)) AS comp_6
+    decimal_10_0_ IN (CAST('1234567890' AS DECIMAL(10, 0))) AS comp_7
+    decimal_20_2_ IN (CAST('123456789012345678.90' AS DECIMAL(20, 2))) AS comp_8
+    char_ IN ('Alice') AS comp_9
+    varchar_ IN ('Zorro') AS comp_10
+    string_ IN ('From A to Z is Lie') AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, true, true, true, true, true, true, true, true, true, true], after=[-1, false, false, false, false, false, false, false, false, false, false, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, false, false, false, false, false, false, false, false, false, false, false], after=[], op=DELETE, meta=()}
+- do: Not In Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    tinyint_ NOT IN (CAST(2 AS TINYINT)) AS comp_1
+    smallint_ NOT IN (CAST(3 AS SMALLINT)) AS comp_2
+    int_ NOT IN (4) AS comp_3
+    bigint_ NOT IN (CAST(5 AS BIGINT)) AS comp_4
+    float_ NOT IN (CAST('7.7' AS FLOAT)) AS comp_5
+    double_ NOT IN (CAST('88.88' AS DOUBLE)) AS comp_6
+    decimal_10_0_ NOT IN (CAST('1234567890' AS DECIMAL(10, 0))) AS comp_7
+    decimal_20_2_ NOT IN (CAST('123456789012345678.90' AS DECIMAL(20, 2))) AS comp_8
+    char_ NOT IN ('Alice') AS comp_9
+    varchar_ NOT IN ('Zorro') AS comp_10
+    string_ NOT IN ('From A to Z is Lie') AS comp_11
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN,`comp_8` BOOLEAN,`comp_9` BOOLEAN,`comp_10` BOOLEAN,`comp_11` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, false, false, false, false, false, false, false, false, false, false, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, false, false, false, false, false, false, false, false, false, false, false], after=[-1, true, true, true, true, true, true, true, true, true, true, true], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, true, true, true, true, true, true, true, true, true, true, true], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, true, true, true, true, true, true, true, true, true, true, true], after=[], op=DELETE, meta=()}

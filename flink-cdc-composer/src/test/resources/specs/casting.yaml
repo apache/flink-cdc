@@ -1,0 +1,271 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Cast To String
+  projection: |-
+    id_
+    CAST(bool_ AS VARCHAR) AS comp_1
+    CAST(tinyint_ AS VARCHAR) AS comp_2
+    CAST(smallint_ AS VARCHAR) AS comp_3
+    CAST(int_ AS VARCHAR) AS comp_4
+    CAST(bigint_ AS VARCHAR) AS comp_5
+    CAST(float_ AS VARCHAR) AS comp_6
+    CAST(double_ AS VARCHAR) AS comp_7
+    CAST(decimal_10_0_ AS VARCHAR) AS comp_8
+    CAST(decimal_20_2_ AS VARCHAR) AS comp_9
+    CAST(char_ AS VARCHAR) AS comp_10
+    CAST(varchar_ AS VARCHAR) AS comp_11
+    CAST(string_ AS VARCHAR) AS comp_12
+    CAST(timestamp_0_ AS VARCHAR) AS comp_13
+    CAST(timestamp_6_ AS VARCHAR) AS comp_14
+    CAST(timestamp_9_ AS VARCHAR) AS comp_15
+    CAST(timestamp_tz_0_ AS VARCHAR) AS comp_16
+    CAST(timestamp_tz_6_ AS VARCHAR) AS comp_17
+    CAST(timestamp_tz_9_ AS VARCHAR) AS comp_18
+    CAST(timestamp_ltz_0_ AS VARCHAR) AS comp_19
+    CAST(timestamp_ltz_6_ AS VARCHAR) AS comp_20
+    CAST(timestamp_ltz_9_ AS VARCHAR) AS comp_21
+    CAST(date_ AS VARCHAR) AS comp_22
+    CAST(time_0_ AS VARCHAR) AS comp_23
+    CAST(time_6_ AS VARCHAR) AS comp_24
+    CAST(time_9_ AS VARCHAR) AS comp_25
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` STRING,`comp_2` STRING,`comp_3` STRING,`comp_4` STRING,`comp_5` STRING,`comp_6` STRING,`comp_7` STRING,`comp_8` STRING,`comp_9` STRING,`comp_10` STRING,`comp_11` STRING,`comp_12` STRING,`comp_13` STRING,`comp_14` STRING,`comp_15` STRING,`comp_16` STRING,`comp_17` STRING,`comp_18` STRING,`comp_19` STRING,`comp_20` STRING,`comp_21` STRING,`comp_22` STRING,`comp_23` STRING,`comp_24` STRING,`comp_25` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, 2, 3, 4, 5, 7.7, 88.88, 1234567890, 123456789012345678.90, Alice, Zorro, From A to Z is Lie, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456+08:00, 1970-01-03T17:09:27.891234561+01:00, 1970-01-05T00:01:18.912345612-04:00, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2000-12-31, 19:43:17, 21:45:03, 03:59:59], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, 2, 3, 4, 5, 7.7, 88.88, 1234567890, 123456789012345678.90, Alice, Zorro, From A to Z is Lie, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456+08:00, 1970-01-03T17:09:27.891234561+01:00, 1970-01-05T00:01:18.912345612-04:00, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2000-12-31, 19:43:17, 21:45:03, 03:59:59], after=[-1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Cast To Boolean
+  projection: |-
+    id_
+    CAST(null AS BOOLEAN) AS comp_0
+    CAST(0 AS BOOLEAN) AS comp_1
+    CAST(1 AS BOOLEAN) AS comp_2
+    CAST('FALSE' AS BOOLEAN) AS comp_3
+    CAST('TRUE' AS BOOLEAN) AS comp_4
+    CAST('false' AS BOOLEAN) AS comp_5
+    CAST('true' AS BOOLEAN) AS comp_6
+    CAST('FOOBAR' AS BOOLEAN) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` BOOLEAN,`comp_1` BOOLEAN,`comp_2` BOOLEAN,`comp_3` BOOLEAN,`comp_4` BOOLEAN,`comp_5` BOOLEAN,`comp_6` BOOLEAN,`comp_7` BOOLEAN}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, false, true, false, true, false, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, false, true, false, true, false, true, false], after=[-1, null, false, true, false, true, false, true, false], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, false, true, false, true, false, true, false], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, false, true, false, true, false, true, false], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, false, true, false, true, false, true, false], after=[], op=DELETE, meta=()}
+- do: Cast To TinyInt
+  projection: |-
+    id_
+    CAST(null AS TINYINT) AS comp_0
+    CAST(0 AS TINYINT) AS comp_1
+    CAST(1 AS TINYINT) AS comp_2
+    CAST('2.22' AS TINYINT) AS comp_3
+    CAST('333' AS TINYINT) AS comp_4
+    CAST('44.44' AS TINYINT) AS comp_5
+    CAST('5555555' AS TINYINT) AS comp_6
+    CAST('FOOBAR' AS TINYINT) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` TINYINT,`comp_1` TINYINT,`comp_2` TINYINT,`comp_3` TINYINT,`comp_4` TINYINT,`comp_5` TINYINT,`comp_6` TINYINT,`comp_7` TINYINT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 77, 44, 99, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 77, 44, 99, null], after=[-1, null, 0, 1, 2, 77, 44, 99, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 77, 44, 99, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 77, 44, 99, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 77, 44, 99, null], after=[], op=DELETE, meta=()}
+- do: Cast To SmallInt
+  projection: |-
+    id_
+    CAST(null AS SMALLINT) AS comp_0
+    CAST(0 AS SMALLINT) AS comp_1
+    CAST(1 AS SMALLINT) AS comp_2
+    CAST('2.22' AS SMALLINT) AS comp_3
+    CAST('333' AS SMALLINT) AS comp_4
+    CAST('44.44' AS SMALLINT) AS comp_5
+    CAST('5555555' AS SMALLINT) AS comp_6
+    CAST('FOOBAR' AS SMALLINT) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` SMALLINT,`comp_1` SMALLINT,`comp_2` SMALLINT,`comp_3` SMALLINT,`comp_4` SMALLINT,`comp_5` SMALLINT,`comp_6` SMALLINT,`comp_7` SMALLINT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 333, 44, -15005, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 333, 44, -15005, null], after=[-1, null, 0, 1, 2, 333, 44, -15005, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 333, 44, -15005, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 333, 44, -15005, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 333, 44, -15005, null], after=[], op=DELETE, meta=()}
+- do: Cast To Integer
+  projection: |-
+    id_
+    CAST(null AS INT) AS comp_0
+    CAST(0 AS INT) AS comp_1
+    CAST(1 AS INT) AS comp_2
+    CAST('2.22' AS INT) AS comp_3
+    CAST('333' AS INT) AS comp_4
+    CAST('44.44' AS INT) AS comp_5
+    CAST('5555555' AS INT) AS comp_6
+    CAST('FOOBAR' AS INT) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` INT,`comp_1` INT,`comp_2` INT,`comp_3` INT,`comp_4` INT,`comp_5` INT,`comp_6` INT,`comp_7` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 333, 44, 5555555, null], after=[-1, null, 0, 1, 2, 333, 44, 5555555, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+- do: Cast To BigInt
+  projection: |-
+    id_
+    CAST(null AS BIGINT) AS comp_0
+    CAST(0 AS BIGINT) AS comp_1
+    CAST(1 AS BIGINT) AS comp_2
+    CAST('2.22' AS BIGINT) AS comp_3
+    CAST('333' AS BIGINT) AS comp_4
+    CAST('44.44' AS BIGINT) AS comp_5
+    CAST('5555555' AS BIGINT) AS comp_6
+    CAST('FOOBAR' AS BIGINT) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` BIGINT,`comp_1` BIGINT,`comp_2` BIGINT,`comp_3` BIGINT,`comp_4` BIGINT,`comp_5` BIGINT,`comp_6` BIGINT,`comp_7` BIGINT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 333, 44, 5555555, null], after=[-1, null, 0, 1, 2, 333, 44, 5555555, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+- do: Cast To Float
+  projection: |-
+    id_
+    CAST(null AS FLOAT) AS comp_0
+    CAST(0 AS FLOAT) AS comp_1
+    CAST(1 AS FLOAT) AS comp_2
+    CAST('2.22' AS FLOAT) AS comp_3
+    CAST('333' AS FLOAT) AS comp_4
+    CAST('44.44' AS FLOAT) AS comp_5
+    CAST('5555555' AS FLOAT) AS comp_6
+    CAST('FOOBAR' AS FLOAT) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` FLOAT,`comp_1` FLOAT,`comp_2` FLOAT,`comp_3` FLOAT,`comp_4` FLOAT,`comp_5` FLOAT,`comp_6` FLOAT,`comp_7` FLOAT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], after=[-1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], after=[], op=DELETE, meta=()}
+- do: Cast To Double
+  projection: |-
+    id_
+    CAST(null AS DOUBLE) AS comp_0
+    CAST(0 AS DOUBLE) AS comp_1
+    CAST(1 AS DOUBLE) AS comp_2
+    CAST('2.22' AS DOUBLE) AS comp_3
+    CAST('333' AS DOUBLE) AS comp_4
+    CAST('44.44' AS DOUBLE) AS comp_5
+    CAST('5555555' AS DOUBLE) AS comp_6
+    CAST('FOOBAR' AS DOUBLE) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DOUBLE,`comp_1` DOUBLE,`comp_2` DOUBLE,`comp_3` DOUBLE,`comp_4` DOUBLE,`comp_5` DOUBLE,`comp_6` DOUBLE,`comp_7` DOUBLE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], after=[-1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.0, 1.0, 2.22, 333.0, 44.44, 5555555.0, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(10, 0)
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(10, 0)) AS comp_0
+    CAST(0 AS DECIMAL(10, 0)) AS comp_1
+    CAST(1 AS DECIMAL(10, 0)) AS comp_2
+    CAST('2.22' AS DECIMAL(10, 0)) AS comp_3
+    CAST('333' AS DECIMAL(10, 0)) AS comp_4
+    CAST('44.44' AS DECIMAL(10, 0)) AS comp_5
+    CAST('5555555' AS DECIMAL(10, 0)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(10, 0)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(10, 0),`comp_1` DECIMAL(10, 0),`comp_2` DECIMAL(10, 0),`comp_3` DECIMAL(10, 0),`comp_4` DECIMAL(10, 0),`comp_5` DECIMAL(10, 0),`comp_6` DECIMAL(10, 0),`comp_7` DECIMAL(10, 0)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0, 1, 2, 333, 44, 5555555, null], after=[-1, null, 0, 1, 2, 333, 44, 5555555, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0, 1, 2, 333, 44, 5555555, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0, 1, 2, 333, 44, 5555555, null], after=[], op=DELETE, meta=()}
+- do: Cast To Decimal(20, 5)
+  projection: |-
+    id_
+    CAST(null AS DECIMAL(20, 5)) AS comp_0
+    CAST(0 AS DECIMAL(20, 5)) AS comp_1
+    CAST(1 AS DECIMAL(20, 5)) AS comp_2
+    CAST('2.22' AS DECIMAL(20, 5)) AS comp_3
+    CAST('333' AS DECIMAL(20, 5)) AS comp_4
+    CAST('44.44' AS DECIMAL(20, 5)) AS comp_5
+    CAST('5555555' AS DECIMAL(20, 5)) AS comp_6
+    CAST('FOOBAR' AS DECIMAL(20, 5)) AS comp_7
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_0` DECIMAL(19, 5),`comp_1` DECIMAL(19, 5),`comp_2` DECIMAL(19, 5),`comp_3` DECIMAL(19, 5),`comp_4` DECIMAL(19, 5),`comp_5` DECIMAL(19, 5),`comp_6` DECIMAL(19, 5),`comp_7` DECIMAL(19, 5)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], after=[-1, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, 0.00000, 1.00000, 2.22000, 333.00000, 44.44000, 5555555.00000, null], after=[], op=DELETE, meta=()}
+- do: Cast To Timestamp (UTC)
+  projection: |-
+    id_
+    CAST(timestamp_0_ AS TIMESTAMP(6)) AS comp_1
+    CAST(timestamp_6_ AS TIMESTAMP(6)) AS comp_2
+    CAST(timestamp_9_ AS TIMESTAMP(6)) AS comp_3
+    CAST(timestamp_tz_0_ AS TIMESTAMP(6)) AS comp_4
+    CAST(timestamp_tz_6_ AS TIMESTAMP(6)) AS comp_5
+    CAST(timestamp_tz_9_ AS TIMESTAMP(6)) AS comp_6
+    CAST(timestamp_ltz_0_ AS TIMESTAMP(6)) AS comp_7
+    CAST(timestamp_ltz_6_ AS TIMESTAMP(6)) AS comp_8
+    CAST(timestamp_ltz_9_ AS TIMESTAMP(6)) AS comp_9
+    CAST('2019-12-31T21:48:25' AS TIMESTAMP(6)) AS comp_10
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` TIMESTAMP(3),`comp_2` TIMESTAMP(3),`comp_3` TIMESTAMP(3),`comp_4` TIMESTAMP(3),`comp_5` TIMESTAMP(3),`comp_6` TIMESTAMP(3),`comp_7` TIMESTAMP(3),`comp_8` TIMESTAMP(3),`comp_9` TIMESTAMP(3),`comp_10` TIMESTAMP(3)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T02:17:36.789123456, 1970-01-03T16:09:27.891234561, 1970-01-05T04:01:18.912345612, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2019-12-31T21:48:25], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T02:17:36.789123456, 1970-01-03T16:09:27.891234561, 1970-01-05T04:01:18.912345612, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2019-12-31T21:48:25], after=[-1, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T00:57:36.789723456, 1970-01-10T14:49:27.891834561, 1970-01-12T02:41:18.912945612, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2019-12-31T21:48:25], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T00:57:36.789723456, 1970-01-10T14:49:27.891834561, 1970-01-12T02:41:18.912945612, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
+- do: Cast To Timestamp (Asia/Shanghai)
+  projection: |-
+    id_
+    CAST(timestamp_0_ AS TIMESTAMP(6)) AS comp_1
+    CAST(timestamp_6_ AS TIMESTAMP(6)) AS comp_2
+    CAST(timestamp_9_ AS TIMESTAMP(6)) AS comp_3
+    CAST(timestamp_tz_0_ AS TIMESTAMP(6)) AS comp_4
+    CAST(timestamp_tz_6_ AS TIMESTAMP(6)) AS comp_5
+    CAST(timestamp_tz_9_ AS TIMESTAMP(6)) AS comp_6
+    CAST(timestamp_ltz_0_ AS TIMESTAMP(6)) AS comp_7
+    CAST(timestamp_ltz_6_ AS TIMESTAMP(6)) AS comp_8
+    CAST(timestamp_ltz_9_ AS TIMESTAMP(6)) AS comp_9
+    CAST('2019-12-31T21:48:25' AS TIMESTAMP(6)) AS comp_10
+  primary-key: id_
+  time-zone: Asia/Shanghai
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` TIMESTAMP(3),`comp_2` TIMESTAMP(3),`comp_3` TIMESTAMP(3),`comp_4` TIMESTAMP(3),`comp_5` TIMESTAMP(3),`comp_6` TIMESTAMP(3),`comp_7` TIMESTAMP(3),`comp_8` TIMESTAMP(3),`comp_9` TIMESTAMP(3),`comp_10` TIMESTAMP(3)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456, 1970-01-04T00:09:27.891234561, 1970-01-05T12:01:18.912345612, 1970-01-02T18:17:36.789123456, 1970-01-04T01:09:27.891234561, 1970-01-05T08:01:18.912345612, 2019-12-31T21:48:25], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456, 1970-01-04T00:09:27.891234561, 1970-01-05T12:01:18.912345612, 1970-01-02T18:17:36.789123456, 1970-01-04T01:09:27.891234561, 1970-01-05T08:01:18.912345612, 2019-12-31T21:48:25], after=[-1, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456, 1970-01-10T22:49:27.891834561, 1970-01-12T10:41:18.912945612, 1970-01-09T16:57:36.789723456, 1970-01-10T23:49:27.891834561, 1970-01-12T06:41:18.912945612, 2019-12-31T21:48:25], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456, 1970-01-10T22:49:27.891834561, 1970-01-12T10:41:18.912945612, 1970-01-09T16:57:36.789723456, 1970-01-10T23:49:27.891834561, 1970-01-12T06:41:18.912945612, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, 2019-12-31T21:48:25], after=[], op=DELETE, meta=()}
+- do: Cast To Timestamp Failure
+  projection: |-
+    id_
+    CAST('FOOBAR' AS TIMESTAMP(6)) AS comp_11
+  primary-key: id_
+  expect-error: Failed to evaluate projection expression `castToTimestamp("FOOBAR", __time_zone__)` for column `comp_11` in table `foo.bar.baz`.
