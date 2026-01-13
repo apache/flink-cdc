@@ -1,0 +1,123 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Add Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    decimal_10_0_ + CAST(1 AS DECIMAL(1, 0)) AS comp_1
+    decimal_20_2_ + CAST(1 AS DECIMAL(1, 0)) AS comp_2
+  non-null: 'true'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(11, 0),`comp_2` DECIMAL(19, 2)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1234567891, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567891, null], after=[-1, -9876543209, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543209, null], after=[], op=DELETE, meta=()}
+- do: Subtract Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    decimal_10_0_ - CAST(1 AS DECIMAL(1, 0)) AS comp_1
+    decimal_20_2_ - CAST(1 AS DECIMAL(1, 0)) AS comp_2
+  primary-key: id_
+  non-null: 'true'
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(11, 0),`comp_2` DECIMAL(19, 2)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1234567889, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567889, null], after=[-1, -9876543211, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543211, null], after=[], op=DELETE, meta=()}
+- do: Multiply Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    decimal_10_0_ * CAST(2 AS DECIMAL(1, 0)) AS comp_1
+    decimal_20_2_ * CAST(2 AS DECIMAL(1, 0)) AS comp_2
+  primary-key: id_
+  non-null: 'true'
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(11, 0),`comp_2` DECIMAL(19, 2)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2469135780, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2469135780, null], after=[-1, -19753086420, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -19753086420, null], after=[], op=DELETE, meta=()}
+- do: Divide Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    decimal_10_0_ / CAST(2 AS DECIMAL(1, 0)) AS comp_1
+    decimal_20_2_ / CAST(2 AS DECIMAL(1, 0)) AS comp_2
+  primary-key: id_
+  non-null: 'true'
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(16, 6),`comp_2` DECIMAL(19, 2)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 617.283945, 61728394506172839.45], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 617.283945, 61728394506172839.45], after=[-1, -4938.271605, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -4938.271605, null], after=[], op=DELETE, meta=()}
+- do: Abs Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    ABS(decimal_10_0_) AS comp_1
+    ABS(decimal_20_2_) AS comp_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(10, 0),`comp_2` DECIMAL(19, 2)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1234567890, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567890, null], after=[-1, 9876543210, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 9876543210, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Ceil Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    CEIL(decimal_10_0_) AS comp_1
+    CEIL(decimal_20_2_) AS comp_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(10, 0),`comp_2` DECIMAL(19, 0)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1234567890, 123456789012345679], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567890, 123456789012345679], after=[-1, -9876543210, -987654321098765432], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543210, -987654321098765432], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Floor Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    FLOOR(decimal_10_0_) AS comp_1
+    FLOOR(decimal_20_2_) AS comp_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(10, 0),`comp_2` DECIMAL(19, 0)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1234567890, 123456789012345678], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567890, 123456789012345678], after=[-1, -9876543210, -987654321098765433], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543210, -987654321098765433], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Round Op
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    ROUND(decimal_10_0_, 1) AS comp_1
+    ROUND(decimal_20_2_, 1) AS comp_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DECIMAL(10, 0),`comp_2` DECIMAL(19, 1)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 12345678900, 123456789012345678.9], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 12345678900, 123456789012345678.9], after=[-1, -98765432100, -987654321098765432.1], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -98765432100, -987654321098765432.1], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}

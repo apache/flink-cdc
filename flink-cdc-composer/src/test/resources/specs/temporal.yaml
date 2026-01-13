@@ -1,0 +1,290 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Date Format Function (UTC)
+  projection: |-
+    id_
+    DATE_FORMAT(timestamp_0_, 'yyyy~MM~dd') AS comp_1
+    DATE_FORMAT(timestamp_6_, 'yyyy~MM~dd') AS comp_2
+    DATE_FORMAT(timestamp_9_, 'yyyy~MM~dd') AS comp_3
+    DATE_FORMAT(timestamp_ltz_0_, 'yyyy~MM~dd') AS comp_4
+    DATE_FORMAT(timestamp_ltz_6_, 'yyyy~MM~dd') AS comp_5
+    DATE_FORMAT(timestamp_ltz_9_, 'yyyy~MM~dd') AS comp_6
+    DATE_FORMAT(timestamp_0_, 'yyyy->MM->dd HH->mm->ss') AS comp_7
+    DATE_FORMAT(timestamp_6_, 'yyyy->MM->dd HH->mm->ss') AS comp_8
+    DATE_FORMAT(timestamp_9_, 'yyyy->MM->dd HH->mm->ss') AS comp_9
+    DATE_FORMAT(timestamp_ltz_0_, 'yyyy->MM->dd HH->mm->ss') AS comp_10
+    DATE_FORMAT(timestamp_ltz_6_, 'yyyy->MM->dd HH->mm->ss') AS comp_11
+    DATE_FORMAT(timestamp_ltz_9_, 'yyyy->MM->dd HH->mm->ss') AS comp_12
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` STRING,`comp_2` STRING,`comp_3` STRING,`comp_4` STRING,`comp_5` STRING,`comp_6` STRING,`comp_7` STRING,`comp_8` STRING,`comp_9` STRING,`comp_10` STRING,`comp_11` STRING,`comp_12` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970~01~02, 1970~01~03, 1970~01~05, 1970~01~02, 1970~01~03, 1970~01~05, 1970->01->02 10->17->36, 1970->01->03 17->09->27, 1970->01->05 00->01->18, 1970->01->02 10->17->36, 1970->01->03 17->09->27, 1970->01->05 00->01->18], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970~01~02, 1970~01~03, 1970~01~05, 1970~01~02, 1970~01~03, 1970~01~05, 1970->01->02 10->17->36, 1970->01->03 17->09->27, 1970->01->05 00->01->18, 1970->01->02 10->17->36, 1970->01->03 17->09->27, 1970->01->05 00->01->18], after=[-1, 1970~01~09, 1970~01~10, 1970~01~11, 1970~01~09, 1970~01~10, 1970~01~11, 1970->01->09 08->57->36, 1970->01->10 15->49->27, 1970->01->11 22->41->18, 1970->01->09 08->57->36, 1970->01->10 15->49->27, 1970->01->11 22->41->18], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970~01~09, 1970~01~10, 1970~01~11, 1970~01~09, 1970~01~10, 1970~01~11, 1970->01->09 08->57->36, 1970->01->10 15->49->27, 1970->01->11 22->41->18, 1970->01->09 08->57->36, 1970->01->10 15->49->27, 1970->01->11 22->41->18], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Date Format Function (Asia/Shanghai)
+  projection: |-
+    id_
+    DATE_FORMAT(timestamp_0_, 'yyyy~MM~dd') AS comp_1
+    DATE_FORMAT(timestamp_6_, 'yyyy~MM~dd') AS comp_2
+    DATE_FORMAT(timestamp_9_, 'yyyy~MM~dd') AS comp_3
+    DATE_FORMAT(timestamp_ltz_0_, 'yyyy~MM~dd') AS comp_4
+    DATE_FORMAT(timestamp_ltz_6_, 'yyyy~MM~dd') AS comp_5
+    DATE_FORMAT(timestamp_ltz_9_, 'yyyy~MM~dd') AS comp_6
+    DATE_FORMAT(timestamp_0_, 'yyyy->MM->dd HH->mm->ss') AS comp_7
+    DATE_FORMAT(timestamp_6_, 'yyyy->MM->dd HH->mm->ss') AS comp_8
+    DATE_FORMAT(timestamp_9_, 'yyyy->MM->dd HH->mm->ss') AS comp_9
+    DATE_FORMAT(timestamp_ltz_0_, 'yyyy->MM->dd HH->mm->ss') AS comp_10
+    DATE_FORMAT(timestamp_ltz_6_, 'yyyy->MM->dd HH->mm->ss') AS comp_11
+    DATE_FORMAT(timestamp_ltz_9_, 'yyyy->MM->dd HH->mm->ss') AS comp_12
+  primary-key: id_
+  time-zone: Asia/Shanghai
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` STRING,`comp_2` STRING,`comp_3` STRING,`comp_4` STRING,`comp_5` STRING,`comp_6` STRING,`comp_7` STRING,`comp_8` STRING,`comp_9` STRING,`comp_10` STRING,`comp_11` STRING,`comp_12` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1970~01~02, 1970~01~03, 1970~01~05, 1970~01~02, 1970~01~04, 1970~01~05, 1970->01->02 10->17->36, 1970->01->03 17->09->27, 1970->01->05 00->01->18, 1970->01->02 18->17->36, 1970->01->04 01->09->27, 1970->01->05 08->01->18], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1970~01~02, 1970~01~03, 1970~01~05, 1970~01~02, 1970~01~04, 1970~01~05, 1970->01->02 10->17->36, 1970->01->03 17->09->27, 1970->01->05 00->01->18, 1970->01->02 18->17->36, 1970->01->04 01->09->27, 1970->01->05 08->01->18], after=[-1, 1970~01~09, 1970~01~10, 1970~01~11, 1970~01~09, 1970~01~10, 1970~01~12, 1970->01->09 08->57->36, 1970->01->10 15->49->27, 1970->01->11 22->41->18, 1970->01->09 16->57->36, 1970->01->10 23->49->27, 1970->01->12 06->41->18], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1970~01~09, 1970~01~10, 1970~01~11, 1970~01~09, 1970~01~10, 1970~01~12, 1970->01->09 08->57->36, 1970->01->10 15->49->27, 1970->01->11 22->41->18, 1970->01->09 16->57->36, 1970->01->10 23->49->27, 1970->01->12 06->41->18], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Timestamp Diff Function
+  projection: |-
+    id_
+    TIMESTAMP_DIFF('SECOND', timestamp_0_, timestamp_0_) AS comp_1
+    TIMESTAMP_DIFF('MINUTE', timestamp_6_, timestamp_0_) AS comp_2
+    TIMESTAMP_DIFF('HOUR', timestamp_9_, timestamp_0_) AS comp_3
+    TIMESTAMP_DIFF('DAY', timestamp_ltz_0_, timestamp_ltz_0_) AS comp_4
+    TIMESTAMP_DIFF('MONTH', timestamp_ltz_6_, timestamp_ltz_0_) AS comp_5
+    TIMESTAMP_DIFF('YEAR', timestamp_ltz_9_, timestamp_ltz_0_) AS comp_6
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` INT,`comp_2` INT,`comp_3` INT,`comp_4` INT,`comp_5` INT,`comp_6` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 0, -1851, -61, 0, 0, 0], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 0, -1851, -61, 0, 0, 0], after=[-1, 0, -1851, -61, 0, 0, 0], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 0, -1851, -61, 0, 0, 0], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: To Date Function
+  ignore: FLINK-38906
+  projection: |-
+    id_
+    TO_DATE('2025-01-05') AS comp_1
+    TO_DATE('9999-12-31') AS comp_2
+    TO_DATE('2024//02//14', 'yyyy//MM//dd') AS comp_3
+    TO_DATE('2024 !! 02 !! 14', 'yyyy//MM//dd') AS comp_4
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` DATE,`comp_2` DATE,`comp_3` DATE,`comp_4` DATE}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2025-01-05, 9999-12-31, 2024-02-14, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2025-01-05, 9999-12-31, 2024-02-14, null], after=[-1, 2025-01-05, 9999-12-31, 2024-02-14, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 2025-01-05, 9999-12-31, 2024-02-14, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 2025-01-05, 9999-12-31, 2024-02-14, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 2025-01-05, 9999-12-31, 2024-02-14, null], after=[], op=DELETE, meta=()}
+- do: To Timestamp Function
+  projection: |-
+    id_
+    TO_TIMESTAMP('2025-01-05 19:59:59') AS comp_1
+    TO_TIMESTAMP('2024//02//14 23//44//17', 'yyyy//MM//dd HH//mm//ss') AS comp_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`comp_1` TIMESTAMP(3),`comp_2` TIMESTAMP(3)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2025-01-05T19:59:59, 2024-02-14T23:44:17], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2025-01-05T19:59:59, 2024-02-14T23:44:17], after=[-1, 2025-01-05T19:59:59, 2024-02-14T23:44:17], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 2025-01-05T19:59:59, 2024-02-14T23:44:17], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 2025-01-05T19:59:59, 2024-02-14T23:44:17], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 2025-01-05T19:59:59, 2024-02-14T23:44:17], after=[], op=DELETE, meta=()}
+- do: To Timestamp Function Failure (1)
+  projection: |-
+    id_
+    TO_TIMESTAMP('2024 !! 02 !! 14', 'yyyy//MM//dd') AS comp
+  expect-error: 'Unparseable date: "2024 !! 02 !! 14"'
+- do: To Timestamp Function Failure (2)
+  projection: |-
+    id_
+    TO_TIMESTAMP('2024 !! 02 !! 14 11 !! 45 !! 49', 'yyyy//MM//dd') AS comp
+  expect-error: 'Unparseable date: "2024 !! 02 !! 14 11 !! 45 !! 49"'
+- do: Format DateType and TimeType
+  ignore: FLINK-38906
+  projection: |-
+    id_, date_, time_0_, time_6_
+    DATE_FORMAT(date_, 'yyyy->MM->dd') AS date_fmt_1
+    DATE_FORMAT(date_, 'yyyy//MM//dd') AS date_fmt_2
+    DATE_FORMAT(time_0_, 'HH::mm::ss.SSS') AS time_fmt_1
+    DATE_FORMAT(time_0_, 'HHmmssSSS') AS time_fmt_2
+    DATE_FORMAT(time_6_, 'HH::mm::ss.SSS') AS time_fmt_3
+    DATE_FORMAT(time_6_, 'HHmmssSSS') AS time_fmt_4
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`date_` DATE,`time_0_` TIME(0),`time_6_` TIME(6),`date_fmt_1` STRING,`date_fmt_2` STRING,`time_fmt_1` STRING,`time_fmt_2` STRING,`time_fmt_3` STRING,`time_fmt_4` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 2000-12-31, 19:43:17, 21:45:03, 2000->12->31, 2000//12//31, 19::43::17.000, 194317000, 21::45::03.000, 214503000], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 2000-12-31, 19:43:17, 21:45:03, 2000->12->31, 2000//12//31, 19::43::17.000, 194317000, 21::45::03.000, 214503000], after=[-1, 2001-01-01, 12:34:45, 23:45:07, 2001->01->01, 2001//01//01, 12::34::45.000, 123445000, 23::45::07.000, 234507000], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 2001-01-01, 12:34:45, 23:45:07, 2001->01->01, 2001//01//01, 12::34::45.000, 123445000, 23::45::07.000, 234507000], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: From UnixTime Function
+  ignore: FLINK-38906
+  projection: |-
+    FROM_UNIXTIME(bigint_) AS col_1
+    FROM_UNIXTIME(bigint_, 'yyyy/MM/dd HH;mm;ss') AS col_2
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-01 00:00:05, 1970/01/01 00;00;05], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-01 00:00:05, 1970/01/01 00;00;05], after=[1969-12-31 23:59:55, 1969/12/31 23;59;55], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1969-12-31 23:59:55, 1969/12/31 23;59;55], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null], after=[], op=DELETE, meta=()}
+- do: From UnixTime Function with Implicit Conversion
+  ignore: FLINK-38906
+  projection: |-
+    FROM_UNIXTIME(int_) AS col_1
+    FROM_UNIXTIME(int_, 'yyyy/MM/dd HH;mm;ss') AS col_2
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-01 00:00:04, 1970/01/01 00;00;04], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-01 00:00:04, 1970/01/01 00;00;04], after=[1969-12-31 23:59:56, 1969/12/31 23;59;56], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1969-12-31 23:59:56, 1969/12/31 23;59;56], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null], after=[], op=DELETE, meta=()}
+- do: To Timestamp LTZ Function
+  ignore: FLINK-38906
+  projection: |-
+    TO_TIMESTAMP_LTZ(bigint_) AS col_1
+    TO_TIMESTAMP_LTZ(bigint_, 0) AS col_2
+    TO_TIMESTAMP_LTZ(bigint_, 3) AS col_3
+    TO_TIMESTAMP_LTZ('1999-12-31 23:50:23.456') AS col_4
+    TO_TIMESTAMP_LTZ('2000:03:29 19-21-48~321', 'yyyy:MM:dd HH-mm-ss~SSS') AS col_5
+    TO_TIMESTAMP_LTZ('2001-11-23 10:48:25.999', 'yyyy-MM-dd HH:mm:ss.SSS', 'Asia/Shanghai') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` TIMESTAMP_LTZ(3),`col_2` TIMESTAMP_LTZ(3),`col_3` TIMESTAMP_LTZ(3),`col_4` TIMESTAMP_LTZ(3),`col_5` TIMESTAMP_LTZ(3),`col_6` TIMESTAMP_LTZ(3)}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-01T00:00:00.005, 1970-01-01T00:00:05, 1970-01-01T00:00:00.005, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-01T00:00:00.005, 1970-01-01T00:00:05, 1970-01-01T00:00:00.005, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], after=[1969-12-31T23:59:59.995, 1969-12-31T23:59:55, 1969-12-31T23:59:59.995, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1969-12-31T23:59:59.995, 1969-12-31T23:59:55, 1969-12-31T23:59:59.995, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], after=[], op=DELETE, meta=()}
+- do: Formatting TIMESTAMP(0) with Timezone
+  ignore: FLINK-38906
+  projection: |-
+    DATE_FORMAT_TZ(timestamp_0_, 'Asia/Shanghai') AS col_1
+    DATE_FORMAT_TZ(timestamp_0_, 'America/Los_Angeles') AS col_2
+    DATE_FORMAT_TZ(timestamp_0_, 'UTC') AS col_3
+    DATE_FORMAT_TZ(timestamp_0_, 'yyyy::MM::dd HH-mm-ss', 'Asia/Shanghai') AS col_4
+    DATE_FORMAT_TZ(timestamp_0_, 'yyyy::MM::dd HH-mm-ss', 'America/Los_Angeles') AS col_5
+    DATE_FORMAT_TZ(timestamp_0_, 'yyyy::MM::dd HH-mm-ss', 'UTC') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-02 10:17:36, 1970-01-02 10:17:36, 1970-01-02 10:17:36, 1970::01::02 10-17-36, 1970::01::02 10-17-36, 1970::01::02 10-17-36], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-02 10:17:36, 1970-01-02 10:17:36, 1970-01-02 10:17:36, 1970::01::02 10-17-36, 1970::01::02 10-17-36, 1970::01::02 10-17-36], after=[1970-01-09 08:57:36, 1970-01-09 08:57:36, 1970-01-09 08:57:36, 1970::01::09 08-57-36, 1970::01::09 08-57-36, 1970::01::09 08-57-36], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-09 08:57:36, 1970-01-09 08:57:36, 1970-01-09 08:57:36, 1970::01::09 08-57-36, 1970::01::09 08-57-36, 1970::01::09 08-57-36], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Formatting TIMESTAMP(6) with Timezone
+  ignore: FLINK-38906
+  projection: |-
+    DATE_FORMAT_TZ(timestamp_6_, 'Asia/Shanghai') AS col_1
+    DATE_FORMAT_TZ(timestamp_6_, 'America/Los_Angeles') AS col_2
+    DATE_FORMAT_TZ(timestamp_6_, 'UTC') AS col_3
+    DATE_FORMAT_TZ(timestamp_6_, 'yyyy::MM::dd HH-mm-ss.SSSSSS', 'Asia/Shanghai') AS col_4
+    DATE_FORMAT_TZ(timestamp_6_, 'yyyy::MM::dd HH-mm-ss.SSSSSS', 'America/Los_Angeles') AS col_5
+    DATE_FORMAT_TZ(timestamp_6_, 'yyyy::MM::dd HH-mm-ss.SSSSSS', 'UTC') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-03 17:09:27, 1970-01-03 17:09:27, 1970-01-03 17:09:27, 1970::01::03 17-09-27.891234, 1970::01::03 17-09-27.891234, 1970::01::03 17-09-27.891234], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-03 17:09:27, 1970-01-03 17:09:27, 1970-01-03 17:09:27, 1970::01::03 17-09-27.891234, 1970::01::03 17-09-27.891234, 1970::01::03 17-09-27.891234], after=[1970-01-10 15:49:27, 1970-01-10 15:49:27, 1970-01-10 15:49:27, 1970::01::10 15-49-27.891834, 1970::01::10 15-49-27.891834, 1970::01::10 15-49-27.891834], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-10 15:49:27, 1970-01-10 15:49:27, 1970-01-10 15:49:27, 1970::01::10 15-49-27.891834, 1970::01::10 15-49-27.891834, 1970::01::10 15-49-27.891834], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Formatting TIMESTAMP(9) with Timezone
+  ignore: FLINK-38906
+  projection: |-
+    DATE_FORMAT_TZ(timestamp_9_, 'Asia/Shanghai') AS col_1
+    DATE_FORMAT_TZ(timestamp_9_, 'America/Los_Angeles') AS col_2
+    DATE_FORMAT_TZ(timestamp_9_, 'UTC') AS col_3
+    DATE_FORMAT_TZ(timestamp_9_, 'yyyy::MM::dd HH-mm-ss.SSSSSSSSS', 'Asia/Shanghai') AS col_4
+    DATE_FORMAT_TZ(timestamp_9_, 'yyyy::MM::dd HH-mm-ss.SSSSSSSSS', 'America/Los_Angeles') AS col_5
+    DATE_FORMAT_TZ(timestamp_9_, 'yyyy::MM::dd HH-mm-ss.SSSSSSSSS', 'UTC') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-05 00:01:18, 1970-01-05 00:01:18, 1970-01-05 00:01:18, 1970::01::05 00-01-18.912345612, 1970::01::05 00-01-18.912345612, 1970::01::05 00-01-18.912345612], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-05 00:01:18, 1970-01-05 00:01:18, 1970-01-05 00:01:18, 1970::01::05 00-01-18.912345612, 1970::01::05 00-01-18.912345612, 1970::01::05 00-01-18.912345612], after=[1970-01-11 22:41:18, 1970-01-11 22:41:18, 1970-01-11 22:41:18, 1970::01::11 22-41-18.912945612, 1970::01::11 22-41-18.912945612, 1970::01::11 22-41-18.912945612], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-11 22:41:18, 1970-01-11 22:41:18, 1970-01-11 22:41:18, 1970::01::11 22-41-18.912945612, 1970::01::11 22-41-18.912945612, 1970::01::11 22-41-18.912945612], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Formatting TIMESTAMP_LTZ(0) with Timezone
+  ignore: FLINK-38906
+  projection: |-
+    DATE_FORMAT_TZ(timestamp_ltz_0_, 'Asia/Shanghai') AS col_1
+    DATE_FORMAT_TZ(timestamp_ltz_0_, 'America/Los_Angeles') AS col_2
+    DATE_FORMAT_TZ(timestamp_ltz_0_, 'UTC') AS col_3
+    DATE_FORMAT_TZ(timestamp_ltz_0_, 'yyyy::MM::dd HH-mm-ss', 'Asia/Shanghai') AS col_4
+    DATE_FORMAT_TZ(timestamp_ltz_0_, 'yyyy::MM::dd HH-mm-ss', 'America/Los_Angeles') AS col_5
+    DATE_FORMAT_TZ(timestamp_ltz_0_, 'yyyy::MM::dd HH-mm-ss', 'UTC') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-02 18:17:36, 1970-01-02 02:17:36, 1970-01-02 10:17:36, 1970::01::02 18-17-36, 1970::01::02 02-17-36, 1970::01::02 10-17-36], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-02 18:17:36, 1970-01-02 02:17:36, 1970-01-02 10:17:36, 1970::01::02 18-17-36, 1970::01::02 02-17-36, 1970::01::02 10-17-36], after=[1970-01-09 16:57:36, 1970-01-09 00:57:36, 1970-01-09 08:57:36, 1970::01::09 16-57-36, 1970::01::09 00-57-36, 1970::01::09 08-57-36], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-09 16:57:36, 1970-01-09 00:57:36, 1970-01-09 08:57:36, 1970::01::09 16-57-36, 1970::01::09 00-57-36, 1970::01::09 08-57-36], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Formatting TIMESTAMP_LTZ(6) with Timezone
+  ignore: FLINK-38906
+  projection: |-
+    DATE_FORMAT_TZ(timestamp_ltz_6_, 'Asia/Shanghai') AS col_1
+    DATE_FORMAT_TZ(timestamp_ltz_6_, 'America/Los_Angeles') AS col_2
+    DATE_FORMAT_TZ(timestamp_ltz_6_, 'UTC') AS col_3
+    DATE_FORMAT_TZ(timestamp_ltz_6_, 'yyyy::MM::dd HH-mm-ss.SSSSSS', 'Asia/Shanghai') AS col_4
+    DATE_FORMAT_TZ(timestamp_ltz_6_, 'yyyy::MM::dd HH-mm-ss.SSSSSS', 'America/Los_Angeles') AS col_5
+    DATE_FORMAT_TZ(timestamp_ltz_6_, 'yyyy::MM::dd HH-mm-ss.SSSSSS', 'UTC') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-04 01:09:27, 1970-01-03 09:09:27, 1970-01-03 17:09:27, 1970::01::04 01-09-27.891234, 1970::01::03 09-09-27.891234, 1970::01::03 17-09-27.891234], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-04 01:09:27, 1970-01-03 09:09:27, 1970-01-03 17:09:27, 1970::01::04 01-09-27.891234, 1970::01::03 09-09-27.891234, 1970::01::03 17-09-27.891234], after=[1970-01-10 23:49:27, 1970-01-10 07:49:27, 1970-01-10 15:49:27, 1970::01::10 23-49-27.891834, 1970::01::10 07-49-27.891834, 1970::01::10 15-49-27.891834], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-10 23:49:27, 1970-01-10 07:49:27, 1970-01-10 15:49:27, 1970::01::10 23-49-27.891834, 1970::01::10 07-49-27.891834, 1970::01::10 15-49-27.891834], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Formatting TIMESTAMP_LTZ(9) with Timezone
+  ignore: FLINK-38906
+  projection: |-
+    DATE_FORMAT_TZ(timestamp_ltz_9_, 'Asia/Shanghai') AS col_1
+    DATE_FORMAT_TZ(timestamp_ltz_9_, 'America/Los_Angeles') AS col_2
+    DATE_FORMAT_TZ(timestamp_ltz_9_, 'UTC') AS col_3
+    DATE_FORMAT_TZ(timestamp_ltz_9_, 'yyyy::MM::dd HH-mm-ss.SSSSSSSSS', 'Asia/Shanghai') AS col_4
+    DATE_FORMAT_TZ(timestamp_ltz_9_, 'yyyy::MM::dd HH-mm-ss.SSSSSSSSS', 'America/Los_Angeles') AS col_5
+    DATE_FORMAT_TZ(timestamp_ltz_9_, 'yyyy::MM::dd HH-mm-ss.SSSSSSSSS', 'UTC') AS col_6
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-05 08:01:18, 1970-01-04 16:01:18, 1970-01-05 00:01:18, 1970::01::05 08-01-18.912345612, 1970::01::04 16-01-18.912345612, 1970::01::05 00-01-18.912345612], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-05 08:01:18, 1970-01-04 16:01:18, 1970-01-05 00:01:18, 1970::01::05 08-01-18.912345612, 1970::01::04 16-01-18.912345612, 1970::01::05 00-01-18.912345612], after=[1970-01-12 06:41:18, 1970-01-11 14:41:18, 1970-01-11 22:41:18, 1970::01::12 06-41-18.912945612, 1970::01::11 14-41-18.912945612, 1970::01::11 22-41-18.912945612], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-12 06:41:18, 1970-01-11 14:41:18, 1970-01-11 22:41:18, 1970::01::12 06-41-18.912945612, 1970::01::11 14-41-18.912945612, 1970::01::11 22-41-18.912945612], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: DATE_ADD Function
+  ignore: FLINK-38906
+  projection: |-
+    DATE_ADD(timestamp_0_, 17) AS col_1
+    DATE_ADD(timestamp_6_, 17) AS col_2
+    DATE_ADD(timestamp_9_, 17) AS col_3
+    DATE_ADD(timestamp_ltz_0_, 17) AS col_4
+    DATE_ADD(timestamp_ltz_6_, 17) AS col_5
+    DATE_ADD(timestamp_ltz_9_, 17) AS col_6
+    DATE_ADD(date_, 17) AS col_7
+    DATE_ADD('2015-07-23', 17) AS col_8
+    DATE_ADD('2015-07-23 21:48:25', 17) AS col_9
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`col_1` STRING,`col_2` STRING,`col_3` STRING,`col_4` STRING,`col_5` STRING,`col_6` STRING,`col_7` STRING,`col_8` STRING,`col_9` STRING}, primaryKeys=, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1970-01-19, 1970-01-20, 1970-01-22, 1970-01-19, 1970-01-20, 1970-01-22, 2001-01-17, 2015-08-09, 2015-08-09], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-19, 1970-01-20, 1970-01-22, 1970-01-19, 1970-01-20, 1970-01-22, 2001-01-17, 2015-08-09, 2015-08-09], after=[1970-01-26, 1970-01-27, 1970-01-28, 1970-01-26, 1970-01-27, 1970-01-28, 2001-01-18, 2015-08-09, 2015-08-09], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1970-01-26, 1970-01-27, 1970-01-28, 1970-01-26, 1970-01-27, 1970-01-28, 2001-01-18, 2015-08-09, 2015-08-09], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null, null, 2015-08-09, 2015-08-09], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null, null, 2015-08-09, 2015-08-09], after=[], op=DELETE, meta=()}

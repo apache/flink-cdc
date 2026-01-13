@@ -1,0 +1,213 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Select Nested Objects
+  ignore: FLINK-38887
+  projection: |-
+    id_
+    array_int_
+    array_string_
+    map_int_string_
+    map_string_array_string_
+    complex_row_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>,`map_int_string_` MAP<INT, STRING>,`map_string_array_string_` MAP<STRING, ARRAY<STRING>>,`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Integer Array Subscripting
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    array_int_
+    array_int_[4] AS sc_int_array
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`sc_int_array` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], 3], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], 3], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], 7], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], 7], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: String Array Subscripting
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    array_string_
+    array_string_[4] AS sc_str_array
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_string_` ARRAY<STRING>,`sc_str_array` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [one, one, two, three, five], three], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [one, one, two, three, five], three], after=[-1, [二, san, 五, qi, 十一], qi], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [二, san, 五, qi, 十一], qi], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Array OOB Subscripting
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    array_string_[0] AS negative_overflow
+    array_string_[10000] AS positive_overflow
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`negative_overflow` STRING,`positive_overflow` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, null], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Array Subscripting With Sub Expression
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    array_int_[1 + 1] AS int_key
+    array_string_[array_int_[1 + 1]] AS str_key
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`int_key` INT,`str_key` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1, one], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1, one], after=[-1, 3, 五], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 3, 五], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Filter by Array-related Expression
+  ignore: FLINK-38888
+  projection: id_, array_string_
+  filter: array_string_[3] = '五'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_string_` ARRAY<STRING>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [one, one, two, three, five]], after=[-1, [二, san, 五, qi, 十一]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [二, san, 五, qi, 十一]], after=[], op=DELETE, meta=()}
+- do: Map Subscripting
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    map_int_string_
+    map_int_string_[2] AS map_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_int_string_` MAP<INT, STRING>,`map_value` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {1 -> one, 2 -> two, 3 -> three}, two], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {1 -> one, 2 -> two, 3 -> three}, two], after=[-1, {1 -> yi, 2 -> er, 3 -> san}, er], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {1 -> yi, 2 -> er, 3 -> san}, er], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting with absent key
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    map_int_string_[233] AS map_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_value` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null], after=[-1, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting with complex expression
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    map_int_string_[1 + 2] AS map_value
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_value` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, three], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, three], after=[-1, san], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, san], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting with nested expressions
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    map_string_array_string_[lower('ONE')] AS index_1
+    map_string_array_string_['o' || 'n' || 'e'][1] AS index_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`index_1` ARRAY<STRING>,`index_2` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [O, N, E], O], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [O, N, E], O], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Map Subscripting With Absent Object
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    map_string_array_string_['foo'] AS index_1
+    map_string_array_string_['bar'][1] AS index_2
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`index_1` ARRAY<STRING>,`index_2` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null, null], after=[-1, null, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
+- do: Filter by Map-related Expression
+  ignore: FLINK-38888
+  projection: id_, map_int_string_
+  filter: map_int_string_[1] = 'one'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_int_string_` MAP<INT, STRING>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {1 -> one, 2 -> two, 3 -> three}], op=INSERT, meta=()}
+- do: Record Subscripting With Index
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    complex_row_
+    complex_row_[1] AS name
+    complex_row_[2] AS length
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`complex_row_` ROW<`name` STRING, `length` INT>,`name` STRING,`length` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {name: STRING -> Alice, length: INT -> 5}, Alice, 5], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {name: STRING -> Alice, length: INT -> 5}, Alice, 5], after=[-1, {name: STRING -> Derrida, length: INT -> 7}, Derrida, 7], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {name: STRING -> Derrida, length: INT -> 7}, Derrida, 7], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null], after=[], op=DELETE, meta=()}
+- do: Record Subscripting With Invalid Index
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    complex_row_
+    complex_row_[0] AS bad_key
+  primary-key: id_
+  expect-error: 'Cannot infer type of field at position 0 within ROW type: RecordType(VARCHAR(65536) name, INTEGER length)'
+- do: Record Subscripting With Computed Index (Illegal, type must be statically determined)
+  ignore: FLINK-38888
+  projection: |-
+    id_
+    complex_row_
+    complex_row_[1 + 1] AS bad_key
+  primary-key: id_
+  expect-error: 'Cannot infer type of field at position null within ROW type: RecordType(VARCHAR(65536) name, INTEGER length)'
+- do: Filter by Record-related Expression
+  ignore: FLINK-38888
+  projection: id_, complex_row_
+  filter: complex_row_[1] = 'Derrida'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {name: STRING -> Alice, length: INT -> 5}], after=[-1, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}

@@ -1,0 +1,146 @@
+################################################################################
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#      http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+################################################################################
+
+- do: Wildcard
+  ignore: FLINK-38887
+  projection: '*'
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`bool_` BOOLEAN 'George' 'false',`tinyint_` TINYINT,`smallint_` SMALLINT,`int_` INT,`bigint_` BIGINT,`float_` FLOAT,`double_` DOUBLE,`decimal_10_0_` DECIMAL(10, 0),`decimal_20_2_` DECIMAL(20, 2),`char_` CHAR(140) 'Let''s Tweet' '...',`varchar_` VARCHAR(140),`string_` STRING,`binary_` BINARY(640),`varbinary_` VARBINARY(640),`bytes_` BYTES,`timestamp_0_` TIMESTAMP(0),`timestamp_6_` TIMESTAMP(6),`timestamp_9_` TIMESTAMP(9),`timestamp_tz_0_` TIMESTAMP(0) WITH TIME ZONE,`timestamp_tz_6_` TIMESTAMP(6) WITH TIME ZONE,`timestamp_tz_9_` TIMESTAMP(9) WITH TIME ZONE,`timestamp_ltz_0_` TIMESTAMP_LTZ(0),`timestamp_ltz_6_` TIMESTAMP_LTZ(6),`timestamp_ltz_9_` TIMESTAMP_LTZ(9),`date_` DATE,`time_0_` TIME(0),`time_6_` TIME(6),`time_9_` TIME(9),`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>,`map_int_string_` MAP<INT, STRING>,`map_string_array_string_` MAP<STRING, ARRAY<STRING>>,`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, 2, 3, 4, 5, 7.7, 88.88, 1234567890, 123456789012345678.90, Alice, Zorro, From A to Z is Lie, TG9yZW0gaXBzdW0=, ZG9sb3Igc2l0IGFtZXQ=, YW1ldCBjb25zZWN0ZXR1ZXI=, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456+08:00, 1970-01-03T17:09:27.891234561+01:00, 1970-01-05T00:01:18.912345612-04:00, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2000-12-31, 19:43:17, 21:45:03, 03:59:59, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, 2, 3, 4, 5, 7.7, 88.88, 1234567890, 123456789012345678.90, Alice, Zorro, From A to Z is Lie, TG9yZW0gaXBzdW0=, ZG9sb3Igc2l0IGFtZXQ=, YW1ldCBjb25zZWN0ZXR1ZXI=, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456+08:00, 1970-01-03T17:09:27.891234561+01:00, 1970-01-05T00:01:18.912345612-04:00, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2000-12-31, 19:43:17, 21:45:03, 03:59:59, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], after=[-1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 5LiA5LqM5LiJ5Zub5LqU, 5YWt5LiD5YWr5Lmd5Y2B, 5ZC+6Lyp44Gv54yr44Gn44GC44KL, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 5LiA5LqM5LiJ5Zub5LqU, 5YWt5LiD5YWr5Lmd5Y2B, 5ZC+6Lyp44Gv54yr44Gn44GC44KL, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: All Primitive Columns
+  projection: |-
+    id_
+    bool_
+    tinyint_
+    smallint_
+    int_
+    bigint_
+    float_
+    double_
+    decimal_10_0_
+    decimal_20_2_
+    char_
+    varchar_
+    string_
+    binary_
+    varbinary_
+    bytes_
+    timestamp_0_
+    timestamp_6_
+    timestamp_9_
+    timestamp_tz_0_
+    timestamp_tz_6_
+    timestamp_tz_9_
+    timestamp_ltz_0_
+    timestamp_ltz_6_
+    timestamp_ltz_9_
+    date_
+    time_0_
+    time_6_
+    time_9_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`bool_` BOOLEAN 'George' 'false',`tinyint_` TINYINT,`smallint_` SMALLINT,`int_` INT,`bigint_` BIGINT,`float_` FLOAT,`double_` DOUBLE,`decimal_10_0_` DECIMAL(10, 0),`decimal_20_2_` DECIMAL(20, 2),`char_` CHAR(140) 'Let''s Tweet' '...',`varchar_` VARCHAR(140),`string_` STRING,`binary_` BINARY(640),`varbinary_` VARBINARY(640),`bytes_` BYTES,`timestamp_0_` TIMESTAMP(0),`timestamp_6_` TIMESTAMP(6),`timestamp_9_` TIMESTAMP(9),`timestamp_tz_0_` TIMESTAMP(0) WITH TIME ZONE,`timestamp_tz_6_` TIMESTAMP(6) WITH TIME ZONE,`timestamp_tz_9_` TIMESTAMP(9) WITH TIME ZONE,`timestamp_ltz_0_` TIMESTAMP_LTZ(0),`timestamp_ltz_6_` TIMESTAMP_LTZ(6),`timestamp_ltz_9_` TIMESTAMP_LTZ(9),`date_` DATE,`time_0_` TIME(0),`time_6_` TIME(6),`time_9_` TIME(9)}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, true, 2, 3, 4, 5, 7.7, 88.88, 1234567890, 123456789012345678.90, Alice, Zorro, From A to Z is Lie, TG9yZW0gaXBzdW0=, ZG9sb3Igc2l0IGFtZXQ=, YW1ldCBjb25zZWN0ZXR1ZXI=, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456+08:00, 1970-01-03T17:09:27.891234561+01:00, 1970-01-05T00:01:18.912345612-04:00, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2000-12-31, 19:43:17, 21:45:03, 03:59:59], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, true, 2, 3, 4, 5, 7.7, 88.88, 1234567890, 123456789012345678.90, Alice, Zorro, From A to Z is Lie, TG9yZW0gaXBzdW0=, ZG9sb3Igc2l0IGFtZXQ=, YW1ldCBjb25zZWN0ZXR1ZXI=, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 1970-01-02T10:17:36.789123456+08:00, 1970-01-03T17:09:27.891234561+01:00, 1970-01-05T00:01:18.912345612-04:00, 1970-01-02T10:17:36.789123456, 1970-01-03T17:09:27.891234561, 1970-01-05T00:01:18.912345612, 2000-12-31, 19:43:17, 21:45:03, 03:59:59], after=[-1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 5LiA5LqM5LiJ5Zub5LqU, 5YWt5LiD5YWr5Lmd5Y2B, 5ZC+6Lyp44Gv54yr44Gn44GC44KL, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, false, -2, -3, -4, -5, -7.7, -88.88, -9876543210, -987654321098765432.10, 爱丽丝, 疯帽子, 天地玄黄宇宙洪荒, 5LiA5LqM5LiJ5Zub5LqU, 5YWt5LiD5YWr5Lmd5Y2B, 5ZC+6Lyp44Gv54yr44Gn44GC44KL, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 1970-01-09T08:57:36.789723456+08:00, 1970-01-10T15:49:27.891834561+01:00, 1970-01-11T22:41:18.912945612-04:00, 1970-01-09T08:57:36.789723456, 1970-01-10T15:49:27.891834561, 1970-01-11T22:41:18.912945612, 2001-01-01, 12:34:45, 23:45:07, 02:30:05], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: All Nested Columns
+  ignore: FLINK-38887
+  projection: |-
+    id_
+    array_int_
+    array_string_
+    map_int_string_
+    map_string_array_string_
+    complex_row_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>,`map_int_string_` MAP<INT, STRING>,`map_string_array_string_` MAP<STRING, ARRAY<STRING>>,`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Basic Transform
+  projection: id_,string_
+  filter: 'true'
+  primary-key: id_
+  partition-key: id_,string_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING}, primaryKeys=id_, partitionKeys=id_;string_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie], after=[-1, 天地玄黄宇宙洪荒], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Calculation Column
+  projection: id_ - 1 AS id_dec, id_ + 1 AS id_inc
+  primary-key: id_dec, id_inc
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_dec` BIGINT NOT NULL,`id_inc` BIGINT NOT NULL}, primaryKeys=id_dec;id_inc, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 2], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 2], after=[-2, 0], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-2, 0], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[-1, 1], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 1], after=[], op=DELETE, meta=()}
+- do: Basic Filter
+  projection: id_, string_
+  filter: id_ > 0
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie], op=INSERT, meta=()}
+- do: Filter by Expression
+  projection: id_, string_
+  filter: id_ + 1 <= 1
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, From A to Z is Lie], after=[-1, 天地玄黄宇宙洪荒], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, 天地玄黄宇宙洪荒], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Filter by Calculation Column
+  non-null: 'true'
+  projection: id_, string_, CHAR_LENGTH(string_) AS strlen_
+  filter: strlen_ > 17
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`strlen_` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, 18], op=INSERT, meta=()}
+- do: Filter by Calculation Column (With NULL)
+  ignore: FLINK-38905
+  projection: id_, string_, CHAR_LENGTH(string_) AS strlen_
+  filter: strlen_ > 17
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`string_` STRING,`strlen_` INT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, From A to Z is Lie, 18], op=INSERT, meta=()}
+- do: Invalid Projection Expr
+  projection: id_, a_column_that_is_nowhere_to_be_found
+  primary-key: id_
+  expect-error: 'SqlValidatorException: Column ''a_column_that_is_nowhere_to_be_found'' not found in any table'
+- do: Invalid Filter Expr
+  projection: id_
+  filter: another_column_that_is_nowhere_to_be_found > 0
+  primary-key: id_
+  expect-error: Unknown variable or type
