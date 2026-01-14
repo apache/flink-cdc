@@ -33,6 +33,7 @@ import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.InitializeTablesEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
@@ -64,7 +65,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -1371,53 +1375,8 @@ class FlinkPipelineComposerITCase {
     @ParameterizedTest
     @EnumSource
     void testMergingDecimalWithVariousPrecisions(ValuesDataSink.SinkApi sinkApi) throws Exception {
-        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
-
-        // Setup value source
-        Configuration sourceConfig = new Configuration();
-        sourceConfig.set(
-                ValuesDataSourceOptions.EVENT_SET_ID,
-                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
-
         List<Event> events = generateDecimalColumnEvents("default_table_");
-        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
-
-        SourceDef sourceDef =
-                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
-
-        // Setup value sink
-        Configuration sinkConfig = new Configuration();
-        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
-        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
-
-        // Setup pipeline
-        Configuration pipelineConfig = new Configuration();
-        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
-        pipelineConfig.set(
-                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
-        PipelineDef pipelineDef =
-                new PipelineDef(
-                        sourceDef,
-                        sinkDef,
-                        Collections.singletonList(
-                                new RouteDef(
-                                        "default_namespace.default_schema.default_table_\\.*",
-                                        "default_namespace.default_schema.default_everything_merged",
-                                        null,
-                                        "Merge all decimal columns with different precision")),
-                        Collections.emptyList(),
-                        Collections.emptyList(),
-                        pipelineConfig);
-
-        // Execute the pipeline
-        PipelineExecution execution = composer.compose(pipelineDef);
-
-        execution.execute();
-
-        // Check the order and content of all received events
-        String[] outputEvents = outCaptor.toString().trim().split("\n");
-
-        String[] expected =
+        List<String> expected =
                 Stream.of(
                                 "CreateTableEvent{tableId={}, schema=columns={`id` INT,`name` STRING,`age` INT,`fav_num` TINYINT}, primaryKeys=id, options=()}",
                                 "DataChangeEvent{tableId={}, before=[], after=[1, Alice, 17, 1], op=INSERT, meta=()}",
@@ -1445,11 +1404,228 @@ class FlinkPipelineComposerITCase {
                         .map(
                                 s ->
                                         s.replace(
-                                                "tableId={}",
-                                                "tableId=default_namespace.default_schema.default_everything_merged"))
-                        .toArray(String[]::new);
+                                                "{}",
+                                                "default_namespace.default_schema.default_everything_merged"))
+                        .collect(Collectors.toList());
 
-        assertThat(outputEvents).containsExactlyInAnyOrder(expected);
+        runGenericMergingTest(
+                sinkApi,
+                List.of(),
+                List.of(
+                        new RouteDef(
+                                "default_namespace.default_schema.default_table_\\.*",
+                                "default_namespace.default_schema.default_everything_merged",
+                                null,
+                                "Merge all decimal columns with different precision")),
+                events,
+                expected);
+    }
+
+    static Stream<Arguments> decimalOOB() {
+        return Stream.of(
+                Arguments.of(
+                        10,
+                        5,
+                        "12345.54321",
+                        19,
+                        3,
+                        "1234567890123456.789",
+                        List.of(
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(21, 5)}, primaryKeys=id, options=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 12345.54321], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}"),
+                        true),
+                Arguments.of(
+                        10,
+                        5,
+                        "12345.54321",
+                        19,
+                        3,
+                        "1234567890123456.789",
+                        List.of(
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(10, 5)}, primaryKeys=id, options=()}",
+                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(21, 5)}, oldTypeMapping={dec=DECIMAL(10, 5)}}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 12345.54321], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 1234567890123456.78900], op=INSERT, meta=()}"),
+                        false),
+                Arguments.of(
+                        25,
+                        16,
+                        "123456789.1234567890123456",
+                        32,
+                        32,
+                        "0.12345678901234567890123456789012",
+                        List.of(
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 29)}, primaryKeys=id, options=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 123456789.12345678901234560000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 0.12345678901234567890123456789], op=INSERT, meta=()}"),
+                        true),
+                Arguments.of(
+                        25,
+                        16,
+                        "123456789.1234567890123456",
+                        32,
+                        32,
+                        "0.12345678901234567890123456789012",
+                        List.of(
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(25, 16)}, primaryKeys=id, options=()}",
+                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 29)}, oldTypeMapping={dec=DECIMAL(25, 16)}}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 123456789.12345678901234560000000000000], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 0.12345678901234567890123456789], op=INSERT, meta=()}"),
+                        false),
+                Arguments.of(
+                        38,
+                        38,
+                        "0.12345678901234567890123456789012345678",
+                        38,
+                        0,
+                        "12345678901234567890123456789012345678",
+                        List.of(
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 0)}, primaryKeys=id, options=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 0], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 12345678901234567890123456789012345678], op=INSERT, meta=()}"),
+                        true),
+                Arguments.of(
+                        38,
+                        38,
+                        "0.12345678901234567890123456789012345678",
+                        38,
+                        0,
+                        "12345678901234567890123456789012345678",
+                        List.of(
+                                "CreateTableEvent{tableId=test_database.merged, schema=columns={`id` BIGINT NOT NULL,`dec` DECIMAL(38, 38)}, primaryKeys=id, options=()}",
+                                "AlterColumnTypeEvent{tableId=test_database.merged, typeMapping={dec=DECIMAL(38, 0)}, oldTypeMapping={dec=DECIMAL(38, 38)}}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[1, 0], op=INSERT, meta=()}",
+                                "DataChangeEvent{tableId=test_database.merged, before=[], after=[2, 12345678901234567890123456789012345678], op=INSERT, meta=()}"),
+                        false));
+    }
+
+    @ParameterizedTest(name = "merge Decimal({0}, {1}) and Decimal({3}, {4}), atFirst: {7}")
+    @MethodSource("decimalOOB")
+    void testMergingDecimalWithOutOfBoundPrecisions(
+            int decimal1Precision,
+            int decimal1Scale,
+            String decimal1,
+            int decimal2Precision,
+            int decimal2Scale,
+            String decimal2,
+            List<String> expectedOutput,
+            boolean mergeAtFirst)
+            throws Exception {
+        TableId tableId1 = TableId.tableId("test_database", "test_table_1");
+        TableId tableId2 = TableId.tableId("test_database", "test_table_2");
+        Schema schema1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("dec", DataTypes.DECIMAL(decimal1Precision, decimal1Scale))
+                        .primaryKey("id")
+                        .build();
+        Schema schema2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.BIGINT().notNull())
+                        .physicalColumn("dec", DataTypes.DECIMAL(decimal2Precision, decimal2Scale))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator1 =
+                new BinaryRecordDataGenerator(
+                        schema1.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator generator2 =
+                new BinaryRecordDataGenerator(
+                        schema2.getColumnDataTypes().toArray(new DataType[0]));
+        List<Event> events = new ArrayList<>();
+        if (mergeAtFirst) {
+            events.add(
+                    new InitializeTablesEvent(
+                            List.of(
+                                    new CreateTableEvent(tableId1, schema1),
+                                    new CreateTableEvent(tableId2, schema2))));
+        } else {
+            events.add(new CreateTableEvent(tableId1, schema1));
+            events.add(new CreateTableEvent(tableId2, schema2));
+        }
+        events.add(
+                DataChangeEvent.insertEvent(
+                        tableId1,
+                        generator1.generate(
+                                new Object[] {
+                                    1L,
+                                    DecimalData.fromBigDecimal(
+                                            new BigDecimal(decimal1),
+                                            decimal1Precision,
+                                            decimal1Scale)
+                                })));
+        events.add(
+                DataChangeEvent.insertEvent(
+                        tableId2,
+                        generator2.generate(
+                                new Object[] {
+                                    2L,
+                                    DecimalData.fromBigDecimal(
+                                            new BigDecimal(decimal2),
+                                            decimal2Precision,
+                                            decimal2Scale)
+                                })));
+
+        runGenericMergingTest(
+                ValuesDataSink.SinkApi.SINK_V2,
+                List.of(),
+                List.of(
+                        new RouteDef(
+                                "test_database.test_table_\\.*",
+                                "test_database.merged",
+                                null,
+                                "Merge all decimal columns with different precision")),
+                events,
+                expectedOutput);
+    }
+
+    void runGenericMergingTest(
+            ValuesDataSink.SinkApi sinkApi,
+            List<TransformDef> transformDef,
+            List<RouteDef> routeDef,
+            List<Event> events,
+            List<String> expectedOutput)
+            throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        routeDef,
+                        transformDef,
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents).containsExactlyInAnyOrderElementsOf(expectedOutput);
     }
 
     private List<Event> generateTemporalColumnEvents(String tableNamePrefix) {
