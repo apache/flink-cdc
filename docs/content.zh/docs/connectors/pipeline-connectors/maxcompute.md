@@ -63,6 +63,8 @@ sink:
 pipeline:
   name: MySQL to MaxCompute Pipeline
   parallelism: 2
+  flink-conf:
+    execution.checkpointing.interval: 2min
 ```
 
 ## 连接器配置项
