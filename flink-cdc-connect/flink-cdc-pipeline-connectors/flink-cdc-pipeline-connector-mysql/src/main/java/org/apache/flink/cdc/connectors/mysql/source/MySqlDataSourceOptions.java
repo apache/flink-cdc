@@ -330,4 +330,12 @@ public class MySqlDataSourceOptions {
                     .defaultValue(false)
                     .withDescription(
                             "Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in change log reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some change log events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed change log events should be handled specially.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> IGNORE_NO_PRIMARY_KEY_TABLE =
+            ConfigOptions.key("ignore-no-primary-key-table")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to ignore tables without primary key in MySQL. When enabled, the connector will skip tables.");
 }
