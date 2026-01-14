@@ -220,7 +220,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                             pipelineDef
                                                     .getSink()
                                                     .getIncludedSchemaEvolutionTypes()),
-                            pipelineDef.getRoute());
+                            pipelineDef.getRoute(),
+                            pipelineDef.getRouteMode());
 
         } else {
             // Translate a regular topology for sources without distributed tables
@@ -235,7 +236,8 @@ public class FlinkPipelineComposer implements PipelineComposer {
                                             pipelineDef
                                                     .getSink()
                                                     .getIncludedSchemaEvolutionTypes()),
-                            pipelineDef.getRoute());
+                            pipelineDef.getRoute(),
+                            pipelineDef.getRouteMode());
 
             // Schema Operator ---(shuffled)---> Partitioning
             stream =

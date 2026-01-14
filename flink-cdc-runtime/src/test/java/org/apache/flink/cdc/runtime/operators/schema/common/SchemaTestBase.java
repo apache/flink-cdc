@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
@@ -64,7 +65,8 @@ public abstract class SchemaTestBase {
                     // Irrelevant routes
                     new RouteRule("foo", "bar", null));
 
-    protected static final TableIdRouter TABLE_ID_ROUTER = new TableIdRouter(ROUTING_RULES);
+    protected static final TableIdRouter TABLE_ID_ROUTER =
+            new TableIdRouter(ROUTING_RULES, RouteMode.ALL_MATCH);
 
     protected static BinaryRecordData genBinRec(String rowType, Object... fields) {
         return (new BinaryRecordDataGenerator(quickGenRow(rowType).toArray(new DataType[0])))
