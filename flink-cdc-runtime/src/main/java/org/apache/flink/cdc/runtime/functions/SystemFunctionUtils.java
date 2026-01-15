@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
+import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.utils.DateTimeUtils;
 
 import org.slf4j.Logger;
@@ -1095,5 +1097,38 @@ public class SystemFunctionUtils {
             return false;
         }
         return universalCompares(lhs, rhs) <= 0;
+    }
+
+    public static Variant tryParseJson(String jsonStr) {
+        return tryParseJson(jsonStr, false);
+    }
+
+    public static Variant tryParseJson(String jsonStr, boolean allowDuplicateKeys) {
+        if (jsonStr == null || jsonStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return BinaryVariantInternalBuilder.parseJson(jsonStr, allowDuplicateKeys);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    public static Variant parseJson(String jsonStr) {
+        return parseJson(jsonStr, false);
+    }
+
+    public static Variant parseJson(String jsonStr, boolean allowDuplicateKeys) {
+        if (jsonStr == null || jsonStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return BinaryVariantInternalBuilder.parseJson(jsonStr, allowDuplicateKeys);
+        } catch (Throwable e) {
+            throw new IllegalArgumentException(
+                    String.format("Failed to parse json string: %s", jsonStr), e);
+        }
     }
 }
