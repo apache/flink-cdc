@@ -19,6 +19,7 @@
 package org.apache.flink.cdc.common.data;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -179,6 +180,11 @@ public final class GenericRecordData implements RecordData {
     @Override
     public TimeData getTime(int pos) {
         return (TimeData) this.fields[pos];
+    }
+
+    @Override
+    public Variant getVariant(int pos) {
+        return (Variant) this.fields[pos];
     }
 
     @Override

@@ -406,4 +406,12 @@ class InternalObjectConverterTest {
 
         assertThat(convertToInternal(null, targetType)).isNull();
     }
+
+    @Test
+    void testConvertToVariant() {
+
+        assertThat(convertToInternal(true, DataTypes.BOOLEAN())).isEqualTo(true);
+        assertThat(convertToInternal(false, DataTypes.BOOLEAN())).isEqualTo(false);
+        assertThat(convertToInternal(null, DataTypes.BOOLEAN())).isNull();
+    }
 }

@@ -48,7 +48,9 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
+import org.apache.flink.cdc.common.types.VariantType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 /**
  * Converts a {@link org.apache.flink.cdc.common.types.DataType} to its CDC Internal representation.
@@ -163,5 +165,10 @@ public class InternalClassConverter implements DataTypeVisitor<Class<?>> {
     @Override
     public Class<?> visit(RowType rowType) {
         return RecordData.class;
+    }
+
+    @Override
+    public Class<?> visit(VariantType variantType) {
+        return Variant.class;
     }
 }

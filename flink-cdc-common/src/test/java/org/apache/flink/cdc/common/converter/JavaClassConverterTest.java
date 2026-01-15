@@ -60,7 +60,8 @@ class JavaClassConverterTest {
                                 DataTypes.ROW(
                                         DataTypes.FIELD("f1", DataTypes.STRING()),
                                         DataTypes.FIELD("f2", DataTypes.STRING(), "desc")),
-                                DataTypes.ROW(DataTypes.SMALLINT(), DataTypes.STRING())))
+                                DataTypes.ROW(DataTypes.SMALLINT(), DataTypes.STRING()),
+                                DataTypes.VARIANT()))
                 .map(JavaClassConverter::toJavaClass)
                 .map(Class::getCanonicalName)
                 .containsExactly(
@@ -90,6 +91,7 @@ class JavaClassConverterTest {
                         "java.util.List",
                         "java.util.Map",
                         "java.util.List",
-                        "java.util.List");
+                        "java.util.List",
+                        "org.apache.flink.cdc.common.types.variant.Variant");
     }
 }

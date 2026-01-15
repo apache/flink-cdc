@@ -39,23 +39,24 @@ If you're writing a UDF, its arguments and return value types should be defined 
 
 ## Full Types List
 
-| CDC Data Type                  | CDC Internal Type                                          | External Java Class       |
-|--------------------------------|------------------------------------------------------------|---------------------------|
-| BOOLEAN                        | `java.lang.Boolean`                                        | `java.lang.Boolean`       |
-| TINYINT                        | `java.lang.Byte`                                           | `java.lang.Byte`          |
-| SMALLINT                       | `java.lang.Short`                                          | `java.lang.Short`         |
-| INTEGER                        | `java.lang.Integer`                                        | `java.lang.Integer`       |
-| BIGINT                         | `java.lang.Long`                                           | `java.lang.Long`          |
-| FLOAT                          | `java.lang.Float`                                          | `java.lang.Float`         |
-| DOUBLE                         | `java.lang.Double`                                         | `java.lang.Double`        |
-| DECIMAL                        | `org.apache.flink.cdc.common.data.DecimalData`             | `java.math.BigDecimal`    |
-| DATE                           | `org.apache.flink.cdc.common.data.DateData`                | `java.time.LocalDate`     |
-| TIME                           | `org.apache.flink.cdc.common.data.TimeData`                | `java.time.LocalTime`     |
-| TIMESTAMP                      | `org.apache.flink.cdc.common.data.TimestampData`           | `java.time.LocalDateTime` |
-| TIMESTAMP_TZ                   | `org.apache.flink.cdc.common.data.ZonedTimestampData`      | `java.time.ZonedDateTime` |
-| TIMESTAMP_LTZ                  | `org.apache.flink.cdc.common.data.LocalZonedTimestampData` | `java.time.Instant`       |
-| CHAR<br/>VARCHAR<br/>STRING    | `org.apache.flink.cdc.common.data.StringData`              | `java.lang.String`        |
-| BINARY<br/>VARBINARY<br/>BYTES | `byte[]`                                                   | `byte[]`                  |
-| ARRAY                          | `org.apache.flink.cdc.common.data.ArrayData`               | `java.util.List<T>`       |
-| MAP                            | `org.apache.flink.cdc.common.data.MapData`                 | `java.util.Map<K, V>`     |
-| ROW                            | `org.apache.flink.cdc.common.data.RecordData`              | `java.util.List<Object>`  |
+| CDC Data Type                  | CDC Internal Type                                          | External Java Class                                |
+|--------------------------------|------------------------------------------------------------|----------------------------------------------------|
+| BOOLEAN                        | `java.lang.Boolean`                                        | `java.lang.Boolean`                                |
+| TINYINT                        | `java.lang.Byte`                                           | `java.lang.Byte`                                   |
+| SMALLINT                       | `java.lang.Short`                                          | `java.lang.Short`                                  |
+| INTEGER                        | `java.lang.Integer`                                        | `java.lang.Integer`                                |
+| BIGINT                         | `java.lang.Long`                                           | `java.lang.Long`                                   |
+| FLOAT                          | `java.lang.Float`                                          | `java.lang.Float`                                  |
+| DOUBLE                         | `java.lang.Double`                                         | `java.lang.Double`                                 |
+| DECIMAL                        | `org.apache.flink.cdc.common.data.DecimalData`             | `java.math.BigDecimal`                             |
+| DATE                           | `org.apache.flink.cdc.common.data.DateData`                | `java.time.LocalDate`                              |
+| TIME                           | `org.apache.flink.cdc.common.data.TimeData`                | `java.time.LocalTime`                              |
+| TIMESTAMP                      | `org.apache.flink.cdc.common.data.TimestampData`           | `java.time.LocalDateTime`                          |
+| TIMESTAMP_TZ                   | `org.apache.flink.cdc.common.data.ZonedTimestampData`      | `java.time.ZonedDateTime`                          |
+| TIMESTAMP_LTZ                  | `org.apache.flink.cdc.common.data.LocalZonedTimestampData` | `java.time.Instant`                                |
+| CHAR<br/>VARCHAR<br/>STRING    | `org.apache.flink.cdc.common.data.StringData`              | `java.lang.String`                                 |
+| BINARY<br/>VARBINARY<br/>BYTES | `byte[]`                                                   | `byte[]`                                           |
+| ARRAY                          | `org.apache.flink.cdc.common.data.ArrayData`               | `java.util.List<T>`                                |
+| MAP                            | `org.apache.flink.cdc.common.data.MapData`                 | `java.util.Map<K, V>`                              |
+| ROW                            | `org.apache.flink.cdc.common.data.RecordData`              | `java.util.List<Object>`                           |
+| VARIANT                        | `org.apache.flink.cdc.common.types.Variant`                | `org.apache.flink.cdc.common.types.Variant`        |

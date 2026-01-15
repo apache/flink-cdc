@@ -35,6 +35,8 @@ import org.apache.flink.cdc.common.types.ArrayType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.common.types.VariantType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 
@@ -120,6 +122,20 @@ public class CommonConverter {
         }
         throw new RuntimeException(
                 "Cannot convert " + obj + " of type " + obj.getClass() + " to BINARY.");
+    }
+
+    static Variant convertToVariant(Object obj, VariantType variantType) {
+        if (obj instanceof Variant) {
+            return (Variant) obj;
+        }
+        throw new RuntimeException(
+                "Cannot convert "
+                        + obj
+                        + " of type "
+                        + obj.getClass()
+                        + " to Variant ("
+                        + variantType
+                        + ").");
     }
 
     // ----------------------

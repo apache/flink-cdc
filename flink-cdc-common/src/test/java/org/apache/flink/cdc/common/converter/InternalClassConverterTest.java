@@ -60,7 +60,8 @@ class InternalClassConverterTest {
                                 DataTypes.ROW(
                                         DataTypes.FIELD("f1", DataTypes.STRING()),
                                         DataTypes.FIELD("f2", DataTypes.STRING(), "desc")),
-                                DataTypes.ROW(DataTypes.SMALLINT(), DataTypes.STRING())))
+                                DataTypes.ROW(DataTypes.SMALLINT(), DataTypes.STRING()),
+                                DataTypes.VARIANT()))
                 .map(InternalClassConverter::toInternalClass)
                 .map(Class::getCanonicalName)
                 .containsExactly(
@@ -90,6 +91,7 @@ class InternalClassConverterTest {
                         "org.apache.flink.cdc.common.data.ArrayData",
                         "org.apache.flink.cdc.common.data.MapData",
                         "org.apache.flink.cdc.common.data.RecordData",
-                        "org.apache.flink.cdc.common.data.RecordData");
+                        "org.apache.flink.cdc.common.data.RecordData",
+                        "org.apache.flink.cdc.common.types.variant.Variant");
     }
 }

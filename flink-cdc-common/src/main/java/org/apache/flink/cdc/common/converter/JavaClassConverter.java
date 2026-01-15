@@ -38,7 +38,9 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
+import org.apache.flink.cdc.common.types.VariantType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -163,5 +165,10 @@ public class JavaClassConverter implements DataTypeVisitor<Class<?>> {
     @Override
     public Class<?> visit(RowType rowType) {
         return List.class;
+    }
+
+    @Override
+    public Class<?> visit(VariantType variantType) {
+        return Variant.class;
     }
 }
