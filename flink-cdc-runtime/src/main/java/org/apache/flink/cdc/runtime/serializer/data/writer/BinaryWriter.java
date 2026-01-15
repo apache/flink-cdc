@@ -35,6 +35,7 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.runtime.serializer.NullableSerializerWrapper;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
@@ -88,6 +89,8 @@ public interface BinaryWriter {
     void writeDate(int pos, DateData value);
 
     void writeTime(int pos, TimeData value, int precision);
+
+    void writeVariant(int pos, Variant variant);
 
     /** Finally, complete write to set real size to binary. */
     void complete();
@@ -173,6 +176,9 @@ public interface BinaryWriter {
             case BINARY:
             case VARBINARY:
                 writer.writeBinary(pos, (byte[]) o);
+                break;
+            case VARIANT:
+                writer.writeVariant(pos, (Variant) o);
                 break;
             default:
                 throw new UnsupportedOperationException("Not support type: " + type);

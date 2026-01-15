@@ -30,10 +30,14 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantBuilder;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -71,7 +75,17 @@ class BinaryRecordDataGeneratorTest {
                         DataTypes.ROW(
                                 DataTypes.FIELD("t1", DataTypes.STRING()),
                                 DataTypes.FIELD("t2", DataTypes.BIGINT())),
-                        DataTypes.STRING());
+                        DataTypes.STRING(),
+                        DataTypes.VARIANT());
+        BinaryVariantBuilder builder = new BinaryVariantBuilder();
+        Variant variant =
+                builder.array()
+                        .add(builder.of(1))
+                        .add(builder.of("hello"))
+                        .add(builder.of(Instant.now().truncatedTo(ChronoUnit.MICROS)))
+                        .add(builder.array().add(builder.of("hello2")).add(builder.of(10f)).build())
+                        .add(builder.ofNull())
+                        .build();
 
         Object[] testData =
                 new Object[] {
@@ -102,7 +116,8 @@ class BinaryRecordDataGeneratorTest {
                     new BinaryRecordDataGenerator(
                                     RowType.of(DataTypes.STRING(), DataTypes.BIGINT()))
                             .generate(new Object[] {BinaryStringData.fromString("test"), 24L}),
-                    null
+                    null,
+                    variant
                 };
         BinaryRecordData actual = new BinaryRecordDataGenerator(rowType).generate(testData);
 
@@ -143,5 +158,6 @@ class BinaryRecordDataGeneratorTest {
                 .isEqualTo(BinaryStringData.fromString("test"));
         assertThat(actual.getRow(24, 2).getLong(1)).isEqualTo(24L);
         assertThat(actual.isNullAt(25)).isTrue();
+        assertThat(actual.getVariant(26)).isEqualTo(variant);
     }
 }

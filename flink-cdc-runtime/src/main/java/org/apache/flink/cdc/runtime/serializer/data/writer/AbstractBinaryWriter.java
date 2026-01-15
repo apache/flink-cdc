@@ -35,6 +35,8 @@ import org.apache.flink.cdc.common.data.binary.BinaryMapData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinarySegmentUtils;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.types.variant.BinaryVariant;
+import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.runtime.serializer.data.ArrayDataSerializer;
 import org.apache.flink.cdc.runtime.serializer.data.MapDataSerializer;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
@@ -43,6 +45,7 @@ import org.apache.flink.core.memory.MemorySegmentFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -234,6 +237,19 @@ abstract class AbstractBinaryWriter implements BinaryWriter {
     @Override
     public void writeTime(int pos, TimeData value, int precision) {
         writeInt(pos, value.toMillisOfDay());
+    }
+
+    @Override
+    public void writeVariant(int pos, Variant variant) {
+        byte[] metadata = ((BinaryVariant) variant).getMetadata();
+        byte[] value = ((BinaryVariant) variant).getValue();
+        int metadataLen = metadata.length;
+
+        int length = metadata.length + value.length + 4;
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        buffer.putInt(metadataLen).put(metadata).put(value);
+
+        writeBytesToVarLenPart(pos, buffer.array(), length);
     }
 
     private void zeroBytes(int offset, int size) {

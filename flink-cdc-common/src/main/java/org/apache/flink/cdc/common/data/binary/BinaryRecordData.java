@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.types.variant.BinaryVariant;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.core.memory.MemorySegment;
 import org.apache.flink.core.memory.MemorySegmentFactory;
@@ -228,6 +229,12 @@ public final class BinaryRecordData extends BinarySection implements RecordData,
     public TimeData getTime(int pos) {
         assertIndexIsValid(pos);
         return TimeData.fromMillisOfDay(getInt(pos));
+    }
+
+    @Override
+    public BinaryVariant getVariant(int pos) {
+        assertIndexIsValid(pos);
+        return BinarySegmentUtils.readVariant(segments, offset, getLong(pos));
     }
 
     /** The bit is 1 when the field is null. Default is 0. */

@@ -67,4 +67,8 @@ public interface DataTypeVisitor<R> {
     R visit(MapType mapType);
 
     R visit(RowType rowType);
+
+    default R visit(VariantType variantType) {
+        throw new UnsupportedOperationException("VariantType was not supported.");
+    }
 }
