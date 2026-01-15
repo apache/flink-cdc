@@ -15,23 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.runtime.operators.schema.common;
+package org.apache.flink.cdc.common.route;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.TableId;
-import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.schema.Selectors;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheLoader;
 import org.apache.flink.shaded.guava31.com.google.common.cache.LoadingCache;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nonnull;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
@@ -39,20 +45,75 @@ import java.util.stream.Collectors;
  * Calculates how upstream data change events should be dispatched to downstream tables. Returns one
  * or many destination Table IDs based on provided routing rules.
  */
+@PublicEvolving
 public class TableIdRouter {
 
-    private final List<Tuple3<Selectors, String, String>> routes;
-    private final LoadingCache<TableId, List<TableId>> routingCache;
+    private static final Logger LOG = LoggerFactory.getLogger(TableIdRouter.class);
     private static final Duration CACHE_EXPIRE_DURATION = Duration.ofDays(1);
+
+    private final List<Tuple3<Pattern, String, String>> routes;
+    private final LoadingCache<TableId, List<TableId>> routingCache;
+
+    private static final String DOT_PLACEHOLDER = "_dot_placeholder_";
+
+    /**
+     * Currently, The supported regular syntax is not exactly the same in {@link Selectors}.
+     *
+     * <p>The main discrepancies are :
+     *
+     * <p>1) {@link Selectors} use {@code ,} to split table names instead of `|`.
+     *
+     * <p>2) If there is a need to use a dot ({@code .}) in a regular expression to match any
+     * character, it is necessary to escape the dot with a backslash.
+     *
+     * <p>3) The unescaped {@code .} is used as the separator of database and table name. When
+     * converting to Debezium style, it is expected to be escaped to match the dot ({@code .})
+     * literally instead of the meta-character.
+     */
+    public static String convertTableListToRegExpPattern(String tables) {
+        LOG.info("Rewriting CDC style table capture list: {}", tables);
+
+        // In CDC-style table matching, table names could be separated by `,` character.
+        // Convert it to `|` as it's standard RegEx syntax.
+        tables =
+                Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
+        LOG.info("Expression after replacing comma with vert separator: {}", tables);
+
+        // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
+        // In our table matching syntax, `\\.` means RegEx token matcher and `.` means database &
+        // table name separator.
+        // On the contrary, while we're matching TableId string, `\\.` means matching the "dot"
+        // literal and `.` is the meta-character.
+
+        // Step 1: escape the dot with a backslash, but keep it as a placeholder (like `$`).
+        // For example, `db\.*.tbl\.*` => `db$*.tbl$*`
+        String unescapedTables = tables.replace("\\.", DOT_PLACEHOLDER);
+        LOG.info("Expression after un-escaping dots as RegEx meta-character: {}", unescapedTables);
+
+        // Step 2: replace all remaining dots (`.`) to quoted version (`\.`), as a separator between
+        // database and table names.
+        // For example, `db$*.tbl$*` => `db$*\.tbl$*`
+        String unescapedTablesWithDbTblSeparator = unescapedTables.replace(".", "\\.");
+        LOG.info("Re-escaping dots as TableId delimiter: {}", unescapedTablesWithDbTblSeparator);
+
+        // Step 3: restore placeholder to normal RegEx matcher (`.`)
+        // For example, `db$*\.tbl$*` => `db.*\.tbl.*`
+        String standardRegExpTableCaptureList =
+                unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
+        LOG.info("Final standard RegExp table capture list: {}", standardRegExpTableCaptureList);
+
+        return standardRegExpTableCaptureList;
+    }
 
     public TableIdRouter(List<RouteRule> routingRules) {
         this.routes = new ArrayList<>();
         for (RouteRule rule : routingRules) {
             try {
-                String tableInclusions = rule.sourceTable;
-                Selectors selectors =
-                        new Selectors.SelectorsBuilder().includeTables(tableInclusions).build();
-                routes.add(new Tuple3<>(selectors, rule.sinkTable, rule.replaceSymbol));
+                routes.add(
+                        new Tuple3<>(
+                                Pattern.compile(convertTableListToRegExpPattern(rule.sourceTable)),
+                                rule.sinkTable,
+                                rule.replaceSymbol));
             } catch (PatternSyntaxException e) {
                 throw new IllegalArgumentException(
                         String.format(
@@ -80,7 +141,7 @@ public class TableIdRouter {
     private List<TableId> calculateRoute(TableId sourceTableId) {
         List<TableId> routedTableIds =
                 routes.stream()
-                        .filter(route -> route.f0.isMatch(sourceTableId))
+                        .filter(route -> matches(route.f0, sourceTableId))
                         .map(route -> resolveReplacement(sourceTableId, route))
                         .collect(Collectors.toList());
         if (routedTableIds.isEmpty()) {
@@ -90,9 +151,14 @@ public class TableIdRouter {
     }
 
     private TableId resolveReplacement(
-            TableId originalTable, Tuple3<Selectors, String, String> route) {
+            TableId originalTable, Tuple3<Pattern, String, String> route) {
         if (route.f2 != null) {
             return TableId.parse(route.f1.replace(route.f2, originalTable.getTableName()));
+        } else {
+            Matcher matcher = route.f0.matcher(originalTable.toString());
+            if (matcher.find()) {
+                return TableId.parse(matcher.replaceAll(route.f1));
+            }
         }
         return TableId.parse(route.f1);
     }
@@ -111,18 +177,16 @@ public class TableIdRouter {
         if (routes.isEmpty()) {
             return new ArrayList<>();
         }
-        List<Set<TableId>> routedTableIds =
-                routes.stream()
-                        .map(
-                                route -> {
-                                    return tableIdSet.stream()
-                                            .filter(
-                                                    tableId -> {
-                                                        return route.f0.isMatch(tableId);
-                                                    })
-                                            .collect(Collectors.toSet());
-                                })
-                        .collect(Collectors.toList());
-        return routedTableIds;
+        return routes.stream()
+                .map(
+                        route ->
+                                tableIdSet.stream()
+                                        .filter(tableId -> matches(route.f0, tableId))
+                                        .collect(Collectors.toSet()))
+                .collect(Collectors.toList());
+    }
+
+    private static boolean matches(Pattern pattern, TableId tableId) {
+        return pattern.matcher(tableId.toString()).matches();
     }
 }
