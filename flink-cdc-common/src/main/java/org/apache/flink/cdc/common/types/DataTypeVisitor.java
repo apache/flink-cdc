@@ -69,6 +69,6 @@ public interface DataTypeVisitor<R> {
     R visit(RowType rowType);
 
     default R visit(VariantType variantType) {
-        return null;
+        throw new UnsupportedOperationException("VariantType was not supported.");
     }
 }

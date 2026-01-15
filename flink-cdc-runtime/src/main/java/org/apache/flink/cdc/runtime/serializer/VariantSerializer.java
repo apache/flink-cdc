@@ -114,7 +114,7 @@ public class VariantSerializer extends TypeSerializerSingleton<Variant> {
     }
 
     /** Snapshot class for the {@link VariantSerializer}. */
-    @org.apache.flink.annotation.Internal
+    @Internal
     public static final class VariantSerializerSnapshot
             extends SimpleTypeSerializerSnapshot<Variant> {
         /** Constructor to create snapshot from serializer (writing the snapshot). */
