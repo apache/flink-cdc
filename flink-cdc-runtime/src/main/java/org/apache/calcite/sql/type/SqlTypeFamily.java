@@ -271,6 +271,8 @@ public enum SqlTypeFamily implements RelDataTypeFamily {
                 return factory.createSqlType(SqlTypeName.CURSOR);
             case COLUMN_LIST:
                 return factory.createSqlType(SqlTypeName.COLUMN_LIST);
+            case VARIANT:
+                return factory.createSqlType(SqlTypeName.VARIANT);
             default:
                 return null;
         }
