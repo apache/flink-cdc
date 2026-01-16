@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -81,7 +82,7 @@ class MySqlHybridSplitAssignerTest extends MySqlSourceTestBase {
         List<TableId> alreadyProcessedTables = Lists.newArrayList(tableId);
         List<MySqlSchemalessSnapshotSplit> remainingSplits = new ArrayList<>();
 
-        Map<String, MySqlSchemalessSnapshotSplit> assignedSplits = new HashMap<>();
+        LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits = new LinkedHashMap<>();
         Map<String, BinlogOffset> splitFinishedOffsets = new HashMap<>();
 
         for (int i = 0; i < 5; i++) {

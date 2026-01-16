@@ -33,12 +33,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * A {@link MySqlSplitAssigner} that splits tables into small chunk splits based on primary key
@@ -208,9 +206,7 @@ public class MySqlHybridSplitAssigner implements MySqlSplitAssigner {
 
     private MySqlBinlogSplit createBinlogSplit() {
         final List<MySqlSchemalessSnapshotSplit> assignedSnapshotSplit =
-                snapshotSplitAssigner.getAssignedSplits().values().stream()
-                        .sorted(Comparator.comparing(MySqlSplit::splitId))
-                        .collect(Collectors.toList());
+                new ArrayList<>(snapshotSplitAssigner.getAssignedSplits().values());
 
         Map<String, BinlogOffset> splitFinishedOffsets =
                 snapshotSplitAssigner.getSplitFinishedOffsets();
