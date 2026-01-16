@@ -59,7 +59,9 @@ import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
+import org.apache.flink.cdc.common.types.VariantType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ArrayListMultimap;
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
@@ -613,7 +615,7 @@ public class SchemaMergingUtils {
     }
 
     @VisibleForTesting
-    static Object coerceObject(
+    public static Object coerceObject(
             String timezone,
             Object originalField,
             DataType originalType,
@@ -731,6 +733,10 @@ public class SchemaMergingUtils {
 
         if (originalField instanceof byte[]) {
             return BinaryStringData.fromString(hexlify((byte[]) originalField));
+        }
+
+        if (originalField instanceof Variant) {
+            return BinaryStringData.fromString(((Variant) originalField).toJson());
         }
 
         return BinaryStringData.fromString(originalField.toString());
@@ -1046,6 +1052,7 @@ public class SchemaMergingUtils {
         mergingTree.put(RowType.class, ImmutableList.of(stringType));
         mergingTree.put(ArrayType.class, ImmutableList.of(stringType));
         mergingTree.put(MapType.class, ImmutableList.of(stringType));
+        mergingTree.put(VariantType.class, ImmutableList.of(stringType));
         return mergingTree;
     }
 }
