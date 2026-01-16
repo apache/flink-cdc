@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.calcite.sql.type;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableList;
