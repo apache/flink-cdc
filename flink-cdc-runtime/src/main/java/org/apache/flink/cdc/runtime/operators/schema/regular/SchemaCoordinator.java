@@ -473,6 +473,10 @@ public class SchemaCoordinator extends SchemaRegistry {
      */
     private void consumeUnusedSchemaDerivationBytes(DataInputStream in) throws IOException {
         TableIdSerializer tableIdSerializer = TableIdSerializer.INSTANCE;
+        // This scenario is due to the reduction of sources
+        if (in.available() < 4) {
+            return;
+        }
         int derivationMappingSize = in.readInt();
         Map<TableId, Set<TableId>> derivationMapping = new HashMap<>(derivationMappingSize);
         for (int i = 0; i < derivationMappingSize; i++) {
