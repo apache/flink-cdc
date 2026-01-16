@@ -32,6 +32,8 @@ import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresSourceBuilder;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfigFactory;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionInclusionDecider;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRouter;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.table.api.ValidationException;
@@ -60,12 +62,15 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CONNECTION_POOL_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CONNECT_TIMEOUT;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DATABASE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DECODING_PLUGIN_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.HOSTNAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.METADATA_LIST;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PARTITION_TABLES;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PASSWORD;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.PG_PORT;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
@@ -74,6 +79,7 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_LSN_COMMIT_CHECKPOINTS_DELAY;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SCHEMA;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SERVER_TIME_ZONE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SLOT_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.SPLIT_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
@@ -109,6 +115,17 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         String password = config.get(PASSWORD);
         String chunkKeyColumn = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         String tables = config.get(TABLES);
+        String partitionTables = config.get(PARTITION_TABLES);
+
+        // Validate: at least one of 'tables' or 'partition.tables' must be configured
+        if ((tables == null || tables.trim().isEmpty())
+                && (partitionTables == null || partitionTables.trim().isEmpty())) {
+            throw new IllegalArgumentException(
+                    "At least one of 'tables' or 'partition.tables' must be configured.");
+        }
+
+        String explicitDatabase = config.get(DATABASE);
+        String explicitSchema = config.get(SCHEMA);
         ZoneId serverTimeZone = getServerTimeZone(config);
         String tablesExclude = config.get(TABLES_EXCLUDE);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
@@ -141,13 +158,53 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         validateDistributionFactorLower(distributionFactorLower);
 
         Map<String, String> configMap = config.toMap();
-        Optional<String> databaseName = getValidateDatabaseName(tables);
+        boolean includePartitionedTables = config.get(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
+        java.util.Properties dbzProps = new java.util.Properties();
+        dbzProps.putAll(getDebeziumProperties(configMap));
+        // Determine database: prefer explicit option, otherwise infer from tables
+        String databaseToUse;
+        Optional<String> databaseFromTables = getValidateDatabaseName(tables);
+        if (!StringUtils.isNullOrWhitespaceOnly(explicitDatabase)) {
+            checkState(
+                    isValidPostgresDbName(explicitDatabase),
+                    String.format("%s is not a valid PostgreSQL database name", explicitDatabase));
+            if (databaseFromTables.isPresent()) {
+                checkState(
+                        explicitDatabase.equals(databaseFromTables.get()),
+                        "The value of option `database` is `%s`, but not all table names have the same or matching database name in `tables` = %s",
+                        explicitDatabase,
+                        tables);
+            }
+            databaseToUse = explicitDatabase;
+        } else {
+            checkState(
+                    databaseFromTables.isPresent(),
+                    String.format(
+                            "Cannot determine database. Please set '%s' or include database in '%s' (format db.schema.table)",
+                            DATABASE.key(), TABLES.key()));
+            databaseToUse = databaseFromTables.get();
+        }
+
+        // Qualify tables/partitionTables/tablesExclude with default schema when provided
+        if (!StringUtils.isNullOrWhitespaceOnly(explicitSchema)) {
+            checkState(
+                    isValidPostgresDbName(explicitSchema),
+                    String.format("%s is not a valid PostgreSQL schema name", explicitSchema));
+            tables = qualifyWithDefaultSchemaForTables(tables, explicitSchema);
+            if (partitionTables != null) {
+                partitionTables =
+                        qualifyWithDefaultSchemaForPartitions(partitionTables, explicitSchema);
+            }
+            if (tablesExclude != null) {
+                tablesExclude = qualifyWithDefaultSchemaForTables(tablesExclude, explicitSchema);
+            }
+        }
 
         PostgresSourceConfigFactory configFactory =
                 PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                         .hostname(hostname)
                         .port(port)
-                        .database(databaseName.get())
+                        .database(databaseToUse)
                         .schemaList(".*")
                         .tableList(".*")
                         .username(username)
@@ -155,7 +212,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .decodingPluginName(pluginName)
                         .slotName(slotName)
                         .serverTimeZone(serverTimeZone.getId())
-                        .debeziumProperties(getDebeziumProperties(configMap))
+                        .debeziumProperties(dbzProps)
                         .splitSize(splitSize)
                         .splitMetaGroupSize(splitMetaGroupSize)
                         .distributionFactorUpper(distributionFactorUpper)
@@ -171,12 +228,20 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .skipSnapshotBackfill(skipSnapshotBackfill)
                         .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                         .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
+                        // Enable enumerator to track and discover newly added tables/partitions
+                        .scanNewlyAddedTableEnabled(true)
+                        .includePartitionedTables(includePartitionedTables)
+                        .partitionTables(partitionTables)
                         .includeDatabaseInTableId(tableIdIncludeDatabase)
                         .getConfigFactory();
 
+        // Always discover tables to validate user patterns, using a temporary wide-open config
         List<TableId> tableIds = PostgresSchemaUtils.listTables(configFactory.create(0), null);
-
-        Selectors selectors = new Selectors.SelectorsBuilder().includeTables(tables).build();
+        PostgresPartitionRouter postgresPartitionRouter =
+                new PostgresPartitionRouter(includePartitionedTables, tables, partitionTables);
+        PostgresPartitionInclusionDecider inclusionDecider =
+                new PostgresPartitionInclusionDecider(t -> true, postgresPartitionRouter);
+        Selectors selectors = inclusionDecider.getSelectors();
         List<String> capturedTables = getTableList(tableIds, selectors);
         if (capturedTables.isEmpty()) {
             throw new IllegalArgumentException(
@@ -196,12 +261,10 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
             }
         }
         configFactory.tableList(capturedTables.toArray(new String[0]));
-
         String metadataList = config.get(METADATA_LIST);
         List<PostgreSQLReadableMetadata> readableMetadataList = listReadableMetadata(metadataList);
 
-        // Create a custom PostgresDataSource that passes the includeDatabaseInTableId flag
-        return new PostgresDataSource(configFactory, readableMetadataList);
+        return new PostgresDataSource(configFactory, readableMetadataList, postgresPartitionRouter);
     }
 
     private List<PostgreSQLReadableMetadata> listReadableMetadata(String metadataList) {
@@ -234,7 +297,6 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(HOSTNAME);
         options.add(USERNAME);
         options.add(PASSWORD);
-        options.add(TABLES);
         options.add(SLOT_NAME);
         return options;
     }
@@ -242,8 +304,12 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(TABLES);
+        options.add(DATABASE);
+        options.add(SCHEMA);
         options.add(PG_PORT);
         options.add(TABLES_EXCLUDE);
+        options.add(PARTITION_TABLES);
         options.add(DECODING_PLUGIN_NAME);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
         options.add(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -261,6 +327,7 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(SCAN_LSN_COMMIT_CHECKPOINTS_DELAY);
         options.add(METADATA_LIST);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED);
         options.add(TABLE_ID_INCLUDE_DATABASE);
         return options;
     }
@@ -272,10 +339,151 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
 
     private static List<String> getTableList(
             @Nullable List<TableId> tableIdList, Selectors selectors) {
-        return tableIdList.stream()
-                .filter(selectors::isMatch)
-                .map(TableId::toString)
-                .collect(Collectors.toList());
+        List<String> result = new ArrayList<>();
+        if (tableIdList == null || tableIdList.isEmpty()) {
+            return result;
+        }
+        for (TableId t : tableIdList) {
+            if (selectors.isMatch(t)) {
+                result.add(t.toString());
+            }
+        }
+        return result;
+    }
+
+    /** Return true if pattern contains an unescaped dot (.) character. */
+    private static boolean containsUnescapedDot(String s) {
+        if (s == null || s.isEmpty()) {
+            return false;
+        }
+        boolean escaped = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (c == '.') {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsEscapedDotBetweenIdentifiers(String s) {
+        if (s == null || s.length() < 3) {
+            return false;
+        }
+        for (int i = 0; i + 1 < s.length(); i++) {
+            if (s.charAt(i) == '\\' && s.charAt(i + 1) == '.') {
+                char prev = i > 0 ? s.charAt(i - 1) : 0;
+                char next = i + 2 < s.length() ? s.charAt(i + 2) : 0;
+                if (isIdentifierLike(prev) && isIdentifierLike(next)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isIdentifierLike(char c) {
+        return Character.isLetterOrDigit(c) || c == '_' || c == '"';
+    }
+
+    private static boolean hasSchemaOrNamespaceForTables(String pattern) {
+        if (pattern == null) {
+            return false;
+        }
+        // For `tables` and `tables.exclude`, Selectors split by unescaped dots only. For patterns
+        // containing escaped dots between identifier-like characters (e.g. "inventory\\.products"
+        // to match a literal dot in the table name), we avoid injecting default schema prefixes,
+        // because doing so would change matching semantics (table-only vs schema-qualified).
+        return containsUnescapedDot(pattern) || containsEscapedDotBetweenIdentifiers(pattern);
+    }
+
+    private static boolean hasSchemaOrNamespaceForPartitions(String pattern) {
+        if (pattern == null) {
+            return false;
+        }
+        // For `partition.tables`, routing supports both "schema.tableRegex" and
+        // "schema\\.tableRegex".
+        return pattern.contains("\\.") || containsUnescapedDot(pattern);
+    }
+
+    /**
+     * Qualify 'tables' patterns with default schema if missing. Comma-separated values.
+     *
+     * <p>Examples: orders -> public.orders (when defaultSchema=public) schema.orders -> unchanged
+     * db.schema.orders -> unchanged
+     */
+    private static String qualifyWithDefaultSchemaForTables(String tables, String defaultSchema) {
+        if (StringUtils.isNullOrWhitespaceOnly(tables)) {
+            return tables;
+        }
+        String[] parts = tables.split(",");
+        List<String> out = new ArrayList<>(parts.length);
+        for (String p : parts) {
+            if (p == null) {
+                continue;
+            }
+            String t = p.trim();
+            if (t.isEmpty()) {
+                continue;
+            }
+            // If no schema/namespace present, prefix with default schema
+            if (!hasSchemaOrNamespaceForTables(t)) {
+                out.add(defaultSchema + "." + t);
+            } else {
+                out.add(t);
+            }
+        }
+        return String.join(",", out);
+    }
+
+    /**
+     * Qualify 'partition.tables' entries with default schema when missing.
+     *
+     * <p>Handles formats: - parent:childRegex - childRegex
+     */
+    private static String qualifyWithDefaultSchemaForPartitions(
+            String partitionTables, String defaultSchema) {
+        if (StringUtils.isNullOrWhitespaceOnly(partitionTables)) {
+            return partitionTables;
+        }
+        String[] entries = partitionTables.split(",");
+        List<String> out = new ArrayList<>(entries.length);
+        for (String e : entries) {
+            if (e == null) {
+                continue;
+            }
+            String s = e.trim();
+            if (s.isEmpty()) {
+                continue;
+            }
+            int idx = s.indexOf(':');
+            if (idx >= 0) {
+                String parent = s.substring(0, idx).trim();
+                String child = s.substring(idx + 1).trim();
+                if (!parent.isEmpty() && !hasSchemaOrNamespaceForPartitions(parent)) {
+                    parent = defaultSchema + "." + parent;
+                }
+                if (!child.isEmpty() && !hasSchemaOrNamespaceForPartitions(child)) {
+                    child = defaultSchema + "." + child;
+                }
+                out.add(parent + ":" + child);
+            } else {
+                if (!hasSchemaOrNamespaceForPartitions(s)) {
+                    out.add(defaultSchema + "." + s);
+                } else {
+                    out.add(s);
+                }
+            }
+        }
+        return String.join(",", out);
     }
 
     /** Checks the value of given integer option is valid. */
@@ -370,16 +578,16 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                 continue; // Skip table names that do not match the expected format
             }
 
-            String[] tableNameParts =
-                    trimmedTableName.split(
-                            "(?<!\\\\)\\.", -1); // Use -1 to avoid ignoring trailing empty elements
-
-            checkState(
-                    tableNameParts.length == 3,
-                    String.format(
-                            "Tables format must db.schema.table, can not 'tables' = %s",
-                            TABLES.key()));
-            String currentDbName = tableNameParts[0];
+            List<String> tableNameParts = splitByUnescapedDot(trimmedTableName);
+            // Only patterns with an explicit database prefix participate in database inference.
+            // Supported formats:
+            //  - db.schema.table
+            //  - schema.table
+            //  - table
+            if (tableNameParts.size() != 3) {
+                continue;
+            }
+            String currentDbName = tableNameParts.get(0).trim();
 
             checkState(
                     isValidPostgresDbName(currentDbName),
@@ -404,14 +612,38 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         // PostgreSQL database name conventions:
         // 1. Length does not exceed 63 characters
         // 2. Can contain letters, numbers, underscores, and dollar signs
-        // 3. Cannot start with a dollar sign
+        // 3. Must start with a letter or underscore
         if (dbName == null || dbName.length() > 63) {
             return false;
         }
-        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
-            return false;
+        return dbName.matches("[a-zA-Z_][a-zA-Z0-9_$]*");
+    }
+
+    private static List<String> splitByUnescapedDot(String identifier) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean escaped = false;
+        for (int i = 0; i < identifier.length(); i++) {
+            char c = identifier.charAt(i);
+            if (escaped) {
+                current.append(c);
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                current.append(c);
+                escaped = true;
+                continue;
+            }
+            if (c == '.') {
+                parts.add(current.toString());
+                current.setLength(0);
+                continue;
+            }
+            current.append(c);
         }
-        return true;
+        parts.add(current.toString());
+        return parts;
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */

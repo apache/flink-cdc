@@ -105,11 +105,32 @@ pipeline:
       <td>Password to use when connecting to the Postgres database server.</td>
     </tr>
     <tr>
+      <td>database</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>
+        Name of the PostgreSQL database to connect to. When set, you may omit the database prefix in <code>tables</code> and <code>partition.tables</code> (e.g., use <code>public.my_table</code> instead of <code>db.public.my_table</code>).<br>
+        If both this option and a database prefix in <code>tables</code> are provided, they must be consistent.
+      </td>
+    </tr>
+    <tr>
+      <td>schema</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>
+        Default schema name. When set, entries in <code>tables</code> and <code>partition.tables</code> that omit schema will be auto-qualified as <code>schema.table</code> (e.g., <code>orders</code> becomes <code>public.orders</code>).<br>
+        Explicit schema in patterns, if present, takes precedence and is left unchanged.
+      </td>
+    </tr>
+    <tr>
       <td>tables</td>
-      <td>required</td>
+      <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
       <td>String</td>
       <td>Table name of the Postgres database to monitor. The table-name also supports regular expressions to monitor multiple tables that satisfy the regular expressions. <br>
+          <b>Note: At least one of 'tables' or 'partition.tables' must be configured.</b><br>
           All the tables are required to share same database.  <br>
           It is important to note that the dot (.) is treated as a delimiter for database, schema and table names.
           If there is a need to use a dot (.) in a regular expression to match any character, it is necessary to escape the dot with a backslash.<br>
@@ -274,9 +295,68 @@ pipeline:
         Defaults to false.
       </td>
     </tr>
+    <tr>
+      <td>scan.include-partitioned-tables.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>
+        Enable partition table support for PostgreSQL.<br>
+        <b>For PostgreSQL 11+:</b> Use this option alone with <code>publish_via_partition_root=true</code> in PUBLICATION. No need to configure <code>partition.tables</code>.<br>
+        <b>For PostgreSQL 10:</b> Must be used together with <code>partition.tables</code> to define parent-child mappings.
+      </td>
+    </tr>
+    <tr>
+      <td>partition.tables</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>
+        <b>Required for PostgreSQL 10 partition tables.</b> Defines parent-child table mappings using colon format: <code>parent:child_regex</code>.<br>
+        Format: <code>schema.parent:schema.child_regex</code> (e.g., <code>public.orders:public.orders_\d{6}</code>).<br>
+        When configured, <code>scan.include-partitioned-tables.enabled</code> is automatically enabled.<br>
+        Child partition events will be routed to their parent table, reducing CreateTableEvent requests.
+      </td>
+    </tr>
     </tbody>
 </table>
 </div>
+
+## Partition Table Support
+
+### PostgreSQL 11+ (Recommended)
+
+Use `publish_via_partition_root=true` in PUBLICATION. Only need `scan.include-partitioned-tables.enabled`:
+
+```yaml
+source:
+  type: postgres
+  tables: db.public.orders
+  scan.include-partitioned-tables.enabled: true
+```
+
+### PostgreSQL 10
+
+Requires `partition.tables` to define parent-child mappings:
+
+```yaml
+source:
+  type: postgres
+  tables: db.public.orders
+  partition.tables: public.orders:public.orders_\d{6}
+```
+
+### partition.tables Format
+
+Use colon format: `parent:child_regex`
+
+- Two segments: `schema.parent:schema.child_regex`
+- Table-only: `parent:child_regex` (schema inherited at runtime)
+
+```text
+public.orders:public.orders_\d{6}    # parent=public.orders, child matches orders_YYYYMM
+orders:orders_\d{6}                  # table-only, schema inherited at runtime
+```
 
 
 Note:
