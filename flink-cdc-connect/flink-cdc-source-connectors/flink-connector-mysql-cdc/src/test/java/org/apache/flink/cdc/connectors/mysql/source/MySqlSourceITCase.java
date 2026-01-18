@@ -1513,6 +1513,7 @@ class MySqlSourceITCase extends MySqlSourceTestBase {
                         .deserializer(deserializer)
                         .startupOptions(StartupOptions.initial())
                         .chunkKeyColumn(new ObjectPath(db, table), "order_id")
+                        .splitSize(2)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

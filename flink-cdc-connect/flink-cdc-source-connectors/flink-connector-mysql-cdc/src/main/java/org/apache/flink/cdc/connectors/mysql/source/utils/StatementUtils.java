@@ -22,6 +22,7 @@ import org.apache.flink.table.types.logical.RowType;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -79,14 +80,14 @@ public class StatementUtils {
 
     // PreparedStatement#setObject method will be converted to long type when handling bigint
     // unsigned, which poses a data overflow issue.
-    // Therefore, we need to handle the overflow issue by converting the long value to BigInteger.
+    // Therefore, we need to handle the overflow issue by converting the bigint unsigned to BigDecimal.
     public static void setSafeObject(PreparedStatement ps, int parameterIndex, Object value)
             throws SQLException {
-        if (value instanceof Long && (Long) value < 0L) {
-            ps.setObject(parameterIndex, new BigInteger(Long.toUnsignedString((Long) value)));
-            return;
+        if (value instanceof BigInteger) {
+            ps.setBigDecimal(parameterIndex, new BigDecimal((BigInteger) value));
+        } else {
+            ps.setObject(parameterIndex, value);
         }
-        ps.setObject(parameterIndex, value);
     }
 
     public static Object queryMin(
