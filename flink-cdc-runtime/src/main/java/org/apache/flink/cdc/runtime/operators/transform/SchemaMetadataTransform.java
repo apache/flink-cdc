@@ -42,7 +42,10 @@ public class SchemaMetadataTransform implements Serializable {
     private Map<String, String> options = new HashMap<>();
 
     public SchemaMetadataTransform(
-            String primaryKeyString, String partitionKeyString, String tableOptionString) {
+            String primaryKeyString,
+            String partitionKeyString,
+            String tableOptionString,
+            String tableOptionsDelimiter) {
         if (!StringUtils.isNullOrWhitespaceOnly(primaryKeyString)) {
             String[] primaryKeyArr = primaryKeyString.split(",");
             for (int i = 0; i < primaryKeyArr.length; i++) {
@@ -58,13 +61,19 @@ public class SchemaMetadataTransform implements Serializable {
             partitionKeys = Arrays.asList(partitionKeyArr);
         }
         if (!StringUtils.isNullOrWhitespaceOnly(tableOptionString)) {
-            for (String tableOption : tableOptionString.split(",")) {
-                String[] kv = tableOption.split("=");
+            // Use custom delimiter if provided, otherwise default to comma for backward
+            // compatibility.
+            String delimiter =
+                    StringUtils.isNullOrWhitespaceOnly(tableOptionsDelimiter)
+                            ? ","
+                            : tableOptionsDelimiter;
+            for (String tableOption : tableOptionString.split(delimiter)) {
+                String[] kv = tableOption.split("=", 2);
                 if (kv.length != 2) {
                     throw new IllegalArgumentException(
-                            "table option format error: "
-                                    + tableOptionString
-                                    + ", it should be like `key1=value1,key2=value2`.");
+                            String.format(
+                                    "table option format error: %s, it should be like `key1=value1%skey2=value2`.",
+                                    tableOptionString, delimiter));
                 }
                 options.put(kv[0].trim(), kv[1].trim());
             }
