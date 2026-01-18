@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.utils;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -32,36 +33,36 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StatementUtilsTest {
 
     @Test
-    void testSetSafeObjectCorrectlyHandlesOverflow() throws SQLException {
+    void testSetSafeObjectConvertsBigIntegerToBigDecimal() throws SQLException {
         Map<String, Object> invocationDetails = new HashMap<>();
         PreparedStatement psProxy = createPreparedStatementProxy(invocationDetails);
 
-        long overflowValue = Long.MAX_VALUE + 1L;
-        BigInteger expectedBigInteger = new BigInteger(Long.toUnsignedString(overflowValue));
+        // Create a BigInteger value that exceeds Long.MAX_VALUE
+        BigInteger bigIntValue = new BigInteger("9223372036854775808"); // Long.MAX_VALUE + 1
+        BigDecimal expectedBigDecimal = new BigDecimal(bigIntValue);
 
         // Use the safe method
-        StatementUtils.setSafeObject(psProxy, 1, overflowValue);
+        StatementUtils.setSafeObject(psProxy, 1, bigIntValue);
 
-        // Assert that it correctly used setObject with the converted BigInteger value
-        assertThat(invocationDetails.get("methodName")).isEqualTo("setObject");
-        assertThat(invocationDetails.get("value")).isInstanceOf(BigInteger.class);
-        assertThat(invocationDetails.get("value")).isEqualTo(expectedBigInteger);
+        // Assert that it correctly used setBigDecimal with the converted BigDecimal value
+        assertThat(invocationDetails.get("methodName")).isEqualTo("setBigDecimal");
+        assertThat(invocationDetails.get("value")).isInstanceOf(BigDecimal.class);
+        assertThat(invocationDetails.get("value")).isEqualTo(expectedBigDecimal);
     }
 
     @Test
-    void testDirectSetObjectFailsOnOverflow() throws SQLException {
+    void testSetSafeObjectHandlesLargeBigIntegerValues() throws SQLException {
         Map<String, Object> invocationDetails = new HashMap<>();
         PreparedStatement psProxy = createPreparedStatementProxy(invocationDetails);
 
-        long overflowValue = Long.MAX_VALUE + 1L;
+        // Test with BIGINT UNSIGNED max value
+        BigInteger maxUnsignedBigInt = new BigInteger("18446744073709551615"); // 2^64 - 1
+        BigDecimal expectedBigDecimal = new BigDecimal(maxUnsignedBigInt);
 
-        // Directly call the unsafe method on the proxy
-        psProxy.setObject(1, overflowValue);
+        StatementUtils.setSafeObject(psProxy, 1, maxUnsignedBigInt);
 
-        // Assert that it incorrectly used setObject, preserving the wrong negative long value
-        assertThat(invocationDetails.get("methodName")).isEqualTo("setObject");
-        assertThat(invocationDetails.get("value")).isInstanceOf(Long.class);
-        assertThat(invocationDetails.get("value")).isEqualTo(Long.MIN_VALUE);
+        assertThat(invocationDetails.get("methodName")).isEqualTo("setBigDecimal");
+        assertThat(invocationDetails.get("value")).isEqualTo(expectedBigDecimal);
     }
 
     @Test
@@ -81,11 +82,16 @@ class StatementUtilsTest {
         assertThat(invocationDetails.get("value")).isEqualTo("test");
         invocationDetails.clear();
 
+        // Test with an Integer
+        StatementUtils.setSafeObject(psProxy, 3, 456);
+        assertThat(invocationDetails.get("methodName")).isEqualTo("setObject");
+        assertThat(invocationDetails.get("value")).isEqualTo(456);
+        invocationDetails.clear();
+
         // Test with null
-        StatementUtils.setSafeObject(psProxy, 3, null);
+        StatementUtils.setSafeObject(psProxy, 4, null);
         assertThat(invocationDetails.get("methodName")).isEqualTo("setObject");
         assertThat(invocationDetails.get("value")).isNull();
-        invocationDetails.clear();
     }
 
     private PreparedStatement createPreparedStatementProxy(Map<String, Object> invocationDetails) {
@@ -95,7 +101,8 @@ class StatementUtilsTest {
                         new Class<?>[] {PreparedStatement.class},
                         (proxy, method, args) -> {
                             String methodName = method.getName();
-                            if (methodName.equals("setObject")) {
+                            if (methodName.equals("setObject")
+                                    || methodName.equals("setBigDecimal")) {
                                 invocationDetails.put("methodName", methodName);
                                 invocationDetails.put("parameterIndex", args[0]);
                                 invocationDetails.put("value", args[1]);

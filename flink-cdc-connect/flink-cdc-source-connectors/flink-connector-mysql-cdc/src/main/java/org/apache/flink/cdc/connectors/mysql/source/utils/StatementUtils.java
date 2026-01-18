@@ -80,7 +80,8 @@ public class StatementUtils {
 
     // PreparedStatement#setObject method will be converted to long type when handling bigint
     // unsigned, which poses a data overflow issue.
-    // Therefore, we need to handle the overflow issue by converting the bigint unsigned to BigDecimal.
+    // Therefore, we need to handle the overflow issue by converting the bigint unsigned to
+    // BigDecimal.
     public static void setSafeObject(PreparedStatement ps, int parameterIndex, Object value)
             throws SQLException {
         if (value instanceof BigInteger) {
