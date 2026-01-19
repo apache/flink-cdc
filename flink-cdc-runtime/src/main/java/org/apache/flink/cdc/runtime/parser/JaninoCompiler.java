@@ -47,6 +47,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable.PARSE_JSON;
+import static org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable.TRY_PARSE_JSON;
+
 /**
  * Use Janino compiler to compiler the statement of flink cdc pipeline transform into the executable
  * code of Janino. For example, compiler 'string1 || string2' into 'concat(string1, string2)'. The
@@ -445,6 +448,20 @@ public class JaninoCompiler {
         if (sqlBasicCall.getOperator().getName().equals("||")) {
             return new Java.MethodInvocation(
                     Location.NOWHERE, null, StringUtils.convertToCamelCase("CONCAT"), atoms);
+        }
+        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase(PARSE_JSON.getName())) {
+            return new Java.MethodInvocation(
+                    Location.NOWHERE,
+                    null,
+                    StringUtils.convertToCamelCase(PARSE_JSON.getName()),
+                    atoms);
+        }
+        if (sqlBasicCall.getOperator().getName().equalsIgnoreCase(TRY_PARSE_JSON.getName())) {
+            return new Java.MethodInvocation(
+                    Location.NOWHERE,
+                    null,
+                    StringUtils.convertToCamelCase(TRY_PARSE_JSON.getName()),
+                    atoms);
         }
         throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
     }

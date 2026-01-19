@@ -51,6 +51,8 @@ import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -123,6 +125,8 @@ public class DataTypeConverter {
                 return ArrayData.class;
             case MAP:
                 return MapData.class;
+            case VARIANT:
+                return Variant.class;
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
@@ -407,6 +411,8 @@ public class DataTypeConverter {
                 return DataTypes.MAP(
                         convertCalciteRelDataTypeToDataType(keyType),
                         convertCalciteRelDataTypeToDataType(valueType));
+            case VARIANT:
+                return DataTypes.VARIANT();
             case ROW:
             default:
                 throw new UnsupportedOperationException(
@@ -457,6 +463,8 @@ public class DataTypeConverter {
                 return convertToArray(value, (ArrayType) dataType);
             case MAP:
                 return convertToMap(value, (MapType) dataType);
+            case VARIANT:
+                return convertToVariant(value);
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
@@ -697,6 +705,21 @@ public class DataTypeConverter {
             return mapData;
         }
         throw new IllegalArgumentException("Unable to convert to MapData: " + obj);
+    }
+
+    private static Object convertToVariant(Object obj) {
+        if (obj instanceof Variant) {
+            return obj;
+        }
+        if (obj instanceof String) {
+            try {
+                return BinaryVariantInternalBuilder.parseJson((String) obj, false);
+            } catch (Throwable e) {
+                throw new IllegalArgumentException(
+                        String.format("Failed to parse json string: %s", obj), e);
+            }
+        }
+        throw new IllegalArgumentException("Unable to convert to Variant: " + obj);
     }
 
     private static Object convertToMapOriginal(Object obj, MapType mapType) {

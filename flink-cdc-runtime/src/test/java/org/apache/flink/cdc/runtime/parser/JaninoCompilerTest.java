@@ -18,6 +18,9 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
+import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.types.variant.VariantTypeException;
 
 import org.assertj.core.api.Assertions;
 import org.codehaus.commons.compiler.CompileException;
@@ -113,7 +116,7 @@ class JaninoCompilerTest {
     }
 
     @Test
-    void testBuildInFunction() throws InvocationTargetException {
+    void testBuildInFunction() throws InvocationTargetException, IOException {
         String expression = "ceil(2.4)";
         List<String> columnNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
@@ -126,6 +129,89 @@ class JaninoCompilerTest {
                         Double.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
         Assertions.assertThat(evaluate).isEqualTo(3.0);
+
+        // parseJson function.
+        String jsonStr =
+                "{\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}";
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("parseJson(testJsonStr)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {jsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(jsonStr, false));
+        final String duplicatedNameJsonStr =
+                "{\"name\":\"Bob\",\"name\":\"Mark\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}";
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("parseJson(testJsonStr, true)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {duplicatedNameJsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(duplicatedNameJsonStr, true));
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(
+                                                    "parseJson(testJsonStr)"),
+                                            List.of("testJsonStr"),
+                                            List.of(String.class),
+                                            Variant.class)
+                                    .evaluate(new Object[] {duplicatedNameJsonStr});
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(VariantTypeException.class)
+                .hasMessageContaining("VARIANT_DUPLICATE_KEY");
+        evaluate = expressionEvaluator.evaluate(new Object[] {null});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {""});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        final String invalidJsonStr = "invalidJson";
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(
+                                                    "parseJson(testJsonStr)"),
+                                            List.of("testJsonStr"),
+                                            List.of(String.class),
+                                            Variant.class)
+                                    .evaluate(new Object[] {invalidJsonStr});
+                        })
+                .cause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Failed to parse json string");
+
+        // tryParseJson function.
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("tryParseJson(testJsonStr)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {null});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {""});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {jsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(jsonStr, false));
+        evaluate = expressionEvaluator.evaluate(new Object[] {duplicatedNameJsonStr});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {invalidJsonStr});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("tryParseJson(testJsonStr, true)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {duplicatedNameJsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(duplicatedNameJsonStr, true));
     }
 
     @Test

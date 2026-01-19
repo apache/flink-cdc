@@ -388,6 +388,8 @@ class TransformParserTest {
                 "cast(CURRENT_TIMESTAMP as TIMESTAMP)",
                 "castToTimestamp(currentTimestamp(__epoch_time__), __time_zone__)");
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
+        testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
+        testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
     }
 
     @Test
