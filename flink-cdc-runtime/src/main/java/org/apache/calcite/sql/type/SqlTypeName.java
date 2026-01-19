@@ -55,7 +55,7 @@ import java.util.Set;
  * <p>This class was copied over from Calcite to support variant type(CALCITE-4918). When upgrading
  * to Calcite 1.39.0 version, please remove the entire class.
  *
- * <p>changList: 1. Add variant type: Line 167~171, Line 236.
+ * <p>changeList: 1. Add variant type: Line 167~171, Line 236.
  */
 public enum SqlTypeName {
     BOOLEAN(PrecScale.NO_NO, false, Types.BOOLEAN, SqlTypeFamily.BOOLEAN),
