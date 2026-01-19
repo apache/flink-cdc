@@ -28,7 +28,8 @@ import org.apache.calcite.rel.type.RelDataTypeFamily;
 import org.apache.calcite.sql.SqlIntervalQualifier;
 import org.apache.calcite.sql.SqlWindow;
 import org.apache.calcite.sql.parser.SqlParserPos;
-import org.checkerframework.checker.nullness.qual.Nullable;
+
+import javax.annotation.Nullable;
 
 import java.sql.Types;
 import java.util.Collection;
@@ -49,6 +50,8 @@ import java.util.Map;
  *
  * <p>This class was copied over from Calcite to support variant type(CALCITE-4918). When upgrading
  * to Calcite 1.39.0 version, please remove the entire class.
+ *
+ * <p>changList: 1. Add variant type: Line 84, Line 120, Line 218~219.
  */
 public enum SqlTypeFamily implements RelDataTypeFamily {
     // Primary families.
