@@ -51,7 +51,7 @@ import java.util.Map;
  * <p>This class was copied over from Calcite to support variant type(CALCITE-4918). When upgrading
  * to Calcite 1.39.0 version, please remove the entire class.
  *
- * <p>changeList: 1. Add variant type: Line 84, Line 120, Line 218~219, Line 277~278.
+ * <p>changeList: 1. Add variant type: Line 85, Line 121, Line 219~220, Line 278~279.
  */
 public enum SqlTypeFamily implements RelDataTypeFamily {
     // Primary families.

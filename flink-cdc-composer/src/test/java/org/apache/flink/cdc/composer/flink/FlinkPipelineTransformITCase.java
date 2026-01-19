@@ -1153,6 +1153,8 @@ class FlinkPipelineTransformITCase {
                 Schema.newBuilder()
                         .physicalColumn("id", DataTypes.INT().notNull())
                         .physicalColumn("message", DataTypes.STRING())
+                        .physicalColumn("duplicatedMessage", DataTypes.STRING())
+                        .physicalColumn("invalidMessage", DataTypes.STRING())
                         .primaryKey("id")
                         .build();
 
@@ -1168,7 +1170,10 @@ class FlinkPipelineTransformITCase {
                                         new Object[] {
                                             1,
                                             BinaryStringData.fromString(
-                                                    "{\"name\":\"张三\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                                    "{\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Bob\",\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString("invalidJson"),
                                         })),
                         DataChangeEvent.insertEvent(
                                 myTable,
@@ -1176,10 +1181,13 @@ class FlinkPipelineTransformITCase {
                                         new Object[] {
                                             2,
                                             BinaryStringData.fromString(
-                                                    "{\"name\":\"李四\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                                    "{\"name\":\"Mark\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString(
+                                                    "{\"name\":\"Mark\",\"name\":\"Mark\",\"age\":40,\"is_active\":true,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}"),
+                                            BinaryStringData.fromString("invalidJson"),
                                         })),
                         DataChangeEvent.insertEvent(
-                                myTable, generator.generate(new Object[] {3, null})));
+                                myTable, generator.generate(new Object[] {3, null, null, null})));
 
         ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
 
@@ -1202,7 +1210,7 @@ class FlinkPipelineTransformITCase {
                         Collections.singletonList(
                                 new TransformDef(
                                         "default_namespace.default_schema.\\.*",
-                                        "id, parse_json(message) as variantVal",
+                                        "id, parse_json(message) as variantVal, parse_json(duplicatedMessage, true) as duplicatedVariantVal, try_parse_json(message) as variantVal2, try_parse_json(duplicatedMessage, true) as duplicatedVariantVal2, try_parse_json(invalidMessage) as invalidVariantVal",
                                         null,
                                         null,
                                         null,
@@ -1221,10 +1229,10 @@ class FlinkPipelineTransformITCase {
 
         Assertions.assertThat(outputEvents)
                 .containsExactly(
-                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`variantVal` VARIANT}, primaryKeys=id, options=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"张三\"}], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"李四\"}], op=INSERT, meta=()}",
-                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null], op=INSERT, meta=()}");
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`variantVal` VARIANT,`duplicatedVariantVal` VARIANT,`variantVal2` VARIANT,`duplicatedVariantVal2` VARIANT,`invalidVariantVal` VARIANT}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":30,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Bob\"}, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, {\"address\":{\"city\":\"Beijing\",\"street\":\"MainSt\",\"zip\":\"100000\"},\"age\":40,\"email\":\"lisi@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"is_active\":true,\"name\":\"Mark\"}, null], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, null, null, null, null, null], op=INSERT, meta=()}");
     }
 
     @ParameterizedTest
