@@ -35,6 +35,7 @@ public class TypeUtils {
      * @return Paimon DataType
      */
     public static org.apache.paimon.types.DataType toPaimonDataType(DataType dataType) {
+        // TODO remove this branch after bumping Flink version to 2.2
         if (dataType.is(DataTypeRoot.VARIANT)) {
             return new VariantType(dataType.isNullable());
         } else {
@@ -50,6 +51,7 @@ public class TypeUtils {
      * @return Flink CDC DataType
      */
     public static DataType toCDCDataType(org.apache.paimon.types.DataType dataType) {
+        // TODO remove this branch after bumping Flink version to 2.2
         if (dataType.is(org.apache.paimon.types.DataTypeRoot.VARIANT)) {
             return new org.apache.flink.cdc.common.types.VariantType(dataType.isNullable());
         } else {

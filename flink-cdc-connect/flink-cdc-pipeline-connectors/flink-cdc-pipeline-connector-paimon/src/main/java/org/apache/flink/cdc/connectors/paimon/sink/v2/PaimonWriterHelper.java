@@ -32,6 +32,7 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.types.variant.BinaryVariant;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketAssignOperator;
 import org.apache.flink.core.memory.MemorySegment;
@@ -179,9 +180,15 @@ public class PaimonWriterHelper {
             case VARIANT:
                 fieldGetter =
                         row -> {
-                            BinaryVariant binaryVariant = (BinaryVariant) row.getVariant(fieldPos);
+                            org.apache.flink.cdc.common.types.variant.Variant variant =
+                                    row.getVariant(fieldPos);
+                            Preconditions.checkArgument(
+                                    variant instanceof BinaryVariant,
+                                    "Unsupported variant type: %s",
+                                    variant.getClass());
                             return new GenericVariant(
-                                    binaryVariant.getValue(), binaryVariant.getMetadata());
+                                    ((BinaryVariant) variant).getValue(),
+                                    ((BinaryVariant) variant).getMetadata());
                         };
                 break;
             default:
