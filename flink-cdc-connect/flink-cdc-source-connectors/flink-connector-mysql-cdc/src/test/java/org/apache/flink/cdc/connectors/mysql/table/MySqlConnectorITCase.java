@@ -2453,4 +2453,13 @@ class MySqlConnectorITCase extends MySqlSourceTestBase {
         Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
         result.getJobClient().get().cancel().get();
     }
+
+    @ParameterizedTest(name = "incrementalSnapshot = {0}")
+    @ValueSource(booleans = {true, false})
+    void testNoPKTableWithIgnoreNoPrimaryKeyTable(boolean incrementalSnapshot) throws Exception {
+        setup(incrementalSnapshot);
+        runConsumingForNoPKTableTest(
+                ", 'scan.incremental.snapshot.ignore-no-primary-key-table'='true'",
+                incrementalSnapshot);
+    }
 }

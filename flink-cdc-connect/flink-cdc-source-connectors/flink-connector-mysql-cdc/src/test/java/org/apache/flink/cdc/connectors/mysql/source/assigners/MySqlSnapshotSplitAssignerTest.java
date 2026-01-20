@@ -404,7 +404,14 @@ class MySqlSnapshotSplitAssignerTest extends MySqlSourceTestBase {
                                     new String[] {tableWithoutPrimaryKey});
                         })
                 .hasStackTraceContaining(
-                        "To use incremental snapshot, 'scan.incremental.snapshot.chunk.key-column' must be set when the table doesn't have primary keys.");
+                        "Table "
+                                + customerDatabase.getDatabaseName()
+                                + "."
+                                + tableWithoutPrimaryKey
+                                + " has no primary key and no chunk key column specified. "
+                                + "To use incremental snapshot, either: "
+                                + "1. Set 'scan.incremental.snapshot.chunk.key-column' for this table, or "
+                                + "2. Set 'scan.incremental.snapshot.ignore-no-primary-key-table' to true to skip tables without primary keys.");
     }
 
     @Test
