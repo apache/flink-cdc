@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 
 import org.apache.paimon.catalog.Catalog;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -72,7 +74,7 @@ class PaimonHashFunctionTest {
     }
 
     @Test
-    public void testHashCodeForAppendOnlyTable() {
+    public void testHashCodeForAppendOnlyTable() throws IOException {
         TableId tableId = TableId.tableId(TEST_DATABASE, "test_table");
         Map<String, String> tableOptions = new HashMap<>();
         MetadataApplier metadataApplier =
@@ -82,6 +84,7 @@ class PaimonHashFunctionTest {
                         .physicalColumn("col1", DataTypes.STRING().notNull())
                         .physicalColumn("col2", DataTypes.STRING())
                         .physicalColumn("pt", DataTypes.STRING())
+                        .physicalColumn("variantCol", DataTypes.VARIANT())
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
         metadataApplier.applySchemaChange(createTableEvent);
@@ -96,7 +99,9 @@ class PaimonHashFunctionTest {
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("2024")
+                                    BinaryStringData.fromString("2024"),
+                                    BinaryVariantInternalBuilder.parseJson(
+                                            "{\"a\":1,\"b\":\"hello\",\"c\":3.1}", false)
                                 }));
         int key1 = hashFunction.hashcode(dataChangeEvent1);
 
@@ -107,7 +112,9 @@ class PaimonHashFunctionTest {
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
                                     BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("2024")
+                                    BinaryStringData.fromString("2024"),
+                                    BinaryVariantInternalBuilder.parseJson(
+                                            "{\"a\":1,\"b\":\"hello\",\"c\":3.1}", false)
                                 }));
         int key2 = hashFunction.hashcode(dataChangeEvent2);
 
@@ -118,7 +125,9 @@ class PaimonHashFunctionTest {
                                 new Object[] {
                                     BinaryStringData.fromString("3"),
                                     BinaryStringData.fromString("1"),
-                                    BinaryStringData.fromString("2024")
+                                    BinaryStringData.fromString("2024"),
+                                    BinaryVariantInternalBuilder.parseJson(
+                                            "{\"a\":1,\"b\":\"hello\",\"c\":3.1}", false)
                                 }));
         int key3 = hashFunction.hashcode(dataChangeEvent3);
         assertThat(key1).isBetween(0, 3);
