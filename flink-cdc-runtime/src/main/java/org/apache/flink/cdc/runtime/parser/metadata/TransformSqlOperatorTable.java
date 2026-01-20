@@ -383,4 +383,30 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     OperandTypes.family(
                             SqlTypeFamily.STRING, SqlTypeFamily.STRING, SqlTypeFamily.STRING),
                     SqlFunctionCategory.USER_DEFINED_FUNCTION);
+
+    // --------------------------------------------------------------------------------------------
+    // Variant functions
+    // --------------------------------------------------------------------------------------------
+
+    public static final SqlFunction PARSE_JSON =
+            new SqlFunction(
+                    "PARSE_JSON",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.explicit(SqlTypeName.VARIANT),
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.STRING),
+                            OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN)),
+                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
+
+    public static final SqlFunction TRY_PARSE_JSON =
+            new SqlFunction(
+                    "TRY_PARSE_JSON",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.explicit(SqlTypeName.VARIANT),
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.STRING),
+                            OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN)),
+                    SqlFunctionCategory.USER_DEFINED_FUNCTION);
 }

@@ -23,6 +23,8 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
+import org.apache.flink.cdc.common.types.variant.Variant;
 import org.apache.flink.cdc.common.utils.DateTimeUtils;
 
 import org.slf4j.Logger;
@@ -1095,5 +1097,69 @@ public class SystemFunctionUtils {
             return false;
         }
         return universalCompares(lhs, rhs) <= 0;
+    }
+
+    /**
+     * Attempts to parse a JSON string, returning null on failure. This method does not allow
+     * duplicate keys (allowDuplicateKeys set to false).
+     *
+     * @param jsonStr the JSON string to parse
+     * @return the parsed Variant object, or null if input is null or empty string or parsing fails
+     */
+    public static Variant tryParseJson(String jsonStr) {
+        return tryParseJson(jsonStr, false);
+    }
+
+    /**
+     * Attempts to parse a JSON string, returning null on failure. Unlike parseJson, this method
+     * does not throw an exception on parsing failure, but returns null instead.
+     *
+     * @param jsonStr the JSON string to parse
+     * @param allowDuplicateKeys whether to allow duplicate keys in the JSON
+     * @return the parsed Variant object, or null if input is null or empty string or parsing fails
+     */
+    public static Variant tryParseJson(String jsonStr, boolean allowDuplicateKeys) {
+        if (jsonStr == null || jsonStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return BinaryVariantInternalBuilder.parseJson(jsonStr, allowDuplicateKeys);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    /**
+     * Parses a JSON string, throwing an exception on failure. This method does not allow duplicate
+     * keys (allowDuplicateKeys set to false).
+     *
+     * @param jsonStr the JSON string to parse
+     * @return the parsed Variant object, or null if input is null or empty string
+     */
+    public static Variant parseJson(String jsonStr) {
+        return parseJson(jsonStr, false);
+    }
+
+    /**
+     * Parses a JSON string, throwing an exception on failure. Unlike tryParseJson, this method
+     * throws an IllegalArgumentException when parsing fails.
+     *
+     * @param jsonStr the JSON string to parse
+     * @param allowDuplicateKeys whether to allow duplicate keys in the JSON
+     * @return the parsed Variant object, or null if input is null or empty string
+     * @throws IllegalArgumentException if the JSON format is invalid or parsing fails
+     */
+    public static Variant parseJson(String jsonStr, boolean allowDuplicateKeys) {
+        if (jsonStr == null || jsonStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return BinaryVariantInternalBuilder.parseJson(jsonStr, allowDuplicateKeys);
+        } catch (Throwable e) {
+            throw new IllegalArgumentException(
+                    String.format("Failed to parse json string: %s", jsonStr), e);
+        }
     }
 }
