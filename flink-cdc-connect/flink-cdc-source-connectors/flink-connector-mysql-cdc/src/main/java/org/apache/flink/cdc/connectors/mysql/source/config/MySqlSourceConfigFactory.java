@@ -51,6 +51,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private List<String> tableList;
     private String excludeTableList;
     private String serverTimeZone = ZoneId.systemDefault().getId();
+    private String debeziumSkippedOperations;
     private StartupOptions startupOptions = StartupOptions.initial();
     private int splitSize = MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue();
     private int splitMetaGroupSize = MySqlSourceOptions.CHUNK_META_GROUP_SIZE.defaultValue();
@@ -110,6 +111,11 @@ public class MySqlSourceConfigFactory implements Serializable {
 
     public MySqlSourceConfigFactory excludeTableList(String tableInclusions) {
         this.excludeTableList = tableInclusions;
+        return this;
+    }
+
+    public MySqlSourceConfigFactory skippedOperations(String debeziumSkippedOperations) {
+        this.debeziumSkippedOperations = debeziumSkippedOperations;
         return this;
     }
 
@@ -388,6 +394,9 @@ public class MySqlSourceConfigFactory implements Serializable {
         }
         if (serverTimeZone != null) {
             props.setProperty("database.serverTimezone", serverTimeZone);
+        }
+        if (debeziumSkippedOperations != null) {
+            props.put("skipped.operations", debeziumSkippedOperations);
         }
 
         // override the user-defined debezium properties
