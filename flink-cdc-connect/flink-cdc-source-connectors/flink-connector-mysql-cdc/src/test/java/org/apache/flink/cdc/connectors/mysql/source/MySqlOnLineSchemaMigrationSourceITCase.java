@@ -174,7 +174,8 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
                         .serverId(getServerId())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .serverTimeZone("UTC")
-                        .includeSchemaChanges(true) // output the schema changes as well
+                        .includeSchemaChanges(true)
+                        .parseOnLineSchemaChanges(true)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -334,7 +335,8 @@ class MySqlOnLineSchemaMigrationSourceITCase extends MySqlSourceTestBase {
                         .serverId(getServerId())
                         .deserializer(new JsonDebeziumDeserializationSchema())
                         .serverTimeZone("UTC")
-                        .includeSchemaChanges(true) // output the schema changes as well
+                        .includeSchemaChanges(true)
+                        .parseOnLineSchemaChanges(true)
                         .build();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

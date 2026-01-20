@@ -92,6 +92,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
             new StoppableChangeEventSourceContext();
     private final boolean isParsingOnLineSchemaChanges;
     private final boolean isBackfillSkipped;
+    private final Map<String, SourceRecord> pendingSchemaChangeEvents;
 
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
@@ -114,6 +115,7 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
         this.isParsingOnLineSchemaChanges =
                 statefulTaskContext.getSourceConfig().isParseOnLineSchemaChanges();
         this.isBackfillSkipped = statefulTaskContext.getSourceConfig().isSkipSnapshotBackfill();
+        this.pendingSchemaChangeEvents = new HashMap<>();
     }
 
     public void submitSplit(MySqlSplit mySqlSplit) {
@@ -181,8 +183,33 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
                     Optional<SourceRecord> oscRecord =
                             parseOnLineSchemaChangeEvent(event.getRecord());
                     if (oscRecord.isPresent()) {
-                        sourceRecords.add(oscRecord.get());
-                        continue;
+                        TableId tableId = RecordUtils.getTableId(oscRecord.get());
+                        if (tableId != null) {
+                            LOG.info(
+                                    "Received the start event of online schema change: {}. Save it for later.",
+                                    oscRecord.get());
+                            pendingSchemaChangeEvents.put(tableId.toString(), oscRecord.get());
+                            continue;
+                        }
+                    }
+
+                    Optional<String> finishedTables =
+                            RecordUtils.parseOnLineSchemaRenameEvent(event.getRecord());
+                    if (finishedTables.isPresent()) {
+                        TableId tableId = RecordUtils.getTableId(event.getRecord());
+                        String finishedTableId = tableId.catalog() + "." + finishedTables.get();
+                        LOG.info(
+                                "Received the ending event of table {}. Emit corresponding DDL event now.",
+                                finishedTableId);
+
+                        if (pendingSchemaChangeEvents.containsKey(finishedTableId)) {
+                            sourceRecords.add(pendingSchemaChangeEvents.remove(finishedTableId));
+                        } else {
+                            LOG.error(
+                                    "Error: met an unexpected osc finish event. Current pending events: {}, Record: {}",
+                                    pendingSchemaChangeEvents,
+                                    event);
+                        }
                     }
                 }
                 if (shouldEmit(event.getRecord())) {

@@ -46,6 +46,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -498,7 +499,7 @@ public class RecordUtils {
             // DROP TRIGGER IF EXISTS `db`.`pt_osc_db_test_tb1_ins`
             //
             // Among all these, we only need the "ALTER" one that happens on the `_gho`/`_new`
-            // table.
+            // table and store them temporarily, and emit them when the RENAME TABLE event pops up.
             String ddl =
                     mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
                             .get(HistoryRecord.Fields.DDL_STATEMENTS)
@@ -516,7 +517,76 @@ public class RecordUtils {
         }
     }
 
+    public static Optional<String> parseOnLineSchemaRenameEvent(SourceRecord record) {
+        if (!isSchemaChangeEvent(record)) {
+            return Optional.empty();
+        }
+        Struct value = (Struct) record.value();
+        ObjectMapper mapper = new ObjectMapper();
+
+        try {
+            String ddl =
+                    mapper.readTree(value.getString(HISTORY_RECORD_FIELD))
+                            .get(HistoryRecord.Fields.DDL_STATEMENTS)
+                            .asText()
+                            .toLowerCase();
+            if (ddl.startsWith("rename table") || ddl.startsWith("rename /* gh-ost */ table")) {
+                LOG.info("Checking if DDL might be an OSC renaming event... {}", ddl);
+                List<String> tableNames =
+                        Arrays.asList(
+                                value.getStruct(Envelope.FieldName.SOURCE)
+                                        .getString(TABLE_NAME_KEY)
+                                        .split(","));
+                if (tableNames.size() != 2) {
+                    LOG.info(
+                            "Table name {} is malformed, skip it.",
+                            value.getStruct(Envelope.FieldName.SOURCE).getString(TABLE_NAME_KEY));
+                    return Optional.empty();
+                }
+
+                String renamedFromTableName =
+                        Collections.min(tableNames, Comparator.comparingInt(String::length));
+                String renamedToTableName =
+                        Collections.max(tableNames, Comparator.comparingInt(String::length));
+
+                LOG.info(
+                        "Determined the shorter TableId {} is the renaming source.",
+                        renamedFromTableName);
+                LOG.info(
+                        "Determined the longer TableId {} is the renaming target.",
+                        renamedToTableName);
+
+                if (OSC_TEMP_TABLE_ID_PATTERN.matcher(renamedToTableName).matches()) {
+                    LOG.info(
+                            "Renamed to TableId name {} matches OSC temporary TableId pattern, yield {}.",
+                            renamedToTableName,
+                            renamedFromTableName);
+                    return Optional.of(renamedFromTableName);
+                }
+
+                if (RDS_OGT_TEMP_TABLE_ID_PATTERN.matcher(renamedToTableName).matches()) {
+                    LOG.info(
+                            "Renamed to TableId name {} matches RDS temporary TableId pattern, yield {}.",
+                            renamedToTableName,
+                            renamedFromTableName);
+                    return Optional.of(renamedFromTableName);
+                }
+
+                LOG.info(
+                        "Renamed to TableId {} does not match any RegEx pattern, skip it.",
+                        renamedToTableName);
+            }
+            return Optional.empty();
+        } catch (JsonProcessingException e) {
+            return Optional.empty();
+        }
+    }
+
     private static final Pattern OSC_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(gho|new)$");
+
+    private static final Pattern OSC_TEMP_TABLE_ID_PATTERN = Pattern.compile("^_(.*)_(del|old)$");
+    private static final Pattern RDS_OGT_TEMP_TABLE_ID_PATTERN =
+            Pattern.compile("^tp_\\d*_del_(.*)$");
 
     /** This utility method peels out gh-ost/pt-osc mangled tableId to the original one. */
     public static TableId peelTableId(TableId tableId) {
