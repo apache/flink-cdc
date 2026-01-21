@@ -31,10 +31,11 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeChecks;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
-import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.common.types.variant.BinaryVariant;
+import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketAssignOperator;
 import org.apache.flink.core.memory.MemorySegment;
-import org.apache.flink.table.types.utils.TypeConversions;
 
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.BinaryRow;
@@ -43,7 +44,7 @@ import org.apache.paimon.data.Decimal;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.data.Timestamp;
-import org.apache.paimon.flink.LogicalTypeConversion;
+import org.apache.paimon.data.variant.GenericVariant;
 import org.apache.paimon.memory.MemorySegmentUtils;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.RowKind;
@@ -176,6 +177,20 @@ public class PaimonWriterHelper {
             case MAP:
                 fieldGetter = new BinaryFieldDataGetter(fieldPos, fieldType.getTypeRoot());
                 break;
+            case VARIANT:
+                fieldGetter =
+                        row -> {
+                            org.apache.flink.cdc.common.types.variant.Variant variant =
+                                    row.getVariant(fieldPos);
+                            Preconditions.checkArgument(
+                                    variant instanceof BinaryVariant,
+                                    "Unsupported variant type: %s",
+                                    variant.getClass());
+                            return new GenericVariant(
+                                    ((BinaryVariant) variant).getValue(),
+                                    ((BinaryVariant) variant).getMetadata());
+                        };
+                break;
             default:
                 throw new IllegalArgumentException(
                         "don't support type of " + fieldType.getTypeRoot());
@@ -278,10 +293,7 @@ public class PaimonWriterHelper {
                                 column ->
                                         Column.physicalColumn(
                                                 column.name(),
-                                                DataTypeUtils.fromFlinkDataType(
-                                                        TypeConversions.fromLogicalToDataType(
-                                                                LogicalTypeConversion.toLogicalType(
-                                                                        column.type()))),
+                                                TypeUtils.toCDCDataType(column.type()),
                                                 column.description()))
                         .collect(Collectors.toList()));
         builder.primaryKey(table.primaryKeys());
