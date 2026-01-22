@@ -2221,6 +2221,7 @@ class FlinkPipelineTransformITCase {
         // Setup pipeline
         Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,
