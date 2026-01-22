@@ -6,6 +6,8 @@
 
 package io.debezium.connector.mysql;
 
+import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
+
 import com.github.shyiko.mysql.binlog.BinaryLogClient;
 import com.github.shyiko.mysql.binlog.BinaryLogClient.LifecycleListener;
 import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
@@ -1240,8 +1242,97 @@ public class MySqlStreamingChangeEventSource
                             e);
                 }
             }
+            // Extract retry configuration from connectorConfig using standard approach
+            Configuration configuration = connectorConfig.getConfig();
+            boolean failOnReconnectionError =
+                    configuration.getBoolean(
+                            MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.key(),
+                            MySqlSourceOptions.BINLOG_FAIL_ON_RECONNECTION_ERROR.defaultValue());
+            int maxRetries =
+                    configuration.getInteger(
+                            MySqlSourceOptions.CONNECT_MAX_RETRIES.key(),
+                            MySqlSourceOptions.CONNECT_MAX_RETRIES.defaultValue());
+            long timeoutMs =
+                    configuration.getLong(
+                            MySqlSourceOptions.CONNECT_TIMEOUT.key(),
+                            MySqlSourceOptions.CONNECT_TIMEOUT.defaultValue().toMillis());
+
+            int reconnectionAttempts = 0;
+            long reconnectionStartTime = 0;
+
             while (context.isRunning()) {
-                Thread.sleep(100);
+                // Check if client is connected
+                if (!client.isConnected()) {
+                    LOGGER.warn("Binlog client disconnected. Attempting to reconnect...");
+
+                    if (failOnReconnectionError && reconnectionStartTime == 0) {
+                        // Start tracking reconnection attempts
+                        reconnectionStartTime = clock.currentTimeInMillis();
+                        reconnectionAttempts = 0;
+                    }
+
+                    try {
+                        if (failOnReconnectionError) {
+                            long elapsedTime = clock.currentTimeInMillis() - reconnectionStartTime;
+                            if (reconnectionAttempts >= maxRetries || elapsedTime >= timeoutMs) {
+                                throw new DebeziumException(
+                                        String.format(
+                                                "Failed to reconnect to MySQL binlog after %d attempts and %d ms. "
+                                                        + "Maximum retries: %d, timeout: %d ms",
+                                                reconnectionAttempts,
+                                                elapsedTime,
+                                                maxRetries,
+                                                timeoutMs));
+                            }
+                            reconnectionAttempts++;
+                            LOGGER.info(
+                                    "Reconnection attempt {} of {} (elapsed time: {} ms of {} ms)",
+                                    reconnectionAttempts,
+                                    maxRetries,
+                                    elapsedTime,
+                                    timeoutMs);
+                        }
+
+                        client.connect(connectorConfig.getConnectionTimeout().toMillis());
+                        LOGGER.info("Successfully reconnected to MySQL binlog");
+
+                        // Reset retry tracking on successful connection
+                        if (failOnReconnectionError) {
+                            reconnectionStartTime = 0;
+                            reconnectionAttempts = 0;
+                        }
+                    } catch (Exception e) {
+                        if (failOnReconnectionError) {
+                            long elapsedTime = clock.currentTimeInMillis() - reconnectionStartTime;
+                            if (reconnectionAttempts >= maxRetries || elapsedTime >= timeoutMs) {
+                                if (e instanceof AuthenticationException) {
+                                    throw new DebeziumException(
+                                            "Authentication failure detected during reconnection to the MySQL database at "
+                                                    + connectorConfig.hostname()
+                                                    + ":"
+                                                    + connectorConfig.port()
+                                                    + " with user '"
+                                                    + connectorConfig.username()
+                                                    + "'",
+                                            e);
+                                } else {
+                                    throw new DebeziumException(
+                                            String.format(
+                                                    "Failed to reconnect to MySQL binlog after %d attempts and %d ms. "
+                                                            + "Last error: %s",
+                                                    reconnectionAttempts,
+                                                    elapsedTime,
+                                                    e.getMessage()),
+                                            e);
+                                }
+                            }
+                        }
+                        LOGGER.error("Reconnection failed: {}", e.getMessage());
+                        Thread.sleep(1000);
+                    }
+                } else {
+                    Thread.sleep(100);
+                }
             }
         } finally {
             try {

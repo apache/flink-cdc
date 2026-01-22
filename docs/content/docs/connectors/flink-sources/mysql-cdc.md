@@ -350,6 +350,13 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
           <td>The max retry times that the connector should retry to build MySQL database server connection.</td>
     </tr>
     <tr>
+          <td>binlog.fail-on-reconnection-error</td>
+          <td>optional</td>
+          <td style="word-wrap: break-word;">false</td>
+          <td>Boolean</td>
+          <td>Whether to fail the job when binlog reader encounters reconnection errors. When enabled, the job will fail after exhausting all retry attempts configured by 'connect.max-retries' and 'connect.timeout'. When disabled (default), the job will keep retrying indefinitely.</td>
+    </tr>
+    <tr>
           <td>connection.pool.size</td>
           <td>optional</td>
           <td style="word-wrap: break-word;">20</td>
