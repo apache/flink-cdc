@@ -28,6 +28,7 @@ import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.DataFile;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.RowDelta;
+import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -56,6 +57,8 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
     public static final String TABLE_GROUP_KEY = "table";
 
+    private static final String CHECKPOINT_SUMMARY_NAME = "flink-cdc-checkpoint-id";
+
     private final Catalog catalog;
 
     private final SinkCommitterMetricGroup metricGroup;
@@ -83,6 +86,12 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
     }
 
     private void commit(List<WriteResultWrapper> writeResultWrappers) {
+        if (writeResultWrappers.isEmpty()) {
+            return;
+        }
+        // all commits a same checkpoint-id
+        long checkpointId = writeResultWrappers.get(0).getCheckpointId();
+
         Map<TableId, List<WriteResult>> tableMap = new HashMap<>();
         for (WriteResultWrapper writeResultWrapper : writeResultWrappers) {
             List<WriteResult> writeResult =
@@ -93,11 +102,27 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
         }
         for (Map.Entry<TableId, List<WriteResult>> entry : tableMap.entrySet()) {
             TableId tableId = entry.getKey();
-            Optional<TableMetric> tableMetric = getTableMetric(tableId);
-            tableMetric.ifPresent(TableMetric::increaseCommitTimes);
+
             Table table =
                     catalog.loadTable(
                             TableIdentifier.of(tableId.getSchemaName(), tableId.getTableName()));
+
+            Snapshot snapshot = table.currentSnapshot();
+            if (snapshot != null) {
+                String lastCheckpointId = snapshot.summary().get(CHECKPOINT_SUMMARY_NAME);
+                if (lastCheckpointId != null
+                        && lastCheckpointId.equals(Long.toString(checkpointId))) {
+                    LOGGER.warn(
+                            "Checkpoint id {} has been committed to table {}, skipping",
+                            checkpointId,
+                            tableId.identifier());
+                    continue;
+                }
+            }
+
+            Optional<TableMetric> tableMetric = getTableMetric(tableId);
+            tableMetric.ifPresent(TableMetric::increaseCommitTimes);
+
             List<WriteResult> results = entry.getValue();
             List<DataFile> dataFiles =
                     results.stream()
@@ -116,10 +141,12 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
             } else {
                 if (deleteFiles.isEmpty()) {
                     AppendFiles append = table.newAppend();
+                    append.set(CHECKPOINT_SUMMARY_NAME, Long.toString(checkpointId));
                     dataFiles.forEach(append::appendFile);
                     append.commit();
                 } else {
                     RowDelta delta = table.newRowDelta();
+                    delta.set(CHECKPOINT_SUMMARY_NAME, Long.toString(checkpointId));
                     dataFiles.forEach(delta::addRows);
                     deleteFiles.forEach(delta::addDeletes);
                     delta.commit();

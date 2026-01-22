@@ -22,6 +22,8 @@ import org.apache.flink.api.connector.sink2.Committer;
 import org.apache.flink.api.connector.sink2.CommitterInitContext;
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
+import org.apache.flink.api.connector.sink2.SupportsWriterState;
 import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
@@ -30,6 +32,7 @@ import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOper
 import org.apache.flink.cdc.connectors.iceberg.sink.v2.compaction.CompactionOptions;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.metrics.groups.SinkCommitterMetricGroup;
+import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
@@ -39,6 +42,7 @@ import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 
@@ -48,7 +52,8 @@ public class IcebergSink
                 WithPreWriteTopology<Event>,
                 WithPreCommitTopology<Event, WriteResultWrapper>,
                 TwoPhaseCommittingSink<Event, WriteResultWrapper>,
-                WithPostCommitTopology<Event, WriteResultWrapper> {
+                WithPostCommitTopology<Event, WriteResultWrapper>,
+                SupportsWriterState<Event, IcebergWriterState> {
 
     protected final Map<String, String> catalogOptions;
     protected final Map<String, String> tableOptions;
@@ -92,20 +97,48 @@ public class IcebergSink
 
     @Override
     public SinkWriter<Event> createWriter(InitContext context) {
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
         return new IcebergWriter(
                 catalogOptions,
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
-                zoneId);
+                zoneId,
+                lastCheckpointId);
     }
 
     @Override
     public SinkWriter<Event> createWriter(WriterInitContext context) {
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
         return new IcebergWriter(
                 catalogOptions,
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
-                zoneId);
+                zoneId,
+                lastCheckpointId);
+    }
+
+    @Override
+    public StatefulSinkWriter<Event, IcebergWriterState> restoreWriter(
+            WriterInitContext context, Collection<IcebergWriterState> writerStates) {
+        // No need to read checkpointId  from state
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+        return new IcebergWriter(
+                catalogOptions,
+                context.getTaskInfo().getIndexOfThisSubtask(),
+                context.getTaskInfo().getAttemptNumber(),
+                zoneId,
+                lastCheckpointId);
+    }
+
+    @Override
+    public SimpleVersionedSerializer<IcebergWriterState> getWriterStateSerializer() {
+        return new IcebergWriterStateSerializer();
     }
 
     @Override

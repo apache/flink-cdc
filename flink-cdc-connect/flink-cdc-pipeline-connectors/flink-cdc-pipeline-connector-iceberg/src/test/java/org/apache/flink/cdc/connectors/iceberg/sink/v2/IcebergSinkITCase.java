@@ -192,4 +192,9 @@ public class IcebergSinkITCase {
         }
         return results;
     }
+
+    @Test
+    public void restoreIcebergSink() throws Exception {
+        //     todo:
+    }
 }
