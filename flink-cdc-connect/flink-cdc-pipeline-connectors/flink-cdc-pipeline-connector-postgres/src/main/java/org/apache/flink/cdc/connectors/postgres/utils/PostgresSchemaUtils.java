@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
@@ -40,6 +41,7 @@ import javax.annotation.Nullable;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -97,6 +99,64 @@ public class PostgresSchemaUtils {
     public static Schema getTableSchema(PostgresSourceConfig sourceConfig, TableId tableId) {
         try (PostgresConnection jdbc = getPostgresDialect(sourceConfig).openJdbcConnection()) {
             return getTableSchema(tableId, sourceConfig, jdbc);
+        }
+    }
+
+    public static Map<String, Integer> getColumnOids(
+            PostgresSourceConfig sourceConfig, TableId tableId, List<String> columns) {
+        try (PostgresConnection jdbc = getPostgresDialect(sourceConfig).openJdbcConnection()) {
+            Map<String, Integer> oidMaps = new HashMap<>();
+            String inClause =
+                    columns.stream()
+                            .map(column -> "'" + column.replace("'", "''") + "'")
+                            .collect(Collectors.joining(",", "in (", ")"));
+            try {
+                jdbc.query(
+                        "SELECT a.attname attname,a.attnum as oid \n"
+                                + "FROM pg_attribute a\n"
+                                + "JOIN pg_class b ON a.attrelid = b.oid\n"
+                                + "WHERE b.relname = '"
+                                + tableId.getTableName()
+                                + "' AND a.attname "
+                                + inClause,
+                        rs -> {
+                            while (rs.next()) {
+                                oidMaps.put(rs.getString(1), rs.getInt(2));
+                            }
+                        });
+            } catch (SQLException e) {
+                throw new FlinkRuntimeException(e);
+            }
+            return oidMaps;
+        }
+    }
+
+    public static Map<TableId, Map<String, Integer>> getAllTablesColumnOids(
+            PostgresSourceConfig sourceConfig, List<String> tableList) {
+        try (PostgresConnection jdbc = getPostgresDialect(sourceConfig).openJdbcConnection()) {
+            Map<TableId, Map<String, Integer>> tableOidMaps = new HashMap<>();
+            String inClause =
+                    tableList.stream()
+                            .map(table -> "'" + table.split("\\.")[1].replace("'", "''") + "'")
+                            .collect(Collectors.joining(",", "in (", ")"));
+            try {
+                jdbc.query(
+                        "SELECT b.relname,a.attname attname,a.attnum AS oid FROM pg_attribute a JOIN pg_class b ON a.attrelid = b.oid WHERE b.relname "
+                                + inClause
+                                + " and a.attnum > 0 and a.attisdropped = 'f' group by b.relname,a.attname,a.attnum",
+                        rs -> {
+                            while (rs.next()) {
+                                TableId tableId = TableId.tableId(rs.getString(1));
+                                if (tableOidMaps.get(tableId) == null) {
+                                    tableOidMaps.put(tableId, new HashMap<>());
+                                }
+                                tableOidMaps.get(tableId).put(rs.getString(2), rs.getInt(3));
+                            }
+                        });
+            } catch (SQLException e) {
+                throw new FlinkRuntimeException(e);
+            }
+            return tableOidMaps;
         }
     }
 
