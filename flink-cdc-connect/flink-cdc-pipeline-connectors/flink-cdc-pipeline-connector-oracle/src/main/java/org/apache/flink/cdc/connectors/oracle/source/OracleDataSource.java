@@ -19,7 +19,6 @@ package org.apache.flink.cdc.connectors.oracle.source;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
-import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -47,7 +46,6 @@ import java.util.stream.Stream;
 public class OracleDataSource implements DataSource, SupportsReadingMetadata {
 
     private final OracleSourceConfig sourceConfig;
-    private final Configuration config;
     private final OracleSourceConfigFactory configFactory;
 
     /** Data type that describes the final output of the source. */
@@ -63,7 +61,6 @@ public class OracleDataSource implements DataSource, SupportsReadingMetadata {
             Configuration config,
             List<OracleReadableMetaData> readableMetadataList) {
         this.sourceConfig = configFactory.create(0);
-        this.config = config;
         this.metadataKeys = Collections.emptyList();
         this.readableMetadataList = readableMetadataList;
         this.configFactory = configFactory;
@@ -73,13 +70,12 @@ public class OracleDataSource implements DataSource, SupportsReadingMetadata {
     public EventSourceProvider getEventSourceProvider() {
 
         OracleDialect oracleDialect = new OracleDialect();
-        OracleEventDeserializer<Event> deserializer =
-                new OracleEventDeserializer<>(
-                        DebeziumChangelogMode.ALL, true, readableMetadataList);
+        OracleEventDeserializer deserializer =
+                new OracleEventDeserializer(DebeziumChangelogMode.ALL, true, readableMetadataList);
 
         RedoLogOffsetFactory offsetFactory = new RedoLogOffsetFactory();
-        OracleTableSourceReader<Event> oracleChangeEventSource =
-                new OracleTableSourceReader<>(
+        OracleTableSourceReader oracleChangeEventSource =
+                new OracleTableSourceReader(
                         configFactory, deserializer, offsetFactory, oracleDialect);
         return FlinkSourceProvider.of(oracleChangeEventSource);
     }

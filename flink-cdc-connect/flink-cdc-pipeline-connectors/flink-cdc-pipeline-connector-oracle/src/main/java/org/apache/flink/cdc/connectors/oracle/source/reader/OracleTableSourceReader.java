@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.oracle.source.reader;
 
 import org.apache.flink.api.connector.source.SourceReaderContext;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.connectors.base.config.JdbcSourceConfig;
 import org.apache.flink.cdc.connectors.base.config.SourceConfig;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
@@ -37,8 +38,7 @@ import org.apache.flink.connector.base.source.reader.RecordEmitter;
  * and Watermark Signal Algorithm which supports parallel reading snapshot of table and then
  * continue to capture data change by streaming reading.
  */
-public class OracleTableSourceReader<Event>
-        extends OracleSourceBuilder.OracleIncrementalSource<Event> {
+public class OracleTableSourceReader extends OracleSourceBuilder.OracleIncrementalSource<Event> {
 
     private OracleSourceConfig sourceConfig;
 

@@ -135,7 +135,7 @@ pipeline:
       <td>optional</td>
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
-      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial","latest-offset".</td>
+      <td>Optional startup mode for Oracle CDC consumer, valid enumerations are "initial" ,"latest-offset" and "snapshot".</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -211,15 +211,6 @@ The max retry times that the connector should retry to build oracle database ser
       </td>
     </tr>
     <tr>
-      <td>heartbeat.interval</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">30</td>
-      <td>String</td>
-      <td>
-        Optional interval of sending heartbeat event for tracing the latest available binlog offsets.
-      </td>
-    </tr>
-    <tr>
       <td>chunk-meta.group.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
@@ -261,15 +252,6 @@ The max retry times that the connector should retry to build oracle database ser
       <td>String</td>
       <td>
       A strategy in log data analysis or mining.  
-      </td>
-    </tr>
-    <tr>
-      <td>debezium.log.mining.continuous.mine</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>
-      A continuous or ongoing mining process in the field of log mining.  
       </td>
     </tr>
     <tr>

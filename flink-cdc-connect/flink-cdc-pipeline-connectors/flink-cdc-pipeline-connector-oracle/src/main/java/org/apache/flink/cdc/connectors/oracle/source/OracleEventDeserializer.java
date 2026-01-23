@@ -49,7 +49,7 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.getHi
 
 /** Event deserializer for {@link OracleDataSource}. */
 @Internal
-public class OracleEventDeserializer<Event> extends DebeziumEventDeserializationSchema {
+public class OracleEventDeserializer extends DebeziumEventDeserializationSchema {
 
     private static final long serialVersionUID = 1L;
 
