@@ -134,7 +134,7 @@ pipeline:
       <td style="word-wrap: break-word;">initial</td>
       <td>String</td>
       <td> Oracle CDC 消费者可选的启动模式，
-         合法的模式为 "initial"，"latest-offset"。</td>
+         合法的模式为 "initial"、"latest-offset"和"snapshot"。</td>
     </tr>
     <tr>
       <td>debezium.*</td>
@@ -209,15 +209,6 @@ pipeline:
       </td>
     </tr>
     <tr>
-      <td>heartbeat.interval</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">30</td>
-      <td>String</td>
-      <td>
-        发送心跳事件的可选间隔，用于跟踪最新可用的binlog偏移量。
-      </td>
-    </tr>
-    <tr>
       <td>chunk-meta.group.size</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">1000</td>
@@ -259,15 +250,6 @@ pipeline:
       <td>String</td>
       <td>
       日志数据分析或挖掘中的一种策略。  
-      </td>
-    </tr>
-    <tr>
-      <td>debezium.log.mining.continuous.mine</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">true</td>
-      <td>Boolean</td>
-      <td>
-      原木开采领域中的连续或正在进行的开采过程。
       </td>
     </tr>
     <tr>

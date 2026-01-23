@@ -92,7 +92,7 @@ public class OracleDataSourceFactoryTest extends OracleSourceTestBase {
                 .hasMessageContaining("Cannot find any table by the option 'tables' = " + tables);
     }
 
-    class MockContext implements Factory.Context {
+    static class MockContext implements Factory.Context {
 
         Configuration factoryConfiguration;
 
@@ -112,7 +112,7 @@ public class OracleDataSourceFactoryTest extends OracleSourceTestBase {
 
         @Override
         public ClassLoader getClassLoader() {
-            return this.getClassLoader();
+            return this.getClass().getClassLoader();
         }
     }
 }

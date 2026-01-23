@@ -70,6 +70,7 @@ public class OracleDataSourceOptions {
                     .noDefaultValue()
                     .withDescription(
                             "Password to use when connecting to the oracle database server.");
+
     public static final ConfigOption<String> TABLES =
             ConfigOptions.key("tables")
                     .stringType()
@@ -131,13 +132,6 @@ public class OracleDataSourceOptions {
                             "Optional startup mode for oracle CDC consumer, valid enumerations are "
                                     + "\"initial\", \"latest-offset\", \"snapshot\"");
 
-    public static final ConfigOption<Duration> HEARTBEAT_INTERVAL =
-            ConfigOptions.key("heartbeat.interval")
-                    .durationType()
-                    .defaultValue(Duration.ofSeconds(30))
-                    .withDescription(
-                            "Optional interval of sending heartbeat event for tracing the latest available archive log offsets");
-
     @Experimental
     public static final ConfigOption<Integer> CHUNK_META_GROUP_SIZE =
             ConfigOptions.key("chunk-meta.group.size")
@@ -196,14 +190,6 @@ public class OracleDataSourceOptions {
                     .stringType()
                     .defaultValue("online_catalog")
                     .withDescription("A strategy in log data analysis or mining.");
-
-    @Experimental
-    public static final ConfigOption<String> LOG_MINING_CONTINUOUS_MINE =
-            ConfigOptions.key("debezium.log.mining.continuous.mine")
-                    .stringType()
-                    .defaultValue("true")
-                    .withDescription(
-                            "A continuous or ongoing mining process in the field of log mining,valid all available values are \"initial\", \"earliest-offset\", \"snapshot\".");
 
     @Experimental
     public static final ConfigOption<Boolean> SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP =

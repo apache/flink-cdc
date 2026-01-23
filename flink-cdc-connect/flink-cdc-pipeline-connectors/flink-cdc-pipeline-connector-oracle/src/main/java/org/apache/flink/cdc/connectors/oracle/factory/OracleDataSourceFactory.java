@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
@@ -49,6 +50,8 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.connectors.base.utils.ObjectUtils.doubleCompare;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.METADATA_LIST;
 import static org.apache.flink.cdc.connectors.oracle.source.OracleDataSourceOptions.SCAN_STARTUP_MODE;
+import static org.apache.flink.cdc.debezium.table.DebeziumOptions.DEBEZIUM_OPTIONS_PREFIX;
+import static org.apache.flink.cdc.debezium.utils.JdbcUrlUtils.PROPERTIES_PREFIX;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
@@ -60,10 +63,12 @@ public class OracleDataSourceFactory implements DataSourceFactory {
     private static final String SCAN_STARTUP_MODE_VALUE_INITIAL = "initial";
     private static final String SCAN_STARTUP_MODE_VALUE_LATEST = "latest-offset";
     private static final String SCAN_STARTUP_MODE_VALUE_SNAPSHOT = "snapshot";
-    private static final String DEBEZIUM_PROPERTIES_PREFIX = "debezium.";
 
     @Override
     public DataSource createDataSource(Context context) {
+        FactoryHelper.createFactoryHelper(this, context)
+                .validateExcept(PROPERTIES_PREFIX, DEBEZIUM_OPTIONS_PREFIX);
+
         final Configuration config = context.getFactoryConfiguration();
         int fetchSize = config.get(OracleDataSourceOptions.SCAN_SNAPSHOT_FETCH_SIZE);
         int splitSize = config.get(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -102,7 +107,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
                 "log.mining.strategy", config.get(OracleDataSourceOptions.LOG_MINING_STRATEGY));
 
         Map<String, String> map =
-                OracleDataSourceOptions.getPropertiesByPrefix(config, DEBEZIUM_PROPERTIES_PREFIX);
+                OracleDataSourceOptions.getPropertiesByPrefix(config, DEBEZIUM_OPTIONS_PREFIX);
         map.keySet().forEach(e -> dbzProperties.put(e, map.get(e)));
         StartupOptions startupOptions = getStartupOptions(config);
 
@@ -177,13 +182,13 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         options.add(OracleDataSourceOptions.PASSWORD);
         options.add(OracleDataSourceOptions.DATABASE);
         options.add(OracleDataSourceOptions.TABLES);
-        options.add(OracleDataSourceOptions.METADATA_LIST);
         return options;
     }
 
     @Override
     public Set<ConfigOption<?>> optionalOptions() {
         Set<ConfigOption<?>> options = new HashSet<>();
+        options.add(OracleDataSourceOptions.METADATA_LIST);
         options.add(OracleDataSourceOptions.JDBC_URL);
         options.add(OracleDataSourceOptions.SERVER_TIME_ZONE);
         options.add(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE);
@@ -195,9 +200,7 @@ public class OracleDataSourceFactory implements DataSourceFactory {
         options.add(OracleDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND);
         options.add(OracleDataSourceOptions.CONNECT_MAX_RETRIES);
         options.add(OracleDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
-        options.add(OracleDataSourceOptions.HEARTBEAT_INTERVAL);
         options.add(OracleDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
-        options.add(OracleDataSourceOptions.LOG_MINING_CONTINUOUS_MINE);
         options.add(OracleDataSourceOptions.LOG_MINING_STRATEGY);
         options.add(OracleDataSourceOptions.DATABASE_CONNECTION_ADAPTER);
         options.add(OracleDataSourceOptions.SCAN_STARTUP_MODE);

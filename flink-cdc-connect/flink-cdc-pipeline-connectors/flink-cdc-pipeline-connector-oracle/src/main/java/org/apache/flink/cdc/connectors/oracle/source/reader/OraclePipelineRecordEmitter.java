@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.oracle.source.reader;
 
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.OffsetFactory;
@@ -49,7 +50,7 @@ import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isDat
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.isSchemaChangeEvent;
 
 /** The {@link RecordEmitter} implementation for Oracle pipeline connector. */
-public class OraclePipelineRecordEmitter<Event> extends IncrementalSourceRecordEmitter<Event> {
+public class OraclePipelineRecordEmitter extends IncrementalSourceRecordEmitter<Event> {
     private static final long serialVersionUID = 1L;
     // Used when startup mode is initial
     private final Set<TableId> alreadySendCreateTableTables;
@@ -150,7 +151,7 @@ public class OraclePipelineRecordEmitter<Event> extends IncrementalSourceRecordE
                         org.apache.flink.cdc.common.event.TableId.tableId(
                                 tableId.schema(), tableId.table()),
                         schema);
-        output.collect((Event) createTableEvent);
+        output.collect(createTableEvent);
         return createTableEvent;
     }
 }
