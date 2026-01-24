@@ -54,6 +54,14 @@ public class RecordDataConverter {
         return fieldGetters;
     }
 
+    /**
+     * Converts a CDC {@link RecordData} to Flink SQL {@link RowData}.
+     *
+     * @param recordData the CDC record data to convert
+     * @param rowType the row type schema defining the structure
+     * @param zoneId the time zone for timestamp conversions
+     * @return the converted Flink SQL RowData, or null if input is null
+     */
     private static RowData convertRowData(RecordData recordData, RowType rowType, ZoneId zoneId) {
         if (recordData == null) {
             return null;
@@ -73,6 +81,19 @@ public class RecordDataConverter {
         return rowData;
     }
 
+    /**
+     * Converts a single field from CDC {@link RecordData} to Flink SQL format.
+     *
+     * <p>This method handles various data types including primitives, temporal types, and complex
+     * types (arrays, maps, rows).
+     *
+     * @param recordData the CDC record data containing the field
+     * @param pos the position of the field in the record
+     * @param fieldType the data type of the field
+     * @param zoneId the time zone for timestamp conversions
+     * @return the converted field value in Flink SQL format, or null if the field is null
+     * @throws IllegalArgumentException if the field type is not supported
+     */
     private static Object convertField(
             RecordData recordData, int pos, DataType fieldType, ZoneId zoneId) {
         if (recordData.isNullAt(pos)) {
@@ -137,6 +158,16 @@ public class RecordDataConverter {
         }
     }
 
+    /**
+     * Converts a CDC {@link ArrayData} to Flink SQL {@link org.apache.flink.table.data.ArrayData}.
+     *
+     * <p>This method recursively converts each element in the array according to the element type.
+     *
+     * @param arrayData the CDC array data to convert
+     * @param arrayType the array type schema defining the element type
+     * @param zoneId the time zone for timestamp conversions
+     * @return the converted Flink SQL ArrayData, or null if input is null
+     */
     private static org.apache.flink.table.data.ArrayData convertArrayData(
             ArrayData arrayData, ArrayType arrayType, ZoneId zoneId) {
         if (arrayData == null) {
@@ -154,6 +185,16 @@ public class RecordDataConverter {
         return new org.apache.flink.table.data.GenericArrayData(result);
     }
 
+    /**
+     * Converts a CDC {@link MapData} to Flink SQL {@link org.apache.flink.table.data.MapData}.
+     *
+     * <p>This method converts both keys and values in the map according to their respective types.
+     *
+     * @param mapData the CDC map data to convert
+     * @param mapType the map type schema defining key and value types
+     * @param zoneId the time zone for timestamp conversions
+     * @return the converted Flink SQL MapData, or null if input is null
+     */
     private static org.apache.flink.table.data.MapData convertMapData(
             MapData mapData, MapType mapType, ZoneId zoneId) {
         if (mapData == null) {
@@ -178,6 +219,18 @@ public class RecordDataConverter {
         return new org.apache.flink.table.data.GenericMapData(result);
     }
 
+    /**
+     * Converts a single element from CDC {@link ArrayData} to Flink SQL format.
+     *
+     * <p>This method is similar to {@link #convertField} but operates on array elements.
+     *
+     * @param arrayData the CDC array data containing the element
+     * @param pos the position of the element in the array
+     * @param elementType the data type of the element
+     * @param zoneId the time zone for timestamp conversions
+     * @return the converted element value in Flink SQL format, or null if the element is null
+     * @throws IllegalArgumentException if the element type is not supported
+     */
     private static Object convertElement(
             ArrayData arrayData, int pos, DataType elementType, ZoneId zoneId) {
         if (arrayData.isNullAt(pos)) {
@@ -241,6 +294,18 @@ public class RecordDataConverter {
         }
     }
 
+    /**
+     * Creates a {@link RecordData.FieldGetter} for extracting and converting a specific field.
+     *
+     * <p>This method generates a lambda function that extracts a field at the given position and
+     * converts it to Flink SQL format.
+     *
+     * @param fieldType the data type of the field
+     * @param fieldPos the position of the field in the record
+     * @param zoneId the time zone for timestamp conversions
+     * @return a FieldGetter that extracts and converts the field value
+     * @throws IllegalArgumentException if the field type is not supported
+     */
     private static RecordData.FieldGetter createFieldGetter(
             DataType fieldType, int fieldPos, ZoneId zoneId) {
         final RecordData.FieldGetter fieldGetter;
@@ -334,7 +399,7 @@ public class RecordDataConverter {
                 break;
             default:
                 throw new IllegalArgumentException(
-                        "don't support type of " + fieldType.getTypeRoot());
+                        "Unsupported field type: " + fieldType.getTypeRoot());
         }
         if (!fieldType.isNullable()) {
             return fieldGetter;
