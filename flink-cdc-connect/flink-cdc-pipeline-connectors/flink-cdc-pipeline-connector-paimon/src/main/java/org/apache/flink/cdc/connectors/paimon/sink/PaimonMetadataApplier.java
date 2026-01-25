@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnPositionEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -111,7 +112,8 @@ public class PaimonMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.ADD_COLUMN,
                 SchemaChangeEventType.DROP_COLUMN,
                 SchemaChangeEventType.RENAME_COLUMN,
-                SchemaChangeEventType.ALTER_COLUMN_TYPE);
+                SchemaChangeEventType.ALTER_COLUMN_TYPE,
+                SchemaChangeEventType.ALTER_COLUMN_POSITION);
     }
 
     @Override
@@ -128,6 +130,10 @@ public class PaimonMetadataApplier implements MetadataApplier {
                 },
                 alterColumnTypeEvent -> {
                     applyAlterColumnType(alterColumnTypeEvent);
+                    return null;
+                },
+                alterColumnPositionEvent -> {
+                    applyAlterColumnPosition(alterColumnPositionEvent);
                     return null;
                 },
                 createTableEvent -> {
@@ -334,6 +340,43 @@ public class PaimonMetadataApplier implements MetadataApplier {
         } catch (Catalog.TableNotExistException
                 | Catalog.ColumnAlreadyExistException
                 | Catalog.ColumnNotExistException e) {
+            throw new SchemaEvolveException(event, e.getMessage(), e);
+        }
+    }
+
+    private void applyAlterColumnPosition(AlterColumnPositionEvent event)
+            throws SchemaEvolveException {
+        try {
+            List<SchemaChange> tableChangeList = new ArrayList<>();
+            Table table = catalog.getTable(tableIdToIdentifier(event));
+            List<String> columnNames = table.rowType().getFieldNames();
+
+            for (Map.Entry<String, AlterColumnPositionEvent.ColumnPosition> entry :
+                    event.getPositionMapping().entrySet()) {
+                String columnName = entry.getKey();
+                AlterColumnPositionEvent.ColumnPosition position = entry.getValue();
+
+                SchemaChange.Move move;
+                if (position.isFirst()) {
+                    move = SchemaChange.Move.first(columnName);
+                } else if (position.getAfterColumn() != null) {
+                    move = SchemaChange.Move.after(columnName, position.getAfterColumn());
+                } else {
+                    int targetIndex =
+                            Math.min(position.getAbsolutePosition(), columnNames.size() - 1);
+                    if (targetIndex == 0) {
+                        move = SchemaChange.Move.first(columnName);
+                    } else {
+                        move =
+                                SchemaChange.Move.after(
+                                        columnName, columnNames.get(targetIndex - 1));
+                    }
+                }
+                tableChangeList.add(SchemaChange.updateColumnPosition(move));
+            }
+
+            catalog.alterTable(tableIdToIdentifier(event), tableChangeList, true);
+        } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
         }
     }
