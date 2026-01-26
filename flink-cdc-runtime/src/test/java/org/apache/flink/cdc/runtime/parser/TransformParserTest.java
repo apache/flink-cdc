@@ -233,8 +233,7 @@ class TransformParserTest {
         testFilterExpression("WEEK(dt)", "week(dt)");
         testFilterExpression(
                 "DATE_FORMAT(dt,'yyyy-MM-dd')", "dateFormat(dt, \"yyyy-MM-dd\", __time_zone__)");
-        testFilterExpression(
-                "TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\", __time_zone__)");
+        testFilterExpression("TO_DATE(dt, 'yyyy-MM-dd')", "toDate(dt, \"yyyy-MM-dd\")");
         testFilterExpression("TO_TIMESTAMP(dt)", "toTimestamp(dt, __time_zone__)");
         testFilterExpression(
                 "TIMESTAMP_DIFF('SECOND', dt1, dt2)",
@@ -370,7 +369,7 @@ class TransformParserTest {
         testFilterExpression("cast(1 as bigint)", "castToLong(1)");
         testFilterExpression("cast(1 as float)", "castToFloat(1)");
         testFilterExpression("cast(1 as double)", "castToDouble(1)");
-        testFilterExpression("cast(1 as decimal)", "castToDecimalData(1, 10, 0)");
+        testFilterExpression("cast(1 as decimal)", "castToBigDecimal(1, 10, 0)");
         testFilterExpression("cast(1 as char)", "castToString(1)");
         testFilterExpression("cast(1 as varchar)", "castToString(1)");
         testFilterExpression("cast(null as int)", "castToInteger(null)");
@@ -381,7 +380,7 @@ class TransformParserTest {
         testFilterExpression("cast(null as bigint)", "castToLong(null)");
         testFilterExpression("cast(null as float)", "castToFloat(null)");
         testFilterExpression("cast(null as double)", "castToDouble(null)");
-        testFilterExpression("cast(null as decimal)", "castToDecimalData(null, 10, 0)");
+        testFilterExpression("cast(null as decimal)", "castToBigDecimal(null, 10, 0)");
         testFilterExpression("cast(null as char)", "castToString(null)");
         testFilterExpression("cast(null as varchar)", "castToString(null)");
         testFilterExpression(

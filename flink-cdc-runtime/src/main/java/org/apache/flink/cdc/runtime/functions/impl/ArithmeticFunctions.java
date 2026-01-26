@@ -17,13 +17,144 @@
 
 package org.apache.flink.cdc.runtime.functions.impl;
 
-import org.apache.flink.cdc.common.data.DecimalData;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /** Arithmetic built-in functions. */
 public class ArithmeticFunctions {
+
+    // Add operator
+    public static int plus(byte lhs, byte rhs) {
+        return lhs + rhs;
+    }
+
+    public static int plus(short lhs, short rhs) {
+        return lhs + rhs;
+    }
+
+    public static int plus(int lhs, int rhs) {
+        return lhs + rhs;
+    }
+
+    public static long plus(long lhs, long rhs) {
+        return lhs + rhs;
+    }
+
+    public static float plus(float lhs, float rhs) {
+        return lhs + rhs;
+    }
+
+    public static double plus(double lhs, double rhs) {
+        return lhs + rhs;
+    }
+
+    public static BigDecimal plus(BigDecimal lhs, BigDecimal rhs) {
+        return lhs.add(rhs);
+    }
+
+    // Subtract operator
+    public static int minus(byte lhs, byte rhs) {
+        return lhs - rhs;
+    }
+
+    public static int minus(short lhs, short rhs) {
+        return lhs - rhs;
+    }
+
+    public static int minus(int lhs, int rhs) {
+        return lhs - rhs;
+    }
+
+    public static long minus(long lhs, long rhs) {
+        return lhs - rhs;
+    }
+
+    public static float minus(float lhs, float rhs) {
+        return lhs - rhs;
+    }
+
+    public static double minus(double lhs, double rhs) {
+        return lhs - rhs;
+    }
+
+    public static BigDecimal minus(BigDecimal lhs, BigDecimal rhs) {
+        return lhs.subtract(rhs);
+    }
+
+    // Multiply operator
+    public static int times(byte lhs, byte rhs) {
+        return lhs * rhs;
+    }
+
+    public static int times(short lhs, short rhs) {
+        return lhs * rhs;
+    }
+
+    public static int times(int lhs, int rhs) {
+        return lhs * rhs;
+    }
+
+    public static long times(long lhs, long rhs) {
+        return lhs * rhs;
+    }
+
+    public static float times(float lhs, float rhs) {
+        return lhs * rhs;
+    }
+
+    public static double times(double lhs, double rhs) {
+        return lhs * rhs;
+    }
+
+    public static BigDecimal times(BigDecimal lhs, BigDecimal rhs) {
+        return lhs.multiply(rhs);
+    }
+
+    // Divides operator
+    public static int divides(byte lhs, byte rhs) {
+        return lhs / rhs;
+    }
+
+    public static int divides(short lhs, short rhs) {
+        return lhs / rhs;
+    }
+
+    public static int divides(int lhs, int rhs) {
+        return lhs / rhs;
+    }
+
+    public static long divides(long lhs, long rhs) {
+        return lhs / rhs;
+    }
+
+    public static float divides(float lhs, float rhs) {
+        return lhs / rhs;
+    }
+
+    public static double divides(double lhs, double rhs) {
+        return lhs / rhs;
+    }
+
+    public static BigDecimal divides(BigDecimal lhs, BigDecimal rhs) {
+        return lhs.divide(rhs, RoundingMode.DOWN);
+    }
+
+    // Mods operator
+    public static int mods(byte lhs, byte rhs) {
+        return lhs % rhs;
+    }
+
+    public static int mods(short lhs, short rhs) {
+        return lhs % rhs;
+    }
+
+    public static int mods(int lhs, int rhs) {
+        return lhs % rhs;
+    }
+
+    public static int mods(long lhs, long rhs) {
+        return (int) (lhs % rhs);
+    }
 
     /** SQL <code>ABS</code> operator applied to byte values. */
     public static Byte abs(Byte value) {
@@ -74,14 +205,11 @@ public class ArithmeticFunctions {
     }
 
     /** SQL <code>ABS</code> operator applied to decimal values. */
-    public static DecimalData abs(DecimalData value) {
+    public static BigDecimal abs(BigDecimal value) {
         if (value == null) {
             return null;
         }
-        return DecimalData.fromBigDecimal(
-                BigDecimal.valueOf(Math.abs(value.toBigDecimal().doubleValue())),
-                value.precision(),
-                value.scale());
+        return value.abs();
     }
 
     public static Byte floor(Byte value) {
@@ -114,14 +242,11 @@ public class ArithmeticFunctions {
         return (float) Math.floor(value);
     }
 
-    public static DecimalData floor(DecimalData value) {
+    public static BigDecimal floor(BigDecimal value) {
         if (value == null) {
             return null;
         }
-        return DecimalData.fromBigDecimal(
-                BigDecimal.valueOf(Math.floor(value.toBigDecimal().doubleValue())),
-                value.precision(),
-                0);
+        return value.setScale(0, RoundingMode.FLOOR);
     }
 
     public static Byte ceil(Byte value) {
@@ -154,14 +279,11 @@ public class ArithmeticFunctions {
         return (float) Math.ceil(value);
     }
 
-    public static DecimalData ceil(DecimalData value) {
+    public static BigDecimal ceil(BigDecimal value) {
         if (value == null) {
             return null;
         }
-        return DecimalData.fromBigDecimal(
-                BigDecimal.valueOf(Math.ceil(value.toBigDecimal().doubleValue())),
-                value.precision(),
-                0);
+        return value.setScale(0, RoundingMode.CEILING);
     }
 
     // SQL ROUND
@@ -197,20 +319,6 @@ public class ArithmeticFunctions {
         return round(BigDecimal.valueOf(value), pointOffset).longValue();
     }
 
-    /** SQL <code>ROUND</code> operator applied to DecimalData values. */
-    public static DecimalData round(DecimalData value, int pointOffset) {
-        if (value == null) {
-            return null;
-        }
-        return DecimalData.fromBigDecimal(
-                value.toBigDecimal()
-                        .movePointRight(pointOffset)
-                        .setScale(0, RoundingMode.HALF_UP)
-                        .movePointLeft(pointOffset),
-                value.precision(),
-                pointOffset);
-    }
-
     /** SQL <code>ROUND</code> operator applied to float values. */
     public static Float round(Float value, int pointOffset) {
         if (value == null) {
@@ -227,12 +335,10 @@ public class ArithmeticFunctions {
         return round(BigDecimal.valueOf(value), pointOffset).doubleValue();
     }
 
-    private static BigDecimal round(BigDecimal value, int pointOffset) {
+    public static BigDecimal round(BigDecimal value, int pointOffset) {
         if (value == null) {
             return null;
         }
-        return value.movePointRight(pointOffset)
-                .setScale(0, RoundingMode.HALF_UP)
-                .movePointLeft(pointOffset);
+        return value.setScale(pointOffset, RoundingMode.HALF_UP);
     }
 }

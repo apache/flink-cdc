@@ -17,17 +17,16 @@
 
 package org.apache.flink.cdc.common.utils;
 
-import org.apache.flink.cdc.common.data.DateData;
-import org.apache.flink.cdc.common.data.TimeData;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
@@ -64,6 +63,9 @@ public class DateTimeUtils {
     private static final ThreadLocalCache<String, SimpleDateFormat> FORMATTER_CACHE =
             ThreadLocalCache.of(SimpleDateFormat::new);
 
+    private static final ThreadLocalCache<String, DateTimeFormatter> DATE_TIME_FORMATTER_CACHE =
+            ThreadLocalCache.of(DateTimeFormatter::ofPattern);
+
     // --------------------------------------------------------------------------------------------
     // TIMESTAMP to  DATE/TIME utils
     // --------------------------------------------------------------------------------------------
@@ -74,12 +76,12 @@ public class DateTimeUtils {
      * @param ts the timestamp in milliseconds.
      * @return the date in days.
      */
-    public static DateData timestampMillisToDate(long ts) {
+    public static LocalDate timestampMillisToDate(long ts) {
         long days = ts / MILLIS_PER_DAY;
         if (days < 0) {
             days = days - 1;
         }
-        return DateData.fromEpochDay((int) days);
+        return LocalDate.ofEpochDay(days);
     }
 
     /**
@@ -88,30 +90,19 @@ public class DateTimeUtils {
      * @param ts the timestamp in milliseconds.
      * @return the time in milliseconds.
      */
-    public static TimeData timestampMillisToTime(long ts) {
-        return TimeData.fromMillisOfDay((int) (ts % MILLIS_PER_DAY));
+    public static LocalTime timestampMillisToTime(long ts) {
+        return LocalTime.ofNanoOfDay(ts * 1_000_000);
     }
 
     // --------------------------------------------------------------------------------------------
     // Parsing functions
     // --------------------------------------------------------------------------------------------
-    /** Returns the epoch days since 1970-01-01. */
-    public static int parseDate(String dateStr, String fromFormat) {
-        // It is OK to use UTC, we just want get the epoch days
-        // TODO  use offset, better performance
-        long ts = internalParseTimestampMillis(dateStr, fromFormat, TimeZone.getTimeZone("UTC"));
-        ZoneId zoneId = ZoneId.of("UTC");
-        Instant instant = Instant.ofEpochMilli(ts);
-        ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, zoneId);
-        return ymdToUnixDate(zdt.getYear(), zdt.getMonthValue(), zdt.getDayOfMonth());
-    }
-
-    public static DateData parseDate(String dateStr, String fromFormat, String timezone) {
-        long ts = internalParseTimestampMillis(dateStr, fromFormat, TimeZone.getTimeZone(timezone));
-        ZoneId zoneId = ZoneId.of(timezone);
-        Instant instant = Instant.ofEpochMilli(ts);
-        ZonedDateTime zdt = ZonedDateTime.ofInstant(instant, zoneId);
-        return DateData.fromLocalDate(zdt.toLocalDate());
+    public static LocalDate parseDate(String dateStr, String fromFormat) {
+        try {
+            return LocalDate.parse(dateStr, DateTimeFormatter.ofPattern(fromFormat));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private static long internalParseTimestampMillis(String dateStr, String format, TimeZone tz) {
@@ -122,9 +113,9 @@ public class DateTimeUtils {
             return date.getTime();
         } catch (ParseException e) {
             LOG.error(
-                    String.format(
-                            "Exception when parsing datetime string '%s' in format '%s', the default value Long.MIN_VALUE(-9223372036854775808) will be returned.",
-                            dateStr, format),
+                    "Exception when parsing datetime string '{}' in format '{}', the default value Long.MIN_VALUE(-9223372036854775808) will be returned.",
+                    dateStr,
+                    format,
                     e);
             return Long.MIN_VALUE;
         }
@@ -196,11 +187,15 @@ public class DateTimeUtils {
     // Format
     // --------------------------------------------------------------------------------------------
 
-    public static String formatTimestampMillis(long ts, String format, TimeZone timeZone) {
+    public static String formatInstant(Instant ts, String format, TimeZone timeZone) {
         SimpleDateFormat formatter = FORMATTER_CACHE.get(format);
         formatter.setTimeZone(timeZone);
-        Date dateTime = new Date(ts);
+        Date dateTime = Date.from(ts);
         return formatter.format(dateTime);
+    }
+
+    public static String formatLocalDateTime(LocalDateTime ts, String format) {
+        return ts.format(DATE_TIME_FORMATTER_CACHE.get(format));
     }
 
     // --------------------------------------------------------------------------------------------
@@ -209,14 +204,14 @@ public class DateTimeUtils {
 
     public static Integer timestampDiff(
             String timeIntervalUnit,
-            long fromDate,
+            Instant fromTimestamp,
             String fromTimezone,
-            long toDate,
+            Instant toTimestamp,
             String toTimezone) {
         Calendar from = Calendar.getInstance(TimeZone.getTimeZone(fromTimezone));
-        from.setTime(new Date(fromDate));
+        from.setTime(Date.from(fromTimestamp));
         Calendar to = Calendar.getInstance(TimeZone.getTimeZone(toTimezone));
-        to.setTime(new Date(toDate));
+        to.setTime(Date.from(toTimestamp));
         long second = (to.getTimeInMillis() - from.getTimeInMillis()) / 1000;
         switch (timeIntervalUnit) {
             case "SECOND":
@@ -257,11 +252,11 @@ public class DateTimeUtils {
     // Add
     // --------------------------------------------------------------------------------------------
 
-    public static long timestampAdd(
-            String timeIntervalUnit, int interval, long timePoint, String timezone) {
+    public static Instant timestampAdd(
+            String timeIntervalUnit, int interval, Instant timePoint, String timezone) {
         Calendar calendar = Calendar.getInstance();
         calendar.setTimeZone(TimeZone.getTimeZone(timezone));
-        calendar.setTime(new Date(timePoint));
+        calendar.setTime(Date.from(timePoint));
         int field;
         switch (timeIntervalUnit) {
             case "SECOND":
@@ -289,6 +284,6 @@ public class DateTimeUtils {
                                 timeIntervalUnit));
         }
         calendar.add(field, interval);
-        return calendar.getTimeInMillis();
+        return calendar.toInstant();
     }
 }

@@ -17,8 +17,6 @@
 
 package org.apache.flink.cdc.runtime.functions.impl;
 
-import org.apache.flink.cdc.common.data.DecimalData;
-
 import java.math.BigDecimal;
 import java.util.Arrays;
 
@@ -123,14 +121,6 @@ public class ComparisonFunctions {
         return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
-    public static boolean betweenAsymmetric(
-            DecimalData value, DecimalData minValue, DecimalData maxValue) {
-        if (value == null) {
-            return false;
-        }
-        return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
-    }
-
     public static boolean notBetweenAsymmetric(String value, String minValue, String maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
@@ -157,11 +147,6 @@ public class ComparisonFunctions {
 
     public static boolean notBetweenAsymmetric(
             BigDecimal value, BigDecimal minValue, BigDecimal maxValue) {
-        return !betweenAsymmetric(value, minValue, maxValue);
-    }
-
-    public static boolean notBetweenAsymmetric(
-            DecimalData value, DecimalData minValue, DecimalData maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
@@ -193,10 +178,6 @@ public class ComparisonFunctions {
         return Arrays.stream(values).anyMatch(item -> value.equals(item));
     }
 
-    public static boolean in(DecimalData value, DecimalData... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
-    }
-
     public static boolean notIn(String value, String... values) {
         return !in(value, values);
     }
@@ -222,10 +203,6 @@ public class ComparisonFunctions {
     }
 
     public static boolean notIn(BigDecimal value, BigDecimal... values) {
-        return !in(value, values);
-    }
-
-    public static boolean notIn(DecimalData value, DecimalData... values) {
         return !in(value, values);
     }
 }

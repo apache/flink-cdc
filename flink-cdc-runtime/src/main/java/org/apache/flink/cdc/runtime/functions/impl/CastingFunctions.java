@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.runtime.functions.impl;
 
-import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
@@ -25,8 +24,12 @@ import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 
 /** Casting built-in functions. */
 public class CastingFunctions {
@@ -34,6 +37,15 @@ public class CastingFunctions {
     public static String castToString(Object object) {
         if (object == null) {
             return null;
+        }
+        if (object instanceof LocalDateTime) {
+            return TimestampData.fromLocalDateTime((LocalDateTime) object).toString();
+        }
+        if (object instanceof ZonedDateTime) {
+            return ZonedTimestampData.fromZonedDateTime((ZonedDateTime) object).toString();
+        }
+        if (object instanceof Instant) {
+            return LocalZonedTimestampData.fromInstant((Instant) object).toString();
         }
         return object.toString();
     }
@@ -57,8 +69,6 @@ public class CastingFunctions {
             return !object.equals(0d);
         } else if (object instanceof BigDecimal) {
             return ((BigDecimal) object).compareTo(BigDecimal.ZERO) != 0;
-        } else if (object instanceof DecimalData) {
-            return ((DecimalData) object).compareTo(DecimalData.zero(1, 0)) != 0;
         }
         return Boolean.valueOf(castToString(object));
     }
@@ -72,9 +82,6 @@ public class CastingFunctions {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).byteValue();
-        }
-        if (object instanceof DecimalData) {
-            return ((DecimalData) object).toBigDecimal().byteValue();
         }
         if (object instanceof Double) {
             return ((Double) object).byteValue();
@@ -106,9 +113,6 @@ public class CastingFunctions {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).shortValue();
         }
-        if (object instanceof DecimalData) {
-            return ((DecimalData) object).toBigDecimal().shortValue();
-        }
         if (object instanceof Double) {
             return ((Double) object).shortValue();
         }
@@ -138,9 +142,6 @@ public class CastingFunctions {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).intValue();
-        }
-        if (object instanceof DecimalData) {
-            return ((DecimalData) object).toBigDecimal().intValue();
         }
         if (object instanceof Double) {
             return ((Double) object).intValue();
@@ -172,9 +173,6 @@ public class CastingFunctions {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).longValue();
         }
-        if (object instanceof DecimalData) {
-            return ((DecimalData) object).toBigDecimal().longValue();
-        }
         if (object instanceof Double) {
             return ((Double) object).longValue();
         }
@@ -205,9 +203,6 @@ public class CastingFunctions {
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).floatValue();
         }
-        if (object instanceof DecimalData) {
-            return ((DecimalData) object).toBigDecimal().floatValue();
-        }
         if (object instanceof Double) {
             return ((Double) object).floatValue();
         }
@@ -230,9 +225,6 @@ public class CastingFunctions {
         }
         if (object instanceof BigDecimal) {
             return ((BigDecimal) object).doubleValue();
-        }
-        if (object instanceof DecimalData) {
-            return ((DecimalData) object).toBigDecimal().doubleValue();
         }
         if (object instanceof Double) {
             return (Double) object;
@@ -271,46 +263,48 @@ public class CastingFunctions {
         return bigDecimal;
     }
 
-    public static DecimalData castToDecimalData(Object object, int precision, int scale) {
+    public static LocalDateTime castToTimestamp(Object object, String timezone) {
+        ZoneId zoneId = ZoneId.of(timezone);
         if (object == null) {
             return null;
         }
-        if (object instanceof Boolean) {
-            object = (Boolean) object ? 1 : 0;
+
+        if (object instanceof LocalDateTime) {
+            return (LocalDateTime) object;
         }
 
-        BigDecimal bigDecimal;
+        if (object instanceof Instant) {
+            return LocalDateTime.ofInstant((Instant) object, zoneId);
+        }
+
+        if (object instanceof ZonedDateTime) {
+            return ((ZonedDateTime) object).withZoneSameInstant(zoneId).toLocalDateTime();
+        }
+
+        String stringRep = castObjectIntoString(object);
+
         try {
-            bigDecimal = new BigDecimal(castObjectIntoString(object), new MathContext(precision));
-            bigDecimal = bigDecimal.setScale(scale, RoundingMode.HALF_UP);
-        } catch (NumberFormatException ignored) {
-            return null;
+            return LocalDate.parse(stringRep).atStartOfDay();
+        } catch (DateTimeParseException ignored) {
         }
 
-        // If the precision overflows, null will be returned. Otherwise, we may accidentally emit a
-        // non-serializable object into the pipeline that breaks downstream.
-        if (bigDecimal.precision() > precision) {
-            return null;
+        try {
+            return LocalDateTime.parse(stringRep);
+        } catch (DateTimeParseException ignored) {
         }
-        return DecimalData.fromBigDecimal(bigDecimal, precision, scale);
-    }
 
-    public static TimestampData castToTimestamp(Object object, String timezone) {
-        if (object == null) {
-            return null;
+        try {
+            return LocalDateTime.ofInstant(Instant.parse(stringRep), zoneId);
+        } catch (DateTimeParseException ignored) {
         }
-        if (object instanceof LocalZonedTimestampData) {
-            return TimestampData.fromLocalDateTime(
-                    LocalDateTime.ofInstant(
-                            ((LocalZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
-        } else if (object instanceof ZonedTimestampData) {
-            return TimestampData.fromLocalDateTime(
-                    LocalDateTime.ofInstant(
-                            ((ZonedTimestampData) object).toInstant(), ZoneId.of(timezone)));
-        } else {
-            return TimestampData.fromLocalDateTime(
-                    LocalDateTime.parse(castObjectIntoString(object)));
+
+        try {
+            return ZonedDateTime.parse(stringRep).toLocalDateTime();
+        } catch (DateTimeParseException ignored) {
         }
+
+        throw new IllegalArgumentException(
+                "Unable to parse given string as timestamp: " + stringRep);
     }
 
     private static String castObjectIntoString(Object object) {

@@ -20,11 +20,11 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
 import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
@@ -106,8 +106,7 @@ public class PreTransformChangeInfo {
         List<RecordData.FieldGetter> sourceFieldGetters =
                 SchemaUtils.createFieldGetters(sourceSchema.getColumns());
         BinaryRecordDataGenerator preTransformedDataGenerator =
-                new BinaryRecordDataGenerator(
-                        DataTypeConverter.toRowType(preTransformedSchema.getColumns()));
+                new BinaryRecordDataGenerator((RowType) preTransformedSchema.toRowDataType());
         return new PreTransformChangeInfo(
                 tableId,
                 sourceSchema,

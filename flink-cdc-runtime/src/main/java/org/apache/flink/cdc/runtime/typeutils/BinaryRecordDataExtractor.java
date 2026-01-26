@@ -79,6 +79,11 @@ public class BinaryRecordDataExtractor {
                     "Malformed MapData: keyArray size (%d) differs from valueArray (%d)",
                     keyArray.size(),
                     valueArray.size());
+
+            if (keyArray.isEmpty()) {
+                return "{}";
+            }
+
             StringBuilder sb = new StringBuilder("{");
             for (int i = 0; i < keyArray.size(); i++) {
                 sb.append(keyArray.get(i)).append(" -> ").append(valueArray.get(i)).append(", ");
@@ -96,7 +101,9 @@ public class BinaryRecordDataExtractor {
                     ArrayData.createElementGetter(arrayType.getElementType());
             List<Object> results = new ArrayList<>();
             for (int i = 0; i < arrayData.size(); i++) {
-                results.add(getter.getElementOrNull(arrayData, i));
+                results.add(
+                        extractRecord(
+                                getter.getElementOrNull(arrayData, i), arrayType.getElementType()));
             }
             return results;
         } else if (dataType instanceof RowType) {
