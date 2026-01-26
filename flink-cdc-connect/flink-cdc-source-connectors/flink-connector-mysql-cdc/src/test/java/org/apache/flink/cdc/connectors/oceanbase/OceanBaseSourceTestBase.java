@@ -121,7 +121,7 @@ public abstract class OceanBaseSourceTestBase extends AbstractTestBase {
     protected static void initializeOceanBaseTables(
             String ddlName, String dbName, Function<String, Boolean> filter)
             throws InterruptedException {
-        final String ddlFile = String.format("ddl/mysql/%s.sql", ddlName);
+        final String ddlFile = String.format("ddl/%s.sql", ddlName);
         final URL ddlTestFile = OceanBaseSourceTestBase.class.getClassLoader().getResource(ddlFile);
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         // need to sleep 1s, make sure the jdbc connection can be created

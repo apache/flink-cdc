@@ -34,6 +34,7 @@ import io.debezium.jdbc.JdbcConnection;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,6 +61,8 @@ import static org.apache.flink.api.common.JobStatus.RUNNING;
 
 /** failover IT tests for oceanbase. */
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
+@Disabled(
+        "The current version of the Oceanbase binlog service causes failover test cases to fail. Disable the test and wait for the binlog version to be updated.")
 public class OceanBaseFailoverITCase extends OceanBaseSourceTestBase {
 
     private static final String DEFAULT_SCAN_STARTUP_MODE = "initial";
