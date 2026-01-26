@@ -55,6 +55,8 @@ sink:
 pipeline:
   name: MySQL to Kafka Pipeline
   parallelism: 2
+  flink-conf:
+    execution.checkpointing.interval: 2min
 ```
 
 Pipeline Connector Options

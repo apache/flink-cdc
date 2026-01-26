@@ -57,6 +57,8 @@ sink:
 pipeline:
   name: MySQL to OceanBase Pipeline
   parallelism: 1
+  flink-conf:
+    execution.checkpointing.interval: 2min
 ```
 
 ## 连接器配置项

@@ -36,8 +36,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Map;
 
+import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTING_TIMEOUT;
 import static org.apache.flink.configuration.StateRecoveryOptions.RESTORE_MODE;
 import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
 import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_PATH;
@@ -109,6 +111,22 @@ class CliFrontendTest {
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
         assertThat(executor.getFlinkConfig().get(RESTORE_MODE)).isEqualTo(RestoreMode.NO_CLAIM);
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
+    }
+
+    @Test
+    void testFlinkConfigurationWithPriority() throws Exception {
+        CliExecutor executor =
+                createExecutor(
+                        pipelineDef(),
+                        "--flink-home",
+                        flinkHome(),
+                        "-D",
+                        "execution.checkpointing.timeout=11min");
+        assertThat(executor.getFlinkConfig().get(CHECKPOINTING_TIMEOUT))
+                .as(
+                        "execution.checkpointing.timeout config priority test: "
+                                + "flink-home(config.yml): 10min(default) < command-line: 11min < pipeline.yml: 12min")
+                .isEqualTo(Duration.ofMinutes(12));
     }
 
     @Test

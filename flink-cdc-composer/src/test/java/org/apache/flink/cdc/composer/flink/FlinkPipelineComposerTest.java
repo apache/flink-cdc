@@ -36,6 +36,8 @@ import org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSource;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.configuration.DeploymentOptions;
+import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 
@@ -45,11 +47,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.apache.flink.configuration.CheckpointingOptions.CHECKPOINTING_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -222,5 +228,23 @@ class FlinkPipelineComposerTest {
                 Collections.emptyList(),
                 Collections.emptyList(),
                 pipelineConfig);
+    }
+
+    @Test
+    void testOfMiniCluster() {
+        org.apache.flink.configuration.Configuration flinkConfig =
+                new org.apache.flink.configuration.Configuration();
+        flinkConfig.set(CHECKPOINTING_INTERVAL, Duration.ofSeconds(30));
+        List<Path> additionalJars = new ArrayList<>();
+        additionalJars.add(new Path("/path/to/additionalJars.jar"));
+        FlinkPipelineComposer flinkPipelineComposer =
+                FlinkPipelineComposer.ofMiniCluster(flinkConfig, additionalJars);
+        ReadableConfig configuration = flinkPipelineComposer.getEnv().getConfiguration();
+
+        Assertions.assertThat(configuration.get(CHECKPOINTING_INTERVAL))
+                .isEqualTo(Duration.ofSeconds(30));
+        Assertions.assertThat(
+                        configuration.get(org.apache.flink.configuration.PipelineOptions.JARS))
+                .contains("file:/path/to/additionalJars.jar");
     }
 }
