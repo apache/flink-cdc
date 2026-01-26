@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.event.visitor;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.AlterTableCommentEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
@@ -38,7 +39,8 @@ public class SchemaChangeEventVisitor {
             DropColumnEventVisitor<T, E> dropColumnEventVisitor,
             DropTableEventVisitor<T, E> dropTableEventVisitor,
             RenameColumnEventVisitor<T, E> renameColumnEventVisitor,
-            TruncateTableEventVisitor<T, E> truncateTableEventVisitor)
+            TruncateTableEventVisitor<T, E> truncateTableEventVisitor,
+            AlterTableCommentEventVisitor<T, E> alterTableCommentEventVisitor)
             throws E {
         if (event instanceof AddColumnEvent) {
             if (addColumnVisitor == null) {
@@ -75,6 +77,11 @@ public class SchemaChangeEventVisitor {
                 return null;
             }
             return truncateTableEventVisitor.visit((TruncateTableEvent) event);
+        } else if (event instanceof AlterTableCommentEvent) {
+            if (alterTableCommentEventVisitor == null) {
+                return null;
+            }
+            return alterTableCommentEventVisitor.visit((AlterTableCommentEvent) event);
         } else {
             throw new IllegalArgumentException(
                     "Unknown schema change event type " + event.getType());

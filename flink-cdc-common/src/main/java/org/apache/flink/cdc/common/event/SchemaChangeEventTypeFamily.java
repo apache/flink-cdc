@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_TABLE_COMMENT;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
@@ -44,7 +45,9 @@ public class SchemaChangeEventTypeFamily {
 
     public static final SchemaChangeEventType[] RENAME = {RENAME_COLUMN};
 
-    public static final SchemaChangeEventType[] TABLE = {CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE};
+    public static final SchemaChangeEventType[] TABLE = {
+        CREATE_TABLE, DROP_TABLE, TRUNCATE_TABLE, ALTER_TABLE_COMMENT
+    };
 
     public static final SchemaChangeEventType[] COLUMN = {
         ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN
@@ -57,7 +60,8 @@ public class SchemaChangeEventTypeFamily {
         DROP_COLUMN,
         DROP_TABLE,
         RENAME_COLUMN,
-        TRUNCATE_TABLE
+        TRUNCATE_TABLE,
+        ALTER_TABLE_COMMENT
     };
 
     public static final SchemaChangeEventType[] NONE = {};
