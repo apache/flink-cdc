@@ -51,7 +51,7 @@ Flink CDC is maintained, improved, and extended by code contributions of volunte
 
 Please feel free to ask questions at any time. Either send a mail to the Dev mailing list or comment on the issue you are working on.
 
-Flink CDC use jdk11 as the baseline version. Please make sure your development environment is set up correctly.
+Flink CDC uses JDK 11 as the baseline version. Please make sure your development environment is set up correctly.
 
 If you would like to contribute to Flink CDC, you could raise it as follows.
 
