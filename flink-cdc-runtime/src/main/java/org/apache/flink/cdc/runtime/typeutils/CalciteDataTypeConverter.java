@@ -287,6 +287,8 @@ public class CalciteDataTypeConverter {
                 RelDataType valueType =
                         convertCalciteType(typeFactory, ((MapType) dataType).getValueType());
                 return typeFactory.createMapType(keyType, valueType);
+            case VARIANT:
+                return typeFactory.createSqlType(SqlTypeName.VARIANT);
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + dataType);
         }
@@ -334,9 +336,9 @@ public class CalciteDataTypeConverter {
                 return DataTypes.MAP(
                         convertCalciteRelDataTypeToDataType(keyType),
                         convertCalciteRelDataTypeToDataType(valueType));
-            case ROW:
             case VARIANT:
                 return DataTypes.VARIANT();
+            case ROW:
             default:
                 throw new UnsupportedOperationException(
                         "Unsupported type: " + relDataType.getSqlTypeName());

@@ -91,7 +91,7 @@ public class DateTimeUtils {
      * @return the time in milliseconds.
      */
     public static LocalTime timestampMillisToTime(long ts) {
-        return LocalTime.ofNanoOfDay(ts * 1_000_000);
+        return LocalTime.ofNanoOfDay((ts % MILLIS_PER_DAY) * 1_000_000);
     }
 
     // --------------------------------------------------------------------------------------------
