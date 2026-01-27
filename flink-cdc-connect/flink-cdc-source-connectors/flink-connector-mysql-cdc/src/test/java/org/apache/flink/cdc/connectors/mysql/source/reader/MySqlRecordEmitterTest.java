@@ -111,7 +111,7 @@ class MySqlRecordEmitterTest {
                         UnregisteredMetricGroups.createUnregisteredOperatorMetricGroup()),
                 false,
                 false,
-        false);
+                false);
     }
 
     @Test

@@ -23,6 +23,8 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import io.debezium.config.CommonConnectorConfig;
+
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -376,7 +378,8 @@ public class MySqlSourceConfigFactory implements Serializable {
         props.setProperty("include.schema.changes", String.valueOf(true));
         // enable transaction metadata if includeTransactionMetadataEvents is true
         props.setProperty(
-                "provide.transaction.metadata", String.valueOf(includeTransactionMetadataEvents));
+                CommonConnectorConfig.PROVIDE_TRANSACTION_METADATA.name(),
+                String.valueOf(includeTransactionMetadataEvents));
         // disable the offset flush totally
         props.setProperty("offset.flush.interval.ms", String.valueOf(Long.MAX_VALUE));
         // disable tombstones
