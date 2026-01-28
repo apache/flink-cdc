@@ -48,6 +48,8 @@ Flink CDC 项目通过众多贡献者的代码贡献来维护，改进和拓展�
 
 在 Flink CDC 社区可以自由的在任何时间提出自己的问题，通过社区 Dev 邮件列表进行交流或在任何感兴趣的 issue 下评论和讨论。
 
+Flink CDC 使用 JDK 11 作为基础版本，请确保您的开发环境已经正确配置。
+
 如果您想要为 Flink CDC 贡献代码，可以通过如下的方式。
 
 1. 首先在 [Flink jira](https://issues.apache.org/jira/projects/FLINK/issues) 的想要负责的 issue
