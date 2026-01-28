@@ -40,6 +40,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     private final int lsnCommitCheckpointsDelay;
     private final boolean includePartitionedTables;
     private final boolean includeDatabaseInTableId;
+    private final String ddlLogTable;
+    private final String ddlFieldObjectType;
+    private final String ddlFieldObjectIdentity;
+    private final String ddlFieldCommandText;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -71,7 +75,11 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean includePartitionedTables,
-            boolean includeDatabaseInTableId) {
+            boolean includeDatabaseInTableId,
+            String ddlLogTable,
+            String ddlFieldObjectType,
+            String ddlFieldObjectIdentity,
+            String ddlFieldCommandText) {
         super(
                 startupOptions,
                 databaseList,
@@ -103,6 +111,10 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
+        this.ddlLogTable = ddlLogTable;
+        this.ddlFieldObjectType = ddlFieldObjectType;
+        this.ddlFieldObjectIdentity = ddlFieldObjectIdentity;
+        this.ddlFieldCommandText = ddlFieldCommandText;
     }
 
     /**
@@ -145,6 +157,22 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     public String getJdbcUrl() {
         return String.format(
                 "jdbc:postgresql://%s:%d/%s", getHostname(), getPort(), getDatabaseList().get(0));
+    }
+
+    public String getDdlLogTable() {
+        return ddlLogTable;
+    }
+
+    public String getDdlFieldObjectType() {
+        return ddlFieldObjectType;
+    }
+
+    public String getDdlFieldObjectIdentity() {
+        return ddlFieldObjectIdentity;
+    }
+
+    public String getDdlFieldCommandText() {
+        return ddlFieldCommandText;
     }
 
     @Override

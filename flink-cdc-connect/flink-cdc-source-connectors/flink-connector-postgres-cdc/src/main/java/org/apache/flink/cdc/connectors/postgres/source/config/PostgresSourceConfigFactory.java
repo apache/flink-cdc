@@ -57,6 +57,14 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     private boolean includeDatabaseInTableId =
             PostgresSourceOptions.TABLE_ID_INCLUDE_DATABASE.defaultValue();
 
+    private String ddlLogTable;
+
+    private String ddlFieldObjectType;
+
+    private String ddlFieldObjectIdentity;
+
+    private String ddlFieldCommandText;
+
     /** Creates a new {@link PostgresSourceConfig} for the given subtask {@code subtaskId}. */
     @Override
     public PostgresSourceConfig create(int subtaskId) {
@@ -140,7 +148,11 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
                 lsnCommitCheckpointsDelay,
                 assignUnboundedChunkFirst,
                 includePartitionedTables,
-                includeDatabaseInTableId);
+                includeDatabaseInTableId,
+                ddlLogTable,
+                ddlFieldObjectType,
+                ddlFieldObjectIdentity,
+                ddlFieldCommandText);
     }
 
     /**
@@ -163,6 +175,22 @@ public class PostgresSourceConfigFactory extends JdbcSourceConfigFactory {
     /** The name of the PostgreSQL database from which to stream the changes. */
     public void database(String database) {
         this.database = database;
+    }
+
+    public void ddlLogTable(String ddlLogTable) {
+        this.ddlLogTable = ddlLogTable;
+    }
+
+    public void setDdlFieldObjectType(String ddlFieldObjectType) {
+        this.ddlFieldObjectType = ddlFieldObjectType;
+    }
+
+    public void setDdlFieldObjectIdentity(String ddlFieldObjectIdentity) {
+        this.ddlFieldObjectIdentity = ddlFieldObjectIdentity;
+    }
+
+    public void setDdlFieldCommandText(String ddlFieldCommandText) {
+        this.ddlFieldCommandText = ddlFieldCommandText;
     }
 
     /**

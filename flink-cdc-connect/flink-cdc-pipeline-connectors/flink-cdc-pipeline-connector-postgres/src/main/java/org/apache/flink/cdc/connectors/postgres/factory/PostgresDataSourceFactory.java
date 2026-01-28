@@ -60,6 +60,10 @@ import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CONNECTION_POOL_SIZE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CONNECT_MAX_RETRIES;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.CONNECT_TIMEOUT;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DDL_FIELD_COMMAND_TEXT;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DDL_FIELD_OBJECT_IDENTITY;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DDL_FIELD_OBJECT_TYPE;
+import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DDL_LOG_TABLE;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.DECODING_PLUGIN_NAME;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.HEARTBEAT_INTERVAL;
 import static org.apache.flink.cdc.connectors.postgres.source.PostgresDataSourceOptions.HOSTNAME;
@@ -109,6 +113,10 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         String password = config.get(PASSWORD);
         String chunkKeyColumn = config.get(SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN);
         String tables = config.get(TABLES);
+        String ddlLogTable = config.get(DDL_LOG_TABLE);
+        String ddlFieldObjectType = config.get(DDL_FIELD_OBJECT_TYPE);
+        String ddlFieldObjectIdentity = config.get(DDL_FIELD_OBJECT_IDENTITY);
+        String ddlFieldCommandText = config.get(DDL_FIELD_COMMAND_TEXT);
         ZoneId serverTimeZone = getServerTimeZone(config);
         String tablesExclude = config.get(TABLES_EXCLUDE);
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
@@ -150,6 +158,10 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
                         .database(databaseName.get())
                         .schemaList(".*")
                         .tableList(".*")
+                        .ddlLogTable(ddlLogTable)
+                        .ddlFieldObjectType(ddlFieldObjectType)
+                        .ddlFieldObjectIdentity(ddlFieldObjectIdentity)
+                        .ddlFieldCommandText(ddlFieldCommandText)
                         .username(username)
                         .password(password)
                         .decodingPluginName(pluginName)
@@ -262,6 +274,10 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
         options.add(METADATA_LIST);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
         options.add(TABLE_ID_INCLUDE_DATABASE);
+        options.add(DDL_LOG_TABLE);
+        options.add(DDL_FIELD_OBJECT_IDENTITY);
+        options.add(DDL_FIELD_OBJECT_TYPE);
+        options.add(DDL_FIELD_COMMAND_TEXT);
         return options;
     }
 

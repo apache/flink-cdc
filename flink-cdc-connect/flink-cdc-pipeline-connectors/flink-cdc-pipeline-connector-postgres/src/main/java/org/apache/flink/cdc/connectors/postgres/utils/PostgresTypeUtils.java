@@ -178,24 +178,26 @@ public class PostgresTypeUtils {
             case PgOid.DATE_ARRAY:
                 return DataTypes.ARRAY(handleDateWithTemporalMode(temporalPrecisionMode));
             default:
-                if (nativeType == typeRegistry.ltreeOid()) {
-                    return DataTypes.STRING();
-                } else if (nativeType == typeRegistry.geometryOid()) {
-                    return DataTypes.STRING();
-                } else if (nativeType == typeRegistry.geographyOid()) {
-                    return DataTypes.STRING();
-                } else if (nativeType == typeRegistry.citextOid()) {
-                    return DataTypes.STRING();
-                } else if (nativeType == typeRegistry.hstoreOid()) {
-                    return handleHstoreWithHstoreMode(hStoreHandlingMode);
-                } else if (nativeType == typeRegistry.ltreeArrayOid()) {
-                    return DataTypes.ARRAY(DataTypes.STRING());
-                } else if (nativeType == typeRegistry.geometryArrayOid()) {
-                    return DataTypes.ARRAY(DataTypes.STRING());
-                }
-                final PostgresType resolvedType = typeRegistry.get(nativeType);
-                if (resolvedType.isEnumType()) {
-                    return DataTypes.STRING();
+                if (typeRegistry != null) {
+                    if (nativeType == typeRegistry.ltreeOid()) {
+                        return DataTypes.STRING();
+                    } else if (nativeType == typeRegistry.geometryOid()) {
+                        return DataTypes.STRING();
+                    } else if (nativeType == typeRegistry.geographyOid()) {
+                        return DataTypes.STRING();
+                    } else if (nativeType == typeRegistry.citextOid()) {
+                        return DataTypes.STRING();
+                    } else if (nativeType == typeRegistry.hstoreOid()) {
+                        return handleHstoreWithHstoreMode(hStoreHandlingMode);
+                    } else if (nativeType == typeRegistry.ltreeArrayOid()) {
+                        return DataTypes.ARRAY(DataTypes.STRING());
+                    } else if (nativeType == typeRegistry.geometryArrayOid()) {
+                        return DataTypes.ARRAY(DataTypes.STRING());
+                    }
+                    final PostgresType resolvedType = typeRegistry.get(nativeType);
+                    if (resolvedType.isEnumType()) {
+                        return DataTypes.STRING();
+                    }
                 }
                 throw new UnsupportedOperationException(
                         String.format(

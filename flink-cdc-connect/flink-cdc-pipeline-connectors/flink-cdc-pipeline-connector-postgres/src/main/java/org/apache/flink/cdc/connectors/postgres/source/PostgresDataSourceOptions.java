@@ -64,6 +64,27 @@ public class PostgresDataSourceOptions {
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
 
+    public static final ConfigOption<String> DDL_LOG_TABLE =
+            ConfigOptions.key("ddl.log.table").stringType().defaultValue("").withDescription("");
+
+    public static final ConfigOption<String> DDL_FIELD_OBJECT_TYPE =
+            ConfigOptions.key("ddl.field.object_type")
+                    .stringType()
+                    .defaultValue("object_type")
+                    .withDescription("");
+
+    public static final ConfigOption<String> DDL_FIELD_OBJECT_IDENTITY =
+            ConfigOptions.key("ddl.field.object_identity")
+                    .stringType()
+                    .defaultValue("object_identity")
+                    .withDescription("");
+
+    public static final ConfigOption<String> DDL_FIELD_COMMAND_TEXT =
+            ConfigOptions.key("ddl.field.command_text")
+                    .stringType()
+                    .defaultValue("command_text")
+                    .withDescription("");
+
     public static final ConfigOption<String> DECODING_PLUGIN_NAME =
             ConfigOptions.key("decoding.plugin.name")
                     .stringType()

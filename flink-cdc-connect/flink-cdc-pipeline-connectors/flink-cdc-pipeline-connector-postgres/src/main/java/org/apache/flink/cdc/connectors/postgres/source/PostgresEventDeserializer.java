@@ -21,6 +21,8 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import org.apache.flink.cdc.connectors.postgres.source.parser.PostgresAntlrDdlParser;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
@@ -31,6 +33,7 @@ import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geography;
 import io.debezium.data.geometry.Geometry;
 import io.debezium.data.geometry.Point;
+import io.debezium.relational.Tables;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -40,9 +43,11 @@ import org.locationtech.jts.io.WKBReader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /** Event deserializer for {@link PostgresDataSource}. */
 @Internal
@@ -52,39 +57,54 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     private List<PostgreSQLReadableMetadata> readableMetadataList;
     private final boolean includeDatabaseInTableId;
     private final String databaseName;
+    private final PostgresSourceConfig postgresSourceConfig;
+    private final String ddlLogTable;
+    private final String ddlFieldObjectType;
+    private final String ddlFieldObjectIdentity;
+    private final String ddlFieldCommandText;
+    private final Set<String> tableSet;
+
+    private transient PostgresAntlrDdlParser customParser;
+    private transient io.debezium.relational.Tables tables;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-    public PostgresEventDeserializer(DebeziumChangelogMode changelogMode) {
-        this(changelogMode, new ArrayList<>(), false, null);
-    }
-
-    public PostgresEventDeserializer(
-            DebeziumChangelogMode changelogMode,
-            List<PostgreSQLReadableMetadata> readableMetadataList) {
-        this(changelogMode, readableMetadataList, false, null);
-    }
-
-    public PostgresEventDeserializer(
-            DebeziumChangelogMode changelogMode,
-            List<PostgreSQLReadableMetadata> readableMetadataList,
-            boolean includeDatabaseInTableId) {
-        this(changelogMode, readableMetadataList, includeDatabaseInTableId, null);
-    }
 
     public PostgresEventDeserializer(
             DebeziumChangelogMode changelogMode,
             List<PostgreSQLReadableMetadata> readableMetadataList,
             boolean includeDatabaseInTableId,
-            String databaseName) {
+            String databaseName,
+            PostgresSourceConfig postgresSourceConfig) {
         super(new PostgresSchemaDataTypeInference(), changelogMode);
         this.readableMetadataList = readableMetadataList;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
         this.databaseName = databaseName;
+        this.postgresSourceConfig = postgresSourceConfig;
+        this.ddlLogTable = postgresSourceConfig.getDdlLogTable();
+        this.ddlFieldObjectType = postgresSourceConfig.getDdlFieldObjectType();
+        this.ddlFieldObjectIdentity = postgresSourceConfig.getDdlFieldObjectIdentity();
+        this.ddlFieldCommandText = postgresSourceConfig.getDdlFieldCommandText();
+        this.tableSet = new HashSet<>(postgresSourceConfig.getTableList());
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
+        Struct after = ((Struct) record.value()).getStruct("after");
+        String objectType = after.getString(ddlFieldObjectType);
+        String objectIdentity = after.getString(ddlFieldObjectIdentity);
+        if ((objectType.equals("table") && tableSet.contains(objectIdentity))
+                || (objectType.equals("table column")
+                        && tableSet.contains(extractTable(objectIdentity)))) {
+            if (customParser == null) {
+                customParser =
+                        new PostgresAntlrDdlParser(postgresSourceConfig.getDbzConnectorConfig());
+                tables = new Tables();
+                customParser.setCurrentDatabase(databaseName);
+            }
+            String ddl = after.getString(ddlFieldCommandText);
+            customParser.parse(ddl, tables);
+            return customParser.getAndClearParsedEvents();
+        }
         return Collections.emptyList();
     }
 
@@ -92,14 +112,22 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     protected boolean isDataChangeRecord(SourceRecord record) {
         Schema valueSchema = record.valueSchema();
         Struct value = (Struct) record.value();
+        TableId tableId = getTableId(record);
         return value != null
                 && valueSchema != null
                 && valueSchema.field(Envelope.FieldName.OPERATION) != null
-                && value.getString(Envelope.FieldName.OPERATION) != null;
+                && value.getString(Envelope.FieldName.OPERATION) != null
+                && !tableId.toString().equals(ddlLogTable);
     }
 
     @Override
     protected boolean isSchemaChangeRecord(SourceRecord record) {
+        Envelope.Operation op = Envelope.operationFor(record);
+        TableId tableId = getTableId(record);
+        if (tableId.toString().equals(ddlLogTable)
+                && (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ)) {
+            return true;
+        }
         return false;
     }
 
@@ -174,5 +202,10 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
         } else {
             return BinaryStringData.fromString(dbzObj.toString());
         }
+    }
+
+    private String extractTable(String objectIdentity) {
+        int index = objectIdentity.lastIndexOf(".");
+        return objectIdentity.substring(0, index);
     }
 }
