@@ -696,6 +696,15 @@ public class PostgresConnection extends JdbcConnection {
     private Optional<ColumnEditor> doReadTableColumn(
             ResultSet columnMetadata, TableId tableId, Tables.ColumnNameFilter columnFilter)
             throws SQLException {
+        // FLINK-38965: Filter out columns from other tables that might be returned due to
+        // PostgreSQL LIKE wildcard matching (underscore '_' matches any single character).
+        // For example, when querying 'ndi_pg_user_sink_1', the LIKE pattern may also match
+        // 'ndi_pg_userbsink_1' because '_' acts as a wildcard.
+        final String resultTableName = columnMetadata.getString(3);
+        if (!tableId.table().equals(resultTableName)) {
+            return Optional.empty();
+        }
+
         final String columnName = columnMetadata.getString(4);
         if (columnFilter == null
                 || columnFilter.matches(
