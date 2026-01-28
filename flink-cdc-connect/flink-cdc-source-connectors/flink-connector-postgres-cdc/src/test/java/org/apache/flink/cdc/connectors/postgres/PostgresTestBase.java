@@ -28,14 +28,11 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
 import io.debezium.jdbc.JdbcConfiguration;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
 
 import java.net.URL;
@@ -46,7 +43,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +50,6 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.lang.Thread.sleep;
 
@@ -69,9 +64,17 @@ public abstract class PostgresTestBase extends AbstractTestBase {
     public static final String TEST_USER = "postgres";
     public static final String TEST_PASSWORD = "postgres";
 
+    private static final String DEFAULT_POSTGRES_IMAGE = "postgres:14";
+    private static final String POSTGRES_IMAGE_PROPERTY_KEY = "flink.cdc.postgres.image";
+
     // use official postgresql image to support pgoutput plugin
     protected static final DockerImageName PG_IMAGE =
-            DockerImageName.parse("postgres:14").asCompatibleSubstituteFor("postgres");
+            DockerImageName.parse(getPostgresImage()).asCompatibleSubstituteFor("postgres");
+
+    // PostgreSQL 10 image for testing partition tables without publish_via_partition_root
+    protected static final DockerImageName PG10_IMAGE =
+            DockerImageName.parse("postgres:10").asCompatibleSubstituteFor("postgres");
+
     public static final Network NETWORK = Network.newNetwork();
     public static final String INTER_CONTAINER_POSTGRES_ALIAS = "postgres";
 
@@ -94,20 +97,50 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                             "-c",
                             "wal_level=logical");
 
-    @BeforeAll
-    static void startContainers() throws Exception {
-        LOG.info("Starting containers...");
-        Startables.deepStart(Stream.of(POSTGRES_CONTAINER)).join();
-        LOG.info("Containers are started.");
+    /**
+     * PostgreSQL 10 container for testing PG10-specific behavior. Lazily initialized to avoid
+     * starting the container when not needed.
+     */
+    private static volatile PostgreSQLContainer<?> pg10Container;
+
+    static {
+        // Singleton Container pattern: start container once and reuse across all tests
+        POSTGRES_CONTAINER.start();
     }
 
-    @AfterAll
-    static void stopContainers() {
-        LOG.info("Stopping containers...");
-        if (POSTGRES_CONTAINER != null) {
-            POSTGRES_CONTAINER.stop();
+    /**
+     * Gets the PostgreSQL 10 container, starting it lazily if needed. Use this for tests that
+     * specifically need PG10 behavior (e.g., partition tables without publish_via_partition_root).
+     */
+    public static PostgreSQLContainer<?> getPg10Container() {
+        if (pg10Container == null) {
+            synchronized (PostgresTestBase.class) {
+                if (pg10Container == null) {
+                    pg10Container =
+                            new PostgreSQLContainer<>(PG10_IMAGE)
+                                    .withDatabaseName(DEFAULT_DB)
+                                    .withUsername(TEST_USER)
+                                    .withPassword(TEST_PASSWORD)
+                                    .withLogConsumer(new Slf4jLogConsumer(LOG))
+                                    .withReuse(false)
+                                    .withCommand(
+                                            "postgres",
+                                            "-c",
+                                            "fsync=off",
+                                            "-c",
+                                            "max_replication_slots=20",
+                                            "-c",
+                                            "wal_level=logical");
+                    pg10Container.start();
+                    LOG.info("PostgreSQL 10 container started lazily for PG10-specific tests.");
+                }
+            }
         }
-        LOG.info("Containers are stopped.");
+        return pg10Container;
+    }
+
+    private static String getPostgresImage() {
+        return System.getProperty(POSTGRES_IMAGE_PROPERTY_KEY, DEFAULT_POSTGRES_IMAGE);
     }
 
     protected Connection getJdbcConnection(PostgreSQLContainer container) throws SQLException {
@@ -143,26 +176,115 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection(container);
                 Statement statement = connection.createStatement()) {
-            final List<String> statements =
-                    Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                            .map(String::trim)
-                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                            .map(
-                                                    x -> {
-                                                        final Matcher m =
-                                                                COMMENT_PATTERN.matcher(x);
-                                                        return m.matches() ? m.group(1) : x;
-                                                    })
-                                            .collect(Collectors.joining("\n"))
-                                            .split(";\n"))
-                            .collect(Collectors.toList());
+            final String ddl =
+                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                            .map(String::trim)
+                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                            .map(
+                                    x -> {
+                                        final Matcher m = COMMENT_PATTERN.matcher(x);
+                                        return m.matches() ? m.group(1) : x;
+                                    })
+                            .collect(Collectors.joining("\n"));
+
+            final List<String> statements = splitSqlStatements(ddl);
             for (String stmt : statements) {
                 statement.execute(stmt);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static List<String> splitSqlStatements(String ddl) {
+        List<String> statements = new ArrayList<>();
+        if (ddl == null || ddl.isEmpty()) {
+            return statements;
+        }
+
+        StringBuilder current = new StringBuilder();
+        boolean inSingleQuote = false;
+        String dollarQuoteTag = null;
+
+        for (int i = 0; i < ddl.length(); ) {
+            if (dollarQuoteTag != null) {
+                if (ddl.startsWith(dollarQuoteTag, i)) {
+                    current.append(dollarQuoteTag);
+                    i += dollarQuoteTag.length();
+                    dollarQuoteTag = null;
+                } else {
+                    current.append(ddl.charAt(i));
+                    i++;
+                }
+                continue;
+            }
+
+            char ch = ddl.charAt(i);
+            if (inSingleQuote) {
+                current.append(ch);
+                if (ch == '\'') {
+                    if (i + 1 < ddl.length() && ddl.charAt(i + 1) == '\'') {
+                        current.append('\'');
+                        i += 2;
+                        continue;
+                    }
+                    inSingleQuote = false;
+                }
+                i++;
+                continue;
+            }
+
+            if (ch == '\'') {
+                inSingleQuote = true;
+                current.append(ch);
+                i++;
+                continue;
+            }
+
+            if (ch == '$') {
+                String tag = tryReadDollarQuoteTag(ddl, i);
+                if (tag != null) {
+                    dollarQuoteTag = tag;
+                    current.append(tag);
+                    i += tag.length();
+                    continue;
+                }
+            }
+
+            if (ch == ';') {
+                String stmt = current.toString().trim();
+                if (!stmt.isEmpty()) {
+                    statements.add(stmt);
+                }
+                current.setLength(0);
+                i++;
+                continue;
+            }
+
+            current.append(ch);
+            i++;
+        }
+
+        String last = current.toString().trim();
+        if (!last.isEmpty()) {
+            statements.add(last);
+        }
+        return statements;
+    }
+
+    private static String tryReadDollarQuoteTag(String ddl, int start) {
+        int end = ddl.indexOf('$', start + 1);
+        if (end < 0) {
+            return null;
+        }
+        String tag = ddl.substring(start, end + 1);
+        for (int i = 1; i < tag.length() - 1; i++) {
+            char c = tag.charAt(i);
+            if (!(Character.isLetterOrDigit(c) || c == '_')) {
+                return null;
+            }
+        }
+        return tag;
     }
 
     protected PostgresConnection createConnection(Map<String, String> properties) {

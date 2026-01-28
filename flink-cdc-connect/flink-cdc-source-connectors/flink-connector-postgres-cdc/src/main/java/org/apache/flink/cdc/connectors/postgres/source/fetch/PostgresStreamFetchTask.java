@@ -153,7 +153,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                             || Lsn.valueOf(commitLsn).compareTo(Lsn.valueOf(lastCommitLsn)) > 0)) {
                 lastCommitLsn = commitLsn;
 
-                Map<String, Object> offsets = new HashMap<>();
+                Map<String, Object> offsets = new HashMap<>(4);
                 offsets.put(PostgresOffsetContext.LAST_COMMIT_LSN_KEY, lastCommitLsn);
                 LOG.debug(
                         "Committing offset {} for {}",
