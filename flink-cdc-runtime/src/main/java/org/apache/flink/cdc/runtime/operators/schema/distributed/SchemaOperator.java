@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
@@ -71,13 +72,16 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     private final String timezone;
     private final SchemaChangeBehavior schemaChangeBehavior;
     private final List<RouteRule> routingRules;
+    private final RouteMode routeMode;
 
     public SchemaOperator(
             List<RouteRule> routingRules,
+            RouteMode routeMode,
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.rpcTimeOut = rpcTimeOut;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.timezone = timezone;
@@ -100,7 +104,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         subTaskId = getRuntimeContext().getIndexOfThisSubtask();
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
-        tableIdRouter = new TableIdRouter(routingRules);
+        tableIdRouter = new TableIdRouter(routingRules, routeMode);
         derivator = new SchemaDerivator();
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
