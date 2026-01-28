@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source;
 
+import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
