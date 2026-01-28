@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.testutils.operators;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
@@ -99,6 +100,7 @@ public class DistributedEventOperatorTestHarness<
                         Executors.newFixedThreadPool(1),
                         new CollectingMetadataApplier(applyDuration),
                         new ArrayList<>(),
+                        RouteMode.ALL_MATCH,
                         SchemaChangeBehavior.LENIENT,
                         rpcTimeout);
         this.schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaCoordinator);
