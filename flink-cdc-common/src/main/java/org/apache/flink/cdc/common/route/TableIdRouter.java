@@ -20,6 +20,7 @@ package org.apache.flink.cdc.common.route;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 
 import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
@@ -53,6 +54,7 @@ public class TableIdRouter {
 
     private final List<Tuple3<Pattern, String, String>> routes;
     private final LoadingCache<TableId, List<TableId>> routingCache;
+    private final RouteMode routeMode;
 
     private static final String DOT_PLACEHOLDER = "_dot_placeholder_";
 
@@ -105,7 +107,8 @@ public class TableIdRouter {
         return standardRegExpTableCaptureList;
     }
 
-    public TableIdRouter(List<RouteRule> routingRules) {
+    public TableIdRouter(List<RouteRule> routingRules, RouteMode routeMode) {
+        this.routeMode = routeMode;
         this.routes = new ArrayList<>();
         for (RouteRule rule : routingRules) {
             try {
@@ -139,11 +142,19 @@ public class TableIdRouter {
     }
 
     private List<TableId> calculateRoute(TableId sourceTableId) {
-        List<TableId> routedTableIds =
-                routes.stream()
-                        .filter(route -> matches(route.f0, sourceTableId))
-                        .map(route -> resolveReplacement(sourceTableId, route))
-                        .collect(Collectors.toList());
+        List<TableId> routedTableIds = new ArrayList<>();
+
+        for (Tuple3<Pattern, String, String> route : routes) {
+            if (matches(route.f0, sourceTableId)) {
+                routedTableIds.add(resolveReplacement(sourceTableId, route));
+
+                // If match mode is FIRST_MATCH, stop after the first match
+                if (routeMode == RouteMode.FIRST_MATCH) {
+                    break;
+                }
+            }
+        }
+
         if (routedTableIds.isEmpty()) {
             routedTableIds.add(sourceTableId);
         }
