@@ -211,6 +211,19 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /**
+     * Whether to capture newly added tables in binlog reading phase without snapshot. This option
+     * can only be used with stream-only startup modes. Cannot be enabled together with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}.
+     */
+    @Experimental
+    public MySqlSourceBuilder<T> scanBinlogNewlyAddedTableEnabled(
+            boolean scanBinlogNewlyAddedTableEnabled) {
+        this.configFactory.scanBinlogNewlyAddedTableEnabled(scanBinlogNewlyAddedTableEnabled);
+        return this;
+    }
+
+
     /** Specifies the startup options. */
     public MySqlSourceBuilder<T> startupOptions(StartupOptions startupOptions) {
         this.configFactory.startupOptions(startupOptions);
