@@ -285,11 +285,13 @@ Data Type Mapping
       <td>TINYINT</td>
       <td>INT16</td>
       <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>SMALLINT</td>
       <td>SMALLINT</td>
       <td>INT16</td>
+      <td></td>
       <td></td>
     </tr>
     <tr>
@@ -297,23 +299,27 @@ Data Type Mapping
       <td>INT</td>
       <td>INT32</td>
       <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>BIGINT</td>
       <td>BIGINT</td>
       <td>INT64</td>
       <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>FLOAT</td>
       <td>FLOAT</td>
       <td>FLOAT</td>
       <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>DOUBLE</td>
       <td>DOUBLE</td>
       <td>DOUBLE</td>
+      <td></td>
       <td></td>
     </tr>
     <tr>
@@ -327,6 +333,7 @@ Data Type Mapping
       <td>BOOLEAN</td>
       <td>BOOLEAN</td>
       <td>BOOLEAN</td>
+      <td></td>
       <td></td>
     </tr>
     <tr>
@@ -355,12 +362,35 @@ Data Type Mapping
       <td>CHAR(n)</td>
       <td>STRING</td>
       <td></td>
+      <td></td>
     </tr>
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n)</td>
       <td>STRING</td>
       <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ARRAY</td>
+      <td>ARRAY</td>
+      <td>ARRAY</td>
+      <td></td>
+      <td>Serialized as JSON array. Element types are recursively converted according to this table.</td>
+    </tr>
+    <tr>
+      <td>MAP</td>
+      <td>MAP</td>
+      <td>MAP</td>
+      <td></td>
+      <td>Serialized as JSON object. Key and value types are recursively converted according to this table.</td>
+    </tr>
+    <tr>
+      <td>ROW</td>
+      <td>ROW</td>
+      <td>STRUCT</td>
+      <td></td>
+      <td>Serialized as JSON object. Field types are recursively converted according to this table.</td>
     </tr>
     </tbody>
 </table>
