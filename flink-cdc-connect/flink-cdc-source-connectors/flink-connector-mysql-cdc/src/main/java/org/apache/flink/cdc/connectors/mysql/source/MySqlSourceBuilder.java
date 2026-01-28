@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.mysql.source;
 
+import org.apache.flink.cdc.common.annotation.Experimental;
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
@@ -201,6 +202,18 @@ public class MySqlSourceBuilder<T> {
     /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
     public MySqlSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
+        return this;
+    }
+
+    /**
+     * Whether to capture newly added tables in binlog reading phase without snapshot. This option
+     * can only be used with stream-only startup modes. Cannot be enabled together with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}.
+     */
+    @Experimental
+    public MySqlSourceBuilder<T> scanBinlogNewlyAddedTableEnabled(
+            boolean scanBinlogNewlyAddedTableEnabled) {
+        this.configFactory.scanBinlogNewlyAddedTableEnabled(scanBinlogNewlyAddedTableEnabled);
         return this;
     }
 

@@ -23,6 +23,9 @@ import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.table.StartupOptions;
 import org.apache.flink.table.catalog.ObjectPath;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.ZoneId;
@@ -32,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.mysql.source.utils.EnvironmentUtils.checkSupportCheckpointsAfterTasksFinished;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -41,6 +45,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 public class MySqlSourceConfigFactory implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(MySqlSourceConfigFactory.class);
 
     private int port = 3306; // default 3306 port
     private String hostname;
@@ -65,6 +70,7 @@ public class MySqlSourceConfigFactory implements Serializable {
     private boolean includeSchemaChanges = false;
     private boolean includeHeartbeatEvents = false;
     private boolean scanNewlyAddedTableEnabled = false;
+    private boolean scanBinlogNewlyAddedTableEnabled = false;
     private boolean closeIdleReaders = false;
     private Properties jdbcProperties;
     private Duration heartbeatInterval = MySqlSourceOptions.HEARTBEAT_INTERVAL.defaultValue();
@@ -248,6 +254,17 @@ public class MySqlSourceConfigFactory implements Serializable {
         return this;
     }
 
+    /**
+     * Whether to capture newly added tables in binlog reading phase without snapshot. This option
+     * can only be used with stream-only startup modes. Cannot be enabled together with {@link
+     * #scanNewlyAddedTableEnabled(boolean)}.
+     */
+    public MySqlSourceConfigFactory scanBinlogNewlyAddedTableEnabled(
+            boolean scanBinlogNewlyAddedTableEnabled) {
+        this.scanBinlogNewlyAddedTableEnabled = scanBinlogNewlyAddedTableEnabled;
+        return this;
+    }
+
     /** Custom properties that will overwrite the default JDBC connection URL. */
     public MySqlSourceConfigFactory jdbcProperties(Properties jdbcProperties) {
         this.jdbcProperties = jdbcProperties;
@@ -384,7 +401,18 @@ public class MySqlSourceConfigFactory implements Serializable {
             props.setProperty("database.include.list", String.join(",", databaseList));
         }
         if (tableList != null) {
-            props.setProperty("table.include.list", String.join(",", tableList));
+            // Convert table patterns to Debezium style if binlog auto-capture is enabled
+            if (scanBinlogNewlyAddedTableEnabled) {
+                String originalPattern = String.join(",", tableList);
+                String debeziumPattern = convertToDebeziumStyle(originalPattern);
+                props.setProperty("table.include.list", debeziumPattern);
+                LOG.info(
+                        "Converted table pattern from '{}' to Debezium style '{}' for binlog auto-capture",
+                        originalPattern,
+                        debeziumPattern);
+            } else {
+                props.setProperty("table.include.list", String.join(",", tableList));
+            }
         }
         if (serverTimeZone != null) {
             props.setProperty("database.serverTimezone", serverTimeZone);
@@ -397,6 +425,13 @@ public class MySqlSourceConfigFactory implements Serializable {
 
         if (jdbcProperties == null) {
             jdbcProperties = new Properties();
+        }
+
+        // Validate: Two modes are mutually exclusive
+        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
+            throw new IllegalArgumentException(
+                    "Cannot enable both 'scan.binlog.newly-added-table.enabled' and "
+                            + "'scan.newly-added-table.enabled' as they may cause duplicate data");
         }
 
         return new MySqlSourceConfig(
@@ -421,6 +456,7 @@ public class MySqlSourceConfigFactory implements Serializable {
                 includeSchemaChanges,
                 includeHeartbeatEvents,
                 scanNewlyAddedTableEnabled,
+                scanBinlogNewlyAddedTableEnabled,
                 closeIdleReaders,
                 props,
                 jdbcProperties,
@@ -430,5 +466,46 @@ public class MySqlSourceConfigFactory implements Serializable {
                 treatTinyInt1AsBoolean,
                 useLegacyJsonFormat,
                 assignUnboundedChunkFirst);
+    }
+
+    /**
+     * Convert Flink CDC style table pattern to Debezium style.
+     *
+     * <p>In CDC-style table matching, table names are separated by commas and use `\.` for regex
+     * matching. In Debezium style, table names are separated by pipes and use `.` for regex
+     * matching while `\.` is used as database.table separator.
+     *
+     * <p>Examples:
+     *
+     * <ul>
+     *   <li>{@code "db1.table_\.*,db2.user_\.*"} -> {@code "db1\.table_.*|db2\.user_.*"}
+     *   <li>{@code "test_db.orders"} -> {@code "test_db\.orders"}
+     * </ul>
+     *
+     * @param tables Flink CDC style table pattern
+     * @return Debezium style table pattern
+     */
+    private String convertToDebeziumStyle(String tables) {
+        LOG.debug("Converting table pattern to Debezium style: {}", tables);
+
+        // Step 1: Replace comma separator with pipe (OR semantics)
+        tables = Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
+        LOG.debug("After replacing comma with pipe separator: {}", tables);
+
+        // Step 2: Replace escaped dot \. with placeholder
+        // In Flink CDC, \. means any character in regex, in Debezium it should be .
+        String unescapedTables = tables.replace("\\.", "$");
+        LOG.debug("After unescaping dots as RegEx meta-character: {}", unescapedTables);
+
+        // Step 3: Replace unescaped dot . with \.
+        // In Flink CDC, unescaped . is database.table separator, in Debezium it should be \.
+        String escapedTables = unescapedTables.replace(".", "\\.");
+        LOG.debug("After escaping dots as separator: {}", escapedTables);
+
+        // Step 4: Restore placeholder to regular dot .
+        String debeziumStyle = escapedTables.replace("$", ".");
+        LOG.debug("Final Debezium-style table pattern: {}", debeziumStyle);
+
+        return debeziumStyle;
     }
 }
