@@ -305,14 +305,25 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     }
 
     private boolean hasEnterPureBinlogPhase(TableId tableId, BinlogOffset position) {
-        // the existed tables those have finished snapshot reading
+        // Case 1: the existed tables those have finished snapshot reading
         if (maxSplitHighWatermarkMap.containsKey(tableId)
                 && position.isAfter(maxSplitHighWatermarkMap.get(tableId))) {
             pureBinlogPhaseTables.add(tableId);
             return true;
         }
 
-        // Use still need to capture new sharding table if user disable scan new added table,
+        // Case 2: binlog-only mode for newly added tables
+        // Capture new tables that match the filter without snapshot
+        if (statefulTaskContext.getSourceConfig().isScanBinlogNewlyAddedTableEnabled()) {
+            if (!maxSplitHighWatermarkMap.containsKey(tableId)
+                    && capturedTableFilter.test(tableId)) {
+                LOG.info("Auto-capturing newly added table in binlog-only mode: {}", tableId);
+                pureBinlogPhaseTables.add(tableId);
+                return true;
+            }
+        }
+
+        // Case 3: Use still need to capture new sharding table if user disable scan new added table,
         // The history records for all new added tables(including sharding table and normal table)
         // will be capture after restore from a savepoint if user enable scan new added table
         if (!statefulTaskContext.getSourceConfig().isScanNewlyAddedTableEnabled()) {
