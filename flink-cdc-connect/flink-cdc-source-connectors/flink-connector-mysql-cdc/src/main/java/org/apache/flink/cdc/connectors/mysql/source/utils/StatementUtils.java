@@ -70,9 +70,7 @@ public class StatementUtils {
         }
 
         final String cntQuery =
-                String.format(
-                        "SELECT COUNT(1) FROM %s WHERE (%s)",
-                        quote(tableId), filter);
+                String.format("SELECT COUNT(1) FROM %s WHERE (%s)", quote(tableId), filter);
         return jdbc.queryAndMap(
                 cntQuery,
                 rs -> {

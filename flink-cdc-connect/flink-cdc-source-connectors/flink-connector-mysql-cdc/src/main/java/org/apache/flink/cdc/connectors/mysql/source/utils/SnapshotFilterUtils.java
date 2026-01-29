@@ -22,7 +22,7 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import io.debezium.relational.TableId;
 
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,19 +37,24 @@ public class SnapshotFilterUtils {
     /**
      * Converts the given filters to a map keyed by {@link Selectors}, caching the result.
      *
-     * <p>The cache is backed by a {@link ConcurrentHashMap} to be safe under concurrent access.
-     * To avoid using a mutable {@link Map} as the cache key, an immutable copy of the input
-     * filters is created and used as the key.
+     * <p>The cache is backed by a {@link ConcurrentHashMap} to be safe under concurrent access. To
+     * avoid using a mutable {@link Map} as the cache key, an immutable copy of the input filters is
+     * created and used as the key.
+     *
+     * <p>Uses {@link LinkedHashMap} to preserve insertion order, ensuring deterministic matching
+     * when multiple patterns could match the same table.
      */
     private static Map<Selectors, String> toSelector(Map<String, String> filters) {
         // Create an immutable copy of the filters to avoid using a mutable map as the cache key.
+        // Use LinkedHashMap to preserve the user-defined order.
         Map<String, String> immutableFilters =
-                Collections.unmodifiableMap(new HashMap<>(filters));
+                Collections.unmodifiableMap(new LinkedHashMap<>(filters));
 
         return cache.computeIfAbsent(
                 immutableFilters,
                 key -> {
-                    Map<Selectors, String> snapshotFilters = new HashMap<>();
+                    // Use LinkedHashMap to preserve insertion order for deterministic matching
+                    Map<Selectors, String> snapshotFilters = new LinkedHashMap<>();
                     key.forEach(
                             (table, filter) -> {
                                 Selectors selector =

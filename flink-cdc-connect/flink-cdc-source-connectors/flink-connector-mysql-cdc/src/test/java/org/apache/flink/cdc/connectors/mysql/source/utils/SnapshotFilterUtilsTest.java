@@ -22,6 +22,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Unit test for {@link org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils}. */
@@ -42,5 +43,43 @@ public class SnapshotFilterUtilsTest {
                 .isEqualTo("id > 200");
         Assertions.assertThat(SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.shop")))
                 .isNull();
+    }
+
+    @Test
+    public void testGetSnapshotFilterPreservesOrder() {
+        // Use LinkedHashMap to ensure deterministic order
+        Map<String, String> map = new LinkedHashMap<>();
+        map.put("db.table_a", "id > 100");
+        map.put("db.table_b", "id > 200");
+        map.put("db.table_c", "id > 300");
+
+        // Verify each table matches its corresponding filter
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.table_a")))
+                .isEqualTo("id > 100");
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.table_b")))
+                .isEqualTo("id > 200");
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(map, TableId.parse("db.table_c")))
+                .isEqualTo("id > 300");
+
+        // Test with regex patterns - non-overlapping patterns
+        Map<String, String> regexMap = new LinkedHashMap<>();
+        regexMap.put("db.order_[0-9]+", "id > 100");
+        regexMap.put("db.user_[0-9]+", "id > 200");
+        regexMap.put("db.product_[0-9]+", "id > 300");
+
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(
+                                regexMap, TableId.parse("db.order_1")))
+                .isEqualTo("id > 100");
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(regexMap, TableId.parse("db.user_2")))
+                .isEqualTo("id > 200");
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(
+                                regexMap, TableId.parse("db.product_3")))
+                .isEqualTo("id > 300");
     }
 }
