@@ -89,10 +89,12 @@ public class ProjectionColumnProcessor {
             throw new RuntimeException(
                     String.format(
                             "Failed to evaluate projection expression `%s` for column `%s` in table `%s`.\n"
+                                    + "\tCompiled expression: %s\n"
                                     + "\tColumn name map: {%s}",
-                            projectionColumn.getScriptExpression(),
+                            projectionColumn.getExpression(),
                             projectionColumn.getColumnName(),
                             tableInfo.getName(),
+                            projectionColumn.getScriptExpression(),
                             projectionColumn.getColumnNameMapAsString()),
                     e);
         }
@@ -168,6 +170,7 @@ public class ProjectionColumnProcessor {
         paramTypes.add(Long.class);
 
         return TransformExpressionKey.of(
+                projectionColumn.getExpression(),
                 JaninoCompiler.loadSystemFunction(scriptExpression),
                 argumentNames,
                 paramTypes,

@@ -112,10 +112,13 @@ public class TransformFilterProcessor {
         } catch (InvocationTargetException e) {
             throw new RuntimeException(
                     String.format(
-                            "Failed to evaluate filtering expression `%s` for table `%s`.\n"
+                            "Failed to evaluate filtering expression for table `%s`.\n"
+                                    + "\tOriginal expression: %s\n"
+                                    + "\tCompiled expression: %s\n"
                                     + "\tColumn name map: {%s}",
-                            transformFilter.getScriptExpression(),
                             tableInfo.getName(),
+                            transformFilter.getExpression(),
+                            transformFilter.getScriptExpression(),
                             transformFilter.getColumnNameMapAsString()),
                     e);
         }
@@ -206,6 +209,7 @@ public class TransformFilterProcessor {
         args.f1.add(Long.class);
 
         return TransformExpressionKey.of(
+                transformFilter.getExpression(),
                 JaninoCompiler.loadSystemFunction(transformFilter.getScriptExpression()),
                 args.f0,
                 args.f1,

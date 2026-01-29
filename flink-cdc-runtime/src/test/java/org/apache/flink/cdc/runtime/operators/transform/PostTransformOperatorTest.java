@@ -2765,6 +2765,10 @@ class PostTransformOperatorTest {
                                 + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=().")
                 .cause()
                 .hasRootCauseInstanceOf(DateTimeParseException.class)
+                .hasMessageContaining(
+                        "Failed to evaluate projection expression `CAST(`TB`.`castFloat` AS TIMESTAMP(3))` for column `castTimestamp` in table `my_company.my_branch.data_cast`.\n"
+                                + "\tCompiled expression: castToTimestamp($0, __time_zone__)\n"
+                                + "\tColumn name map: {$0 -> castFloat}")
                 .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
         transformFunctionEventEventOperatorTestHarness.close();
     }

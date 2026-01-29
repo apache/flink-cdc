@@ -77,7 +77,11 @@ public class TransformExpressionCompiler {
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(
-                                            "Expression cannot be compiled. This is a bug. Please file an issue.\n\tExpression: %s\n\tColumn name map: {%s}",
+                                            "Expression cannot be compiled. This is a bug. Please file an issue.\n"
+                                                    + "\tOriginal expression: %s\n"
+                                                    + "\tCompiled expression: %s\n"
+                                                    + "\tColumn name map: {%s}",
+                                            key.getOriginalExpression(),
                                             key.getExpression(),
                                             TransformException.prettyPrintColumnNameMap(
                                                     key.getColumnNameMap())),
