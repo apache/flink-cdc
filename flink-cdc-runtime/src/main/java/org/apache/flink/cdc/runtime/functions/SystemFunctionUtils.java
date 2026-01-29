@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.functions;
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.StringData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
@@ -39,6 +40,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -1161,5 +1163,123 @@ public class SystemFunctionUtils {
             throw new IllegalArgumentException(
                     String.format("Failed to parse json string: %s", jsonStr), e);
         }
+    }
+
+    /**
+     * Accesses an element from an ARRAY or MAP by index or key.
+     *
+     * <p>For ARRAY: Uses 1-based index (SQL standard). array[1] returns the first element.
+     *
+     * <p>For MAP: Uses key to access the value. map['key'] returns the value for 'key'.
+     *
+     * <p>Note: ROW type field access uses dot notation (row.field) in Flink SQL, which is handled
+     * by SqlKind.DOT, not by this ITEM operator. This function only handles ARRAY and MAP.
+     *
+     * @param collection the ARRAY (ArrayData) or MAP (MapData) to access
+     * @param indexOrKey the index (for ARRAY, 1-based) or key (for MAP)
+     * @return the element at the specified index or key, or null if not found or out of bounds
+     */
+    public static Object itemAccess(Object collection, Object indexOrKey) {
+        if (collection == null || indexOrKey == null) {
+            return null;
+        }
+
+        Object result;
+        if (collection instanceof Object[]) {
+            // Support Object[] which may come from DataTypeConverter.convertToArrayOriginal
+            result = arrayElement((Object[]) collection, indexOrKey);
+        } else if (collection instanceof Map) {
+            // Support Map which may come from DataTypeConverter.convertToMapOriginal
+            result = mapValue((Map<?, ?>) collection, indexOrKey);
+        } else {
+            throw new IllegalArgumentException(
+                    "itemAccess only supports ArrayData, Object[], MapData or Map, but got: "
+                            + collection.getClass().getName());
+        }
+
+        // Convert StringData to String for proper comparison with SQL string literals
+        // This is necessary because SQL string literals like 'active' are Java String objects,
+        // and StringData.equals(String) would return false
+        return convertStringDataToString(result);
+    }
+
+    /**
+     * Converts StringData to String for proper comparison with SQL string literals. Other types are
+     * returned as-is.
+     *
+     * @param value the value to potentially convert
+     * @return the converted value (String if input was StringData, otherwise unchanged)
+     */
+    private static Object convertStringDataToString(Object value) {
+        if (value instanceof StringData) {
+            return value.toString();
+        }
+        return value;
+    }
+
+    /**
+     * Gets an element from an Object array by index (1-based, SQL standard). This overload handles
+     * arrays that have been converted from ArrayData to Object[] by DataTypeConverter.
+     *
+     * @param array the Object array to access
+     * @param index the 1-based index
+     * @return the element at the specified index, or null if index is out of bounds
+     */
+    public static Object arrayElement(Object[] array, Object index) {
+        if (array == null || index == null) {
+            return null;
+        }
+
+        int idx;
+        if (index instanceof Number) {
+            idx = ((Number) index).intValue();
+        } else {
+            idx = Integer.parseInt(index.toString());
+        }
+
+        // Convert 1-based index to 0-based (SQL standard uses 1-based indexing)
+        int zeroBasedIndex = idx - 1;
+
+        // Check bounds
+        if (zeroBasedIndex < 0 || zeroBasedIndex >= array.length) {
+            return null;
+        }
+
+        return array[zeroBasedIndex];
+    }
+
+    /**
+     * Gets a value from a Map by key. This overload handles maps that have been converted from
+     * MapData to Map by DataTypeConverter.
+     *
+     * @param map the Map to access
+     * @param key the key to look up
+     * @return the value for the specified key, or null if not found
+     */
+    public static Object mapValue(Map<?, ?> map, Object key) {
+        if (map == null || key == null) {
+            return null;
+        }
+
+        // Try direct lookup first
+        Object value = map.get(key);
+        if (value != null) {
+            return value;
+        }
+
+        // If key is a String, try to find a matching StringData key
+        if (key instanceof String) {
+            String keyStr = (String) key;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                Object mapKey = entry.getKey();
+                if (mapKey instanceof StringData) {
+                    if (mapKey.toString().equals(keyStr)) {
+                        return entry.getValue();
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }

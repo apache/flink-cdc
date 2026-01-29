@@ -19,6 +19,8 @@ package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
@@ -44,6 +46,8 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Unit tests for the {@link PostTransformOperator}. */
 class PostTransformOperatorTest {
@@ -377,6 +381,58 @@ class PostTransformOperatorTest {
                     .physicalColumn("f0", DataTypes.INT())
                     .physicalColumn("f1", DataTypes.INT())
                     .physicalColumn("f2", DataTypes.INT())
+                    .build();
+
+    private static final TableId COMPLEX_TYPE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "complex_types");
+
+    private static final Schema COMPLEX_TYPE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT().notNull())
+                    .physicalColumn("tags", DataTypes.ARRAY(DataTypes.STRING()))
+                    .physicalColumn("scores", DataTypes.ARRAY(DataTypes.INT()))
+                    .physicalColumn("props", DataTypes.MAP(DataTypes.STRING(), DataTypes.STRING()))
+                    .physicalColumn("metrics", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                    .primaryKey("id")
+                    .build();
+
+    private static final Schema COMPLEX_TYPE_EXPECTED_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT().notNull())
+                    .physicalColumn("first_tag", DataTypes.STRING())
+                    .physicalColumn("first_score", DataTypes.INT())
+                    .physicalColumn("status", DataTypes.STRING())
+                    .physicalColumn("cnt", DataTypes.INT())
+                    .primaryKey("id")
+                    .build();
+
+    // ROW type test constants
+    private static final TableId ROW_TYPE_TABLEID =
+            TableId.tableId("my_company", "my_branch", "row_types");
+
+    private static final Schema ROW_TYPE_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT().notNull())
+                    .physicalColumn(
+                            "person",
+                            DataTypes.ROW(
+                                    DataTypes.FIELD("name", DataTypes.STRING()),
+                                    DataTypes.FIELD("age", DataTypes.INT())))
+                    .physicalColumn(
+                            "address",
+                            DataTypes.ROW(
+                                    DataTypes.FIELD("city", DataTypes.STRING()),
+                                    DataTypes.FIELD("zipcode", DataTypes.STRING())))
+                    .primaryKey("id")
+                    .build();
+
+    private static final Schema ROW_TYPE_EXPECTED_SCHEMA =
+            Schema.newBuilder()
+                    .physicalColumn("id", DataTypes.INT().notNull())
+                    .physicalColumn("person_name", DataTypes.STRING())
+                    .physicalColumn("person_age", DataTypes.INT())
+                    .physicalColumn("city", DataTypes.STRING())
+                    .primaryKey("id")
                     .build();
 
     @Test
@@ -3380,5 +3436,266 @@ class PostTransformOperatorTest {
         Assertions.assertThat(
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(updateEventExpect));
+    }
+
+    @Test
+    void testArrayAccessTransform() throws Exception {
+        // Test array element access: tags[1] gets the first element (1-based index)
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COMPLEX_TYPE_TABLEID.identifier(),
+                                "id, tags[1] AS first_tag, scores[1] AS first_score, props['status'] AS status, metrics['cnt'] AS cnt",
+                                null)
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COMPLEX_TYPE_TABLEID, COMPLEX_TYPE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COMPLEX_TYPE_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) COMPLEX_TYPE_EXPECTED_SCHEMA.toRowDataType()));
+
+        // Prepare test data
+        GenericArrayData tagsArray =
+                new GenericArrayData(
+                        new Object[] {
+                            BinaryStringData.fromString("tag1"),
+                            BinaryStringData.fromString("tag2"),
+                            BinaryStringData.fromString("tag3")
+                        });
+        GenericArrayData scoresArray = new GenericArrayData(new Object[] {100, 200, 300});
+
+        Map<Object, Object> propsMap = new HashMap<>();
+        propsMap.put(BinaryStringData.fromString("status"), BinaryStringData.fromString("active"));
+        propsMap.put(BinaryStringData.fromString("type"), BinaryStringData.fromString("premium"));
+        GenericMapData propsMapData = new GenericMapData(propsMap);
+
+        Map<Object, Object> metricsMap = new HashMap<>();
+        metricsMap.put(BinaryStringData.fromString("cnt"), 42);
+        metricsMap.put(BinaryStringData.fromString("total"), 100);
+        GenericMapData metricsMapData = new GenericMapData(metricsMap);
+
+        // Insert
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, tagsArray, scoresArray, propsMapData, metricsMapData
+                                }));
+        DataChangeEvent insertEventExpect =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    BinaryStringData.fromString("tag1"),
+                                    100,
+                                    BinaryStringData.fromString("active"),
+                                    42
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        COMPLEX_TYPE_TABLEID, COMPLEX_TYPE_EXPECTED_SCHEMA)));
+        transform.processElement(new StreamRecord<>(insertEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEventExpect));
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testArrayAccessWithFilter() throws Exception {
+        // Test array access in filter condition
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COMPLEX_TYPE_TABLEID.identifier(),
+                                "id, tags[1] AS first_tag, scores[1] AS first_score, props['status'] AS status, metrics['cnt'] AS cnt",
+                                "scores[1] > 50")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COMPLEX_TYPE_TABLEID, COMPLEX_TYPE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COMPLEX_TYPE_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) COMPLEX_TYPE_EXPECTED_SCHEMA.toRowDataType()));
+
+        // Prepare test data - will pass filter (scores[1] = 100 > 50)
+        GenericArrayData tagsArray1 =
+                new GenericArrayData(new Object[] {BinaryStringData.fromString("pass")});
+        GenericArrayData scoresArray1 = new GenericArrayData(new Object[] {100});
+
+        // Prepare test data - will NOT pass filter (scores[1] = 30 <= 50)
+        GenericArrayData tagsArray2 =
+                new GenericArrayData(new Object[] {BinaryStringData.fromString("fail")});
+        GenericArrayData scoresArray2 = new GenericArrayData(new Object[] {30});
+
+        Map<Object, Object> propsMap = new HashMap<>();
+        propsMap.put(BinaryStringData.fromString("status"), BinaryStringData.fromString("active"));
+        GenericMapData propsMapData = new GenericMapData(propsMap);
+
+        Map<Object, Object> metricsMap = new HashMap<>();
+        metricsMap.put(BinaryStringData.fromString("cnt"), 1);
+        GenericMapData metricsMapData = new GenericMapData(metricsMap);
+
+        // Insert event that passes filter
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, tagsArray1, scoresArray1, propsMapData, metricsMapData
+                                }));
+        DataChangeEvent insertEvent1Expect =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    BinaryStringData.fromString("pass"),
+                                    100,
+                                    BinaryStringData.fromString("active"),
+                                    1
+                                }));
+
+        // Insert event that does NOT pass filter
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    2, tagsArray2, scoresArray2, propsMapData, metricsMapData
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        COMPLEX_TYPE_TABLEID, COMPLEX_TYPE_EXPECTED_SCHEMA)));
+        // First insert passes filter
+        transform.processElement(new StreamRecord<>(insertEvent1));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent1Expect));
+        // Second insert does NOT pass filter - no output expected
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isNull();
+        transformFunctionEventEventOperatorTestHarness.close();
+    }
+
+    @Test
+    void testMapAccessWithFilter() throws Exception {
+        // Test map access in filter condition
+        PostTransformOperator transform =
+                PostTransformOperator.newBuilder()
+                        .addTransform(
+                                COMPLEX_TYPE_TABLEID.identifier(),
+                                "id, tags[1] AS first_tag, scores[1] AS first_score, props['status'] AS status, metrics['cnt'] AS cnt",
+                                "props['status'] = 'active'")
+                        .build();
+        RegularEventOperatorTestHarness<PostTransformOperator, Event>
+                transformFunctionEventEventOperatorTestHarness =
+                        RegularEventOperatorTestHarness.with(transform, 1);
+        // Initialization
+        transformFunctionEventEventOperatorTestHarness.open();
+        // Create table
+        CreateTableEvent createTableEvent =
+                new CreateTableEvent(COMPLEX_TYPE_TABLEID, COMPLEX_TYPE_SCHEMA);
+        BinaryRecordDataGenerator recordDataGenerator =
+                new BinaryRecordDataGenerator(((RowType) COMPLEX_TYPE_SCHEMA.toRowDataType()));
+        BinaryRecordDataGenerator expectedRecordDataGenerator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) COMPLEX_TYPE_EXPECTED_SCHEMA.toRowDataType()));
+
+        // Prepare test data - active status (passes filter)
+        GenericArrayData tagsArray =
+                new GenericArrayData(new Object[] {BinaryStringData.fromString("tag1")});
+        GenericArrayData scoresArray = new GenericArrayData(new Object[] {100});
+
+        Map<Object, Object> propsMapActive = new HashMap<>();
+        propsMapActive.put(
+                BinaryStringData.fromString("status"), BinaryStringData.fromString("active"));
+        GenericMapData propsMapDataActive = new GenericMapData(propsMapActive);
+
+        Map<Object, Object> propsMapInactive = new HashMap<>();
+        propsMapInactive.put(
+                BinaryStringData.fromString("status"), BinaryStringData.fromString("inactive"));
+        GenericMapData propsMapDataInactive = new GenericMapData(propsMapInactive);
+
+        Map<Object, Object> metricsMap = new HashMap<>();
+        metricsMap.put(BinaryStringData.fromString("cnt"), 1);
+        GenericMapData metricsMapData = new GenericMapData(metricsMap);
+
+        // Insert event with active status (passes filter)
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    1, tagsArray, scoresArray, propsMapDataActive, metricsMapData
+                                }));
+        DataChangeEvent insertEvent1Expect =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        expectedRecordDataGenerator.generate(
+                                new Object[] {
+                                    1,
+                                    BinaryStringData.fromString("tag1"),
+                                    100,
+                                    BinaryStringData.fromString("active"),
+                                    1
+                                }));
+
+        // Insert event with inactive status (does NOT pass filter)
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        COMPLEX_TYPE_TABLEID,
+                        recordDataGenerator.generate(
+                                new Object[] {
+                                    2, tagsArray, scoresArray, propsMapDataInactive, metricsMapData
+                                }));
+
+        transform.processElement(new StreamRecord<>(createTableEvent));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(
+                        new StreamRecord<>(
+                                new CreateTableEvent(
+                                        COMPLEX_TYPE_TABLEID, COMPLEX_TYPE_EXPECTED_SCHEMA)));
+        // First insert passes filter
+        transform.processElement(new StreamRecord<>(insertEvent1));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isEqualTo(new StreamRecord<>(insertEvent1Expect));
+        // Second insert does NOT pass filter - no output expected
+        transform.processElement(new StreamRecord<>(insertEvent2));
+        Assertions.assertThat(
+                        transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
+                .isNull();
+        transformFunctionEventEventOperatorTestHarness.close();
     }
 }

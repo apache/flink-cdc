@@ -19,6 +19,11 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.types.ArrayType;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.MapType;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
@@ -112,8 +117,18 @@ public class JaninoCompiler {
             SqlNode transform,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
             Map<String, String> columnNameMap) {
+        return translateSqlNodeToJaninoExpression(
+                transform, udfDescriptors, columnNameMap, Collections.emptyMap());
+    }
+
+    public static String translateSqlNodeToJaninoExpression(
+            SqlNode transform,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, String> columnNameMap,
+            Map<String, DataType> columnTypeMap) {
         Java.Rvalue rvalue =
-                translateSqlNodeToJaninoRvalue(transform, udfDescriptors, columnNameMap);
+                translateSqlNodeToJaninoRvalue(
+                        transform, udfDescriptors, columnNameMap, columnTypeMap);
         if (rvalue != null) {
             return rvalue.toString();
         }
@@ -123,13 +138,16 @@ public class JaninoCompiler {
     public static Java.Rvalue translateSqlNodeToJaninoRvalue(
             SqlNode transform,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+            Map<String, String> columnNameMap,
+            Map<String, DataType> columnTypeMap) {
         if (transform instanceof SqlIdentifier) {
             return translateSqlIdentifier((SqlIdentifier) transform, columnNameMap);
         } else if (transform instanceof SqlBasicCall) {
-            return translateSqlBasicCall((SqlBasicCall) transform, udfDescriptors, columnNameMap);
+            return translateSqlBasicCall(
+                    (SqlBasicCall) transform, udfDescriptors, columnNameMap, columnTypeMap);
         } else if (transform instanceof SqlCase) {
-            return translateSqlCase((SqlCase) transform, udfDescriptors, columnNameMap);
+            return translateSqlCase(
+                    (SqlCase) transform, udfDescriptors, columnNameMap, columnTypeMap);
         } else if (transform instanceof SqlLiteral) {
             return translateSqlSqlLiteral((SqlLiteral) transform);
         }
@@ -180,11 +198,12 @@ public class JaninoCompiler {
     private static Java.Rvalue translateSqlBasicCall(
             SqlBasicCall sqlBasicCall,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+            Map<String, String> columnNameMap,
+            Map<String, DataType> columnTypeMap) {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
-            translateSqlNodeToAtoms(sqlNode, atoms, udfDescriptors, columnNameMap);
+            translateSqlNodeToAtoms(sqlNode, atoms, udfDescriptors, columnNameMap, columnTypeMap);
         }
         if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(
                 sqlBasicCall.getOperator().getName().toUpperCase())) {
@@ -198,26 +217,30 @@ public class JaninoCompiler {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
         return sqlBasicCallToJaninoRvalue(
-                sqlBasicCall, atoms.toArray(new Java.Rvalue[0]), udfDescriptors);
+                sqlBasicCall, atoms.toArray(new Java.Rvalue[0]), udfDescriptors, columnTypeMap);
     }
 
     private static Java.Rvalue translateSqlCase(
             SqlCase sqlCase,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+            Map<String, String> columnNameMap,
+            Map<String, DataType> columnTypeMap) {
         SqlNodeList whenOperands = sqlCase.getWhenOperands();
         SqlNodeList thenOperands = sqlCase.getThenOperands();
         SqlNode elseOperand = sqlCase.getElseOperand();
         List<Java.Rvalue> whenAtoms = new ArrayList<>();
         for (SqlNode sqlNode : whenOperands) {
-            translateSqlNodeToAtoms(sqlNode, whenAtoms, udfDescriptors, columnNameMap);
+            translateSqlNodeToAtoms(
+                    sqlNode, whenAtoms, udfDescriptors, columnNameMap, columnTypeMap);
         }
         List<Java.Rvalue> thenAtoms = new ArrayList<>();
         for (SqlNode sqlNode : thenOperands) {
-            translateSqlNodeToAtoms(sqlNode, thenAtoms, udfDescriptors, columnNameMap);
+            translateSqlNodeToAtoms(
+                    sqlNode, thenAtoms, udfDescriptors, columnNameMap, columnTypeMap);
         }
         Java.Rvalue elseAtoms =
-                translateSqlNodeToJaninoRvalue(elseOperand, udfDescriptors, columnNameMap);
+                translateSqlNodeToJaninoRvalue(
+                        elseOperand, udfDescriptors, columnNameMap, columnTypeMap);
         Java.Rvalue sqlCaseRvalueTemp = elseAtoms;
         for (int i = whenAtoms.size() - 1; i >= 0; i--) {
             sqlCaseRvalueTemp =
@@ -234,26 +257,32 @@ public class JaninoCompiler {
             SqlNode sqlNode,
             List<Java.Rvalue> atoms,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+            Map<String, String> columnNameMap,
+            Map<String, DataType> columnTypeMap) {
         if (sqlNode instanceof SqlIdentifier) {
             atoms.add(translateSqlIdentifier((SqlIdentifier) sqlNode, columnNameMap));
         } else if (sqlNode instanceof SqlLiteral) {
             atoms.add(translateSqlSqlLiteral((SqlLiteral) sqlNode));
         } else if (sqlNode instanceof SqlBasicCall) {
-            atoms.add(translateSqlBasicCall((SqlBasicCall) sqlNode, udfDescriptors, columnNameMap));
+            atoms.add(
+                    translateSqlBasicCall(
+                            (SqlBasicCall) sqlNode, udfDescriptors, columnNameMap, columnTypeMap));
         } else if (sqlNode instanceof SqlNodeList) {
             for (SqlNode node : (SqlNodeList) sqlNode) {
-                translateSqlNodeToAtoms(node, atoms, udfDescriptors, columnNameMap);
+                translateSqlNodeToAtoms(node, atoms, udfDescriptors, columnNameMap, columnTypeMap);
             }
         } else if (sqlNode instanceof SqlCase) {
-            atoms.add(translateSqlCase((SqlCase) sqlNode, udfDescriptors, columnNameMap));
+            atoms.add(
+                    translateSqlCase(
+                            (SqlCase) sqlNode, udfDescriptors, columnNameMap, columnTypeMap));
         }
     }
 
     private static Java.Rvalue sqlBasicCallToJaninoRvalue(
             SqlBasicCall sqlBasicCall,
             Java.Rvalue[] atoms,
-            List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            Map<String, DataType> columnTypeMap) {
         switch (sqlBasicCall.getKind()) {
             case AND:
                 return generateBinaryOperation(sqlBasicCall, atoms, "&&");
@@ -307,6 +336,8 @@ public class JaninoCompiler {
                 return generateTimestampAddOperation(sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(sqlBasicCall, atoms);
+            case ITEM:
+                return generateItemOperation(sqlBasicCall, atoms, columnTypeMap);
             default:
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
@@ -314,6 +345,45 @@ public class JaninoCompiler {
 
     private static Java.Rvalue generateUnaryOperation(String operator, Java.Rvalue atom) {
         return new Java.UnaryOperation(Location.NOWHERE, operator, atom);
+    }
+
+    /**
+     * Generates item access operation for ARRAY and MAP types.
+     *
+     * <p>For arrays: array[index] where index is 1-based (SQL standard)
+     *
+     * <p>For maps: map[key] where key can be any type
+     *
+     * @param sqlBasicCall the SQL basic call node
+     * @param atoms the translated operands (array/map and index/key)
+     * @return the Janino Rvalue for item access
+     */
+    private static Java.Rvalue generateItemOperation(
+            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, Map<String, DataType> columnTypeMap) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        // atoms[0] is the array/map, atoms[1] is the index/key
+        // Generate: itemAccess(array/map, index/key)
+        SqlIdentifier identifier = (SqlIdentifier) (sqlBasicCall.getOperandList().get(0));
+        String filedName = identifier.names.get(identifier.names.size() - 1);
+        if (columnTypeMap.containsKey(filedName)) {
+            DataType dataType = columnTypeMap.get(filedName);
+            DataType elementType = null;
+            if (dataType.getTypeRoot() == DataTypeRoot.ARRAY) {
+                elementType = ((ArrayType) dataType).getElementType();
+            } else if (dataType.getTypeRoot() == DataTypeRoot.MAP) {
+                elementType = ((MapType) dataType).getValueType();
+            }
+            if (elementType != null) {
+                return generateTypeConvertMethod(
+                        elementType,
+                        new Java.Rvalue[] {
+                            new Java.MethodInvocation(Location.NOWHERE, null, "itemAccess", atoms)
+                        });
+            }
+        }
+        return new Java.MethodInvocation(Location.NOWHERE, null, "itemAccess", atoms);
     }
 
     private static Java.Rvalue generateBinaryOperation(
@@ -531,7 +601,55 @@ public class JaninoCompiler {
 
     private static Java.Rvalue generateTypeConvertMethod(
             SqlDataTypeSpec sqlDataTypeSpec, Java.Rvalue[] atoms) {
-        switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
+        String typeName = sqlDataTypeSpec.getTypeName().getSimple().toUpperCase();
+        int precision = DecimalType.DEFAULT_PRECISION;
+        int scale = DecimalType.DEFAULT_SCALE;
+        if (typeName.equals("DECIMAL")
+                && sqlDataTypeSpec.getTypeNameSpec() instanceof SqlBasicTypeNameSpec) {
+            SqlBasicTypeNameSpec typeNameSpec =
+                    (SqlBasicTypeNameSpec) sqlDataTypeSpec.getTypeNameSpec();
+            if (typeNameSpec.getPrecision() > -1) {
+                precision = typeNameSpec.getPrecision();
+            }
+            if (typeNameSpec.getScale() > -1) {
+                scale = typeNameSpec.getScale();
+            }
+        }
+        return generateTypeConvertMethodInternal(typeName, precision, scale, atoms);
+    }
+
+    /**
+     * Generates type conversion method invocation for Flink CDC DataType.
+     *
+     * @param dataType the Flink CDC DataType
+     * @param atoms the operands to be converted
+     * @return the Janino Rvalue for type conversion
+     */
+    private static Java.Rvalue generateTypeConvertMethod(DataType dataType, Java.Rvalue[] atoms) {
+        DataTypeRoot typeRoot = dataType.getTypeRoot();
+        String typeName = typeRoot.name();
+        int precision = DecimalType.DEFAULT_PRECISION;
+        int scale = DecimalType.DEFAULT_SCALE;
+        if (dataType instanceof DecimalType) {
+            DecimalType decimalType = (DecimalType) dataType;
+            precision = decimalType.getPrecision();
+            scale = decimalType.getScale();
+        }
+        return generateTypeConvertMethodInternal(typeName, precision, scale, atoms);
+    }
+
+    /**
+     * Internal method that generates type conversion method invocation.
+     *
+     * @param typeName the type name (uppercase)
+     * @param precision the precision for DECIMAL type
+     * @param scale the scale for DECIMAL type
+     * @param atoms the operands to be converted
+     * @return the Janino Rvalue for type conversion
+     */
+    private static Java.Rvalue generateTypeConvertMethodInternal(
+            String typeName, int precision, int scale, Java.Rvalue[] atoms) {
+        switch (typeName.toUpperCase()) {
             case "BOOLEAN":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToBoolean", atoms);
             case "TINYINT":
@@ -539,6 +657,7 @@ public class JaninoCompiler {
             case "SMALLINT":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToShort", atoms);
             case "INTEGER":
+            case "INT":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToInteger", atoms);
             case "BIGINT":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToLong", atoms);
@@ -547,18 +666,6 @@ public class JaninoCompiler {
             case "DOUBLE":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToDouble", atoms);
             case "DECIMAL":
-                int precision = 10;
-                int scale = 0;
-                if (sqlDataTypeSpec.getTypeNameSpec() instanceof SqlBasicTypeNameSpec) {
-                    SqlBasicTypeNameSpec typeNameSpec =
-                            (SqlBasicTypeNameSpec) sqlDataTypeSpec.getTypeNameSpec();
-                    if (typeNameSpec.getPrecision() > -1) {
-                        precision = typeNameSpec.getPrecision();
-                    }
-                    if (typeNameSpec.getScale() > -1) {
-                        scale = typeNameSpec.getScale();
-                    }
-                }
                 List<Java.Rvalue> newAtoms = new ArrayList<>(Arrays.asList(atoms));
                 newAtoms.add(
                         new Java.AmbiguousName(
@@ -575,6 +682,9 @@ public class JaninoCompiler {
             case "VARCHAR":
             case "STRING":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToString", atoms);
+            case "TIMESTAMP_WITHOUT_TIME_ZONE":
+            case "TIMESTAMP_WITH_TIME_ZONE":
+            case "TIMESTAMP_WITH_LOCAL_TIME_ZONE":
             case "TIMESTAMP":
                 List<Java.Rvalue> timestampAtoms = new ArrayList<>(Arrays.asList(atoms));
                 timestampAtoms.add(
@@ -584,9 +694,16 @@ public class JaninoCompiler {
                         null,
                         "castToTimestamp",
                         timestampAtoms.toArray(new Java.Rvalue[0]));
+            case "DATE":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToDate", atoms);
+            case "TIME_WITHOUT_TIME_ZONE":
+            case "TIME":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToTime", atoms);
+            case "BINARY":
+            case "VARBINARY":
+                return new Java.MethodInvocation(Location.NOWHERE, null, "castToBinary", atoms);
             default:
-                throw new ParseException(
-                        "Unsupported data type cast: " + sqlDataTypeSpec.toString());
+                throw new ParseException("Unsupported data type cast: " + typeName);
         }
     }
 

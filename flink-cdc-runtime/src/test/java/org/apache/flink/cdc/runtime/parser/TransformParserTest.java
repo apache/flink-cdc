@@ -390,6 +390,18 @@ class TransformParserTest {
         testFilterExpression("cast(dt as TIMESTAMP)", "castToTimestamp(dt, __time_zone__)");
         testFilterExpression("parse_json(jsonStr)", "parseJson(jsonStr)");
         testFilterExpression("try_parse_json(jsonStr)", "tryParseJson(jsonStr)");
+
+        // Collection access functions (ARRAY, MAP)
+        // Array access: array[index] - index is 1-based (SQL standard)
+        testFilterExpression("arr[1]", "itemAccess(arr, 1)");
+        testFilterExpression("arr[2]", "itemAccess(arr, 2)");
+        testFilterExpression("arr[idx]", "itemAccess(arr, idx)");
+        // Map access: map[key]
+        testFilterExpression("m['key']", "itemAccess(m, \"key\")");
+        testFilterExpression("m[k]", "itemAccess(m, k)");
+        // Nested access
+        testFilterExpression("arr[1] = 'value'", "valueEquals(itemAccess(arr, 1), \"value\")");
+        testFilterExpression("m['key'] > 10", "greaterThan(itemAccess(m, \"key\"), 10)");
     }
 
     @Test
