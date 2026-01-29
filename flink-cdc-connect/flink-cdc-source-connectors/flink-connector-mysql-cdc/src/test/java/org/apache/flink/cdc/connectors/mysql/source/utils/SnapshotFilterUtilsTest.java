@@ -28,7 +28,7 @@ import java.util.Map;
 public class SnapshotFilterUtilsTest {
 
     @Test
-    public void test() {
+    public void testGetSnapshotFilter() {
         Map<String, String> map = new HashMap<>();
         map.put("db.user", "id > 100");
         map.put("db.order_[0-9]+", "id > 200");
