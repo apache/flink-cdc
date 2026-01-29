@@ -207,7 +207,7 @@ Pipeline 连接器配置项
     </tr>
     <tr>
       <td>TIMESTAMP</td>
-      <td>DATETIME</td>
+      <td>TIMESTAMP</td>
       <td></td>
     </tr>
     <tr>
