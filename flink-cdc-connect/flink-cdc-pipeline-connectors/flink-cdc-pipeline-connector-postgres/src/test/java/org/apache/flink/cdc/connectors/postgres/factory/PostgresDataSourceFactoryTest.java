@@ -21,8 +21,13 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.factories.Factory;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
+import org.apache.flink.cdc.connectors.postgres.source.DatabaseNameMetadataColumn;
+import org.apache.flink.cdc.connectors.postgres.source.OpTsMetadataColumn;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource;
+import org.apache.flink.cdc.connectors.postgres.source.SchemaNameMetadataColumn;
+import org.apache.flink.cdc.connectors.postgres.source.TableNameMetadataColumn;
 import org.apache.flink.table.api.ValidationException;
 
 import org.junit.jupiter.api.AfterEach;
@@ -303,6 +308,34 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         assertThatThrownBy(() -> factory.createDataSource(context))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot find any table by the option 'tables'");
+    }
+
+    @Test
+    public void testSupportedMetadataColumns() {
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), POSTGRES_CONTAINER.getHost());
+        options.put(
+                PG_PORT.key(), String.valueOf(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT)));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), POSTGRES_CONTAINER.getDatabaseName() + ".inventory.prod\\.*");
+        options.put(SLOT_NAME.key(), slotName);
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        PostgresDataSourceFactory factory = new PostgresDataSourceFactory();
+        PostgresDataSource dataSource = (PostgresDataSource) factory.createDataSource(context);
+
+        SupportedMetadataColumn[] metadataColumns = dataSource.supportedMetadataColumns();
+        assertThat(metadataColumns).hasSize(4);
+        assertThat(metadataColumns[0]).isInstanceOf(OpTsMetadataColumn.class);
+        assertThat(metadataColumns[0].getName()).isEqualTo("op_ts");
+        assertThat(metadataColumns[1]).isInstanceOf(TableNameMetadataColumn.class);
+        assertThat(metadataColumns[1].getName()).isEqualTo("table_name");
+        assertThat(metadataColumns[2]).isInstanceOf(DatabaseNameMetadataColumn.class);
+        assertThat(metadataColumns[2].getName()).isEqualTo("database_name");
+        assertThat(metadataColumns[3]).isInstanceOf(SchemaNameMetadataColumn.class);
+        assertThat(metadataColumns[3].getName()).isEqualTo("schema_name");
+
     }
 
     class MockContext implements Factory.Context {
