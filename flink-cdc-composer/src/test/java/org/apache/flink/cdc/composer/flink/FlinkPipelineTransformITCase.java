@@ -2803,10 +2803,10 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate filtering expression for table `default_namespace.default_schema.mytable1`.\n" +
-                                "\tOriginal expression: name + 1 > 0\n" +
-                                "\tCompiled expression: greaterThan($0 + 1, 0)\n" +
-                                "\tColumn name map: {$0 -> name}")
+                        "Failed to evaluate filtering expression for table `default_namespace.default_schema.mytable1`.\n"
+                                + "\tOriginal expression: name + 1 > 0\n"
+                                + "\tCompiled expression: greaterThan($0 + 1, 0)\n"
+                                + "\tColumn name map: {$0 -> name}")
                 .hasMessageContaining("Column name map: {$0 -> name}")
                 .rootCause()
                 .isExactlyInstanceOf(RuntimeException.class)
