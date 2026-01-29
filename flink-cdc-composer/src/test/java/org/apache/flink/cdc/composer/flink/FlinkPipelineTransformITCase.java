@@ -2736,10 +2736,10 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
-                        "Failed to compile expression TransformExpressionKey{expression='import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
+                        "Failed to compile expression TransformExpressionKey{originalExpression='id1 > 0', expression='import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
                 .cause()
                 .hasMessageContaining(
-                        "Expression: import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)")
+                        "Compiled expression: import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)")
                 .hasMessageContaining("Column name map: {$0 -> id1}")
                 .rootCause()
                 .isExactlyInstanceOf(CompileException.class)
@@ -2782,7 +2782,7 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate projection expression `castToInteger($0) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
+                        "Failed to evaluate projection expression `CAST(`TB`.`name` AS INTEGER) + 1` for column `new_name` in table `default_namespace.default_schema.mytable1`")
                 .hasMessageContaining("Column name map: {$0 -> name}");
 
         // Unsupported operations in filter rule
@@ -2803,7 +2803,10 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(RuntimeException.class)
                 .hasMessageContaining(
-                        "Failed to evaluate filtering expression `greaterThan($0 + 1, 0)` for table `default_namespace.default_schema.mytable1`")
+                        "Failed to evaluate filtering expression for table `default_namespace.default_schema.mytable1`.\n" +
+                                "\tOriginal expression: name + 1 > 0\n" +
+                                "\tCompiled expression: greaterThan($0 + 1, 0)\n" +
+                                "\tColumn name map: {$0 -> name}")
                 .hasMessageContaining("Column name map: {$0 -> name}")
                 .rootCause()
                 .isExactlyInstanceOf(RuntimeException.class)
