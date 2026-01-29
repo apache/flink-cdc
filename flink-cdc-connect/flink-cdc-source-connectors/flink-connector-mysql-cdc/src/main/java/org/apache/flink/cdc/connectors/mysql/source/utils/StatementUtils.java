@@ -215,7 +215,7 @@ public class StatementUtils {
         }
 
         if (filter != null) {
-            condition = condition == null ? filter : filter + " AND " + condition;
+            condition = condition == null ? filter : "(" + filter + ") AND " + condition;
         }
 
         if (isScanningData) {
