@@ -294,6 +294,7 @@ class MySqlTableSourceFactoryTest {
         options.put("scan.incremental.close-idle-reader.enabled", "true");
         options.put("scan.incremental.snapshot.backfill.skip", "true");
         options.put("use.legacy.json.format", "true");
+        options.put("scan.incremental.snapshot.enabled", "true");
         options.put("scan.snapshot.filter", "id > 200");
 
         DynamicTableSource actualSource = createTableSource(options);
@@ -316,7 +317,7 @@ class MySqlTableSourceFactoryTest {
                         ZoneId.of("Asia/Shanghai"),
                         dbzProperties,
                         "4321",
-                        false,
+                        true,
                         SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE.defaultValue(),
                         CHUNK_META_GROUP_SIZE.defaultValue(),
                         SCAN_SNAPSHOT_FETCH_SIZE.defaultValue(),
