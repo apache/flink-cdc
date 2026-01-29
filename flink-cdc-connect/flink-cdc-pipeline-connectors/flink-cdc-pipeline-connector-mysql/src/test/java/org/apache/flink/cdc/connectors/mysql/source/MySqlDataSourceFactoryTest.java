@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_SNAPSHOT_FILTERS;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TREAT_TINYINT1_AS_BOOLEAN_ENABLED;
@@ -328,6 +330,142 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                                 put(productsTable, "id");
                             }
                         });
+    }
+
+    @Test
+    void testAddSnapshotFilters() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, Object> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+        options.put(SCAN_SNAPSHOT_FILTERS.key(), mockSnapshotFilters());
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+
+        assertThat(dataSource.getSourceConfig().getSnapshotFilters())
+                .isNotEmpty()
+                .isEqualTo(
+                        new HashMap<String, String>() {
+                            {
+                                put(
+                                        inventoryDatabase.getDatabaseName() + ".multi_max_\\.*",
+                                        "id > 200");
+                                put(inventoryDatabase.getDatabaseName() + ".products", "1 = 0");
+                                put(
+                                        inventoryDatabase.getDatabaseName() + ".customers",
+                                        "city != 'China:beijing'");
+                            }
+                        });
+    }
+
+    @Test
+    void testSnapshotFiltersMissingTableKey() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, Object> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+
+        // Create snapshot filters with missing 'table' key
+        List<Map<String, String>> snapshotFilters = new ArrayList<>();
+        Map<String, String> filter1 = new HashMap<>();
+        filter1.put("filter", "id > 100");
+        // Missing 'table' key
+        snapshotFilters.add(filter1);
+        options.put(SCAN_SNAPSHOT_FILTERS.key(), snapshotFilters);
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("missing required key 'table'");
+    }
+
+    @Test
+    void testSnapshotFiltersMissingFilterKey() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, Object> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+
+        // Create snapshot filters with missing 'filter' key
+        List<Map<String, String>> snapshotFilters = new ArrayList<>();
+        Map<String, String> filter1 = new HashMap<>();
+        filter1.put("table", inventoryDatabase.getDatabaseName() + ".products");
+        // Missing 'filter' key
+        snapshotFilters.add(filter1);
+        options.put(SCAN_SNAPSHOT_FILTERS.key(), snapshotFilters);
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("missing required key 'filter'");
+    }
+
+    @Test
+    void testSnapshotFiltersDuplicateTablePattern() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, Object> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".\\.*");
+
+        // Create snapshot filters with duplicate table pattern
+        List<Map<String, String>> snapshotFilters = new ArrayList<>();
+        Map<String, String> filter1 = new HashMap<>();
+        filter1.put("table", inventoryDatabase.getDatabaseName() + ".products");
+        filter1.put("filter", "id > 100");
+        snapshotFilters.add(filter1);
+
+        Map<String, String> filter2 = new HashMap<>();
+        filter2.put("table", inventoryDatabase.getDatabaseName() + ".products");
+        filter2.put("filter", "id > 200");
+        snapshotFilters.add(filter2);
+
+        options.put(SCAN_SNAPSHOT_FILTERS.key(), snapshotFilters);
+
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+
+        assertThatThrownBy(() -> factory.createDataSource(context))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("Duplicate table pattern");
+    }
+
+    private List<Map<String, String>> mockSnapshotFilters() {
+        List<Map<String, String>> snapshotFilters = new ArrayList<>();
+
+        Map<String, String> filter1 = new HashMap<>();
+        filter1.put("table", inventoryDatabase.getDatabaseName() + ".multi_max_\\.*");
+        filter1.put("filter", "id > 200");
+        snapshotFilters.add(filter1);
+
+        Map<String, String> filter2 = new HashMap<>();
+        filter2.put("table", inventoryDatabase.getDatabaseName() + ".products");
+        filter2.put("filter", "1 = 0");
+        snapshotFilters.add(filter2);
+
+        Map<String, String> filter3 = new HashMap<>();
+        filter3.put("table", inventoryDatabase.getDatabaseName() + ".customers");
+        filter3.put("filter", "city != 'China:beijing'");
+        snapshotFilters.add(filter3);
+
+        return snapshotFilters;
     }
 
     class MockContext implements Factory.Context {
