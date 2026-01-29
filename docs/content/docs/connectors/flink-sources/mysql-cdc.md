@@ -391,6 +391,30 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
       </td>
     </tr>
     <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Whether to enable capturing newly added tables or not, by default is false. This option is only useful when restoring the job from a savepoint/checkpoint. <br>
+          When enabled, newly added tables that match the configured table patterns will be automatically captured with full snapshot + incremental binlog reading.
+      </td>
+    </tr>
+    <tr>
+      <td>scan.binlog.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>Cannot be enabled together with <code>scan.newly-added-table.enabled</code>. <br>
+          <b><code>table-name</code> config Examples:</b>
+          <ul>
+            <li><code>db\.*</code> - captures all tables in database 'db'</li>
+            <li><code>db\.user_\.*</code> - captures tables like 'user_orders', 'user_profiles' in database 'db'</li>
+            <li><code>db\.order_[0-9]+</code> - captures tables like 'order_1', 'order_2' in database 'db'</li>
+            <li><code>db1\.*,db2\.user_\.*</code> - captures all tables in 'db1' and 'user_*' tables in 'db2'</li>
+          </ul>
+      </td>
+    </tr>
+    <tr>
       <td>debezium.binary.handling.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>

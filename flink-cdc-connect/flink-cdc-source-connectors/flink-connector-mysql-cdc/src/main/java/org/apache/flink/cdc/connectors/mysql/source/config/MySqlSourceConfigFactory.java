@@ -413,6 +413,13 @@ public class MySqlSourceConfigFactory implements Serializable {
         if (databaseList != null) {
             props.setProperty("database.include.list", String.join(",", databaseList));
         }
+        // Validate: Two modes are mutually exclusive
+        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
+            throw new IllegalArgumentException(
+                    "Cannot enable both 'scan.binlog.newly-added-table.enabled' and "
+                            + "'scan.newly-added-table.enabled' as they may cause duplicate data");
+        }
+
         if (tableList != null) {
             // Convert table patterns to Debezium style if binlog auto-capture is enabled
             if (scanBinlogNewlyAddedTableEnabled) {
@@ -438,13 +445,6 @@ public class MySqlSourceConfigFactory implements Serializable {
 
         if (jdbcProperties == null) {
             jdbcProperties = new Properties();
-        }
-
-        // Validate: Two modes are mutually exclusive
-        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
-            throw new IllegalArgumentException(
-                    "Cannot enable both 'scan.binlog.newly-added-table.enabled' and "
-                            + "'scan.newly-added-table.enabled' as they may cause duplicate data");
         }
 
         return new MySqlSourceConfig(
@@ -499,11 +499,12 @@ public class MySqlSourceConfigFactory implements Serializable {
      * @param tables Flink CDC style table pattern
      * @return Debezium style table pattern
      */
-    private String convertToDebeziumStyle(String tables) {
+    private static String convertToDebeziumStyle(String tables) {
         LOG.debug("Converting table pattern to Debezium style: {}", tables);
 
         // Step 1: Replace comma separator with pipe (OR semantics)
-        tables = Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
+        tables =
+                Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
         LOG.debug("After replacing comma with pipe separator: {}", tables);
 
         // Step 2: Replace escaped dot \. with placeholder

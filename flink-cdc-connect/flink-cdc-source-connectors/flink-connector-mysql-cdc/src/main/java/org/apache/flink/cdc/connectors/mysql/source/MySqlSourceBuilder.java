@@ -213,9 +213,27 @@ public class MySqlSourceBuilder<T> {
     }
 
     /**
-     * Whether to capture newly added tables in binlog reading phase without snapshot. This option
-     * can only be used with stream-only startup modes. Cannot be enabled together with {@link
-     * #scanNewlyAddedTableEnabled(boolean)}.
+     * Whether to capture newly added tables in binlog reading phase without snapshot. Cannot be
+     * enabled together with {@link #scanNewlyAddedTableEnabled(boolean)}.
+     *
+     * <p>The difference between {@link #scanNewlyAddedTableEnabled(boolean)} and this option:
+     *
+     * <ul>
+     *   <li>scanNewlyAddedTableEnabled: performs full snapshot + incremental binlog reading for
+     *       newly added tables when restored from checkpoint/savepoint
+     *   <li>scanBinlogNewlyAddedTableEnabled: only captures binlog events for newly added tables
+     *       during binlog reading phase, without snapshot
+     * </ul>
+     *
+     * <p>table-name pattern examples for the {@link #tableList(String...)} method:
+     *
+     * <ul>
+     *   <li>"db\\.*" - captures all tables in database 'db'
+     *   <li>"db\\.user_\\.*" - captures tables like 'user_orders', 'user_profiles' in database 'db'
+     *   <li>"db\\.order_[0-9]+" - captures tables like 'order_1', 'order_2' in database 'db'
+     *   <li>"db1\\.*", "db2\\.user_\\.*" - captures all tables in 'db1' and 'user_*' tables in
+     *       'db2'
+     * </ul>
      */
     @Experimental
     public MySqlSourceBuilder<T> scanBinlogNewlyAddedTableEnabled(

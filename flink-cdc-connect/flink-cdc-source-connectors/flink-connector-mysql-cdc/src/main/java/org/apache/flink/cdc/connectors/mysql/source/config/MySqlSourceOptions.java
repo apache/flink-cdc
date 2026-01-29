@@ -252,9 +252,12 @@ public class MySqlSourceOptions {
                             "In binlog reading stage, whether to capture newly added tables "
                                     + "that match the table patterns. When enabled, new tables will be "
                                     + "captured without snapshot, only binlog events will be emitted. "
-                                    + "This option can only be used with stream-only startup modes "
-                                    + "(latest-offset, earliest-offset, timestamp, specific-offset). "
-                                    + "Cannot be enabled together with 'scan.newly-added-table.enabled'.");
+                                    + "Cannot be enabled together with 'scan.newly-added-table.enabled'. "
+                                    + "table-name pattern examples: "
+                                    + "'db\\.*' (all tables in database 'db'), "
+                                    + "'db\\.user_\\.*' (tables like 'user_orders', 'user_profiles'), "
+                                    + "'db\\.order_[0-9]+' (tables like 'order_1', 'order_2'), "
+                                    + "'db1\\.*,db2\\.user_\\.*' (all tables in 'db1' and 'user_*' tables in 'db2').");
 
     @Experimental
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =

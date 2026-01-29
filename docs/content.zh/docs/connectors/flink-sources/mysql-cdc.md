@@ -389,6 +389,30 @@ Flink SQL> SELECT * FROM orders;
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
     <tr>
+      <td>scan.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>是否启用捕获新增表的功能，默认为 false。此选项仅在从 savepoint/checkpoint 恢复作业时有效。<br>
+          启用后，新增的符合配置表达式的表将自动捕获，执行完整快照 + 增量 binlog 读取。
+      </td>
+    </tr>
+    <tr>
+      <td>scan.binlog.newly-added-table.enabled</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">false</td>
+      <td>Boolean</td>
+      <td>不能与 <code>scan.newly-added-table.enabled</code> 同时启用。<br>
+          <b><code>table-name</code>参数 匹配模式示例：</b>
+          <ul>
+            <li><code>db\.*</code> - 捕获数据库 'db' 下的所有表</li>
+            <li><code>db\.user_\.*</code> - 捕获数据库 'db' 下类似 'user_orders'、'user_profiles' 的表</li>
+            <li><code>db\.order_[0-9]+</code> - 捕获数据库 'db' 下类似 'order_1'、'order_2' 的表</li>
+            <li><code>db1\.*,db2\.user_\.*</code> - 捕获 'db1' 下所有表和 'db2' 下 'user_*' 开头的表</li>
+          </ul>
+      </td>
+    </tr>
+    <tr>
       <td>scan.parse.online.schema.changes.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
