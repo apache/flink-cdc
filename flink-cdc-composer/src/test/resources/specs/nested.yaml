@@ -14,7 +14,6 @@
 ################################################################################
 
 - do: Select Nested Objects
-  ignore: FLINK-38887
   projection: |-
     id_
     array_int_
@@ -22,14 +21,103 @@
     map_int_string_
     map_string_array_string_
     complex_row_
+    variant_
   primary-key: id_
   expect: |-
-    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>,`map_int_string_` MAP<INT, STRING>,`map_string_array_string_` MAP<STRING, ARRAY<STRING>>,`complex_row_` ROW<`name` STRING, `length` INT>}, primaryKeys=id_, options=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], op=INSERT, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], op=UPDATE, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}], after=[], op=DELETE, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null], op=INSERT, meta=()}
-    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null], after=[], op=DELETE, meta=()}
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`array_int_` ARRAY<INT>,`array_string_` ARRAY<STRING>,`map_int_string_` MAP<INT, STRING>,`map_string_array_string_` MAP<STRING, ARRAY<STRING>>,`complex_row_` ROW<`name` STRING, `length` INT>,`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, [1, 1, 2, 3, 5, 8, 13], [one, one, two, three, five], {1 -> one, 2 -> two, 3 -> three}, {two -> [T, W, O], one -> [O, N, E], three -> [T, H, R, E, E]}, {name: STRING -> Alice, length: INT -> 5}, {"array":[1,2,{"kk":1.123}],"k":1,"object":{"k":"hello"}}], after=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}, [{"k":1},"hello",{"k":2}]], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, [2, 3, 5, 7, 11, 13, 17, 19], [二, san, 五, qi, 十一], {1 -> yi, 2 -> er, 3 -> san}, {二 -> [E, R], 三 -> [S, A, N], 一 -> [Y, I]}, {name: STRING -> Derrida, length: INT -> 7}, [{"k":1},"hello",{"k":2}]], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
+- do: Parse Variant from JSON
+  projection: |-
+    id_
+    PARSE_JSON(id_) AS variant_id_
+    PARSE_JSON('[' || id_ || ',' || bool_ || ']') AS variant_array_
+    PARSE_JSON('{\"id\": ' || id_ || ', \"name\": \"' || string_ || '\"}') AS variant_doc_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_id_` VARIANT,`variant_array_` VARIANT,`variant_doc_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], after=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 0, [0,null], {"id":0,"name":"null"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 0, [0,null], {"id":0,"name":"null"}], after=[], op=DELETE, meta=()}
+- do: Parse Variant from JSON with Error
+  projection: |-
+    id_
+    PARSE_JSON('NOT A VALID JSON') AS variant_
+  primary-key: id_
+  expect-error: 'Failed to parse json string: NOT A VALID JSON'
+- do: Try Parse Variant from JSON
+  projection: |-
+    id_
+    TRY_PARSE_JSON(id_) AS variant_id_
+    TRY_PARSE_JSON('[' || id_ || ',' || bool_ || ']') AS variant_array_
+    TRY_PARSE_JSON('{\"id\": ' || id_ || ', \"name\": \"' || string_ || '\"}') AS variant_doc_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_id_` VARIANT,`variant_array_` VARIANT,`variant_doc_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, 1, [1,true], {"id":1,"name":"From A to Z is Lie"}], after=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, -1, [-1,false], {"id":-1,"name":"天地玄黄宇宙洪荒"}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, 0, [0,null], {"id":0,"name":"null"}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, 0, [0,null], {"id":0,"name":"null"}], after=[], op=DELETE, meta=()}
+- do: Try Parse Variant from JSON with Error
+  projection: |-
+    id_
+    TRY_PARSE_JSON('NOT A VALID JSON') AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null], after=[-1, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Parse Variant from JSON with duplicate key rejected
+  projection: |-
+    id_
+    PARSE_JSON('{\"id\": 1, \"id\": 2}') AS variant_
+  primary-key: id_
+  expect-error: 'org.apache.flink.cdc.common.types.variant.VariantTypeException: VARIANT_DUPLICATE_KEY'
+- do: Parse Variant from JSON with duplicate key allowed
+  projection: |-
+    id_
+    PARSE_JSON('{\"id\": 1, \"id\": 2}', TRUE) AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {"id":2}], after=[-1, {"id":2}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {"id":2}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, {"id":2}], after=[], op=DELETE, meta=()}
+- do: Try Parse Variant from JSON with duplicate key rejected
+  projection: |-
+    id_
+    TRY_PARSE_JSON('{\"id\": 1, \"id\": 2}') AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, null], after=[-1, null], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, null], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
+- do: Try Parse Variant from JSON with duplicate key allowed
+  projection: |-
+    id_
+    TRY_PARSE_JSON('{\"id\": 1, \"id\": 2}', TRUE) AS variant_
+  primary-key: id_
+  expect: |-
+    CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`variant_` VARIANT}, primaryKeys=id_, options=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[1, {"id":2}], after=[-1, {"id":2}], op=UPDATE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[-1, {"id":2}], after=[], op=DELETE, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, {"id":2}], op=INSERT, meta=()}
+    DataChangeEvent{tableId=foo.bar.baz, before=[0, {"id":2}], after=[], op=DELETE, meta=()}
 - do: Integer Array Subscripting
   ignore: FLINK-38888
   projection: |-

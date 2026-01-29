@@ -19,9 +19,10 @@ package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.ParseException;
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
+import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlBasicTypeNameSpec;
@@ -42,10 +43,10 @@ import org.codehaus.janino.Java;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Use Janino compiler to compiler the statement of flink cdc pipeline transform into the executable
@@ -68,11 +69,10 @@ public class JaninoCompiler {
                     "UNIX_TIMESTAMP");
 
     private static final List<String> TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS =
-            Collections.emptyList();
+            List.of("TO_DATE", "TO_TIMESTAMP_LTZ");
 
     private static final List<String> TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS =
             Arrays.asList(
-                    "TO_DATE",
                     "TO_TIMESTAMP",
                     "FROM_UNIXTIME",
                     "TIMESTAMPADD",
@@ -83,9 +83,22 @@ public class JaninoCompiler {
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
+    private static final String[] BUILTIN_FUNCTION_MODULES = {
+        "Arithmetic", "Casting", "Comparison", "Logical", "String", "Temporal"
+    };
+
+    @VisibleForTesting
+    public static final String LOAD_MODULES_EXPRESSION =
+            Arrays.stream(BUILTIN_FUNCTION_MODULES)
+                    .map(
+                            mod ->
+                                    String.format(
+                                            "import static org.apache.flink.cdc.runtime.functions.impl.%sFunctions.*;",
+                                            mod))
+                    .collect(Collectors.joining());
+
     public static String loadSystemFunction(String expression) {
-        return "import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;"
-                + expression;
+        return LOAD_MODULES_EXPRESSION + expression;
     }
 
     public static ExpressionEvaluator compileExpression(
@@ -569,7 +582,7 @@ public class JaninoCompiler {
                 return new Java.MethodInvocation(
                         Location.NOWHERE,
                         null,
-                        "castToDecimalData",
+                        "castToBigDecimal",
                         newAtoms.toArray(new Java.Rvalue[0]));
             case "CHAR":
             case "VARCHAR":
@@ -594,7 +607,7 @@ public class JaninoCompiler {
         if (udfFunction.getReturnTypeHint() != null) {
             return String.format(
                     "(%s) __instanceOf%s.eval",
-                    DataTypeConverter.convertOriginalClass(udfFunction.getReturnTypeHint())
+                    JavaClassConverter.toJavaClass(udfFunction.getReturnTypeHint())
                             .getCanonicalName(),
                     udfFunction.getClassName());
         } else {

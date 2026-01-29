@@ -26,7 +26,7 @@ import org.apache.flink.cdc.runtime.operators.transform.ProjectionColumn;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSchemaFactory;
 import org.apache.flink.cdc.runtime.parser.metadata.TransformSqlOperatorTable;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
+import org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter;
 
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.Lex;
@@ -87,7 +87,7 @@ import java.util.stream.Stream;
 
 import static org.apache.flink.cdc.common.utils.StringUtils.isNullOrWhitespaceOnly;
 import static org.apache.flink.cdc.runtime.parser.metadata.MetadataColumns.METADATA_COLUMNS;
-import static org.apache.flink.cdc.runtime.typeutils.DataTypeConverter.convertCalciteType;
+import static org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter.convertCalciteType;
 
 /** Use Flink's calcite parser to parse the statement of flink cdc pipeline transform. */
 public class TransformParser {
@@ -344,7 +344,7 @@ public class TransformParser {
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
-                                    DataTypeConverter.convertCalciteRelDataTypeToDataType(
+                                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(
                                             relDataType),
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
@@ -399,7 +399,8 @@ public class TransformParser {
             return ProjectionColumn.ofCalculated(
                     projectedColumnName,
                     // Metadata columns should never be null
-                    DataTypeConverter.convertCalciteRelDataTypeToDataType(relDataType).notNull(),
+                    CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(relDataType)
+                            .notNull(),
                     identifier,
                     columnNameMap.get(identifier),
                     Collections.singletonList(identifier),
