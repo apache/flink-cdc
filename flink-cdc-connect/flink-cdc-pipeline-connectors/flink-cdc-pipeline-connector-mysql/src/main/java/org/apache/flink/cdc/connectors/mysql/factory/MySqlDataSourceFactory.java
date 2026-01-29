@@ -30,7 +30,6 @@ import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
-import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -45,7 +44,6 @@ import org.apache.flink.table.catalog.ObjectPath;
 
 import com.mysql.cj.conf.PropertyKey;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
-import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,6 +215,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .debeziumProperties(getDebeziumProperties(configMap))
                         .jdbcProperties(getJdbcProperties(configMap))
                         .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
+                        .scanBinlogNewlyAddedTableEnabled(scanBinlogNewlyAddedTableEnabled)
                         .parseOnLineSchemaChanges(isParsingOnLineSchemaChanges)
                         .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
                         .useLegacyJsonFormat(useLegacyJsonFormat)
@@ -225,14 +224,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
-        if (scanBinlogNewlyAddedTableEnabled && scanNewlyAddedTableEnabled) {
-            throw new IllegalArgumentException(
-                    "If both scan.binlog.newly-added-table.enabled and scan.newly-added-table.enabled are true, data maybe duplicate after restore");
-        }
-
         if (scanBinlogNewlyAddedTableEnabled) {
-            String newTables = validateTableAndReturnDebeziumStyle(tables);
-            configFactory.tableList(newTables);
+            configFactory.tableList(tables);
             configFactory.excludeTableList(tablesExclude);
 
         } else {
@@ -512,60 +505,6 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
-    }
-
-    private static final String DOT_PLACEHOLDER = "_$dot_placeholder$_";
-
-    /**
-     * Currently, The supported regular syntax is not exactly the same in {@link Selectors} and
-     * {@link Tables.TableFilter}.
-     *
-     * <p>The main distinction are :
-     *
-     * <p>1) {@link Selectors} use {@code ,} to split table names and {@link Tables.TableFilter} use
-     * `|` to split table names.
-     *
-     * <p>2) If there is a need to use a dot ({@code .}) in a regular expression to match any
-     * character, it is necessary to escape the dot with a backslash, refer to {@link
-     * MySqlDataSourceOptions#TABLES}.
-     *
-     * <p>3) The unescaped {@code .} is used as the separator of database and table name. When
-     * converting to Debezium style, it is expected to be escaped to match the dot ({@code .})
-     * literally instead of the meta-character.
-     */
-    private String validateTableAndReturnDebeziumStyle(String tables) {
-        LOG.info("Rewriting CDC style table capture list: {}", tables);
-
-        // In CDC-style table matching, table names could be separated by `,` character.
-        // Convert it to `|` as it's standard RegEx syntax.
-        tables =
-                Arrays.stream(tables.split(",")).map(String::trim).collect(Collectors.joining("|"));
-        LOG.info("Expression after replacing comma with vert separator: {}", tables);
-
-        // Essentially, we're just trying to swap escaped `\\.` and unescaped `.`.
-        // In our table matching syntax, `\\.` means RegEx token matcher and `.` means database &
-        // table name separator.
-        // On the contrary, while we're matching TableId string, `\\.` means matching the "dot"
-        // literal and `.` is the meta-character.
-
-        // Step 1: escape the dot with a backslash, but keep it as a placeholder (like `$`).
-        // For example, `db\.*.tbl\.*` => `db$*.tbl$*`
-        String unescapedTables = tables.replace("\\.", DOT_PLACEHOLDER);
-        LOG.info("Expression after unescaping dots as RegEx meta-character: {}", unescapedTables);
-
-        // Step 2: replace all remaining dots (`.`) to quoted version (`\.`), as a separator between
-        // database and table names.
-        // For example, `db$*.tbl$*` => `db$*\.tbl$*`
-        String unescapedTablesWithDbTblSeparator = unescapedTables.replace(".", "\\.");
-        LOG.info("Re-escaping dots as TableId delimiter: {}", unescapedTablesWithDbTblSeparator);
-
-        // Step 3: restore placeholder to normal RegEx matcher (`.`)
-        // For example, `db$*\.tbl$*` => `db.*\.tbl.*`
-        String debeziumStyleTableCaptureList =
-                unescapedTablesWithDbTblSeparator.replace(DOT_PLACEHOLDER, ".");
-        LOG.info("Final Debezium-style table capture list: {}", debeziumStyleTableCaptureList);
-
-        return debeziumStyleTableCaptureList;
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
