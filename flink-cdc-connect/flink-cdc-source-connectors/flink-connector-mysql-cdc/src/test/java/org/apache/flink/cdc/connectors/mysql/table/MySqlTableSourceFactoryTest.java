@@ -780,6 +780,17 @@ class MySqlTableSourceFactoryTest {
                         String.format(
                                 "The table-name '%s' is not a valid regular expression",
                                 "*_invalid_table"));
+
+        // validate snapshot filter requires parallel read enabled
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            Map<String, String> properties = getAllOptions();
+                            properties.put("scan.incremental.snapshot.enabled", "false");
+                            properties.put("scan.snapshot.filter", "id > 100");
+                            createTableSource(properties);
+                        })
+                .hasStackTraceContaining(
+                        "Option 'scan.snapshot.filter' can only be used when 'scan.incremental.snapshot.enabled' is enabled");
     }
 
     @Test

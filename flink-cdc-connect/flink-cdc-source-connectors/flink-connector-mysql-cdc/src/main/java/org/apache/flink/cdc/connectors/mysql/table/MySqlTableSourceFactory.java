@@ -125,6 +125,8 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                     MySqlSourceOptions.CONNECT_TIMEOUT, connectTimeout, Duration.ofMillis(250));
         }
 
+        validateSnapshotFilterWithParallelRead(snapshotFilter, enableParallelRead);
+
         OptionUtils.printOptions(IDENTIFIER, config.toMap());
 
         return new MySqlTableSource(
@@ -386,6 +388,28 @@ public class MySqlTableSourceFactory implements DynamicTableSourceFactory {
                         0.0d,
                         1.0d,
                         distributionFactorLower));
+    }
+
+    /**
+     * Checks that snapshot filter is only used when parallel read is enabled.
+     *
+     * @param snapshotFilter The snapshot filter expression
+     * @param enableParallelRead Whether parallel read is enabled
+     * @throws ValidationException If snapshot filter is set but parallel read is disabled
+     */
+    private void validateSnapshotFilterWithParallelRead(
+            @Nullable String snapshotFilter, boolean enableParallelRead) {
+        if (snapshotFilter != null && !snapshotFilter.isEmpty() && !enableParallelRead) {
+            throw new ValidationException(
+                    String.format(
+                            "Option '%s' can only be used when '%s' is enabled. "
+                                    + "Either enable parallel snapshot reading by setting '%s' to true, "
+                                    + "or remove the '%s' option.",
+                            MySqlSourceOptions.SCAN_SNAPSHOT_FILTER.key(),
+                            MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(),
+                            MySqlSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_ENABLED.key(),
+                            MySqlSourceOptions.SCAN_SNAPSHOT_FILTER.key()));
+        }
     }
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
