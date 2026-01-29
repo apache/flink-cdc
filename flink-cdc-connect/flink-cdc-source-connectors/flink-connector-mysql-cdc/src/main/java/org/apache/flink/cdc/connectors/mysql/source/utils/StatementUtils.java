@@ -116,7 +116,9 @@ public class StatementUtils {
                         "SELECT MIN(%s) FROM %s WHERE %s > ?",
                         quote(columnName),
                         quote(tableId),
-                        filter != null ? filter + " AND " + quote(columnName) : quote(columnName));
+                        filter != null
+                                ? "(" + filter + ") AND " + quote(columnName)
+                                : quote(columnName));
         return jdbc.prepareQueryAndMap(
                 minQuery,
                 ps -> ps.setObject(1, excludedLowerBound),
@@ -148,7 +150,7 @@ public class StatementUtils {
                         quotedColumn,
                         quotedColumn,
                         quote(tableId),
-                        filter != null ? filter + " AND " + quotedColumn : quotedColumn,
+                        filter != null ? "(" + filter + ") AND " + quotedColumn : quotedColumn,
                         quotedColumn,
                         chunkSize);
         return jdbc.prepareQueryAndMap(
