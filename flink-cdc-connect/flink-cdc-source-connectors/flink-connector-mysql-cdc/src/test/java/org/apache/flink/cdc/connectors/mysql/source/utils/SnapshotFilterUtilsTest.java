@@ -81,5 +81,27 @@ public class SnapshotFilterUtilsTest {
                         SnapshotFilterUtils.getSnapshotFilter(
                                 regexMap, TableId.parse("db.product_3")))
                 .isEqualTo("id > 300");
+
+        // Test with overlapping patterns - this is the critical case that reproduces the original
+        // bug
+        // Multiple patterns match the same table, should return the first one in insertion order
+        Map<String, String> overlappingMap = new LinkedHashMap<>();
+        overlappingMap.put("db.order_[0-9]+", "id > 100"); // Broader pattern - matches order_1
+        overlappingMap.put("db.order_1", "id > 200"); // More specific - also matches order_1
+        overlappingMap.put("db.order_[1-9]", "id > 300"); // Also matches order_1
+
+        // All three patterns match db.order_1, but should consistently return the first one
+        Assertions.assertThat(
+                        SnapshotFilterUtils.getSnapshotFilter(
+                                overlappingMap, TableId.parse("db.order_1")))
+                .isEqualTo("id > 100"); // First pattern wins
+
+        // Verify this is deterministic by calling multiple times
+        for (int i = 0; i < 10; i++) {
+            Assertions.assertThat(
+                            SnapshotFilterUtils.getSnapshotFilter(
+                                    overlappingMap, TableId.parse("db.order_1")))
+                    .isEqualTo("id > 100");
+        }
     }
 }
