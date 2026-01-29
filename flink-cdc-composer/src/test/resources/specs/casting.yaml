@@ -268,4 +268,4 @@
     id_
     CAST('FOOBAR' AS TIMESTAMP(6)) AS comp_11
   primary-key: id_
-  expect-error: Failed to evaluate projection expression `castToTimestamp("FOOBAR", __time_zone__)` for column `comp_11` in table `foo.bar.baz`.
+  expect-error: Failed to evaluate projection expression `CAST('FOOBAR' AS TIMESTAMP(6))` for column `comp_11` in table `foo.bar.baz`.

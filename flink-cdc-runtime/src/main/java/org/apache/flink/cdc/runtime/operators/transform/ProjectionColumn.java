@@ -87,6 +87,10 @@ public class ProjectionColumn implements Serializable {
         return column.getType();
     }
 
+    public String getExpression() {
+        return expression;
+    }
+
     public String getScriptExpression() {
         return scriptExpression;
     }
