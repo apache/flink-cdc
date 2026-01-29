@@ -122,9 +122,9 @@ public class DataTypeConverter {
             case ROW:
                 return Object.class;
             case ARRAY:
-                return ArrayData.class;
+                return Object[].class;
             case MAP:
-                return MapData.class;
+                return Map.class;
             case VARIANT:
                 return Variant.class;
             default:

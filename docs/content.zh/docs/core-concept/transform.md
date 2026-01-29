@@ -214,6 +214,15 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 | NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
 | STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
 
+## 集合访问函数
+
+这些函数允许访问复杂类型（ARRAY、MAP）中的元素。
+
+| 函数                 | Janino 代码              | 描述                                       |
+| -------------------- | ------------------------ | ------------------------------------------------- |
+| array[index] | itemAccess(array, index) | 返回数组中指定索引位置的元素。索引从 1 开始（SQL 标准）。如果索引超出范围则返回 NULL。 |
+| map[key] | itemAccess(map, key) | 返回 Map 中指定 key 对应的 value。如果 key 不存在则返回 NULL。 |
+
 # 示例
 ## 添加计算列
 表达式可以用来生成新的列。例如，如果我们想基于表 `web_order` 在数据库 `mydb` 中添加两个计算列，我们可以定义一个转换规则如下：
@@ -328,6 +337,17 @@ transform:
     projection: order_id as id, id as order_id
     filter: UPPER(province) = 'BEIJING'
     description: classification mapping example
+```
+
+## 访问数组和 Map 元素
+可以使用方括号语法访问 ARRAY 和 MAP 类型列中的元素。数组索引从 1 开始（遵循 SQL 标准）。例如，给定数据库 `mydb` 中的表 `products`，其中包含 ARRAY 类型列 `tags` 和 MAP 类型列 `properties`，我们可以定义一个转换规则如下：
+
+```yaml
+transform:
+  - source-table: mydb.products
+    projection: id, tags[1] as first_tag, properties['color'] as color
+    filter: tags[1] IS NOT NULL AND properties['status'] = 'active'
+    description: access array and map elements example
 ```
 
 ## 用户自定义函数

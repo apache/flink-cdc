@@ -215,6 +215,15 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 | NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
 | STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
 
+## Collection Access Functions
+
+These functions allow accessing elements from complex types (ARRAY, MAP).
+
+| Function             | Janino Code              | Description                                       |
+| -------------------- | ------------------------ | ------------------------------------------------- |
+| array[index] | itemAccess(array, index) | Returns the element at the specified index from an array. Index is 1-based (SQL standard). Returns NULL if index is out of bounds. |
+| map[key] | itemAccess(map, key) | Returns the value for the specified key from a map. Returns NULL if the key does not exist. |
+
 # Example
 ## Add computed columns
 Evaluation expressions can be used to generate new columns. For example, if we want to append two computed columns based on the table `web_order` in the database `mydb`, we may define a transform rule as follows:
@@ -331,6 +340,17 @@ transform:
     projection: order_id as id, id as order_id
     filter: UPPER(province) = 'BEIJING'
     description: classification mapping example
+```
+
+## Access Array and Map elements
+You can access elements from ARRAY and MAP type columns using bracket notation. Array index is 1-based (following SQL standard). For example, given a table `products` with an ARRAY column `tags` and a MAP column `properties` in database `mydb`, we may define a transform rule as follows:
+
+```yaml
+transform:
+  - source-table: mydb.products
+    projection: id, tags[1] as first_tag, properties['color'] as color
+    filter: tags[1] IS NOT NULL AND properties['status'] = 'active'
+    description: access array and map elements example
 ```
 
 ## User-defined Functions

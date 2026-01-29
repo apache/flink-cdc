@@ -93,7 +93,7 @@ import static org.apache.flink.cdc.runtime.typeutils.DataTypeConverter.convertCa
 public class TransformParser {
     private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
-    private static final String DEFAULT_TABLE = "TB";
+    public static final String DEFAULT_TABLE = "TB";
     private static final String MAPPED_COLUMN_NAME_PREFIX = "$";
     private static final String MAPPED_SINGLE_COLUMN_NAME = MAPPED_COLUMN_NAME_PREFIX + "0";
 
@@ -341,6 +341,9 @@ public class TransformParser {
                 } else {
                     List<String> originalColumnNames = parseColumnNameList(exprNode);
                     Map<String, String> columnNameMap = generateColumnNameMap(originalColumnNames);
+                    // Build column type map for ROW field access resolution
+                    Map<String, DataType> columnTypeMap =
+                            buildColumnTypeMap(originalColumnNames, originalColumnMap);
                     projectionColumn =
                             ProjectionColumn.ofCalculated(
                                     columnName,
@@ -348,7 +351,7 @@ public class TransformParser {
                                             relDataType),
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
-                                            exprNode, udfDescriptors, columnNameMap),
+                                            exprNode, udfDescriptors, columnNameMap, columnTypeMap),
                                     originalColumnNames,
                                     columnNameMap);
                 }
@@ -595,5 +598,26 @@ public class TransformParser {
             }
         }
         return columnNameMap;
+    }
+
+    /**
+     * Builds a column name to DataType mapping for referenced columns.
+     *
+     * <p>This is used to resolve ROW field names to indices at compile time.
+     *
+     * @param columnNames the list of referenced column names
+     * @param originalColumnMap the map of original columns
+     * @return a map from column name to its DataType
+     */
+    public static Map<String, DataType> buildColumnTypeMap(
+            List<String> columnNames, Map<String, Column> originalColumnMap) {
+        Map<String, DataType> columnTypeMap = new HashMap<>();
+        for (String columnName : columnNames) {
+            Column column = originalColumnMap.get(columnName);
+            if (column != null) {
+                columnTypeMap.put(columnName, column.getType());
+            }
+        }
+        return columnTypeMap;
     }
 }
