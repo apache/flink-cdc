@@ -26,6 +26,8 @@ import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
 
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.ExpressionEvaluator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +37,8 @@ import java.util.List;
  * filters.
  */
 public class TransformExpressionCompiler {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TransformExpressionCompiler.class);
 
     static final Cache<TransformExpressionKey, ExpressionEvaluator> COMPILED_EXPRESSION_CACHE =
             CacheBuilder.newBuilder().softValues().build();
@@ -71,6 +75,14 @@ public class TransformExpressionCompiler {
 
                         // Result type
                         expressionEvaluator.setExpressionType(key.getReturnClass());
+
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Going to evaluate expression: {}", key.getFullExpression());
+                            LOG.debug("  - Argument names: {}", argumentNames);
+                            LOG.debug("  - Argument types: {}", argumentClasses);
+                            LOG.debug("  - Returns: {}", key.getReturnClass());
+                        }
+
                         try {
                             // Compile
                             expressionEvaluator.cook(key.getFullExpression());
@@ -82,7 +94,7 @@ public class TransformExpressionCompiler {
                                                     + "\tCompiled expression: %s\n"
                                                     + "\tColumn name map: {%s}",
                                             key.getOriginalExpression(),
-                                            key.getExpression(),
+                                            key.getCompiledExpression(),
                                             TransformException.prettyPrintColumnNameMap(
                                                     key.getColumnNameMap())),
                                     e);
