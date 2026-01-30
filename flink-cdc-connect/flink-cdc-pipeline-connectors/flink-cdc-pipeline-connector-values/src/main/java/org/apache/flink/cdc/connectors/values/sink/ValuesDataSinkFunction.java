@@ -79,10 +79,13 @@ public class ValuesDataSinkFunction implements SinkFunction<Event> {
         }
 
         if (print) {
+            TableId tableId = ((ChangeEvent) event).tableId();
             // print the detail message to console for verification.
             System.out.println(
                     ValuesDataSinkHelper.convertEventToStr(
-                            event, fieldGetterMaps.get(((ChangeEvent) event).tableId())));
+                            event,
+                            schemaMaps.get(tableId).getColumnDataTypes(),
+                            fieldGetterMaps.get(tableId)));
         }
     }
 

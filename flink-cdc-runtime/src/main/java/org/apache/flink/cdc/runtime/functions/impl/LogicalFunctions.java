@@ -15,15 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.udf.examples.scala.precision
+package org.apache.flink.cdc.runtime.functions.impl;
 
-import org.apache.flink.cdc.common.types.{DataType, DataTypes}
-import org.apache.flink.cdc.common.udf.UserDefinedFunction
+/** Logical built-in functions. */
+public class LogicalFunctions {
 
-import java.math.BigDecimal
-
-/** This is an example UDF class for testing purposes only. */
-class DecimalTypeNonNullReturningClass extends UserDefinedFunction {
-  override def getReturnType: DataType = DataTypes.DECIMAL(10, 3).notNull()
-  def eval: BigDecimal = new BigDecimal("12.315")
+    public static Object coalesce(Object... objects) {
+        for (Object item : objects) {
+            if (item != null) {
+                return item;
+            }
+        }
+        return null;
+    }
 }
