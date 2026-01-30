@@ -51,6 +51,7 @@ import org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper;
 import org.apache.flink.cdc.connectors.values.source.ValuesDataSourceOptions;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
+import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.junit5.MiniClusterExtension;
@@ -2736,10 +2737,14 @@ class FlinkPipelineTransformITCase {
                 .cause()
                 .isExactlyInstanceOf(FlinkRuntimeException.class)
                 .hasMessage(
-                        "Failed to compile expression TransformExpressionKey{originalExpression='id1 > 0', expression='import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
+                        "Failed to compile expression TransformExpressionKey{expression='"
+                                + JaninoCompiler.LOAD_MODULES_EXPRESSION
+                                + "greaterThan($0, 0)', argumentNames=[__time_zone__, __epoch_time__], argumentClasses=[class java.lang.String, class java.lang.Long], returnClass=class java.lang.Boolean, columnNameMap={id1=$0}}")
                 .cause()
                 .hasMessageContaining(
-                        "Compiled expression: import static org.apache.flink.cdc.runtime.functions.SystemFunctionUtils.*;greaterThan($0, 0)")
+                        "Expression: "
+                                + JaninoCompiler.LOAD_MODULES_EXPRESSION
+                                + "greaterThan($0, 0)")
                 .hasMessageContaining("Column name map: {$0 -> id1}")
                 .rootCause()
                 .isExactlyInstanceOf(CompileException.class)

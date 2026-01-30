@@ -22,6 +22,8 @@ import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.udf.UserDefinedFunction;
 
+import java.time.Instant;
+
 /** This is an example UDF class for testing purposes only. */
 public class LocalZonedTimestampTypeReturningClass implements UserDefinedFunction {
     @Override
@@ -29,7 +31,7 @@ public class LocalZonedTimestampTypeReturningClass implements UserDefinedFunctio
         return DataTypes.TIMESTAMP_LTZ(2);
     }
 
-    public LocalZonedTimestampData eval() {
-        return LocalZonedTimestampData.fromEpochMillis(24 * 60 * 60 * 1000);
+    public Instant eval() {
+        return LocalZonedTimestampData.fromEpochMillis(24 * 60 * 60 * 1000).toInstant();
     }
 }

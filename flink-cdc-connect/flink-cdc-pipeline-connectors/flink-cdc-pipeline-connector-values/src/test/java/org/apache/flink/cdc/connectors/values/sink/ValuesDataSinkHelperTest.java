@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -45,13 +46,16 @@ class ValuesDataSinkHelperTest {
                         .primaryKey("col1")
                         .build();
         TableId tableId = TableId.parse("default.default.table1");
+        List<DataType> schemaDataTypes = schema.getColumnDataTypes();
         BinaryRecordDataGenerator generator =
                 new BinaryRecordDataGenerator(RowType.of(DataTypes.STRING(), DataTypes.STRING()));
 
         List<RecordData.FieldGetter> fieldGetters = SchemaUtils.createFieldGetters(schema);
         Assertions.assertThat(
                         ValuesDataSinkHelper.convertEventToStr(
-                                new CreateTableEvent(tableId, schema), fieldGetters))
+                                new CreateTableEvent(tableId, schema),
+                                schemaDataTypes,
+                                fieldGetters))
                 .isEqualTo(
                         "CreateTableEvent{tableId=default.default.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}");
 
@@ -63,7 +67,9 @@ class ValuesDataSinkHelperTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
                                 }));
-        Assertions.assertThat(ValuesDataSinkHelper.convertEventToStr(insertEvent, fieldGetters))
+        Assertions.assertThat(
+                        ValuesDataSinkHelper.convertEventToStr(
+                                insertEvent, schemaDataTypes, fieldGetters))
                 .isEqualTo(
                         "DataChangeEvent{tableId=default.default.table1, before=[], after=[1, 1], op=INSERT, meta=()}");
         DataChangeEvent deleteEvent =
@@ -74,7 +80,9 @@ class ValuesDataSinkHelperTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("1")
                                 }));
-        Assertions.assertThat(ValuesDataSinkHelper.convertEventToStr(deleteEvent, fieldGetters))
+        Assertions.assertThat(
+                        ValuesDataSinkHelper.convertEventToStr(
+                                deleteEvent, schemaDataTypes, fieldGetters))
                 .isEqualTo(
                         "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[], op=DELETE, meta=()}");
         DataChangeEvent updateEvent =
@@ -90,7 +98,9 @@ class ValuesDataSinkHelperTest {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("x")
                                 }));
-        Assertions.assertThat(ValuesDataSinkHelper.convertEventToStr(updateEvent, fieldGetters))
+        Assertions.assertThat(
+                        ValuesDataSinkHelper.convertEventToStr(
+                                updateEvent, schemaDataTypes, fieldGetters))
                 .isEqualTo(
                         "DataChangeEvent{tableId=default.default.table1, before=[1, 1], after=[1, x], op=UPDATE, meta=()}");
     }

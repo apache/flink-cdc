@@ -18,10 +18,10 @@
 package org.apache.flink.cdc.runtime.operators.transform;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
 
 import org.codehaus.janino.ExpressionEvaluator;
 
@@ -147,7 +147,7 @@ public class TransformFilterProcessor {
                 if (column.getName().equals(columnName)) {
                     rawArgNames.add(columnName);
                     argNames.add(mapColumnNames ? columnNameMap.get(columnName) : columnName);
-                    argTypes.add(DataTypeConverter.convertOriginalClass(column.getType()));
+                    argTypes.add(JavaClassConverter.toJavaClass(column.getType()));
                     break;
                 }
             }
