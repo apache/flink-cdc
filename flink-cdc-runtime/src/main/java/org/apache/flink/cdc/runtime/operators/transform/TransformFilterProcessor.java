@@ -128,7 +128,7 @@ public class TransformFilterProcessor {
                                     ? transformExpressionKey.getOriginalExpression()
                                     : "<no op>",
                             transformExpressionKey != null
-                                    ? transformExpressionKey.getExpression()
+                                    ? transformExpressionKey.getCompiledExpression()
                                     : "<no op>",
                             transformFilter.getColumnNameMapAsString()),
                     e);
