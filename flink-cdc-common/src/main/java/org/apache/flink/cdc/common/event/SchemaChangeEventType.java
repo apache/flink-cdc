@@ -28,7 +28,9 @@ public enum SchemaChangeEventType {
     DROP_COLUMN("drop.column"),
     DROP_TABLE("drop.table"),
     RENAME_COLUMN("rename.column"),
-    TRUNCATE_TABLE("truncate.table");
+    TRUNCATE_TABLE("truncate.table"),
+    ALTER_COLUMN_POSITION("alter.column.position"),
+    ALTER_COLUMN_COMMENT("alter.column.comment");
 
     private final String tag;
 
@@ -55,6 +57,8 @@ public enum SchemaChangeEventType {
             return RENAME_COLUMN;
         } else if (event instanceof TruncateTableEvent) {
             return TRUNCATE_TABLE;
+        } else if (event instanceof AlterColumnPositionEvent) {
+            return ALTER_COLUMN_POSITION;
         } else {
             throw new RuntimeException("Unknown schema change event type: " + event.getClass());
         }
@@ -76,6 +80,10 @@ public enum SchemaChangeEventType {
                 return RENAME_COLUMN;
             case "truncate.table":
                 return TRUNCATE_TABLE;
+            case "alter.column.position":
+                return ALTER_COLUMN_POSITION;
+            case "alter.column.comment":
+                return ALTER_COLUMN_COMMENT;
             default:
                 throw new RuntimeException("Unknown schema change event type: " + tag);
         }

@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.connectors.mysql.source.parser;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnPositionEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
@@ -362,7 +363,6 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                     }
 
                     Map<String, DataType> typeMapping = new HashMap<>();
-
                     typeMapping.put(oldColumnName, fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
 
@@ -371,6 +371,29 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                         renameMap.put(oldColumnName, newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
                     }
+
+                    // Check for position changes
+                    String targetColumnName = newColumnName != null ? newColumnName : oldColumnName;
+                    if (ctx.FIRST() != null) {
+                        Map<String, AlterColumnPositionEvent.ColumnPosition> positionMapping =
+                                new HashMap<>();
+                        positionMapping.put(
+                                targetColumnName, AlterColumnPositionEvent.ColumnPosition.first());
+                        changes.add(new AlterColumnPositionEvent(currentTable, positionMapping));
+                    } else if (ctx.AFTER() != null) {
+                        String afterColumn =
+                                parser.parseName(ctx.uid(2)); // ctx.uid(2) for CHANGE COLUMN
+                        if (isTableIdCaseInsensitive) {
+                            afterColumn = afterColumn.toLowerCase(Locale.ROOT);
+                        }
+                        Map<String, AlterColumnPositionEvent.ColumnPosition> positionMapping =
+                                new HashMap<>();
+                        positionMapping.put(
+                                targetColumnName,
+                                AlterColumnPositionEvent.ColumnPosition.after(afterColumn));
+                        changes.add(new AlterColumnPositionEvent(currentTable, positionMapping));
+                    }
+
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);
@@ -416,13 +439,36 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
-                    Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(
+                    String columnName =
                             isTableIdCaseInsensitive
                                     ? column.name().toLowerCase(Locale.ROOT)
-                                    : column.name(),
-                            fromDbzColumn(column, tinyInt1isBit));
+                                    : column.name();
+
+                    // Generate AlterColumnTypeEvent for type changes
+                    Map<String, DataType> typeMapping = new HashMap<>();
+                    typeMapping.put(columnName, fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
+
+                    // Check for position changes
+                    if (ctx.FIRST() != null) {
+                        Map<String, AlterColumnPositionEvent.ColumnPosition> positionMapping =
+                                new HashMap<>();
+                        positionMapping.put(
+                                columnName, AlterColumnPositionEvent.ColumnPosition.first());
+                        changes.add(new AlterColumnPositionEvent(currentTable, positionMapping));
+                    } else if (ctx.AFTER() != null) {
+                        String afterColumn = parser.parseName(ctx.uid(1));
+                        if (isTableIdCaseInsensitive) {
+                            afterColumn = afterColumn.toLowerCase(Locale.ROOT);
+                        }
+                        Map<String, AlterColumnPositionEvent.ColumnPosition> positionMapping =
+                                new HashMap<>();
+                        positionMapping.put(
+                                columnName,
+                                AlterColumnPositionEvent.ColumnPosition.after(afterColumn));
+                        changes.add(new AlterColumnPositionEvent(currentTable, positionMapping));
+                    }
+
                     listeners.remove(columnDefinitionListener);
                 },
                 columnDefinitionListener);

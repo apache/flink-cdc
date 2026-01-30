@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnPositionEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -77,6 +78,11 @@ public class ChangeEventUtils {
                                 tableId,
                                 alterColumnEvent.getTypeMapping(),
                                 alterColumnEvent.getOldTypeMapping()),
+                alterColumnPositionEvent ->
+                        new AlterColumnPositionEvent(
+                                tableId,
+                                alterColumnPositionEvent.getPositionMapping(),
+                                alterColumnPositionEvent.getOldPositionMapping()),
                 createTableEvent -> new CreateTableEvent(tableId, createTableEvent.getSchema()),
                 dropColumnEvent ->
                         new DropColumnEvent(tableId, dropColumnEvent.getDroppedColumnNames()),
