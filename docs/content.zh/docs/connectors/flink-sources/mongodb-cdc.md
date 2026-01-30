@@ -489,6 +489,63 @@ MongoDB 的`oplog.rs` 集合没有在状态之前保持更改记录的更新， 
 顺便说一句，[DBZ-435](https://issues.redhat.com/browse/DBZ-435)提到的Debezium的MongoDB变更流探索,正在制定路线图。<br>
 如果完成了，我们可以考虑集成两种源连接器供用户选择。
 
+### 动态加表
+
+**注意:** 该功能从 Flink CDC 3.1.0 版本开始支持。
+
+动态加表功能使你可以为正在运行的作业添加新集合进行监控。新添加的集合将首先读取其快照数据,然后自动读取其变更流。
+
+想象一下这个场景:一开始,Flink 作业监控集合 `[product, user, address]`,但几天后,我们希望这个作业还可以监控集合 `[order, custom]`,这些集合包含历史数据,我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
+
+以下操作显示了如何启用此功能来解决上述场景。使用现有的 MongoDB CDC Source 作业,如下:
+
+```java
+    MongoDBSource<String> mongoSource = MongoDBSource.<String>builder()
+        .hosts("yourHostname:27017")
+        .databaseList("db") // 设置捕获的数据库
+        .collectionList("db.product", "db.user", "db.address") // 设置捕获的集合
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // 启用扫描新添加的表功能
+        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+        .build();
+   // 你的业务代码
+```
+
+如果我们想添加新集合 `[order, custom]` 到现有的 Flink 作业,只需更新作业的 `collectionList()` 将新增集合 `[order, custom]` 加入并从已有的 savepoint 恢复作业。
+
+_Step 1_: 使用 savepoint 停止现有的 Flink 作业。
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: 更新现有 Flink 作业的集合列表选项。
+1. 更新 `collectionList()` 参数。
+2. 编译更新后的作业,示例如下:
+```java
+    MongoDBSource<String> mongoSource = MongoDBSource.<String>builder()
+        .hosts("yourHostname:27017")
+        .databaseList("db")
+        .collectionList("db.product", "db.user", "db.address", "db.order", "db.custom") // 设置捕获的集合 [product, user, address, order, custom]
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true)
+        .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+        .build();
+   // 你的业务代码
+```
+_Step 3_: 从 savepoint 还原更新后的 Flink 作业。
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+
 ### DataStream Source
 
 MongoDB CDC 连接器也可以是一个数据流源。 你可以创建 SourceFunction，如下所示：

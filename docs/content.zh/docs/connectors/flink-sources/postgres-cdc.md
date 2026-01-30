@@ -510,6 +510,71 @@ The config option `scan.startup.mode` specifies the startup mode for PostgreSQL 
 - `committed-offset`: Skip snapshot phase and start reading events from a `confirmed_flush_lsn` offset of replication slot.
 - `snapshot`: Only the snapshot phase is performed and exits after the snapshot phase reading is completed.
 
+### 动态加表
+
+**注意:** 该功能从 Flink CDC 3.1.0 版本开始支持。
+
+动态加表功能使你可以为正在运行的作业添加新表进行监控。新添加的表将首先读取其快照数据,然后自动读取其 binlog。
+
+想象一下这个场景:一开始,Flink 作业监控表 `[product, user, address]`,但几天后,我们希望这个作业还可以监控表 `[order, custom]`,这些表包含历史数据,我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
+
+以下操作显示了如何启用此功能来解决上述场景。使用现有的 PostgreSQL CDC Source 作业,如下:
+
+```java
+    JdbcIncrementalSource<String> postgresSource =
+            PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
+                .hostname("yourHostname")
+                .port(5432)
+                .database("postgres") // 设置捕获的数据库
+                .schemaList("inventory") // 设置捕获的 schema
+                .tableList("inventory.product", "inventory.user", "inventory.address") // 设置捕获的表
+                .username("yourUsername")
+                .password("yourPassword")
+                .slotName("flink")
+                .scanNewlyAddedTableEnabled(true) // 启用扫描新添加的表功能
+                .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+                .build();
+   // 你的业务代码
+```
+
+如果我们想添加新表 `[inventory.order, inventory.custom]` 到现有的 Flink 作业,只需更新作业的 `tableList()` 将新增表 `[inventory.order, inventory.custom]` 加入并从已有的 savepoint 恢复作业。
+
+_Step 1_: 使用 savepoint 停止现有的 Flink 作业。
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: 更新现有 Flink 作业的表列表选项。
+1. 更新 `tableList()` 参数。
+2. 编译更新后的作业,示例如下:
+```java
+    JdbcIncrementalSource<String> postgresSource =
+            PostgresSourceBuilder.PostgresIncrementalSource.<String>builder()
+                .hostname("yourHostname")
+                .port(5432)
+                .database("postgres")
+                .schemaList("inventory")
+                .tableList("inventory.product", "inventory.user", "inventory.address", "inventory.order", "inventory.custom") // 设置捕获的表 [product, user, address, order, custom]
+                .username("yourUsername")
+                .password("yourPassword")
+                .slotName("flink")
+                .scanNewlyAddedTableEnabled(true)
+                .deserializer(new JsonDebeziumDeserializationSchema()) // 将 SourceRecord 转换为 JSON 字符串
+                .build();
+   // 你的业务代码
+```
+_Step 3_: 从 savepoint 还原更新后的 Flink 作业。
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**注意:** 请参考文档 [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) 了解更多详细信息。
+
 ### DataStream Source
 
 The Postgres CDC connector can also be a DataStream source. There are two modes for the DataStream source:
