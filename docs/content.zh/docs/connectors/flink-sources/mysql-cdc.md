@@ -389,15 +389,6 @@ Flink SQL> SELECT * FROM orders;
       <td>是否在快照结束后关闭空闲的 Reader。 此特性需要 flink 版本大于等于 1.14 并且 'execution.checkpointing.checkpoints-after-tasks-finish.enabled' 需要设置为 true。</td>
     </tr>
     <tr>
-      <td>scan.newly-added-table.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>是否启用捕获新增表的功能，默认为 false。此选项仅在从 savepoint/checkpoint 恢复作业时有效。<br>
-          启用后，新增的符合配置表达式的表将自动捕获，执行完整快照 + 增量 binlog 读取。
-      </td>
-    </tr>
-    <tr>
       <td>scan.binlog.newly-added-table.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>

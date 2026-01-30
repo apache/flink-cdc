@@ -391,15 +391,6 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
       </td>
     </tr>
     <tr>
-      <td>scan.newly-added-table.enabled</td>
-      <td>optional</td>
-      <td style="word-wrap: break-word;">false</td>
-      <td>Boolean</td>
-      <td>Whether to enable capturing newly added tables or not, by default is false. This option is only useful when restoring the job from a savepoint/checkpoint. <br>
-          When enabled, newly added tables that match the configured table patterns will be automatically captured with full snapshot + incremental binlog reading.
-      </td>
-    </tr>
-    <tr>
       <td>scan.binlog.newly-added-table.enabled</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">false</td>
