@@ -45,4 +45,4 @@
     bool_ IS FALSE AS comp_8
     bool_ IS NOT FALSE AS comp_9
   primary-key: id_
-  expect-error: 'java.lang.RuntimeException: Failed to evaluate projection expression `$0 || false` for column `comp_2` in table `foo.bar.baz`.'
+  expect-error: 'java.lang.RuntimeException: Failed to evaluate projection expression ``TB`.`bool_` OR FALSE` for column `comp_2` in table `foo.bar.baz`.'
