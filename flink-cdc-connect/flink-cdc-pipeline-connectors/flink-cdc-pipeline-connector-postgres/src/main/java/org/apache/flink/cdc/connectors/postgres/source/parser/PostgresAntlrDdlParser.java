@@ -167,31 +167,33 @@ public class PostgresAntlrDdlParser extends AntlrDdlParser<PostgreSQLLexer, Post
         int length = 1;
         if (simpleTypename.numeric() != null) {
             PostgreSQLParser.NumericContext numeric = simpleTypename.numeric();
-            if (numeric.INTEGER() != null || numeric.INT_P() != null) {
+            if (numeric.INTEGER() != null || numeric.INT_P() != null || numeric.INT4() != null) {
                 if (isArray) {
                     columnEditor.nativeType(PgOid.INT4_ARRAY);
                 } else {
                     columnEditor.nativeType(PgOid.INT4);
                 }
-            } else if (numeric.SMALLINT() != null) {
+            } else if (numeric.SMALLINT() != null || numeric.INT2() != null) {
                 if (isArray) {
                     columnEditor.nativeType(PgOid.INT2_ARRAY);
                 } else {
                     columnEditor.nativeType(PgOid.INT2);
                 }
-            } else if (numeric.BIGINT() != null) {
+            } else if (numeric.BIGINT() != null || numeric.INT8() != null) {
                 if (isArray) {
                     columnEditor.nativeType(PgOid.INT8_ARRAY);
                 } else {
                     columnEditor.nativeType(PgOid.INT8);
                 }
-            } else if (numeric.FLOAT_P() != null || numeric.REAL() != null) {
+            } else if (numeric.REAL() != null || numeric.FLOAT4() != null) {
                 if (isArray) {
                     columnEditor.nativeType(PgOid.FLOAT4_ARRAY);
                 } else {
                     columnEditor.nativeType(PgOid.FLOAT4);
                 }
-            } else if (numeric.DOUBLE_P() != null) {
+            } else if (numeric.FLOAT_P() != null
+                    || numeric.DOUBLE_P() != null
+                    || numeric.FLOAT8() != null) {
                 if (isArray) {
                     columnEditor.nativeType(PgOid.FLOAT8_ARRAY);
                 } else {

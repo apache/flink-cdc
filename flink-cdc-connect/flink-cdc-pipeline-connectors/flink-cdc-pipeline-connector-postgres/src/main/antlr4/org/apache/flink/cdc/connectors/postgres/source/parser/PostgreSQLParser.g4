@@ -3378,11 +3378,16 @@
 
  numeric
      : INT_P
+     | INT4
      | INTEGER
+     | INT2
      | SMALLINT
+     | INT8
      | BIGINT
+     | FLOAT4
      | REAL
      | FLOAT_P float_?
+     | FLOAT8
      | DOUBLE_P PRECISION
      | DECIMAL_P type_modifiers_?
      | DEC type_modifiers_?
