@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
+
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -71,6 +73,10 @@ public class TransformExpressionKey implements Serializable {
 
     public String getExpression() {
         return expression;
+    }
+
+    public String getFullExpression() {
+        return JaninoCompiler.loadSystemFunction(expression);
     }
 
     public List<String> getArgumentNames() {

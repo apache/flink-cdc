@@ -487,7 +487,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                     new PostTransformer(
                             selectors,
                             TransformProjection.of(projection).orElse(null),
-                            TransformFilter.of(filterExpression, udfDescriptors).orElse(null),
+                            TransformFilter.of(filterExpression).orElse(null),
                             PostTransformConverters.of(rule.getPostTransformConverter())
                                     .orElse(null),
                             rule.getSupportedMetadataColumns());

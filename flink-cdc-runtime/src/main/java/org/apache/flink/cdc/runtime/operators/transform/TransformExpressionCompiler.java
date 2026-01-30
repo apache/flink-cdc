@@ -73,7 +73,7 @@ public class TransformExpressionCompiler {
                         expressionEvaluator.setExpressionType(key.getReturnClass());
                         try {
                             // Compile
-                            expressionEvaluator.cook(key.getExpression());
+                            expressionEvaluator.cook(key.getFullExpression());
                         } catch (CompileException e) {
                             throw new InvalidProgramException(
                                     String.format(

@@ -14,7 +14,6 @@
 ################################################################################
 
 - do: Add Op
-  ignore: FLINK-38906
   projection: |-
     id_
     decimal_10_0_ + CAST(1 AS DECIMAL(1, 0)) AS comp_1
@@ -27,7 +26,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567891, null], after=[-1, -9876543209, null], op=UPDATE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543209, null], after=[], op=DELETE, meta=()}
 - do: Subtract Op
-  ignore: FLINK-38906
   projection: |-
     id_
     decimal_10_0_ - CAST(1 AS DECIMAL(1, 0)) AS comp_1
@@ -40,7 +38,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1, 1234567889, null], after=[-1, -9876543211, null], op=UPDATE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, -9876543211, null], after=[], op=DELETE, meta=()}
 - do: Multiply Op
-  ignore: FLINK-38906
   projection: |-
     id_
     decimal_10_0_ * CAST(2 AS DECIMAL(1, 0)) AS comp_1
@@ -53,7 +50,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1, 2469135780, null], after=[-1, -19753086420, null], op=UPDATE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, -19753086420, null], after=[], op=DELETE, meta=()}
 - do: Divide Op
-  ignore: FLINK-38906
   projection: |-
     id_
     decimal_10_0_ / CAST(2 AS DECIMAL(1, 0)) AS comp_1
@@ -66,7 +62,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1, 617.283945, 61728394506172839.45], after=[-1, -4938.271605, null], op=UPDATE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, -4938.271605, null], after=[], op=DELETE, meta=()}
 - do: Abs Op
-  ignore: FLINK-38906
   projection: |-
     id_
     ABS(decimal_10_0_) AS comp_1
@@ -80,7 +75,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Ceil Op
-  ignore: FLINK-38906
   projection: |-
     id_
     CEIL(decimal_10_0_) AS comp_1
@@ -94,7 +88,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Floor Op
-  ignore: FLINK-38906
   projection: |-
     id_
     FLOOR(decimal_10_0_) AS comp_1
@@ -108,7 +101,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Round Op
-  ignore: FLINK-38906
   projection: |-
     id_
     ROUND(decimal_10_0_, 1) AS comp_1

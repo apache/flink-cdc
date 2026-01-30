@@ -78,6 +78,13 @@ public class ComparisonFunctions {
         return value.compareTo(minValue) >= 0 && value.compareTo(maxValue) <= 0;
     }
 
+    public static boolean betweenAsymmetric(Byte value, byte minValue, byte maxValue) {
+        if (value == null) {
+            return false;
+        }
+        return value >= minValue && value <= maxValue;
+    }
+
     public static boolean betweenAsymmetric(Short value, short minValue, short maxValue) {
         if (value == null) {
             return false;
@@ -125,6 +132,10 @@ public class ComparisonFunctions {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
 
+    public static boolean notBetweenAsymmetric(Byte value, byte minValue, byte maxValue) {
+        return !betweenAsymmetric(value, minValue, maxValue);
+    }
+
     public static boolean notBetweenAsymmetric(Short value, short minValue, short maxValue) {
         return !betweenAsymmetric(value, minValue, maxValue);
     }
@@ -151,34 +162,42 @@ public class ComparisonFunctions {
     }
 
     public static boolean in(String value, String... str) {
-        return Arrays.stream(str).anyMatch(item -> value.equals(item));
+        return Arrays.asList(str).contains(value);
+    }
+
+    public static boolean in(Byte value, Byte... values) {
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean in(Short value, Short... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean in(Integer value, Integer... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean in(Long value, Long... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean in(Float value, Float... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean in(Double value, Double... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean in(BigDecimal value, BigDecimal... values) {
-        return Arrays.stream(values).anyMatch(item -> value.equals(item));
+        return Arrays.asList(values).contains(value);
     }
 
     public static boolean notIn(String value, String... values) {
+        return !in(value, values);
+    }
+
+    public static boolean notIn(Byte value, Byte... values) {
         return !in(value, values);
     }
 

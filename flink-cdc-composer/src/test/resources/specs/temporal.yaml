@@ -78,7 +78,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: To Date Function
-  ignore: FLINK-38906
   projection: |-
     id_
     TO_DATE('2025-01-05') AS comp_1
@@ -117,7 +116,6 @@
     TO_TIMESTAMP('2024 !! 02 !! 14 11 !! 45 !! 49', 'yyyy//MM//dd') AS comp
   expect-error: 'Unparseable date: "2024 !! 02 !! 14 11 !! 45 !! 49"'
 - do: Format DateType and TimeType
-  ignore: FLINK-38906
   projection: |-
     id_, date_, time_0_, time_6_
     DATE_FORMAT(date_, 'yyyy->MM->dd') AS date_fmt_1
@@ -134,7 +132,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null, null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null, null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: From UnixTime Function
-  ignore: FLINK-38906
   projection: |-
     FROM_UNIXTIME(bigint_) AS col_1
     FROM_UNIXTIME(bigint_, 'yyyy/MM/dd HH;mm;ss') AS col_2
@@ -146,7 +143,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null], after=[], op=DELETE, meta=()}
 - do: From UnixTime Function with Implicit Conversion
-  ignore: FLINK-38906
   projection: |-
     FROM_UNIXTIME(int_) AS col_1
     FROM_UNIXTIME(int_, 'yyyy/MM/dd HH;mm;ss') AS col_2
@@ -158,7 +154,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null], after=[], op=DELETE, meta=()}
 - do: To Timestamp LTZ Function
-  ignore: FLINK-38906
   projection: |-
     TO_TIMESTAMP_LTZ(bigint_) AS col_1
     TO_TIMESTAMP_LTZ(bigint_, 0) AS col_2
@@ -174,7 +169,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, 1999-12-31T23:50:23.456, 2000-03-29T19:21:48.321, 2001-11-23T02:48:25.999], after=[], op=DELETE, meta=()}
 - do: Formatting TIMESTAMP(0) with Timezone
-  ignore: FLINK-38906
   projection: |-
     DATE_FORMAT_TZ(timestamp_0_, 'Asia/Shanghai') AS col_1
     DATE_FORMAT_TZ(timestamp_0_, 'America/Los_Angeles') AS col_2
@@ -190,7 +184,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: Formatting TIMESTAMP(6) with Timezone
-  ignore: FLINK-38906
   projection: |-
     DATE_FORMAT_TZ(timestamp_6_, 'Asia/Shanghai') AS col_1
     DATE_FORMAT_TZ(timestamp_6_, 'America/Los_Angeles') AS col_2
@@ -206,7 +199,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: Formatting TIMESTAMP(9) with Timezone
-  ignore: FLINK-38906
   projection: |-
     DATE_FORMAT_TZ(timestamp_9_, 'Asia/Shanghai') AS col_1
     DATE_FORMAT_TZ(timestamp_9_, 'America/Los_Angeles') AS col_2
@@ -222,7 +214,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: Formatting TIMESTAMP_LTZ(0) with Timezone
-  ignore: FLINK-38906
   projection: |-
     DATE_FORMAT_TZ(timestamp_ltz_0_, 'Asia/Shanghai') AS col_1
     DATE_FORMAT_TZ(timestamp_ltz_0_, 'America/Los_Angeles') AS col_2
@@ -238,7 +229,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: Formatting TIMESTAMP_LTZ(6) with Timezone
-  ignore: FLINK-38906
   projection: |-
     DATE_FORMAT_TZ(timestamp_ltz_6_, 'Asia/Shanghai') AS col_1
     DATE_FORMAT_TZ(timestamp_ltz_6_, 'America/Los_Angeles') AS col_2
@@ -254,7 +244,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: Formatting TIMESTAMP_LTZ(9) with Timezone
-  ignore: FLINK-38906
   projection: |-
     DATE_FORMAT_TZ(timestamp_ltz_9_, 'Asia/Shanghai') AS col_1
     DATE_FORMAT_TZ(timestamp_ltz_9_, 'America/Los_Angeles') AS col_2
@@ -270,7 +259,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[null, null, null, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[null, null, null, null, null, null], after=[], op=DELETE, meta=()}
 - do: DATE_ADD Function
-  ignore: FLINK-38906
   projection: |-
     DATE_ADD(timestamp_0_, 17) AS col_1
     DATE_ADD(timestamp_6_, 17) AS col_2
