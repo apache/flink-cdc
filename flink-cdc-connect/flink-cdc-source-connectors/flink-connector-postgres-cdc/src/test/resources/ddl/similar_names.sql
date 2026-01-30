@@ -13,10 +13,12 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- FLINK-38965: Test case for similar table names with underscore
--- This tests the fix for PostgreSQL LIKE wildcard matching issue
--- where underscore '_' matches any single character, causing
--- 'ndi_pg_user_sink_1' to also match 'ndi_pg_userbsink_1'
+-- FLINK-38965: Test case for similar table names with underscore or percent characters
+-- This tests the fix for PostgreSQL LIKE wildcard matching issue:
+-- - underscore '_' matches any single character
+-- - percent '%' matches any sequence of characters
+-- For example, 'user_sink' may match 'userbsink' (due to '_')
+-- and 'user%sink' may match 'user_test_sink' (due to '%')
 
 DROP SCHEMA IF EXISTS similar_names CASCADE;
 CREATE SCHEMA similar_names;
@@ -49,3 +51,34 @@ INSERT INTO ndi_pg_userbsink_1
 VALUES (101, 'userb_1', 'Guangzhou'),
        (102, 'userb_2', 'Shenzhen'),
        (103, 'userb_3', 'Chengdu');
+
+-- Table 3: user%data (tests '%' wildcard scenario)
+-- The table name contains '%' character which acts as a wildcard in LIKE pattern.
+-- When querying for table 'user%data', the LIKE pattern may also match
+-- 'user_test_data' because '%' matches any sequence of characters.
+CREATE TABLE "user%data" (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  address VARCHAR(1024)
+);
+ALTER TABLE "user%data" REPLICA IDENTITY FULL;
+
+INSERT INTO "user%data"
+VALUES (201, 'percent_1', 'Tianjin'),
+       (202, 'percent_2', 'Dalian'),
+       (203, 'percent_3', 'Qingdao');
+
+-- Table 4: user_test_data (similar to 'user%data' when % is treated as wildcard)
+-- This table name would match the LIKE pattern for 'user%data'
+-- because '%' matches '_test_' sequence.
+CREATE TABLE user_test_data (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  address VARCHAR(1024)
+);
+ALTER TABLE user_test_data REPLICA IDENTITY FULL;
+
+INSERT INTO user_test_data
+VALUES (301, 'test_1', 'Harbin'),
+       (302, 'test_2', 'Changchun'),
+       (303, 'test_3', 'Shenyang');

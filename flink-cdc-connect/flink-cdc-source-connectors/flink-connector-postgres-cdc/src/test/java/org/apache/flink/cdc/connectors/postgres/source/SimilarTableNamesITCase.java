@@ -48,7 +48,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * IT tests for FLINK-38965: Fix PostgreSQL CDC connector issue when table names contain underscore
- * that matches other tables due to LIKE wildcard behavior.
+ * or percent characters that match other tables due to LIKE wildcard behavior.
+ *
+ * <p>PostgreSQL LIKE wildcards:
+ *
+ * <ul>
+ *   <li>'_' (underscore) matches any single character. E.g., 'user_sink' matches 'userbsink'
+ *   <li>'%' (percent) matches any sequence of characters. E.g., 'user%data' matches
+ *       'user_test_data'
+ * </ul>
+ *
+ * <p>When table names contain these special characters, JDBC metadata queries using LIKE may return
+ * columns from unintended tables.
  */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
 class SimilarTableNamesITCase extends PostgresTestBase {
@@ -135,17 +146,64 @@ class SimilarTableNamesITCase extends PostgresTestBase {
     }
 
     /**
-     * Test reading from both similar-named tables to verify they can be captured independently
+     * Test that when capturing CDC events for table 'user%data' (which contains a literal '%'
+     * character), we don't accidentally capture events from 'user_test_data' which would match due
+     * to PostgreSQL's LIKE wildcard behavior (percent '%' matches any sequence of characters).
+     *
+     * <p>When querying for table 'user%data', the LIKE pattern may also match 'user_test_data'
+     * because '%' matches the '_test_' sequence.
+     */
+    @Test
+    void testReadTableWithSimilarNamePercent() throws Exception {
+        StreamTableEnvironment tEnv = createTableEnv();
+
+        // Only capture events from 'user%data' table (note: % is a literal character in table name)
+        tEnv.executeSql(createSourceDDL("target_table", "user%data"));
+
+        TableResult result = tEnv.executeSql("SELECT * FROM target_table");
+        CloseableIterator<Row> iterator = result.collect();
+
+        try {
+            // Verify snapshot data (3 rows from user%data only)
+            List<String> expectedSnapshotData =
+                    Arrays.asList(
+                            "+I[201, percent_1, Tianjin]",
+                            "+I[202, percent_2, Dalian]",
+                            "+I[203, percent_3, Qingdao]");
+            assertRowsEquals(collectRows(iterator, 3), expectedSnapshotData);
+
+            // Perform DML on user_test_data table - these should NOT be captured
+            executeDmlOperationsOnTestDataTable();
+
+            // Perform DML on target table - these SHOULD be captured
+            try (Connection conn =
+                            getJdbcConnection(
+                                    POSTGRES_CONTAINER, similarNamesDatabase.getDatabaseName());
+                    Statement stmt = conn.createStatement()) {
+                stmt.execute(
+                        "INSERT INTO similar_names.\"user%data\" VALUES (204, 'percent_4', 'Xiamen')");
+            }
+
+            // Should only see the insert from target table, not user_test_data table
+            List<String> expectedStreamData = Arrays.asList("+I[204, percent_4, Xiamen]");
+            assertRowsEquals(collectRows(iterator, 1), expectedStreamData);
+        } finally {
+            closeResourcesAndWaitForJobTermination(iterator, result);
+        }
+    }
+
+    /**
+     * Test reading from all similar-named tables to verify they can be captured independently
      * without interference.
      */
     @Test
-    void testReadBothSimilarNamedTables() throws Exception {
+    void testReadAllSimilarNamedTables() throws Exception {
         StreamTableEnvironment tEnv = createTableEnv();
 
-        // Capture events from both tables using regex pattern
-        tEnv.executeSql(createSourceDDL("all_tables", "ndi_pg_user.*"));
+        // Capture events from underscore-related tables using regex pattern
+        tEnv.executeSql(createSourceDDL("underscore_tables", "ndi_pg_user.*"));
 
-        TableResult result = tEnv.executeSql("SELECT * FROM all_tables");
+        TableResult result = tEnv.executeSql("SELECT * FROM underscore_tables");
         CloseableIterator<Row> iterator = result.collect();
 
         try {
@@ -229,7 +287,7 @@ class SimilarTableNamesITCase extends PostgresTestBase {
                         expected.stream().sorted().collect(Collectors.toList()));
     }
 
-    /** Executes DML operations on both tables for streaming phase testing. */
+    /** Executes DML operations on target and similar-named tables for streaming phase testing. */
     private void executeDmlOperations() throws Exception {
         try (Connection conn =
                         getJdbcConnection(
@@ -245,6 +303,22 @@ class SimilarTableNamesITCase extends PostgresTestBase {
             // Update target table
             stmt.execute(
                     "UPDATE similar_names.ndi_pg_user_sink_1 SET address = 'Suzhou' WHERE id = 1");
+        }
+    }
+
+    /** Executes DML operations on user_test_data table for '%' wildcard testing. */
+    private void executeDmlOperationsOnTestDataTable() throws Exception {
+        try (Connection conn =
+                        getJdbcConnection(
+                                POSTGRES_CONTAINER, similarNamesDatabase.getDatabaseName());
+                Statement stmt = conn.createStatement()) {
+            // Insert into user_test_data table (should NOT be captured when only listening to
+            // user%data)
+            stmt.execute(
+                    "INSERT INTO similar_names.user_test_data VALUES (304, 'test_4', 'Harbin')");
+            // Update user_test_data table
+            stmt.execute(
+                    "UPDATE similar_names.user_test_data SET address = 'Changchun' WHERE id = 301");
         }
     }
 
