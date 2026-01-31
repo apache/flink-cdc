@@ -225,6 +225,11 @@ Pipeline 连接器配置项
       <td>VARCHAR(n)</td>
       <td></td>
     </tr>
+    <tr>
+      <td>VARIANT</td>
+      <td>VARIANT</td>
+      <td></td>
+    </tr>
     </tbody>
 </table>
 </div>
