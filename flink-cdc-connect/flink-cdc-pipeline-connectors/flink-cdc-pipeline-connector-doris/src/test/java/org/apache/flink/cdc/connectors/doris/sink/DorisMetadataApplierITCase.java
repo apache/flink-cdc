@@ -630,7 +630,7 @@ class DorisMetadataApplierITCase extends DorisSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    /** Microsecond variant: '0000-00-00 00:00:00.000000' */
+    /** Microsecond variant: '0000-00-00 00:00:00.000000'. */
     private static final String INVALID_DATETIME_WITH_MICROS = "0000-00-00 00:00:00.000000";
 
     @ParameterizedTest(name = "batchMode: {0}")
