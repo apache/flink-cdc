@@ -93,6 +93,9 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  * specifying starting offset on start.
  *
  * <p>Line 1485 : Add more error details for some exceptions.
+ *
+ * <p>Line 947-958 : Use iterator instead of index-based loop to avoid O(n²) complexity when
+ * processing LinkedList rows in handleChange method. See FLINK-38846.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -946,11 +949,18 @@ public class MySqlStreamingChangeEventSource
             int count = 0;
             int numRows = rows.size();
             if (startingRowNumber < numRows) {
-                for (int row = startingRowNumber; row != numRows; ++row) {
-                    offsetContext.setRowNumber(row, numRows);
-                    offsetContext.event(tableId, eventTimestamp);
-                    changeEmitter.emit(tableId, rows.get(row));
-                    count++;
+                // Use iterator to avoid O(n²) complexity when rows is a LinkedList
+                // (mysql-binlog-connector-java uses LinkedList in WriteRowsEventDataDeserializer
+                // and DeleteRowsEventDataDeserializer)
+                int rowIndex = 0;
+                for (U rowData : rows) {
+                    if (rowIndex >= startingRowNumber) {
+                        offsetContext.setRowNumber(rowIndex, numRows);
+                        offsetContext.event(tableId, eventTimestamp);
+                        changeEmitter.emit(tableId, rowData);
+                        count++;
+                    }
+                    rowIndex++;
                 }
                 if (LOGGER.isDebugEnabled()) {
                     if (startingRowNumber != 0) {
