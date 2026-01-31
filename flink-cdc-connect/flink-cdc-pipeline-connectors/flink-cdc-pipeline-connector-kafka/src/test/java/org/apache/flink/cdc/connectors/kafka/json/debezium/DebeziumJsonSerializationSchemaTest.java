@@ -411,68 +411,30 @@ class DebeziumJsonSerializationSchemaTest {
         byte[] serialized = serializationSchema.serialize(insertEvent);
         JsonNode actual = mapper.readTree(serialized);
 
-        // Verify the schema is present
-        assertThat(actual.has("schema")).isTrue();
-        assertThat(actual.has("payload")).isTrue();
+        JsonNode expected =
+                mapper.readTree(
+                        "{\"schema\":{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                                + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                                + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                                + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                                + "],\"optional\":true,\"field\":\"row\"}"
+                                + "],\"optional\":true,\"field\":\"before\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                                + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                                + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                                + "{\"type\":\"struct\",\"fields\":["
+                                + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                                + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                                + "],\"optional\":true,\"field\":\"row\"}"
+                                + "],\"optional\":true,\"field\":\"after\"}"
+                                + "],\"optional\":false},"
+                                + "\"payload\":{\"before\":null,\"after\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"table1\"}}}");
 
-        JsonNode schemaNode = actual.get("schema");
-        assertThat(schemaNode.has("fields")).isTrue();
-
-        // Get before/after schema fields
-        JsonNode fields = schemaNode.get("fields");
-        JsonNode afterSchema = null;
-        for (JsonNode field : fields) {
-            if ("after".equals(field.get("field").asText())) {
-                afterSchema = field;
-                break;
-            }
-        }
-        assertThat(afterSchema).isNotNull();
-
-        // Verify schema contains complex type definitions
-        JsonNode afterFields = afterSchema.get("fields");
-        assertThat(afterFields).isNotNull();
-
-        // Find and verify array schema
-        JsonNode arrSchema = null;
-        JsonNode mapSchema = null;
-        JsonNode rowSchema = null;
-        for (JsonNode f : afterFields) {
-            String fieldName = f.get("field").asText();
-            if ("arr".equals(fieldName)) {
-                arrSchema = f;
-            } else if ("map".equals(fieldName)) {
-                mapSchema = f;
-            } else if ("row".equals(fieldName)) {
-                rowSchema = f;
-            }
-        }
-
-        // Verify array schema type
-        assertThat(arrSchema).isNotNull();
-        assertThat(arrSchema.get("type").asText()).isEqualTo("array");
-        assertThat(arrSchema.has("items")).isTrue();
-        assertThat(arrSchema.get("items").get("type").asText()).isEqualTo("string");
-
-        // Verify map schema type
-        assertThat(mapSchema).isNotNull();
-        assertThat(mapSchema.get("type").asText()).isEqualTo("map");
-        assertThat(mapSchema.has("keys")).isTrue();
-        assertThat(mapSchema.has("values")).isTrue();
-        assertThat(mapSchema.get("keys").get("type").asText()).isEqualTo("string");
-        assertThat(mapSchema.get("values").get("type").asText()).isEqualTo("int32");
-
-        // Verify row schema type (struct)
-        assertThat(rowSchema).isNotNull();
-        assertThat(rowSchema.get("type").asText()).isEqualTo("struct");
-        assertThat(rowSchema.has("fields")).isTrue();
-
-        // Verify payload data
-        JsonNode payload = actual.get("payload");
-        assertThat(payload.has("after")).isTrue();
-        JsonNode afterData = payload.get("after");
-        assertThat(afterData.has("arr")).isTrue();
-        assertThat(afterData.has("map")).isTrue();
-        assertThat(afterData.has("row")).isTrue();
+        assertThat(actual).isEqualTo(expected);
     }
 }
