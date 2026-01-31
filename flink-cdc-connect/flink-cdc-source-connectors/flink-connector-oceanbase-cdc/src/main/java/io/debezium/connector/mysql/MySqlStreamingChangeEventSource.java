@@ -94,7 +94,7 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  *
  * <p>Line 1485 : Add more error details for some exceptions.
  *
- * <p>Line 947-958 : Use iterator instead of index-based loop to avoid O(n²) complexity when
+ * <p>Line 951-964 : Use iterator instead of index-based loop to avoid O(n²) complexity when
  * processing LinkedList rows in handleChange method. See FLINK-38846.
  */
 public class MySqlStreamingChangeEventSource
