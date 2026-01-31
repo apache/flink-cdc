@@ -404,7 +404,7 @@ public class StarRocksUtils {
                 || dataType instanceof org.apache.flink.cdc.common.types.TimestampType
                 || dataType instanceof org.apache.flink.cdc.common.types.ZonedTimestampType) {
 
-            if (INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+            if (defaultValue.startsWith(INVALID_OR_MISSING_DATATIME)) {
                 return DEFAULT_DATETIME;
             }
         }
