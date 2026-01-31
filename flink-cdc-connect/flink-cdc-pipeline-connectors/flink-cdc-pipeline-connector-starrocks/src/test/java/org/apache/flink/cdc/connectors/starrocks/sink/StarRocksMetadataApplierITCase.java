@@ -642,10 +642,7 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
 
         PhysicalColumn createdTimeCol =
                 new PhysicalColumn(
-                        "created_time",
-                        DataTypes.TIMESTAMP(6),
-                        null,
-                        INVALID_DATETIME_WITH_MICROS);
+                        "created_time", DataTypes.TIMESTAMP(6), null, INVALID_DATETIME_WITH_MICROS);
 
         PhysicalColumn updatedTimeCol =
                 new PhysicalColumn(
