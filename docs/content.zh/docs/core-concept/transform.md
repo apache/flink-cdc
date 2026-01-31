@@ -214,6 +214,13 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 | NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
 | STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
 
+## Variant Functions
+
+| Function | Janino Code | Description |
+| -------- | ----------- | ----------- |
+| PARSE_JSON(string[, allowDuplicateKeys]) | parseJson(string[, allowDuplicateKeys]) | Parse a JSON string into a Variant. If the JSON string is invalid, an error will be thrown. To return NULL instead of an error, use the TRY_PARSE_JSON function. <br><br> If there are duplicate keys in the input JSON string, when `allowDuplicateKeys` is true, the parser will keep the last occurrence of all fields with the same key, otherwise it will throw an error. The default value of `allowDuplicateKeys` is false. |
+| TRY_PARSE_JSON(string[, allowDuplicateKeys]) | tryParseJson(string[, allowDuplicateKeys]) | Parse a JSON string into a Variant if possible. If the JSON string is invalid, return NULL. To throw an error instead of returning NULL, use the PARSE_JSON function. <br><br> If there are duplicate keys in the input JSON string, when `allowDuplicateKeys` is true, the parser will keep the last occurrence of all fields with the same key, otherwise it will return NULL. The default value of `allowDuplicateKeys` is false. |
+
 # 示例
 ## 添加计算列
 表达式可以用来生成新的列。例如，如果我们想基于表 `web_order` 在数据库 `mydb` 中添加两个计算列，我们可以定义一个转换规则如下：
