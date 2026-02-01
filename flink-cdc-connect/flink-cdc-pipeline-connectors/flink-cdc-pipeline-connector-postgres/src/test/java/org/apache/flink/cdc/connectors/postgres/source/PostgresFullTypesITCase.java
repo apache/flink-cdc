@@ -873,6 +873,12 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
 
         ArrayData actualIntArray = (ArrayData) actualSnapshotObjects[3];
         Assertions.assertThat(actualIntArray.getInt(0)).isEqualTo(42);
+
+        ArrayData actualUuidArray = (ArrayData) actualSnapshotObjects[4];
+        Assertions.assertThat(actualUuidArray.getString(0))
+                .isEqualTo(BinaryStringData.fromString("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"));
+        Assertions.assertThat(actualUuidArray.getString(1))
+                .isEqualTo(BinaryStringData.fromString("b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22"));
     }
 
     @Test
@@ -1117,7 +1123,8 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.INT(),
                     DataTypes.ARRAY(DataTypes.STRING()),
                     DataTypes.ARRAY(DataTypes.INT()),
-                    DataTypes.ARRAY(DataTypes.INT()));
+                    DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.ARRAY(DataTypes.STRING()));
 
     private static final RowType ARRAY_TYPES_WITH_NULL =
             RowType.of(

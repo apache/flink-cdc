@@ -970,6 +970,116 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    void testArrayTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE array_types ("
+                                + "    id INTEGER NOT NULL,"
+                                + "    text_a1 ARRAY<STRING>,"
+                                + "    int_a1 ARRAY<INT>,"
+                                + "    int_s1 ARRAY<INT>,"
+                                + "    uuid_a1 ARRAY<STRING>"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGIS_CONTAINER.getHost(),
+                        POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGIS_CONTAINER.getUsername(),
+                        POSTGIS_CONTAINER.getPassword(),
+                        POSTGIS_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "array_types",
+                        parallelismSnapshot,
+                        getSlotName());
+
+        tEnv.executeSql(sourceDDL);
+
+        // async submit job
+        TableResult tableResult = tEnv.executeSql("SELECT * FROM array_types");
+        CloseableIterator<Row> iterator = tableResult.collect();
+
+        // wait for snapshot to complete
+        List<Row> snapshotResults = new ArrayList<>();
+        while (iterator.hasNext() && snapshotResults.size() < 1) {
+            Row row = iterator.next();
+            snapshotResults.add(row);
+        }
+
+        // verify snapshot data
+        Assertions.assertThat(snapshotResults).hasSize(1);
+        Row snapshotRow = snapshotResults.get(0);
+
+        Assertions.assertThat(snapshotRow.getField(0)).isEqualTo(1);
+
+        String[] textArray = (String[]) snapshotRow.getField(1);
+        Assertions.assertThat(textArray).containsExactly("electronics", "gadget", "sale");
+
+        Integer[] intArray1 = (Integer[]) snapshotRow.getField(2);
+        Assertions.assertThat(intArray1).containsExactly(85, 90, 78);
+
+        Integer[] intArray2 = (Integer[]) snapshotRow.getField(3);
+        Assertions.assertThat(intArray2).containsExactly(42);
+
+        String[] uuidArray = (String[]) snapshotRow.getField(4);
+        Assertions.assertThat(uuidArray).hasSize(2);
+        // UUID values should be present (format may vary)
+        Assertions.assertThat(uuidArray[0]).isNotEmpty();
+        Assertions.assertThat(uuidArray[1]).isNotEmpty();
+
+        // Test incremental (WAL) path - UPDATE array data
+        try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE inventory.array_types SET text_a1=ARRAY['updated', 'array'], "
+                            + "int_a1='{100, 200}' WHERE id=1;");
+        }
+
+        // Wait for and verify the update event
+        List<Row> incrementalResults = new ArrayList<>();
+        while (iterator.hasNext() && incrementalResults.size() < 2) {
+            Row row = iterator.next();
+            incrementalResults.add(row);
+        }
+
+        // Should have received delete (-D) and insert (+I) for the update
+        Assertions.assertThat(incrementalResults).hasSize(2);
+
+        Row updatedRow =
+                incrementalResults.stream()
+                        .filter(r -> r.getKind().name().equals("INSERT"))
+                        .findFirst()
+                        .orElseThrow(() -> new AssertionError("No INSERT row found"));
+
+        String[] updatedTextArray = (String[]) updatedRow.getField(1);
+        Assertions.assertThat(updatedTextArray).containsExactly("updated", "array");
+
+        Integer[] updatedIntArray = (Integer[]) updatedRow.getField(2);
+        Assertions.assertThat(updatedIntArray).containsExactly(100, 200);
+
+        Integer[] unchangedIntArray = (Integer[]) updatedRow.getField(3);
+        Assertions.assertThat(unchangedIntArray).containsExactly(42);
+
+        String[] unchangedUuidArray = (String[]) updatedRow.getField(4);
+        Assertions.assertThat(unchangedUuidArray).hasSize(2);
+
+        tableResult.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     void testUniqueIndexIncludingFunction(boolean parallelismSnapshot) throws Exception {
         setup(parallelismSnapshot);
         // Clear the influence of usesLegacyRows which set USE_LEGACY_TO_STRING = true.

@@ -740,6 +740,7 @@ Since the order of processing these records cannot be guaranteed, the final valu
         CHARACTER(n)<br>
         VARCHAR(n)<br>
         CHARACTER VARYING(n)<br>
+        UUID<br>
         TEXT</td>
       <td>STRING</td>
     </tr>
