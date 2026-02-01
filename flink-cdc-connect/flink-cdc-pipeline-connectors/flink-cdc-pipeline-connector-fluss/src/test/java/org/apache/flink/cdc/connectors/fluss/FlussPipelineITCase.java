@@ -45,6 +45,8 @@ import org.apache.flink.test.junit5.MiniClusterExtension;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
+import com.alibaba.fluss.client.Connection;
+import com.alibaba.fluss.client.ConnectionFactory;
 import com.alibaba.fluss.config.ConfigOptions;
 import com.alibaba.fluss.config.MemorySize;
 import com.alibaba.fluss.metadata.DataLakeFormat;
@@ -117,7 +119,8 @@ public class FlussPipelineITCase {
     protected TableEnvironment tBatchEnv;
 
     @BeforeEach
-    void before() {
+    void before() throws Exception {
+        waitForFlussClusterReady();
         // open a catalog so that we can get table from the catalog
         String bootstrapServers = FLUSS_CLUSTER_EXTENSION.getBootstrapServers();
 
@@ -135,6 +138,27 @@ public class FlussPipelineITCase {
         // create database
         tBatchEnv.executeSql("create database " + DEFAULT_DB);
         tBatchEnv.useDatabase(DEFAULT_DB);
+    }
+
+    private void waitForFlussClusterReady() throws Exception {
+        int maxRetries = 30;
+        int retryIntervalMs = 1000;
+        Exception lastException = null;
+
+        for (int i = 0; i < maxRetries; i++) {
+            try (Connection connection =
+                    ConnectionFactory.createConnection(FLUSS_CLUSTER_EXTENSION.getClientConfig())) {
+                // Connection successful, cluster is ready
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                Thread.sleep(retryIntervalMs);
+            }
+        }
+
+        throw new IllegalStateException(
+                "Failed to connect to Fluss cluster after " + maxRetries + " attempts",
+                lastException);
     }
 
     @AfterEach
