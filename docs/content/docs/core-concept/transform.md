@@ -39,6 +39,7 @@ To describe a transform rule, the following parameters can be used:
 | primary-keys              | Sink table primary keys, separated by commas                                      | optional          |
 | partition-keys            | Sink table partition keys, separated by commas                                    | optional          |
 | table-options             | used to the configure table creation statement when automatically creating tables | optional          |
+| table-options.delimiter   | delimiter for table-options key-value pairs, default is `,`                       | optional          |
 | converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
 | description               | Transform rule description                                                        | optional          |
 
@@ -327,6 +328,13 @@ transform:
     description: auto creating table options example
 ```
 Tips: The format of table-options is `key1=value1,key2=value2`.
+If option values contain commas or other special characters, you can specify a custom delimiter using `table-options.delimiter` (such as `;`, `|`, `$`, etc.):
+```yaml
+transform:
+  - source-table: mydb.web_order
+    table-options: sequence.field=gxsj,jjsj;file-index.bloom-filter.columns=jjdbh
+    table-options.delimiter: ";"
+```
 
 ## Classification mapping
 Multiple transform rules can be defined to classify input data rows and apply different processing.

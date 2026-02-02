@@ -43,6 +43,7 @@ public class PreTransformOperatorBuilder {
                         "",
                         "",
                         "",
+                        "",
                         null,
                         new SupportedMetadataColumn[0]));
         return this;
@@ -57,6 +58,28 @@ public class PreTransformOperatorBuilder {
             String tableOption,
             @Nullable String postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
+        return addTransform(
+                tableInclusions,
+                projection,
+                filter,
+                primaryKey,
+                partitionKey,
+                tableOption,
+                null,
+                postTransformConverter,
+                supportedMetadataColumns);
+    }
+
+    public PreTransformOperatorBuilder addTransform(
+            String tableInclusions,
+            @Nullable String projection,
+            @Nullable String filter,
+            String primaryKey,
+            String partitionKey,
+            String tableOption,
+            String tableOptionsDelimiter,
+            @Nullable String postTransformConverter,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         transformRules.add(
                 new TransformRule(
                         tableInclusions,
@@ -65,6 +88,7 @@ public class PreTransformOperatorBuilder {
                         primaryKey,
                         partitionKey,
                         tableOption,
+                        tableOptionsDelimiter,
                         postTransformConverter,
                         supportedMetadataColumns));
         return this;

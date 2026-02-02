@@ -34,6 +34,7 @@ public class TransformRule implements Serializable {
     private final String primaryKey;
     private final String partitionKey;
     private final String tableOption;
+    private final String tableOptionsDelimiter;
     private final @Nullable String postTransformConverter;
     private final SupportedMetadataColumn[] supportedMetadataColumns;
 
@@ -44,6 +45,7 @@ public class TransformRule implements Serializable {
             String primaryKey,
             String partitionKey,
             String tableOption,
+            String tableOptionsDelimiter,
             @Nullable String postTransformConverter,
             SupportedMetadataColumn[] supportedMetadataColumns) {
         this.tableInclusions = tableInclusions;
@@ -52,6 +54,7 @@ public class TransformRule implements Serializable {
         this.primaryKey = primaryKey;
         this.partitionKey = partitionKey;
         this.tableOption = tableOption;
+        this.tableOptionsDelimiter = tableOptionsDelimiter;
         this.postTransformConverter = postTransformConverter;
         this.supportedMetadataColumns = supportedMetadataColumns;
     }
@@ -80,6 +83,10 @@ public class TransformRule implements Serializable {
 
     public String getTableOption() {
         return tableOption;
+    }
+
+    public String getTableOptionsDelimiter() {
+        return tableOptionsDelimiter;
     }
 
     @Nullable

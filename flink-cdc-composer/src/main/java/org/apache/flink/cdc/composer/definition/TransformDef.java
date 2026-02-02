@@ -36,6 +36,8 @@ import java.util.Objects;
  *       by `,`. Optional for the definition.
  *   <li>tableOptions: a string for table options for matching input table IDs, options are
  *       seperated by `,`, key and value are seperated by `=`. Optional for the definition.
+ *   <li>tableOptionsDelimiter: a string for delimiter of table options, default is `,`. Optional
+ *       for the definition.
  *   <li>description: description for the transformation. Optional for the definition.
  * </ul>
  */
@@ -47,6 +49,7 @@ public class TransformDef {
     private final String primaryKeys;
     private final String partitionKeys;
     private final String tableOptions;
+    private final String tableOptionsDelimiter;
     private final String postTransformConverter;
 
     public TransformDef(
@@ -56,6 +59,7 @@ public class TransformDef {
             String primaryKeys,
             String partitionKeys,
             String tableOptions,
+            String tableOptionsDelimiter,
             String description,
             String postTransformConverter) {
         this.sourceTable = sourceTable;
@@ -64,10 +68,30 @@ public class TransformDef {
         this.primaryKeys = primaryKeys;
         this.partitionKeys = partitionKeys;
         this.tableOptions = tableOptions;
+        this.tableOptionsDelimiter = tableOptionsDelimiter;
         this.description = description;
         this.postTransformConverter = postTransformConverter;
     }
-
+    public TransformDef(
+            String sourceTable,
+            String projection,
+            String filter,
+            String primaryKeys,
+            String partitionKeys,
+            String tableOptions,
+            String description,
+            String postTransformConverter) {
+        this(
+                sourceTable,
+                projection,
+                filter,
+                primaryKeys,
+                partitionKeys,
+                tableOptions,
+                ",",
+                description,
+                postTransformConverter);
+    }
     public String getSourceTable() {
         return sourceTable;
     }
@@ -94,6 +118,10 @@ public class TransformDef {
 
     public String getTableOptions() {
         return tableOptions;
+    }
+
+    public String getTableOptionsDelimiter() {
+        return tableOptionsDelimiter;
     }
 
     public String getPostTransformConverter() {
@@ -137,6 +165,7 @@ public class TransformDef {
                 && Objects.equals(primaryKeys, that.primaryKeys)
                 && Objects.equals(partitionKeys, that.partitionKeys)
                 && Objects.equals(tableOptions, that.tableOptions)
+                && Objects.equals(tableOptionsDelimiter, that.tableOptionsDelimiter)
                 && Objects.equals(postTransformConverter, that.postTransformConverter);
     }
 
@@ -150,6 +179,7 @@ public class TransformDef {
                 primaryKeys,
                 partitionKeys,
                 tableOptions,
+                tableOptionsDelimiter,
                 postTransformConverter);
     }
 }
