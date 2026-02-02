@@ -119,7 +119,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, {"id":2}], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, {"id":2}], after=[], op=DELETE, meta=()}
 - do: Integer Array Subscripting
-  ignore: FLINK-38888
   projection: |-
     id_
     array_int_
@@ -133,7 +132,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: String Array Subscripting
-  ignore: FLINK-38888
   projection: |-
     id_
     array_string_
@@ -147,7 +145,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Array OOB Subscripting
-  ignore: FLINK-38888
   projection: |-
     id_
     array_string_[0] AS negative_overflow
@@ -161,7 +158,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Array Subscripting With Sub Expression
-  ignore: FLINK-38888
   projection: |-
     id_
     array_int_[1 + 1] AS int_key
@@ -175,7 +171,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Filter by Array-related Expression
-  ignore: FLINK-38888
   projection: id_, array_string_
   filter: array_string_[3] = '五'
   primary-key: id_
@@ -184,7 +179,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[1, [one, one, two, three, five]], after=[-1, [二, san, 五, qi, 十一]], op=UPDATE, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[-1, [二, san, 五, qi, 十一]], after=[], op=DELETE, meta=()}
 - do: Map Subscripting
-  ignore: FLINK-38888
   projection: |-
     id_
     map_int_string_
@@ -198,7 +192,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Map Subscripting with absent key
-  ignore: FLINK-38888
   projection: |-
     id_
     map_int_string_[233] AS map_value
@@ -211,7 +204,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
 - do: Map Subscripting with complex expression
-  ignore: FLINK-38888
   projection: |-
     id_
     map_int_string_[1 + 2] AS map_value
@@ -224,7 +216,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null], after=[], op=DELETE, meta=()}
 - do: Map Subscripting with nested expressions
-  ignore: FLINK-38888
   projection: |-
     id_
     map_string_array_string_[lower('ONE')] AS index_1
@@ -238,7 +229,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Map Subscripting With Absent Object
-  ignore: FLINK-38888
   projection: |-
     id_
     map_string_array_string_['foo'] AS index_1
@@ -252,7 +242,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null], after=[], op=DELETE, meta=()}
 - do: Filter by Map-related Expression
-  ignore: FLINK-38888
   projection: id_, map_int_string_
   filter: map_int_string_[1] = 'one'
   primary-key: id_
@@ -260,7 +249,6 @@
     CreateTableEvent{tableId=foo.bar.baz, schema=columns={`id_` BIGINT NOT NULL 'Identifier',`map_int_string_` MAP<INT, STRING>}, primaryKeys=id_, options=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[1, {1 -> one, 2 -> two, 3 -> three}], op=INSERT, meta=()}
 - do: Record Subscripting With Index
-  ignore: FLINK-38888
   projection: |-
     id_
     complex_row_
@@ -275,7 +263,6 @@
     DataChangeEvent{tableId=foo.bar.baz, before=[], after=[0, null, null, null], op=INSERT, meta=()}
     DataChangeEvent{tableId=foo.bar.baz, before=[0, null, null, null], after=[], op=DELETE, meta=()}
 - do: Record Subscripting With Invalid Index
-  ignore: FLINK-38888
   projection: |-
     id_
     complex_row_
@@ -283,7 +270,6 @@
   primary-key: id_
   expect-error: 'Cannot infer type of field at position 0 within ROW type: RecordType(VARCHAR(65536) name, INTEGER length)'
 - do: Record Subscripting With Computed Index (Illegal, type must be statically determined)
-  ignore: FLINK-38888
   projection: |-
     id_
     complex_row_
@@ -291,7 +277,6 @@
   primary-key: id_
   expect-error: 'Cannot infer type of field at position null within ROW type: RecordType(VARCHAR(65536) name, INTEGER length)'
 - do: Filter by Record-related Expression
-  ignore: FLINK-38888
   projection: id_, complex_row_
   filter: complex_row_[1] = 'Derrida'
   primary-key: id_

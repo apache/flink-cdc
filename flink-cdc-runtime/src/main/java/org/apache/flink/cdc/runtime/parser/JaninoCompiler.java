@@ -89,7 +89,7 @@ public class JaninoCompiler {
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
     private static final String[] BUILTIN_FUNCTION_MODULES = {
-        "Arithmetic", "Casting", "Comparison", "Logical", "String", "Temporal"
+        "Arithmetic", "Casting", "Comparison", "Logical", "String", "Struct", "Temporal"
     };
 
     @VisibleForTesting
@@ -306,6 +306,8 @@ public class JaninoCompiler {
                 return generateTimestampAddOperation(context, sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(context, sqlBasicCall, atoms);
+            case ITEM:
+                return generateItemAccessOperation(context, sqlBasicCall, atoms);
             default:
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
         }
@@ -466,6 +468,37 @@ public class JaninoCompiler {
                     Location.NOWHERE, null, StringUtils.convertToCamelCase("CONCAT"), atoms);
         }
         throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+    }
+
+    private static Java.Rvalue generateItemAccessOperation(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        if (atoms.length != 2) {
+            throw new ParseException("Unrecognized item access expression: " + sqlBasicCall);
+        }
+        Java.Rvalue methodInvocation =
+                new Java.MethodInvocation(Location.NOWHERE, null, "itemAccess", atoms);
+
+        // Deduce the return type and add a cast to ensure proper type conversion
+        DataType resultType =
+                TransformParser.deduceSubExpressionType(
+                        context.columns,
+                        sqlBasicCall,
+                        context.udfDescriptors,
+                        context.supportedMetadataColumns);
+
+        // Get the Java class for the result type and add a cast
+        Class<?> javaClass = JavaClassConverter.toJavaClass(resultType);
+        if (javaClass != null && javaClass != Object.class) {
+            return new Java.Cast(
+                    Location.NOWHERE,
+                    new Java.ReferenceType(
+                            Location.NOWHERE,
+                            new Java.Annotation[0],
+                            javaClass.getName().split("\\."),
+                            null),
+                    methodInvocation);
+        }
+        return methodInvocation;
     }
 
     private static Java.Rvalue generateOtherFunctionOperation(

@@ -93,7 +93,7 @@ import static org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter.co
 public class TransformParser {
     private static final Logger LOG = LoggerFactory.getLogger(TransformParser.class);
     private static final String DEFAULT_SCHEMA = "default_schema";
-    private static final String DEFAULT_TABLE = "TB";
+    public static final String DEFAULT_TABLE = "TB";
     private static final String MAPPED_COLUMN_NAME_PREFIX = "$";
     private static final String MAPPED_SINGLE_COLUMN_NAME = MAPPED_COLUMN_NAME_PREFIX + "0";
 

@@ -398,6 +398,12 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // --------------
     public static final SqlFunction CAST = SqlStdOperatorTable.CAST;
 
+    // ---------------------
+    // Collection Functions
+    // ---------------------
+    // Supports array[index] and map[key] syntax
+    public static final SqlOperator ITEM = SqlStdOperatorTable.ITEM;
+
     public static final SqlFunction AI_CHAT_PREDICT =
             new SqlFunction(
                     "AI_CHAT_PREDICT",

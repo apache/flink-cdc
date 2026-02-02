@@ -392,6 +392,39 @@ class TransformParserTest {
     }
 
     @Test
+    public void testTranslateItemAccessToJaninoExpression() {
+        // Test collection access functions (ARRAY, MAP) with proper column schema
+        List<Column> columns =
+                List.of(
+                        Column.physicalColumn("arr", DataTypes.ARRAY(DataTypes.STRING())),
+                        Column.physicalColumn(
+                                "m", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT())),
+                        Column.physicalColumn("idx", DataTypes.INT()),
+                        Column.physicalColumn("k", DataTypes.STRING()));
+
+        // Array access: array[index] - index is 1-based (SQL standard)
+        // Result type is String (from ARRAY<STRING>), so cast is added
+        testFilterExpressionWithColumns("arr[1]", "(java.lang.String) itemAccess(arr, 1)", columns);
+        testFilterExpressionWithColumns("arr[2]", "(java.lang.String) itemAccess(arr, 2)", columns);
+        testFilterExpressionWithColumns(
+                "arr[idx]", "(java.lang.String) itemAccess(arr, idx)", columns);
+        // Map access: map[key]
+        // Result type is Integer (from MAP<STRING, INT>), so cast is added
+        testFilterExpressionWithColumns(
+                "m['key']", "(java.lang.Integer) itemAccess(m, \"key\")", columns);
+        testFilterExpressionWithColumns("m[k]", "(java.lang.Integer) itemAccess(m, k)", columns);
+        // Nested access with comparisons
+        testFilterExpressionWithColumns(
+                "arr[1] = 'value'",
+                "valueEquals((java.lang.String) itemAccess(arr, 1), \"value\")",
+                columns);
+        testFilterExpressionWithColumns(
+                "m['key'] > 10",
+                "greaterThan((java.lang.Integer) itemAccess(m, \"key\"), 10)",
+                columns);
+    }
+
+    @Test
     public void testTranslateFilterToJaninoExpressionError() {
         Assertions.assertThatThrownBy(
                         () -> {
@@ -812,6 +845,18 @@ class TransformParserTest {
                 TransformParser.translateFilterExpressionToJaninoExpression(
                         expression,
                         DUMMY_COLUMNS,
+                        Collections.emptyList(),
+                        new SupportedMetadataColumn[0],
+                        Collections.emptyMap());
+        Assertions.assertThat(janinoExpression).isEqualTo(expressionExpect);
+    }
+
+    private void testFilterExpressionWithColumns(
+            String expression, String expressionExpect, List<Column> columns) {
+        String janinoExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        expression,
+                        columns,
                         Collections.emptyList(),
                         new SupportedMetadataColumn[0],
                         Collections.emptyMap());
