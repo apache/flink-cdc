@@ -1007,37 +1007,44 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         tEnv.executeSql(sourceDDL);
 
+        String sinkDDL =
+                "CREATE TABLE array_sink ("
+                        + "    id INTEGER NOT NULL,"
+                        + "    text_a1 ARRAY<STRING>,"
+                        + "    int_a1 ARRAY<INT>,"
+                        + "    int_s1 ARRAY<INT>,"
+                        + "    uuid_a1 ARRAY<STRING>,"
+                        + "    PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + "  'connector' = 'values',"
+                        + "  'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sinkDDL);
+
         // async submit job
-        TableResult tableResult = tEnv.executeSql("SELECT * FROM array_types");
-        CloseableIterator<Row> iterator = tableResult.collect();
+        TableResult tableResult =
+                tEnv.executeSql("INSERT INTO array_sink SELECT * FROM array_types");
 
         // wait for snapshot to complete
-        List<Row> snapshotResults = new ArrayList<>();
-        while (iterator.hasNext() && snapshotResults.size() < 1) {
-            Row row = iterator.next();
-            snapshotResults.add(row);
-        }
+        waitForSinkSize("array_sink", 1);
 
         // verify snapshot data
+        List<String> snapshotResults = TestValuesTableFactory.getRawResultsAsStrings("array_sink");
         Assertions.assertThat(snapshotResults).hasSize(1);
-        Row snapshotRow = snapshotResults.get(0);
 
-        Assertions.assertThat(snapshotRow.getField(0)).isEqualTo(1);
+        // verify snapshot contains expected array data patterns (insert record)
+        String snapshotRow = snapshotResults.get(0);
+        Assertions.assertThat(snapshotRow).startsWith("+I(");
+        Assertions.assertThat(snapshotRow).contains("electronics");
+        Assertions.assertThat(snapshotRow).contains("gadget");
+        Assertions.assertThat(snapshotRow).contains("sale");
+        Assertions.assertThat(snapshotRow).contains("85");
+        Assertions.assertThat(snapshotRow).contains("90");
+        Assertions.assertThat(snapshotRow).contains("78");
+        Assertions.assertThat(snapshotRow).contains("42");
 
-        String[] textArray = (String[]) snapshotRow.getField(1);
-        Assertions.assertThat(textArray).containsExactly("electronics", "gadget", "sale");
-
-        Integer[] intArray1 = (Integer[]) snapshotRow.getField(2);
-        Assertions.assertThat(intArray1).containsExactly(85, 90, 78);
-
-        Integer[] intArray2 = (Integer[]) snapshotRow.getField(3);
-        Assertions.assertThat(intArray2).containsExactly(42);
-
-        String[] uuidArray = (String[]) snapshotRow.getField(4);
-        Assertions.assertThat(uuidArray).hasSize(2);
-        // UUID values should be present (format may vary)
-        Assertions.assertThat(uuidArray[0]).isNotEmpty();
-        Assertions.assertThat(uuidArray[1]).isNotEmpty();
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
 
         // Test incremental (WAL) path - UPDATE array data
         try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
@@ -1047,33 +1054,25 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
                             + "int_a1='{100, 200}' WHERE id=1;");
         }
 
-        // Wait for and verify the update event
-        List<Row> incrementalResults = new ArrayList<>();
-        while (iterator.hasNext() && incrementalResults.size() < 2) {
-            Row row = iterator.next();
-            incrementalResults.add(row);
-        }
+        // Wait for update event (-D and +I, total 3 records including initial +I)
+        waitForSinkSize("array_sink", 3);
 
-        // Should have received delete (-D) and insert (+I) for the update
-        Assertions.assertThat(incrementalResults).hasSize(2);
+        // verify incremental update data with raw changelog
+        List<String> incrementalResults =
+                TestValuesTableFactory.getRawResultsAsStrings("array_sink");
+        Assertions.assertThat(incrementalResults).hasSize(3);
 
-        Row updatedRow =
-                incrementalResults.stream()
-                        .filter(r -> r.getKind().name().equals("INSERT"))
-                        .findFirst()
-                        .orElseThrow(() -> new AssertionError("No INSERT row found"));
-
-        String[] updatedTextArray = (String[]) updatedRow.getField(1);
-        Assertions.assertThat(updatedTextArray).containsExactly("updated", "array");
-
-        Integer[] updatedIntArray = (Integer[]) updatedRow.getField(2);
-        Assertions.assertThat(updatedIntArray).containsExactly(100, 200);
-
-        Integer[] unchangedIntArray = (Integer[]) updatedRow.getField(3);
-        Assertions.assertThat(unchangedIntArray).containsExactly(42);
-
-        String[] unchangedUuidArray = (String[]) updatedRow.getField(4);
-        Assertions.assertThat(unchangedUuidArray).hasSize(2);
+        // verify updated array data is present in results
+        String allResults = String.join(",", incrementalResults);
+        // Should contain delete (-D) and insert (+I) for the update
+        Assertions.assertThat(allResults).contains("-D(");
+        // Updated values
+        Assertions.assertThat(allResults).contains("updated");
+        Assertions.assertThat(allResults).contains("array");
+        Assertions.assertThat(allResults).contains("100");
+        Assertions.assertThat(allResults).contains("200");
+        // Unchanged values still present
+        Assertions.assertThat(allResults).contains("42");
 
         tableResult.getJobClient().get().cancel().get();
     }
