@@ -910,8 +910,63 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
         } catch (Exception e) {
             Assertions.assertThat(getRootCause(e))
                     .hasMessage(
-                            "Unable convert multidimensional array value '[null, null]' to a flat array.");
+                            "Unable to convert multidimensional array value '[null, null]' to a flat array.");
         }
+    }
+
+    @Test
+    public void testArrayTypesWithNull() throws Exception {
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGIS_CONTAINER.getHost())
+                                .port(POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(POSTGRES_CONTAINER.getDatabaseName())
+                                .tableList("inventory.array_types_with_null")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(POSTGRES_CONTAINER.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        List<Event> snapshotResults = fetchResultsAndCreateTableEvent(events, 1).f0;
+        RecordData snapshotRecord = ((DataChangeEvent) snapshotResults.get(0)).after();
+
+        Object[] actualSnapshotObjects = recordFields(snapshotRecord, ARRAY_TYPES_WITH_NULL);
+
+        Assertions.assertThat(actualSnapshotObjects[0]).isEqualTo(1); // id column
+
+        // Test text array with null element: ARRAY['hello', NULL, 'world']
+        ArrayData actualTextArray = (ArrayData) actualSnapshotObjects[1];
+        Assertions.assertThat(actualTextArray.size()).isEqualTo(3);
+        Assertions.assertThat(actualTextArray.getString(0))
+                .isEqualTo(BinaryStringData.fromString("hello"));
+        Assertions.assertThat(actualTextArray.isNullAt(1)).isTrue();
+        Assertions.assertThat(actualTextArray.getString(2))
+                .isEqualTo(BinaryStringData.fromString("world"));
+
+        // Test integer array with null element: ARRAY[1, NULL, 3]
+        ArrayData actualIntArray = (ArrayData) actualSnapshotObjects[2];
+        Assertions.assertThat(actualIntArray.size()).isEqualTo(3);
+        Assertions.assertThat(actualIntArray.getInt(0)).isEqualTo(1);
+        Assertions.assertThat(actualIntArray.isNullAt(1)).isTrue();
+        Assertions.assertThat(actualIntArray.getInt(2)).isEqualTo(3);
     }
 
     public Throwable getRootCause(Throwable throwable) {
@@ -1062,6 +1117,12 @@ public class PostgresFullTypesITCase extends PostgresTestBase {
                     DataTypes.INT(),
                     DataTypes.ARRAY(DataTypes.STRING()),
                     DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.ARRAY(DataTypes.INT()));
+
+    private static final RowType ARRAY_TYPES_WITH_NULL =
+            RowType.of(
+                    DataTypes.INT(),
+                    DataTypes.ARRAY(DataTypes.STRING()),
                     DataTypes.ARRAY(DataTypes.INT()));
 
     private static final RowType ARRAY_TYPES_MATRIX =

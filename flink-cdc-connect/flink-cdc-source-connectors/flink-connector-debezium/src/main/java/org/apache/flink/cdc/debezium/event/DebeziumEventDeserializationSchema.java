@@ -504,6 +504,13 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
 
         Schema elementSchema = schema.valueSchema();
+        // Multidimensional arrays are not supported
+        if (elementSchema.type() == Schema.Type.ARRAY) {
+            throw new IllegalArgumentException(
+                    "Unable to convert multidimensional array value '"
+                            + dbzObj
+                            + "' to a flat array.");
+        }
         DataType elementType = schemaDataTypeInference.infer(null, elementSchema);
         DeserializationRuntimeConverter elementConverter = getOrCreateConverter(elementType);
 
@@ -513,13 +520,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
 
             for (int i = 0; i < list.size(); i++) {
                 Object element = list.get(i);
-                if (element != null && elementSchema.type() != Schema.Type.ARRAY) {
-                    array[i] = elementConverter.convert(element, elementSchema);
+                if (element == null) {
+                    array[i] = null;
                 } else {
-                    throw new IllegalArgumentException(
-                            "Unable convert multidimensional array value '"
-                                    + dbzObj
-                                    + "' to a flat array.");
+                    array[i] = elementConverter.convert(element, elementSchema);
                 }
             }
 
@@ -529,13 +533,10 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
             Object[] convertedArray = new Object[inputArray.length];
 
             for (int i = 0; i < inputArray.length; i++) {
-                if (inputArray[i] != null && elementSchema.type() != Schema.Type.ARRAY) {
-                    convertedArray[i] = elementConverter.convert(inputArray[i], elementSchema);
+                if (inputArray[i] == null) {
+                    convertedArray[i] = null;
                 } else {
-                    throw new IllegalArgumentException(
-                            "Unable convert multidimensional array value '"
-                                    + dbzObj
-                                    + "' to a flat array.");
+                    convertedArray[i] = elementConverter.convert(inputArray[i], elementSchema);
                 }
             }
 

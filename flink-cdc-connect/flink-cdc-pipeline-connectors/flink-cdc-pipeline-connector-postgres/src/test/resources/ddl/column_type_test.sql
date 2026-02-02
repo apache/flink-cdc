@@ -173,6 +173,22 @@ VALUES
      '{42}'
     );
 
+CREATE TABLE array_types_with_null (
+                             id        SERIAL PRIMARY KEY,
+                             text_a1   TEXT[],
+                             int_a1    INTEGER[]
+);
+
+ALTER TABLE inventory.array_types_with_null
+    REPLICA IDENTITY FULL;
+
+INSERT INTO array_types_with_null (id, text_a1, int_a1)
+VALUES
+    (1,
+     ARRAY['hello', NULL, 'world'],
+     ARRAY[1, NULL, 3]
+    );
+
 CREATE TABLE array_types_unsupported_matrix (
                              id        SERIAL PRIMARY KEY,
                              matrix_a1 INTEGER[][]
