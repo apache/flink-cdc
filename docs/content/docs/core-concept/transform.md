@@ -227,6 +227,16 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 | PARSE_JSON(string[, allowDuplicateKeys]) | parseJson(string[, allowDuplicateKeys]) | Parse a JSON string into a Variant. If the JSON string is invalid, an error will be thrown. To return NULL instead of an error, use the TRY_PARSE_JSON function. <br><br> If there are duplicate keys in the input JSON string, when `allowDuplicateKeys` is true, the parser will keep the last occurrence of all fields with the same key, otherwise it will throw an error. The default value of `allowDuplicateKeys` is false. |
 | TRY_PARSE_JSON(string[, allowDuplicateKeys]) | tryParseJson(string[, allowDuplicateKeys]) | Parse a JSON string into a Variant if possible. If the JSON string is invalid, return NULL. To throw an error instead of returning NULL, use the PARSE_JSON function. <br><br> If there are duplicate keys in the input JSON string, when `allowDuplicateKeys` is true, the parser will keep the last occurrence of all fields with the same key, otherwise it will return NULL. The default value of `allowDuplicateKeys` is false. |
 
+## Struct Functions
+
+Struct functions are used to access elements in ARRAY, MAP and ROW types using subscript syntax.
+
+| Function | Janino Code | Description |
+| -------- | ----------- | ----------- |
+| array[index] | itemAccess(array, index) | Returns the element at position `index` in the array. Index is 1-based (SQL standard). Returns NULL if the index is out of bounds or if the array is NULL. |
+| map[key] | itemAccess(map, key) | Returns the value associated with `key` in the map. Returns NULL if the key does not exist or if the map is NULL. |
+| row[index] | itemAccess(row, index) | Returns the field at position `index` in the row. Index is 1-based. The index must be a constant (not a computed expression) since the return type must be statically determined. |
+
 # Example
 ## Add computed columns
 Evaluation expressions can be used to generate new columns. For example, if we want to append two computed columns based on the table `web_order` in the database `mydb`, we may define a transform rule as follows:

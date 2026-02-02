@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 
@@ -472,9 +473,11 @@ public class JaninoCompiler {
 
     private static Java.Rvalue generateItemAccessOperation(
             Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
-        if (atoms.length != 2) {
-            throw new ParseException("Unrecognized item access expression: " + sqlBasicCall);
-        }
+        Preconditions.checkArgument(
+                atoms.length == 2,
+                "Expecting item accessing call %s to have 2 operands, got %s actually",
+                sqlBasicCall,
+                List.of(atoms));
         Java.Rvalue methodInvocation =
                 new Java.MethodInvocation(Location.NOWHERE, null, "itemAccess", atoms);
 
@@ -487,16 +490,20 @@ public class JaninoCompiler {
                         context.supportedMetadataColumns);
 
         // Get the Java class for the result type and add a cast
+        // Use getCanonicalName() to correctly handle array types (e.g., byte[] instead of "[B")
         Class<?> javaClass = JavaClassConverter.toJavaClass(resultType);
         if (javaClass != null && javaClass != Object.class) {
-            return new Java.Cast(
-                    Location.NOWHERE,
-                    new Java.ReferenceType(
-                            Location.NOWHERE,
-                            new Java.Annotation[0],
-                            javaClass.getName().split("\\."),
-                            null),
-                    methodInvocation);
+            String canonicalName = javaClass.getCanonicalName();
+            if (canonicalName != null) {
+                return new Java.Cast(
+                        Location.NOWHERE,
+                        new Java.ReferenceType(
+                                Location.NOWHERE,
+                                new Java.Annotation[0],
+                                canonicalName.split("\\."),
+                                null),
+                        methodInvocation);
+            }
         }
         return methodInvocation;
     }

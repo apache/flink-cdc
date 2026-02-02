@@ -20,77 +20,51 @@ package org.apache.flink.cdc.runtime.functions.impl;
 import java.util.List;
 import java.util.Map;
 
-/** Struct built-in functions. */
+/**
+ * Built-in functions for collection and struct data types.
+ *
+ * <p>These functions support accessing elements from collections (ARRAY, MAP) and structured data
+ * types (ROW).
+ */
 public class StructFunctions {
 
     /**
-     * Accesses an element from an ARRAY or MAP by index or key.
+     * Accesses an element from an ARRAY by index (1-based, SQL standard).
      *
-     * <p>For ARRAY: Uses 1-based index (SQL standard). array[1] returns the first element.
+     * <p>array[1] returns the first element.
      *
-     * <p>For MAP: Uses key to access the value. map['key'] returns the value for 'key'.
-     */
-    public static Object itemAccess(Object collection, Object indexOrKey) {
-        if (collection == null || indexOrKey == null) {
-            return null;
-        }
-
-        Object result;
-        if (collection instanceof List) {
-            result = arrayElement((List) collection, indexOrKey);
-        } else if (collection instanceof Map) {
-            result = mapValue((Map<?, ?>) collection, indexOrKey);
-        } else {
-            throw new IllegalArgumentException(
-                    "itemAccess only supports List or Map, but got: "
-                            + collection.getClass().getName());
-        }
-        return result;
-    }
-
-    /**
-     * Gets an element from an Object array by index (1-based, SQL standard). This overload handles
-     * arrays that have been converted from ArrayData to Object[] by DataTypeConverter.
-     *
-     * @param array the Object array to access
+     * @param <T> the element type of the array
+     * @param array the array to access
      * @param index the 1-based index
      * @return the element at the specified index, or null if index is out of bounds
      */
-    public static Object arrayElement(List array, Object index) {
+    public static <T> T itemAccess(List<T> array, Integer index) {
         if (array == null || index == null) {
             return null;
         }
-
-        int idx;
-        if (index instanceof Number) {
-            idx = ((Number) index).intValue();
-        } else {
-            idx = Integer.parseInt(index.toString());
-        }
-
         // Convert 1-based index to 0-based (SQL standard uses 1-based indexing)
-        int zeroBasedIndex = idx - 1;
-
-        // Check bounds
+        int zeroBasedIndex = index - 1;
         if (zeroBasedIndex < 0 || zeroBasedIndex >= array.size()) {
             return null;
         }
-
         return array.get(zeroBasedIndex);
     }
 
     /**
-     * Gets a value from a Map by key.
+     * Accesses a value from a MAP by key.
      *
-     * @param map the Map to access
+     * <p>map['key'] returns the value for 'key'.
+     *
+     * @param <K> the key type of the map
+     * @param <V> the value type of the map
+     * @param map the map to access
      * @param key the key to look up
      * @return the value for the specified key, or null if not found
      */
-    public static Object mapValue(Map<?, ?> map, Object key) {
+    public static <K, V> V itemAccess(Map<K, V> map, K key) {
         if (map == null || key == null) {
             return null;
         }
-
         return map.get(key);
     }
 }

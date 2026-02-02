@@ -422,6 +422,11 @@ class TransformParserTest {
                 "m['key'] > 10",
                 "greaterThan((java.lang.Integer) itemAccess(m, \"key\"), 10)",
                 columns);
+
+        List<Column> binaryArrayColumns =
+                List.of(Column.physicalColumn("binArr", DataTypes.ARRAY(DataTypes.BINARY(16))));
+        testFilterExpressionWithColumns(
+                "binArr[1]", "(byte[]) itemAccess(binArr, 1)", binaryArrayColumns);
     }
 
     @Test
