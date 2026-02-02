@@ -41,27 +41,18 @@ import java.util.Optional;
 public class TransformFilter implements Serializable {
     private static final long serialVersionUID = 1L;
     private final String expression;
-    private final String scriptExpression;
     private final List<String> columnNames;
     private final Map<String, String> columnNameMap;
 
     public TransformFilter(
-            String expression,
-            String scriptExpression,
-            List<String> columnNames,
-            Map<String, String> columnNameMap) {
+            String expression, List<String> columnNames, Map<String, String> columnNameMap) {
         this.expression = expression;
-        this.scriptExpression = scriptExpression;
         this.columnNames = columnNames;
         this.columnNameMap = columnNameMap;
     }
 
     public String getExpression() {
         return expression;
-    }
-
-    public String getScriptExpression() {
-        return scriptExpression;
     }
 
     public List<String> getColumnNames() {
@@ -76,19 +67,13 @@ public class TransformFilter implements Serializable {
         return TransformException.prettyPrintColumnNameMap(getColumnNameMap());
     }
 
-    public static Optional<TransformFilter> of(
-            String filterExpression, List<UserDefinedFunctionDescriptor> udfDescriptors) {
+    public static Optional<TransformFilter> of(String filterExpression) {
         if (StringUtils.isNullOrWhitespaceOnly(filterExpression)) {
             return Optional.empty();
         }
         List<String> columnNames = TransformParser.parseFilterColumnNameList(filterExpression);
         Map<String, String> columnNameMap = TransformParser.generateColumnNameMap(columnNames);
-        String scriptExpression =
-                TransformParser.translateFilterExpressionToJaninoExpression(
-                        filterExpression, udfDescriptors, columnNameMap);
-        return Optional.of(
-                new TransformFilter(
-                        filterExpression, scriptExpression, columnNames, columnNameMap));
+        return Optional.of(new TransformFilter(filterExpression, columnNames, columnNameMap));
     }
 
     public boolean isValid() {
@@ -100,9 +85,6 @@ public class TransformFilter implements Serializable {
         return "TransformFilter{"
                 + "expression='"
                 + expression
-                + '\''
-                + ", scriptExpression='"
-                + scriptExpression
                 + '\''
                 + ", columnNames="
                 + columnNames

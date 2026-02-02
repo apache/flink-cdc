@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
+
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -43,7 +45,7 @@ import java.util.Objects;
 public class TransformExpressionKey implements Serializable {
     private static final long serialVersionUID = 1L;
     @Nullable private final String originalExpression;
-    private final String expression;
+    private final String compiledExpression;
     private final List<String> argumentNames;
     private final List<Class<?>> argumentClasses;
     private final Class<?> returnClass;
@@ -51,13 +53,13 @@ public class TransformExpressionKey implements Serializable {
 
     private TransformExpressionKey(
             @Nullable String originalExpression,
-            String expression,
+            String compiledExpression,
             List<String> argumentNames,
             List<Class<?>> argumentClasses,
             Class<?> returnClass,
             Map<String, String> columnNameMap) {
         this.originalExpression = originalExpression;
-        this.expression = expression;
+        this.compiledExpression = compiledExpression;
         this.argumentNames = argumentNames;
         this.argumentClasses = argumentClasses;
         this.returnClass = returnClass;
@@ -69,8 +71,12 @@ public class TransformExpressionKey implements Serializable {
         return originalExpression;
     }
 
-    public String getExpression() {
-        return expression;
+    public String getCompiledExpression() {
+        return compiledExpression;
+    }
+
+    public String getFullExpression() {
+        return JaninoCompiler.loadSystemFunction(compiledExpression);
     }
 
     public List<String> getArgumentNames() {
@@ -91,14 +97,14 @@ public class TransformExpressionKey implements Serializable {
 
     public static TransformExpressionKey of(
             @Nullable String originalExpression,
-            String expression,
+            String compiledExpression,
             List<String> argumentNames,
             List<Class<?>> argumentClasses,
             Class<?> returnClass,
             Map<String, String> columnNameMap) {
         return new TransformExpressionKey(
                 originalExpression,
-                expression,
+                compiledExpression,
                 argumentNames,
                 argumentClasses,
                 returnClass,
@@ -115,7 +121,7 @@ public class TransformExpressionKey implements Serializable {
         }
         TransformExpressionKey that = (TransformExpressionKey) o;
         return Objects.equals(originalExpression, that.originalExpression)
-                && expression.equals(that.expression)
+                && compiledExpression.equals(that.compiledExpression)
                 && argumentNames.equals(that.argumentNames)
                 && argumentClasses.equals(that.argumentClasses)
                 && returnClass.equals(that.returnClass)
@@ -126,7 +132,7 @@ public class TransformExpressionKey implements Serializable {
     public int hashCode() {
         return Objects.hash(
                 originalExpression,
-                expression,
+                compiledExpression,
                 argumentNames,
                 argumentClasses,
                 returnClass,
@@ -139,8 +145,8 @@ public class TransformExpressionKey implements Serializable {
                 + "originalExpression='"
                 + originalExpression
                 + '\''
-                + ", expression='"
-                + expression
+                + ", compiledExpression='"
+                + compiledExpression
                 + '\''
                 + ", argumentNames="
                 + argumentNames

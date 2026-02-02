@@ -21,6 +21,10 @@ import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.ParseException;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.converter.JavaClassConverter;
+import org.apache.flink.cdc.common.schema.Column;
+import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
+import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypeRoot;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 
@@ -78,7 +82,8 @@ public class JaninoCompiler {
                     "TIMESTAMPADD",
                     "TIMESTAMPDIFF",
                     "TIMESTAMP_DIFF",
-                    "DATE_FORMAT");
+                    "DATE_FORMAT",
+                    "DATE_ADD");
 
     public static final String DEFAULT_EPOCH_TIME = "__epoch_time__";
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
@@ -121,54 +126,47 @@ public class JaninoCompiler {
         }
     }
 
-    public static String translateSqlNodeToJaninoExpression(
-            SqlNode transform,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
-        Java.Rvalue rvalue =
-                translateSqlNodeToJaninoRvalue(transform, udfDescriptors, columnNameMap);
+    public static String translateSqlNodeToJaninoExpression(Context context, SqlNode transform) {
+        Java.Rvalue rvalue = translateSqlNodeToJaninoRvalue(context, transform);
         if (rvalue != null) {
             return rvalue.toString();
         }
         return "";
     }
 
-    public static Java.Rvalue translateSqlNodeToJaninoRvalue(
-            SqlNode transform,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+    public static Java.Rvalue translateSqlNodeToJaninoRvalue(Context context, SqlNode transform) {
         if (transform instanceof SqlIdentifier) {
-            return translateSqlIdentifier((SqlIdentifier) transform, columnNameMap);
+            return translateSqlIdentifier(context, (SqlIdentifier) transform);
         } else if (transform instanceof SqlBasicCall) {
-            return translateSqlBasicCall((SqlBasicCall) transform, udfDescriptors, columnNameMap);
+            return translateSqlBasicCall(context, (SqlBasicCall) transform);
         } else if (transform instanceof SqlCase) {
-            return translateSqlCase((SqlCase) transform, udfDescriptors, columnNameMap);
+            return translateSqlCase(context, (SqlCase) transform);
         } else if (transform instanceof SqlLiteral) {
-            return translateSqlSqlLiteral((SqlLiteral) transform);
+            return translateSqlSqlLiteral(context, (SqlLiteral) transform);
         }
         return null;
     }
 
     private static Java.Rvalue translateSqlIdentifier(
-            SqlIdentifier sqlIdentifier, Map<String, String> columnNameMap) {
+            Context context, SqlIdentifier sqlIdentifier) {
         String columnName = sqlIdentifier.names.get(sqlIdentifier.names.size() - 1);
         if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(columnName.toUpperCase())) {
-            return generateTimezoneFreeTemporalFunctionOperation(columnName);
+            return generateTimezoneFreeTemporalFunctionOperation(context, columnName);
         } else if (TIMEZONE_REQUIRED_TEMPORAL_FUNCTIONS.contains(columnName.toUpperCase())) {
-            return generateTimezoneRequiredTemporalFunctionOperation(columnName);
+            return generateTimezoneRequiredTemporalFunctionOperation(context, columnName);
         } else if (TIMEZONE_FREE_TEMPORAL_CONVERSION_FUNCTIONS.contains(columnName.toUpperCase())) {
-            return generateTimezoneFreeTemporalConversionFunctionOperation(columnName);
+            return generateTimezoneFreeTemporalConversionFunctionOperation(context, columnName);
         } else if (TIMEZONE_REQUIRED_TEMPORAL_CONVERSION_FUNCTIONS.contains(
                 columnName.toUpperCase())) {
-            return generateTimezoneRequiredTemporalConversionFunctionOperation(columnName);
+            return generateTimezoneRequiredTemporalConversionFunctionOperation(context, columnName);
         } else {
             return new Java.AmbiguousName(
                     Location.NOWHERE,
-                    new String[] {columnNameMap.getOrDefault(columnName, columnName)});
+                    new String[] {context.columnNameMap.getOrDefault(columnName, columnName)});
         }
     }
 
-    private static Java.Rvalue translateSqlSqlLiteral(SqlLiteral sqlLiteral) {
+    private static Java.Rvalue translateSqlSqlLiteral(Context context, SqlLiteral sqlLiteral) {
         if (sqlLiteral.getValue() == null) {
             return new Java.NullLiteral(Location.NOWHERE);
         }
@@ -190,14 +188,11 @@ public class JaninoCompiler {
         return new Java.AmbiguousName(Location.NOWHERE, new String[] {value.toString()});
     }
 
-    private static Java.Rvalue translateSqlBasicCall(
-            SqlBasicCall sqlBasicCall,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+    private static Java.Rvalue translateSqlBasicCall(Context context, SqlBasicCall sqlBasicCall) {
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         List<Java.Rvalue> atoms = new ArrayList<>();
         for (SqlNode sqlNode : operandList) {
-            translateSqlNodeToAtoms(sqlNode, atoms, udfDescriptors, columnNameMap);
+            translateSqlNodeToAtoms(context, sqlNode, atoms);
         }
         if (TIMEZONE_FREE_TEMPORAL_FUNCTIONS.contains(
                 sqlBasicCall.getOperator().getName().toUpperCase())) {
@@ -210,27 +205,22 @@ public class JaninoCompiler {
                 sqlBasicCall.getOperator().getName().toUpperCase())) {
             atoms.add(new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_TIME_ZONE}));
         }
-        return sqlBasicCallToJaninoRvalue(
-                sqlBasicCall, atoms.toArray(new Java.Rvalue[0]), udfDescriptors);
+        return sqlBasicCallToJaninoRvalue(context, sqlBasicCall, atoms.toArray(new Java.Rvalue[0]));
     }
 
-    private static Java.Rvalue translateSqlCase(
-            SqlCase sqlCase,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+    private static Java.Rvalue translateSqlCase(Context context, SqlCase sqlCase) {
         SqlNodeList whenOperands = sqlCase.getWhenOperands();
         SqlNodeList thenOperands = sqlCase.getThenOperands();
         SqlNode elseOperand = sqlCase.getElseOperand();
         List<Java.Rvalue> whenAtoms = new ArrayList<>();
         for (SqlNode sqlNode : whenOperands) {
-            translateSqlNodeToAtoms(sqlNode, whenAtoms, udfDescriptors, columnNameMap);
+            translateSqlNodeToAtoms(context, sqlNode, whenAtoms);
         }
         List<Java.Rvalue> thenAtoms = new ArrayList<>();
         for (SqlNode sqlNode : thenOperands) {
-            translateSqlNodeToAtoms(sqlNode, thenAtoms, udfDescriptors, columnNameMap);
+            translateSqlNodeToAtoms(context, sqlNode, thenAtoms);
         }
-        Java.Rvalue elseAtoms =
-                translateSqlNodeToJaninoRvalue(elseOperand, udfDescriptors, columnNameMap);
+        Java.Rvalue elseAtoms = translateSqlNodeToJaninoRvalue(context, elseOperand);
         Java.Rvalue sqlCaseRvalueTemp = elseAtoms;
         for (int i = whenAtoms.size() - 1; i >= 0; i--) {
             sqlCaseRvalueTemp =
@@ -244,50 +234,46 @@ public class JaninoCompiler {
     }
 
     private static void translateSqlNodeToAtoms(
-            SqlNode sqlNode,
-            List<Java.Rvalue> atoms,
-            List<UserDefinedFunctionDescriptor> udfDescriptors,
-            Map<String, String> columnNameMap) {
+            Context context, SqlNode sqlNode, List<Java.Rvalue> atoms) {
         if (sqlNode instanceof SqlIdentifier) {
-            atoms.add(translateSqlIdentifier((SqlIdentifier) sqlNode, columnNameMap));
+            atoms.add(translateSqlIdentifier(context, (SqlIdentifier) sqlNode));
         } else if (sqlNode instanceof SqlLiteral) {
-            atoms.add(translateSqlSqlLiteral((SqlLiteral) sqlNode));
+            atoms.add(translateSqlSqlLiteral(context, (SqlLiteral) sqlNode));
         } else if (sqlNode instanceof SqlBasicCall) {
-            atoms.add(translateSqlBasicCall((SqlBasicCall) sqlNode, udfDescriptors, columnNameMap));
+            atoms.add(translateSqlBasicCall(context, (SqlBasicCall) sqlNode));
         } else if (sqlNode instanceof SqlNodeList) {
             for (SqlNode node : (SqlNodeList) sqlNode) {
-                translateSqlNodeToAtoms(node, atoms, udfDescriptors, columnNameMap);
+                translateSqlNodeToAtoms(context, node, atoms);
             }
         } else if (sqlNode instanceof SqlCase) {
-            atoms.add(translateSqlCase((SqlCase) sqlNode, udfDescriptors, columnNameMap));
+            atoms.add(translateSqlCase(context, (SqlCase) sqlNode));
         }
     }
 
     private static Java.Rvalue sqlBasicCallToJaninoRvalue(
-            SqlBasicCall sqlBasicCall,
-            Java.Rvalue[] atoms,
-            List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         switch (sqlBasicCall.getKind()) {
             case AND:
-                return generateBinaryOperation(sqlBasicCall, atoms, "&&");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "&&");
             case OR:
-                return generateBinaryOperation(sqlBasicCall, atoms, "||");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "||");
             case NOT:
-                return generateUnaryOperation("!", atoms[0]);
+                return generateUnaryOperation(context, "!", atoms[0]);
             case EQUALS:
-                return generateEqualsOperation(sqlBasicCall, atoms);
+                return generateEqualsOperation(context, sqlBasicCall, atoms);
             case NOT_EQUALS:
-                return generateUnaryOperation("!", generateEqualsOperation(sqlBasicCall, atoms));
+                return generateUnaryOperation(
+                        context, "!", generateEqualsOperation(context, sqlBasicCall, atoms));
             case IS_NULL:
-                return generateUnaryOperation("null == ", atoms[0]);
+                return generateUnaryOperation(context, "null == ", atoms[0]);
             case IS_NOT_NULL:
-                return generateUnaryOperation("null != ", atoms[0]);
+                return generateUnaryOperation(context, "null != ", atoms[0]);
             case IS_FALSE:
             case IS_NOT_TRUE:
-                return generateUnaryOperation("false == ", atoms[0]);
+                return generateUnaryOperation(context, "false == ", atoms[0]);
             case IS_TRUE:
             case IS_NOT_FALSE:
-                return generateUnaryOperation("true == ", atoms[0]);
+                return generateUnaryOperation(context, "true == ", atoms[0]);
             case BETWEEN:
             case IN:
             case NOT_IN:
@@ -296,49 +282,69 @@ public class JaninoCompiler {
             case FLOOR:
             case TRIM:
             case OTHER_FUNCTION:
-                return generateOtherFunctionOperation(sqlBasicCall, atoms, udfDescriptors);
+                return generateOtherFunctionOperation(context, sqlBasicCall, atoms);
             case PLUS:
-                return generateBinaryOperation(sqlBasicCall, atoms, "+");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "+");
             case MINUS:
-                return generateBinaryOperation(sqlBasicCall, atoms, "-");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "-");
             case TIMES:
-                return generateBinaryOperation(sqlBasicCall, atoms, "*");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "*");
             case DIVIDE:
-                return generateBinaryOperation(sqlBasicCall, atoms, "/");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "/");
             case MOD:
-                return generateBinaryOperation(sqlBasicCall, atoms, "%");
+                return generateBinaryOperation(context, sqlBasicCall, atoms, "%");
             case LESS_THAN:
             case GREATER_THAN:
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN_OR_EQUAL:
-                return generateCompareOperation(sqlBasicCall, atoms);
+                return generateCompareOperation(context, sqlBasicCall, atoms);
             case CAST:
-                return generateCastOperation(sqlBasicCall, atoms);
+                return generateCastOperation(context, sqlBasicCall, atoms);
             case TIMESTAMP_DIFF:
-                return generateTimestampDiffOperation(sqlBasicCall, atoms);
+                return generateTimestampDiffOperation(context, sqlBasicCall, atoms);
             case TIMESTAMP_ADD:
-                return generateTimestampAddOperation(sqlBasicCall, atoms);
+                return generateTimestampAddOperation(context, sqlBasicCall, atoms);
             case OTHER:
-                return generateOtherOperation(sqlBasicCall, atoms);
+                return generateOtherOperation(context, sqlBasicCall, atoms);
             default:
-                throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+                throw new ParseException("Unrecognized expression: " + sqlBasicCall);
         }
     }
 
-    private static Java.Rvalue generateUnaryOperation(String operator, Java.Rvalue atom) {
+    private static Java.Rvalue generateUnaryOperation(
+            Context context, String operator, Java.Rvalue atom) {
         return new Java.UnaryOperation(Location.NOWHERE, operator, atom);
     }
 
+    private static final Map<String, String> decimalArithmeticHandlers =
+            Map.of(
+                    "+", "plus",
+                    "-", "minus",
+                    "*", "times",
+                    "/", "divides");
+
     private static Java.Rvalue generateBinaryOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, String operator) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms, String operator) {
         if (atoms.length != 2) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+        }
+        if (decimalArithmeticHandlers.containsKey(operator)) {
+            String handler = decimalArithmeticHandlers.get(operator);
+            DataType resultType =
+                    TransformParser.deduceSubExpressionType(
+                            context.columns,
+                            sqlBasicCall,
+                            context.udfDescriptors,
+                            context.supportedMetadataColumns);
+            if (resultType.is(DataTypeRoot.DECIMAL)) {
+                return new Java.MethodInvocation(Location.NOWHERE, null, handler, atoms);
+            }
         }
         return new Java.BinaryOperation(Location.NOWHERE, atoms[0], operator, atoms[1]);
     }
 
     private static Java.Rvalue generateEqualsOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (atoms.length != 2) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
@@ -347,17 +353,17 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateCastOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (atoms.length != 1) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
         List<SqlNode> operandList = sqlBasicCall.getOperandList();
         SqlDataTypeSpec sqlDataTypeSpec = (SqlDataTypeSpec) operandList.get(1);
-        return generateTypeConvertMethod(sqlDataTypeSpec, atoms);
+        return generateTypeConvertMethod(context, sqlDataTypeSpec, atoms);
     }
 
     private static Java.Rvalue generateCompareOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (atoms.length != 2) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
@@ -385,7 +391,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTimestampDiffOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (atoms.length != 4) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
@@ -417,7 +423,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTimestampAddOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (atoms.length != 4) {
             throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
         }
@@ -448,13 +454,13 @@ public class JaninoCompiler {
                 timestampDiffFunctionParam.toArray(new Java.Rvalue[0]));
     }
 
-    private static Java.Rvalue generateCharLengthOperation(Java.Rvalue[] atoms) {
+    private static Java.Rvalue generateCharLengthOperation(Context context, Java.Rvalue[] atoms) {
         return new Java.MethodInvocation(
                 Location.NOWHERE, null, StringUtils.convertToCamelCase("CHAR_LENGTH"), atoms);
     }
 
     private static Java.Rvalue generateOtherOperation(
-            SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         if (sqlBasicCall.getOperator().getName().equals("||")) {
             return new Java.MethodInvocation(
                     Location.NOWHERE, null, StringUtils.convertToCamelCase("CONCAT"), atoms);
@@ -463,9 +469,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateOtherFunctionOperation(
-            SqlBasicCall sqlBasicCall,
-            Java.Rvalue[] atoms,
-            List<UserDefinedFunctionDescriptor> udfDescriptors) {
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
         String operationName = sqlBasicCall.getOperator().getName().toUpperCase();
         if (operationName.equals("IF")) {
             if (atoms.length == 3) {
@@ -476,7 +480,7 @@ public class JaninoCompiler {
             }
         } else {
             Optional<UserDefinedFunctionDescriptor> udfFunctionOptional =
-                    udfDescriptors.stream()
+                    context.udfDescriptors.stream()
                             .filter(e -> e.getName().equalsIgnoreCase(operationName))
                             .findFirst();
             return udfFunctionOptional
@@ -498,7 +502,8 @@ public class JaninoCompiler {
         }
     }
 
-    private static Java.Rvalue generateTimezoneFreeTemporalFunctionOperation(String operationName) {
+    private static Java.Rvalue generateTimezoneFreeTemporalFunctionOperation(
+            Context context, String operationName) {
         return new Java.MethodInvocation(
                 Location.NOWHERE,
                 null,
@@ -509,7 +514,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTimezoneRequiredTemporalFunctionOperation(
-            String operationName) {
+            Context context, String operationName) {
         List<Java.Rvalue> timestampFunctionParam = new ArrayList<>();
         timestampFunctionParam.add(
                 new Java.AmbiguousName(Location.NOWHERE, new String[] {DEFAULT_EPOCH_TIME}));
@@ -523,7 +528,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTimezoneFreeTemporalConversionFunctionOperation(
-            String operationName) {
+            Context context, String operationName) {
         return new Java.MethodInvocation(
                 Location.NOWHERE,
                 null,
@@ -532,7 +537,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTimezoneRequiredTemporalConversionFunctionOperation(
-            String operationName) {
+            Context context, String operationName) {
         return new Java.MethodInvocation(
                 Location.NOWHERE,
                 null,
@@ -543,7 +548,7 @@ public class JaninoCompiler {
     }
 
     private static Java.Rvalue generateTypeConvertMethod(
-            SqlDataTypeSpec sqlDataTypeSpec, Java.Rvalue[] atoms) {
+            Context context, SqlDataTypeSpec sqlDataTypeSpec, Java.Rvalue[] atoms) {
         switch (sqlDataTypeSpec.getTypeName().getSimple().toUpperCase()) {
             case "BOOLEAN":
                 return new Java.MethodInvocation(Location.NOWHERE, null, "castToBoolean", atoms);
@@ -612,6 +617,41 @@ public class JaninoCompiler {
                     udfFunction.getClassName());
         } else {
             return String.format("__instanceOf%s.eval", udfFunction.getClassName());
+        }
+    }
+
+    /** Contextual information for {@link JaninoCompiler}. */
+    public static class Context {
+
+        // Upstream physical columns
+        public final List<Column> columns;
+
+        // Mangled column name map to $1, $2...
+        public final Map<String, String> columnNameMap;
+
+        // User defined function signatures
+        public final List<UserDefinedFunctionDescriptor> udfDescriptors;
+
+        // Readable metadata columns
+        public final SupportedMetadataColumn[] supportedMetadataColumns;
+
+        private Context(
+                List<Column> columns,
+                Map<String, String> columnNameMap,
+                List<UserDefinedFunctionDescriptor> udfDescriptors,
+                SupportedMetadataColumn[] supportedMetadataColumns) {
+            this.columns = columns;
+            this.columnNameMap = columnNameMap;
+            this.udfDescriptors = udfDescriptors;
+            this.supportedMetadataColumns = supportedMetadataColumns;
+        }
+
+        public static Context of(
+                List<Column> columns,
+                Map<String, String> columnNameMap,
+                List<UserDefinedFunctionDescriptor> udfDescriptors,
+                SupportedMetadataColumn[] supportedMetadataColumns) {
+            return new Context(columns, columnNameMap, udfDescriptors, supportedMetadataColumns);
         }
     }
 }

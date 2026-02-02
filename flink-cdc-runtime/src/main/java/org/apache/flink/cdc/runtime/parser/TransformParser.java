@@ -348,7 +348,12 @@ public class TransformParser {
                                             relDataType),
                                     exprNode.toString(),
                                     JaninoCompiler.translateSqlNodeToJaninoExpression(
-                                            exprNode, udfDescriptors, columnNameMap),
+                                            JaninoCompiler.Context.of(
+                                                    columns,
+                                                    columnNameMap,
+                                                    udfDescriptors,
+                                                    supportedMetadataColumns),
+                                            exprNode),
                                     originalColumnNames,
                                     columnNameMap);
                 }
@@ -423,7 +428,9 @@ public class TransformParser {
 
     public static String translateFilterExpressionToJaninoExpression(
             String filterExpression,
+            List<Column> columns,
             List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns,
             Map<String, String> columnNameMap) {
         if (isNullOrWhitespaceOnly(filterExpression)) {
             return "";
@@ -434,7 +441,9 @@ public class TransformParser {
         }
         SqlNode where = sqlSelect.getWhere();
         return JaninoCompiler.translateSqlNodeToJaninoExpression(
-                where, udfDescriptors, columnNameMap);
+                JaninoCompiler.Context.of(
+                        columns, columnNameMap, udfDescriptors, supportedMetadataColumns),
+                where);
     }
 
     public static List<String> parseComputedColumnNames(
@@ -596,5 +605,38 @@ public class TransformParser {
             }
         }
         return columnNameMap;
+    }
+
+    public static DataType deduceSubExpressionType(
+            List<Column> columns,
+            SqlNode subExpression,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
+        SqlSelect sqlSelect =
+                new SqlSelect(
+                        SqlParserPos.QUOTED_ZERO,
+                        SqlNodeList.EMPTY,
+                        SqlNodeList.of(subExpression),
+                        new SqlIdentifier(DEFAULT_TABLE, SqlParserPos.QUOTED_ZERO),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null);
+        RelNode relNode = sqlToRel(columns, sqlSelect, udfDescriptors, supportedMetadataColumns);
+        RelDataType[] relDataTypes =
+                relNode.getRowType().getFieldList().stream()
+                        .map(RelDataTypeField::getType)
+                        .toArray(RelDataType[]::new);
+        Preconditions.checkArgument(
+                relDataTypes.length == 1,
+                "RelDataType %s should be unary from SqlNode %s",
+                relDataTypes,
+                sqlSelect);
+        RelDataType expressionType = relDataTypes[0];
+        return CalciteDataTypeConverter.convertCalciteRelDataTypeToDataType(expressionType);
     }
 }

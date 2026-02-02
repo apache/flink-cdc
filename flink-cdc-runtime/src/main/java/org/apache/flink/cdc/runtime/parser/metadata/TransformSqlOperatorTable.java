@@ -241,6 +241,8 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     InferTypes.RETURN_TYPE,
                     OperandTypes.or(
                             OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.STRING),
+                            OperandTypes.family(SqlTypeFamily.DATE, SqlTypeFamily.STRING),
+                            OperandTypes.family(SqlTypeFamily.TIME, SqlTypeFamily.STRING),
                             OperandTypes.family(SqlTypeFamily.STRING, SqlTypeFamily.STRING)),
                     SqlFunctionCategory.TIMEDATE);
     public static final SqlFunction TIMESTAMP_DIFF =
@@ -297,6 +299,50 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
                     OperandTypes.or(
                             OperandTypes.family(SqlTypeFamily.CHARACTER),
                             OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.TIMEDATE);
+    public static final SqlFunction TO_TIMESTAMP_LTZ =
+            new SqlFunction(
+                    "TO_TIMESTAMP_LTZ",
+                    SqlKind.OTHER_FUNCTION,
+                    ReturnTypes.cascade(
+                            ReturnTypes.explicit(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, 3),
+                            SqlTypeTransforms.FORCE_NULLABLE),
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.INTEGER),
+                            OperandTypes.family(SqlTypeFamily.INTEGER, SqlTypeFamily.INTEGER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.TIMEDATE);
+
+    public static final SqlFunction DATE_FORMAT_TZ =
+            new SqlFunction(
+                    "DATE_FORMAT_TZ",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.VARCHAR_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER),
+                            OperandTypes.family(
+                                    SqlTypeFamily.TIMESTAMP,
+                                    SqlTypeFamily.CHARACTER,
+                                    SqlTypeFamily.CHARACTER)),
+                    SqlFunctionCategory.TIMEDATE);
+
+    public static final SqlFunction DATE_ADD =
+            new SqlFunction(
+                    "DATE_ADD",
+                    SqlKind.OTHER_FUNCTION,
+                    TransformSqlReturnTypes.VARCHAR_FORCE_NULLABLE,
+                    null,
+                    OperandTypes.or(
+                            OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.INTEGER),
+                            OperandTypes.family(SqlTypeFamily.DATE, SqlTypeFamily.INTEGER),
+                            OperandTypes.family(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER)),
                     SqlFunctionCategory.TIMEDATE);
 
     // ---------------------

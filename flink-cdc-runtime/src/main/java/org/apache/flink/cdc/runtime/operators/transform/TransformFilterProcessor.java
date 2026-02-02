@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.converter.JavaClassConverter;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.runtime.parser.JaninoCompiler;
+import org.apache.flink.cdc.runtime.parser.TransformParser;
 
 import org.codehaus.janino.ExpressionEvaluator;
 
@@ -69,7 +70,13 @@ public class TransformFilterProcessor {
             this.transformExpressionKey = null;
             this.expressionEvaluator = null;
         } else {
-            this.transformExpressionKey = generateTransformExpressionKey();
+            this.transformExpressionKey =
+                    generateTransformExpressionKey(
+                            tableInfo.getPreTransformedSchema().getColumns(),
+                            udfDescriptors,
+                            supportedMetadataColumns
+                                    .values()
+                                    .toArray(new SupportedMetadataColumn[0]));
             this.expressionEvaluator =
                     TransformExpressionCompiler.compileExpression(
                             transformExpressionKey, udfDescriptors);
@@ -117,8 +124,12 @@ public class TransformFilterProcessor {
                                     + "\tCompiled expression: %s\n"
                                     + "\tColumn name map: {%s}",
                             tableInfo.getName(),
-                            transformFilter.getExpression(),
-                            transformFilter.getScriptExpression(),
+                            transformExpressionKey != null
+                                    ? transformExpressionKey.getOriginalExpression()
+                                    : "<no op>",
+                            transformExpressionKey != null
+                                    ? transformExpressionKey.getCompiledExpression()
+                                    : "<no op>",
                             transformFilter.getColumnNameMapAsString()),
                     e);
         }
@@ -200,7 +211,10 @@ public class TransformFilterProcessor {
         return params.toArray();
     }
 
-    private TransformExpressionKey generateTransformExpressionKey() {
+    private TransformExpressionKey generateTransformExpressionKey(
+            List<Column> columns,
+            List<UserDefinedFunctionDescriptor> udfDescriptors,
+            SupportedMetadataColumn[] supportedMetadataColumns) {
         Tuple2<List<String>, List<Class<?>>> args = generateArguments(true);
 
         args.f0.add(JaninoCompiler.DEFAULT_TIME_ZONE);
@@ -208,9 +222,17 @@ public class TransformFilterProcessor {
         args.f0.add(JaninoCompiler.DEFAULT_EPOCH_TIME);
         args.f1.add(Long.class);
 
+        String scriptExpression =
+                TransformParser.translateFilterExpressionToJaninoExpression(
+                        transformFilter.getExpression(),
+                        columns,
+                        udfDescriptors,
+                        supportedMetadataColumns,
+                        transformFilter.getColumnNameMap());
+
         return TransformExpressionKey.of(
                 transformFilter.getExpression(),
-                JaninoCompiler.loadSystemFunction(transformFilter.getScriptExpression()),
+                scriptExpression,
                 args.f0,
                 args.f1,
                 Boolean.class,
