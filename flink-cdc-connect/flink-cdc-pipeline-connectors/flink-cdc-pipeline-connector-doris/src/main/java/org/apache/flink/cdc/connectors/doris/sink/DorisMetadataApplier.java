@@ -331,7 +331,7 @@ public class DorisMetadataApplier implements MetadataApplier {
                 || dataType instanceof TimestampType
                 || dataType instanceof ZonedTimestampType) {
 
-            if (DorisSchemaUtils.INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+            if (defaultValue.startsWith(DorisSchemaUtils.INVALID_OR_MISSING_DATATIME)) {
                 return DorisSchemaUtils.DEFAULT_DATETIME;
             }
         }

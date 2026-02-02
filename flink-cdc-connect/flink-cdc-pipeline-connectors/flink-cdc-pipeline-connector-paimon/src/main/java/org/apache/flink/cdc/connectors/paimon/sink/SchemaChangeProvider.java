@@ -161,7 +161,7 @@ public class SchemaChangeProvider {
                 || dataType instanceof TimestampType
                 || dataType instanceof ZonedTimestampType) {
 
-            if (INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+            if (defaultValue.startsWith(INVALID_OR_MISSING_DATATIME)) {
                 return DEFAULT_DATETIME;
             }
         }
