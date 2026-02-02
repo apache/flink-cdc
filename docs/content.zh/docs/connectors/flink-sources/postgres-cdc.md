@@ -514,7 +514,7 @@ The config option `scan.startup.mode` specifies the startup mode for PostgreSQL 
 
 **注意:** 该功能从 Flink CDC 3.1.0 版本开始支持。
 
-动态加表功能使你可以为正在运行的作业添加新表进行监控。新添加的表将首先读取其快照数据,然后自动读取其 binlog。
+动态加表功能使你可以为正在运行的作业添加新表进行监控。新添加的表将首先读取其快照数据,然后自动读取其 WAL (Write-Ahead Log) or replication slot changes。
 
 想象一下这个场景:一开始,Flink 作业监控表 `[product, user, address]`,但几天后,我们希望这个作业还可以监控表 `[order, custom]`,这些表包含历史数据,我们需要作业仍然可以复用作业的已有状态。动态加表功能可以优雅地解决此问题。
 

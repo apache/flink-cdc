@@ -515,7 +515,7 @@ The config option `scan.startup.mode` specifies the startup mode for PostgreSQL 
 
 **Note:** This feature is available since Flink CDC 3.1.0.
 
-Scan Newly Added Tables feature enables you to add new tables to monitor for existing running pipeline. The newly added tables will read their snapshot data firstly and then read their binlog automatically.
+Scan Newly Added Tables feature enables you to add new tables to monitor for existing running pipeline. The newly added tables will read their snapshot data firstly and then read their WAL (Write-Ahead Log) or replication slot changes automatically.
 
 Imagine this scenario: At the beginning, a Flink job monitors tables `[product, user, address]`, but after some days we would like the job can also monitor tables `[order, custom]` which contain history data, and we need the job can still reuse existing state of the job. This feature can resolve this case gracefully.
 
@@ -532,13 +532,13 @@ The following operations show how to enable this feature to resolve above scenar
                 .username("yourUsername")
                 .password("yourPassword")
                 .slotName("flink")
-                .scanNewlyAddedTableEnabled(true) // enable scan the newly added tables feature
+                .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
                 .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
                 .build();
    // your business code
 ```
 
-If we would like to add new tables `[inventory.order, inventory.custom]` to an existing Flink job, just need to update the `tableList()` value of the job to include `[inventory.order, inventory.custom]` and restore the job from previous savepoint.
+If we would like to add new tables `[inventory.order, inventory.custom]` to an existing Flink job, we just need to update the `tableList()` value of the job to include `[inventory.order, inventory.custom]` and restore the job from previous savepoint.
 
 _Step 1_: Stop the existing Flink job with savepoint.
 ```shell
@@ -574,7 +574,7 @@ $ ./bin/flink run \
       --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
       ./FlinkCDCExample.jar
 ```
-**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+**Note:** Please refer to the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
 
 ### DataStream Source
 

@@ -516,7 +516,7 @@ If it's done, we can consider integrating two kinds of source connector for user
 
 **Note:** This feature is available since Flink CDC 3.1.0.
 
-Scan Newly Added Tables feature enables you to add new collections to monitor for existing running pipeline. The newly added collections will read their snapshot data firstly and then read their change stream automatically.
+The Scan Newly Added Tables feature enables you to add new collections to monitor for existing running pipeline. The newly added collections will read their snapshot data firstly and then read their change stream automatically.
 
 Imagine this scenario: At the beginning, a Flink job monitors collections `[product, user, address]`, but after some days we would like the job can also monitor collections `[order, custom]` which contain history data, and we need the job can still reuse existing state of the job. This feature can resolve this case gracefully.
 
@@ -535,7 +535,7 @@ The following operations show how to enable this feature to resolve above scenar
    // your business code
 ```
 
-If we would like to add new collections `[order, custom]` to an existing Flink job, just need to update the `collectionList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+If we would like to add new collections `[order, custom]` to an existing Flink job, we just need to update the `collectionList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
 
 _Step 1_: Stop the existing Flink job with savepoint.
 ```shell
@@ -555,7 +555,7 @@ _Step 2_: Update the collection list option for the existing Flink job.
         .collectionList("db.product", "db.user", "db.address", "db.order", "db.custom") // set captured collections [product, user, address, order, custom]
         .username("yourUsername")
         .password("yourPassword")
-        .scanNewlyAddedTableEnabled(true)
+        .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
         .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
         .build();
    // your business code

@@ -563,7 +563,7 @@ The Oracle CDC source can't work in parallel reading, because there is only one 
 
 **Note:** This feature is available since Flink CDC 3.1.0.
 
-Scan Newly Added Tables feature enables you to add new tables to monitor for existing running pipeline. The newly added tables will read their snapshot data firstly and then read their redo log automatically.
+Scan Newly Added Tables feature enables you to add new tables to monitor for an existing running pipeline. The newly added tables will read their snapshot data first and then read their redo log automatically.
 
 Imagine this scenario: At the beginning, a Flink job monitors tables `[product, user, address]`, but after some days we would like the job can also monitor tables `[order, custom]` which contain history data, and we need the job can still reuse existing state of the job. This feature can resolve this case gracefully.
 
@@ -578,13 +578,13 @@ The following operations show how to enable this feature to resolve above scenar
         .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS") // set captured tables
         .username("yourUsername")
         .password("yourPassword")
-        .scanNewlyAddedTableEnabled(true) // enable scan the newly added tables feature
+        .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
         .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
         .build();
    // your business code
 ```
 
-If we would like to add new tables `[INVENTORY.ORDER, INVENTORY.CUSTOM]` to an existing Flink job, just need to update the `tableList()` value of the job to include `[INVENTORY.ORDER, INVENTORY.CUSTOM]` and restore the job from previous savepoint.
+If we would like to add new tables `[INVENTORY.ORDER, INVENTORY.CUSTOM]` to an existing Flink job, we just need to update the `tableList()` value of the job to include `[INVENTORY.ORDER, INVENTORY.CUSTOM]` and restore the job from previous savepoint.
 
 _Step 1_: Stop the existing Flink job with savepoint.
 ```shell
