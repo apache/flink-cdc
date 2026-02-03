@@ -379,7 +379,14 @@ Flink SQL> SELECT * FROM orders;
       <td>String</td>
       <td>将 Debezium 的属性传递给 Debezium 嵌入式引擎，该引擎用于从 MySQL 服务器捕获数据更改。
           For example: <code>'debezium.snapshot.mode' = 'never'</code>.
-          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td> 
+          查看更多关于 <a href="https://debezium.io/documentation/reference/1.9/connectors/mysql.html#mysql-connector-properties"> Debezium 的  MySQL 连接器属性</a></td>
+    </tr>
+    <tr>
+      <td>debezium.binlog.ssl.protocol</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>覆盖自动检测的 binlog SSL 连接 TLS 协议。例如：<code>'debezium.binlog.ssl.protocol' = 'TLSv1.2'</code>。</td>
     </tr>
     <tr>
       <td>scan.incremental.close-idle-reader.enabled</td>

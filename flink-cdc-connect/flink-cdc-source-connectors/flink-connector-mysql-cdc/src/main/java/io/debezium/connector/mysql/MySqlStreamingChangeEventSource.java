@@ -102,6 +102,21 @@ public class MySqlStreamingChangeEventSource
             LoggerFactory.getLogger(MySqlStreamingChangeEventSource.class);
 
     private static final String KEEPALIVE_THREAD_NAME = "blc-keepalive";
+    static final String BINLOG_SSL_PROTOCOL = "binlog.ssl.protocol";
+
+    /**
+     * Resolves the TLS protocol to use for the binlog connection.
+     *
+     * @param configuredProtocol the user-configured protocol (may be null or empty)
+     * @param detectedProtocol the protocol detected from the MySQL server
+     * @return the configured protocol if set, otherwise the detected protocol
+     */
+    static String resolveBinlogSslProtocol(String configuredProtocol, String detectedProtocol) {
+        if (configuredProtocol == null || configuredProtocol.isEmpty()) {
+            return detectedProtocol;
+        }
+        return configuredProtocol;
+    }
 
     private final EnumMap<EventType, BlockingConsumer<Event>> eventHandlers =
             new EnumMap<>(EventType.class);
@@ -1332,8 +1347,18 @@ public class MySqlStreamingChangeEventSource
             }
             // DBZ-1208 Resembles the logic from the upstream BinaryLogClient, only that
             // the accepted TLS version is passed to the constructed factory
+            // FLINK-38934 Honour the configured ssl protocol where provided.
+            String configuredProtocol = connectorConfig.getConfig().getString(BINLOG_SSL_PROTOCOL);
+            String protocolToUse = resolveBinlogSslProtocol(configuredProtocol, acceptedTlsVersion);
+            LOGGER.debug(
+                    "Using TLS protocol {} for binlog connection{}",
+                    protocolToUse,
+                    configuredProtocol == null || configuredProtocol.isEmpty()
+                            ? " (auto-detected)"
+                            : " (configured)");
+
             final KeyManager[] finalKMS = keyManagers;
-            return new DefaultSSLSocketFactory(acceptedTlsVersion) {
+            return new DefaultSSLSocketFactory(protocolToUse) {
 
                 @Override
                 protected void initSSLContext(SSLContext sc) throws GeneralSecurityException {
