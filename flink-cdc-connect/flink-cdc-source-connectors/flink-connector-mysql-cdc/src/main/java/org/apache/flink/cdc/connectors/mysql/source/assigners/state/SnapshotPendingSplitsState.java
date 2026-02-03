@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSchemalessSnapsho
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,7 +51,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
      * The snapshot splits that the {@link MySqlSourceEnumerator} has assigned to {@link
      * MySqlSplitReader}s.
      */
-    private final Map<String, MySqlSchemalessSnapshotSplit> assignedSplits;
+    private final LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits;
 
     /**
      * The offsets of finished (snapshot) splits that the {@link MySqlSourceEnumerator} has received
@@ -75,7 +76,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
     public SnapshotPendingSplitsState(
             List<TableId> alreadyProcessedTables,
             List<MySqlSchemalessSnapshotSplit> remainingSplits,
-            Map<String, MySqlSchemalessSnapshotSplit> assignedSplits,
+            LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSplits,
             Map<TableId, TableChange> tableSchemas,
             Map<String, BinlogOffset> splitFinishedOffsets,
             AssignerStatus assignerStatus,
@@ -103,7 +104,7 @@ public class SnapshotPendingSplitsState extends PendingSplitsState {
         return remainingSplits;
     }
 
-    public Map<String, MySqlSchemalessSnapshotSplit> getAssignedSplits() {
+    public LinkedHashMap<String, MySqlSchemalessSnapshotSplit> getAssignedSplits() {
         return assignedSplits;
     }
 

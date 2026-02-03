@@ -61,10 +61,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -423,15 +421,24 @@ public class MySqlSourceReader<T>
                                 binlogSplit, receivedTotalFinishedSplitSize);
                 uncompletedBinlogSplits.put(binlogSplit.splitId(), binlogSplit);
             } else if (receivedMetaGroupId == expectedMetaGroupId) {
-                List<FinishedSnapshotSplitInfo> newAddedMetadataGroup;
-                Set<String> existedSplitsOfLastGroup =
-                        getExistedSplitsOfLastGroup(
-                                binlogSplit.getFinishedSnapshotSplitInfos(),
-                                sourceConfig.getSplitMetaGroupSize());
-                newAddedMetadataGroup =
-                        metadataEvent.getMetaGroup().stream()
+                int expectedNumberOfAlreadyRetrievedElements =
+                        binlogSplit.getFinishedSnapshotSplitInfos().size()
+                                % sourceConfig.getSplitMetaGroupSize();
+                List<byte[]> metaGroup = metadataEvent.getMetaGroup();
+                if (expectedNumberOfAlreadyRetrievedElements > 0) {
+                    LOG.info(
+                            "Source reader {} is discarding the first {} out of {} elements of meta group {}.",
+                            subtaskId,
+                            expectedNumberOfAlreadyRetrievedElements,
+                            metaGroup.size(),
+                            receivedMetaGroupId);
+                    metaGroup =
+                            metaGroup.subList(
+                                    expectedNumberOfAlreadyRetrievedElements, metaGroup.size());
+                }
+                List<FinishedSnapshotSplitInfo> newAddedMetadataGroup =
+                        metaGroup.stream()
                                 .map(FinishedSnapshotSplitInfo::deserialize)
-                                .filter(r -> !existedSplitsOfLastGroup.contains(r.getSplitId()))
                                 .collect(Collectors.toList());
 
                 uncompletedBinlogSplits.put(
@@ -499,28 +506,6 @@ public class MySqlSourceReader<T>
                     split);
             return split;
         }
-    }
-
-    private Set<String> getExistedSplitsOfLastGroup(
-            List<FinishedSnapshotSplitInfo> finishedSnapshotSplits, int metaGroupSize) {
-        int splitsNumOfLastGroup =
-                finishedSnapshotSplits.size() % sourceConfig.getSplitMetaGroupSize();
-        if (splitsNumOfLastGroup != 0) {
-            int lastGroupStart =
-                    ((int) (finishedSnapshotSplits.size() / sourceConfig.getSplitMetaGroupSize()))
-                            * metaGroupSize;
-            // Keep same order with MySqlHybridSplitAssigner.createBinlogSplit() to avoid
-            // 'invalid request meta group id' error
-            List<String> sortedFinishedSnapshotSplits =
-                    finishedSnapshotSplits.stream()
-                            .map(FinishedSnapshotSplitInfo::getSplitId)
-                            .sorted()
-                            .collect(Collectors.toList());
-            return new HashSet<>(
-                    sortedFinishedSnapshotSplits.subList(
-                            lastGroupStart, lastGroupStart + splitsNumOfLastGroup));
-        }
-        return new HashSet<>();
     }
 
     private void logCurrentBinlogOffsets(List<MySqlSplit> splits, long checkpointId) {

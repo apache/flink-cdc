@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -147,7 +148,8 @@ class PendingSplitsStateSerializerTest {
         remainingSplits.add(getTestSchemalessSnapshotSplit(tableId1, 2));
         remainingSplits.add(getTestSchemalessSnapshotSplit(tableId1, 3));
 
-        final Map<String, MySqlSchemalessSnapshotSplit> assignedSnapshotSplits = new HashMap<>();
+        final LinkedHashMap<String, MySqlSchemalessSnapshotSplit> assignedSnapshotSplits =
+                new LinkedHashMap<>();
         Arrays.asList(
                         getTestSchemalessSnapshotSplit(tableId0, 0),
                         getTestSchemalessSnapshotSplit(tableId0, 1),
