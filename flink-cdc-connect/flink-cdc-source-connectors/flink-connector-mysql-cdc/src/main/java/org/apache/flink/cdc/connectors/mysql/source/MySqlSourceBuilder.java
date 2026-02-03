@@ -320,4 +320,9 @@ public class MySqlSourceBuilder<T> {
     public MySqlSource<T> build() {
         return new MySqlSource<>(configFactory, checkNotNull(deserializer));
     }
+
+    public MySqlSourceBuilder<T> setDebeziumSkippedOperations(String skippedOperation) {
+        this.configFactory.skippedOperations(skippedOperation);
+        return this;
+    }
 }
