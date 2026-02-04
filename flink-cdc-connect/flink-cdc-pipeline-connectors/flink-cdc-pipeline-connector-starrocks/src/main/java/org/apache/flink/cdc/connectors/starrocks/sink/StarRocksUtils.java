@@ -44,6 +44,8 @@ import com.starrocks.connector.flink.catalog.StarRocksTable;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -133,6 +135,35 @@ public class StarRocksUtils {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /** Format TIME type data. */
+    private static final DateTimeFormatter TIME_FORMATTER =
+            new DateTimeFormatterBuilder().appendPattern("HH:mm:ss").toFormatter();
+
+    private static final DateTimeFormatter[] TIME_FORMATTERS = new DateTimeFormatter[10];
+
+    private static DateTimeFormatter timeFormatter(int precision) {
+        if (precision <= 0) {
+            return TIME_FORMATTER;
+        }
+        if (precision < TIME_FORMATTERS.length) {
+            DateTimeFormatter formatter = TIME_FORMATTERS[precision];
+            if (formatter == null) {
+                formatter =
+                        new DateTimeFormatterBuilder()
+                                .appendPattern("HH:mm:ss")
+                                .appendFraction(
+                                        ChronoField.NANO_OF_SECOND, precision, precision, true)
+                                .toFormatter();
+                TIME_FORMATTERS[precision] = formatter;
+            }
+            return formatter;
+        }
+        return new DateTimeFormatterBuilder()
+                .appendPattern("HH:mm:ss")
+                .appendFraction(ChronoField.NANO_OF_SECOND, precision, precision, true)
+                .toFormatter();
+    }
+
     /**
      * Creates an accessor for getting elements in an internal RecordData structure at the given
      * position.
@@ -185,7 +216,11 @@ public class StarRocksUtils {
                         record -> record.getDate(fieldPos).toLocalDate().format(DATE_FORMATTER);
                 break;
             case TIME_WITHOUT_TIME_ZONE:
-                fieldGetter = record -> record.getTime(fieldPos).toLocalTime().toString();
+                fieldGetter =
+                        record ->
+                                record.getTime(fieldPos)
+                                        .toLocalTime()
+                                        .format(timeFormatter(getPrecision(fieldType)));
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =

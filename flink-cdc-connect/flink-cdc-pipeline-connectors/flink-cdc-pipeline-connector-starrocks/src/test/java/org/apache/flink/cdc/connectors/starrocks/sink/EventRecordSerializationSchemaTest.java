@@ -280,9 +280,7 @@ class EventRecordSerializationSchemaTest {
         Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
 
         BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(
-                        schema.getColumnDataTypes()
-                                .toArray(new org.apache.flink.cdc.common.types.DataType[0]));
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
 
         // Test insert with TIME values
         DataChangeEvent insertEvent =
@@ -306,6 +304,34 @@ class EventRecordSerializationSchemaTest {
     }
 
     @Test
+    void testTimeTypeZeroSecondsFormat() throws Exception {
+        TableId tableId = TableId.parse("test.time_zero_seconds_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("zero_time", new TimeType())
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(
+                                new Object[] {1, TimeData.fromLocalTime(LocalTime.of(16, 0, 0))}));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(tableId, "{\"id\":1,\"zero_time\":\"16:00:00\",\"__op\":0}", result);
+    }
+
+    @Test
     void testTimeTypeWithSchemaEvolution() throws Exception {
         TableId tableId = TableId.parse("test.time_evolution_table");
         Schema initialSchema =
@@ -321,9 +347,7 @@ class EventRecordSerializationSchemaTest {
 
         BinaryRecordDataGenerator initialGenerator =
                 new BinaryRecordDataGenerator(
-                        initialSchema
-                                .getColumnDataTypes()
-                                .toArray(new org.apache.flink.cdc.common.types.DataType[0]));
+                        initialSchema.getColumnDataTypes().toArray(new DataType[0]));
 
         // Insert initial data
         DataChangeEvent initialInsert =
@@ -361,9 +385,7 @@ class EventRecordSerializationSchemaTest {
         // Insert data with TIME column after schema evolution
         BinaryRecordDataGenerator evolvedGenerator =
                 new BinaryRecordDataGenerator(
-                        evolvedSchema
-                                .getColumnDataTypes()
-                                .toArray(new org.apache.flink.cdc.common.types.DataType[0]));
+                        evolvedSchema.getColumnDataTypes().toArray(new DataType[0]));
 
         DataChangeEvent evolvedInsert =
                 DataChangeEvent.insertEvent(
@@ -380,7 +402,7 @@ class EventRecordSerializationSchemaTest {
 
         verifySerializeResult(
                 tableId,
-                "{\"id\":2,\"name\":\"Evolved Record\",\"created_time\":\"14:30\",\"__op\":0}",
+                "{\"id\":2,\"name\":\"Evolved Record\",\"created_time\":\"14:30:00\",\"__op\":0}",
                 evolvedResult);
     }
 
@@ -400,9 +422,7 @@ class EventRecordSerializationSchemaTest {
         Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
 
         BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(
-                        schema.getColumnDataTypes()
-                                .toArray(new org.apache.flink.cdc.common.types.DataType[0]));
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
 
         // Test boundary TIME values
         DataChangeEvent insertEvent =
@@ -421,7 +441,7 @@ class EventRecordSerializationSchemaTest {
 
         verifySerializeResult(
                 tableId,
-                "{\"id\":1,\"min_time\":\"00:00\",\"max_time\":\"23:59:59.999\",\"midnight\":\"00:00\",\"__op\":0}",
+                "{\"id\":1,\"min_time\":\"00:00:00\",\"max_time\":\"23:59:59\",\"midnight\":\"00:00:00\",\"__op\":0}",
                 result);
     }
 
@@ -440,9 +460,7 @@ class EventRecordSerializationSchemaTest {
         Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
 
         BinaryRecordDataGenerator generator =
-                new BinaryRecordDataGenerator(
-                        schema.getColumnDataTypes()
-                                .toArray(new org.apache.flink.cdc.common.types.DataType[0]));
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
 
         // Test TIME values with null
         DataChangeEvent insertEvent =
@@ -459,7 +477,8 @@ class EventRecordSerializationSchemaTest {
         StarRocksRowData result = serializer.serialize(insertEvent);
         Assertions.assertThat(result).isNotNull();
 
-        verifySerializeResult(tableId, "{\"id\":1,\"not_null_time\":\"12:00\",\"__op\":0}", result);
+        verifySerializeResult(
+                tableId, "{\"id\":1,\"not_null_time\":\"12:00:00\",\"__op\":0}", result);
     }
 
     private void verifySerializeResult(
