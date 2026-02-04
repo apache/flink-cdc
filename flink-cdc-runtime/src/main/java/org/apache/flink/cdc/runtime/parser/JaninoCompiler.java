@@ -25,6 +25,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypeRoot;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.runtime.operators.transform.UserDefinedFunctionDescriptor;
 
@@ -89,7 +90,7 @@ public class JaninoCompiler {
     public static final String DEFAULT_TIME_ZONE = "__time_zone__";
 
     private static final String[] BUILTIN_FUNCTION_MODULES = {
-        "Arithmetic", "Casting", "Comparison", "Logical", "String", "Temporal"
+        "Arithmetic", "Casting", "Comparison", "Logical", "String", "Struct", "Temporal"
     };
 
     @VisibleForTesting
@@ -306,6 +307,8 @@ public class JaninoCompiler {
                 return generateTimestampAddOperation(context, sqlBasicCall, atoms);
             case OTHER:
                 return generateOtherOperation(context, sqlBasicCall, atoms);
+            case ITEM:
+                return generateItemAccessOperation(context, sqlBasicCall, atoms);
             default:
                 throw new ParseException("Unrecognized expression: " + sqlBasicCall);
         }
@@ -466,6 +469,43 @@ public class JaninoCompiler {
                     Location.NOWHERE, null, StringUtils.convertToCamelCase("CONCAT"), atoms);
         }
         throw new ParseException("Unrecognized expression: " + sqlBasicCall.toString());
+    }
+
+    private static Java.Rvalue generateItemAccessOperation(
+            Context context, SqlBasicCall sqlBasicCall, Java.Rvalue[] atoms) {
+        Preconditions.checkArgument(
+                atoms.length == 2,
+                "Expecting item accessing call %s to have 2 operands, got %s actually",
+                sqlBasicCall,
+                List.of(atoms));
+        Java.Rvalue methodInvocation =
+                new Java.MethodInvocation(Location.NOWHERE, null, "itemAccess", atoms);
+
+        // Deduce the return type and add a cast to ensure proper type conversion
+        DataType resultType =
+                TransformParser.deduceSubExpressionType(
+                        context.columns,
+                        sqlBasicCall,
+                        context.udfDescriptors,
+                        context.supportedMetadataColumns);
+
+        // Get the Java class for the result type and add a cast
+        // Use getCanonicalName() to correctly handle array types (e.g., byte[] instead of "[B")
+        Class<?> javaClass = JavaClassConverter.toJavaClass(resultType);
+        if (javaClass != null && javaClass != Object.class) {
+            String canonicalName = javaClass.getCanonicalName();
+            if (canonicalName != null) {
+                return new Java.Cast(
+                        Location.NOWHERE,
+                        new Java.ReferenceType(
+                                Location.NOWHERE,
+                                new Java.Annotation[0],
+                                canonicalName.split("\\."),
+                                null),
+                        methodInvocation);
+            }
+        }
+        return methodInvocation;
     }
 
     private static Java.Rvalue generateOtherFunctionOperation(

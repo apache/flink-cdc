@@ -226,6 +226,14 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 | PARSE_JSON(string[, allowDuplicateKeys]) | parseJson(string[, allowDuplicateKeys]) | Parse a JSON string into a Variant. If the JSON string is invalid, an error will be thrown. To return NULL instead of an error, use the TRY_PARSE_JSON function. <br><br> If there are duplicate keys in the input JSON string, when `allowDuplicateKeys` is true, the parser will keep the last occurrence of all fields with the same key, otherwise it will throw an error. The default value of `allowDuplicateKeys` is false. |
 | TRY_PARSE_JSON(string[, allowDuplicateKeys]) | tryParseJson(string[, allowDuplicateKeys]) | Parse a JSON string into a Variant if possible. If the JSON string is invalid, return NULL. To throw an error instead of returning NULL, use the PARSE_JSON function. <br><br> If there are duplicate keys in the input JSON string, when `allowDuplicateKeys` is true, the parser will keep the last occurrence of all fields with the same key, otherwise it will return NULL. The default value of `allowDuplicateKeys` is false. |
 
+## Struct Functions
+
+| Function | Janino Code | Description |
+| -------- | ----------- | ----------- |
+| array[index] | itemAccess(array, index) | 返回数组中位置 `index` 的元素。索引从 1 开始（SQL 标准）。如果索引超出范围或数组为 NULL，则返回 NULL。 |
+| map[key] | itemAccess(map, key) | 返回 map 中与 `key` 关联的值。如果 key 不存在或 map 为 NULL，则返回 NULL。 |
+| row[index] | itemAccess(row, index) | 返回 row 中位置 `index` 的字段。索引从 1 开始。索引必须是常量（不能是计算表达式），因为返回类型必须在静态阶段确定。 |
+
 # 示例
 ## 添加计算列
 表达式可以用来生成新的列。例如，如果我们想基于表 `web_order` 在数据库 `mydb` 中添加两个计算列，我们可以定义一个转换规则如下：
