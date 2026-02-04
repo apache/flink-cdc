@@ -21,13 +21,10 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
-import org.apache.flink.cdc.common.event.DataChangeEvent;
-import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.cdc.common.event.SchemaChangeEvent;
-import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.event.*;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
@@ -289,6 +286,73 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         boolean hasProductDataEvent =
                 restoreAfterEvents.stream().anyMatch(event -> event instanceof DataChangeEvent);
         assertThat(hasProductDataEvent).isTrue();
+    }
+
+    @Test
+    public void testSchemaChangeEvents() throws Exception {
+        inventoryDatabase.createAndInitialize();
+        initializePostgresTable(POSTGRES_CONTAINER, "ddl_audit");
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGRES_CONTAINER.getHost())
+                                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(inventoryDatabase.getDatabaseName())
+                                .tableList("inventory.products", "audit.ddl_log")
+                                .startupOptions(StartupOptions.latest())
+                                .serverTimeZone("UTC");
+        configFactory.database(inventoryDatabase.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+        configFactory.ddlLogTable("audit.ddl_log");
+        configFactory.setDdlFieldObjectType("object_type");
+        configFactory.setDdlFieldObjectIdentity("object_identity");
+        configFactory.setDdlFieldCommandText("command_text");
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        List<Event> expected = new ArrayList<>();
+        initializePostgresTable(POSTGRES_CONTAINER, "ddl_audit");
+        TableId tableId = TableId.tableId("inventory", "products");
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                Statement stmt = conn.createStatement()) {
+            stmt.execute("ALTER TABLE inventory.products ALTER COLUMN weight TYPE VARCHAR(50)");
+            expected.add(
+                    new AlterColumnTypeEvent(
+                            tableId, Collections.singletonMap("weight", DataTypes.VARCHAR(50))));
+            stmt.execute("ALTER TABLE inventory.products ALTER COLUMN name DROP NOT NULL");
+            expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
+            stmt.execute("ALTER TABLE inventory.products DROP COLUMN name");
+            expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
+            stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+            expected.add(
+                    new AddColumnEvent(
+                            tableId,
+                            Collections.singletonList(
+                                    new AddColumnEvent.ColumnWithPosition(
+                                            Column.physicalColumn(
+                                                    "age", DataTypes.VARCHAR(100))))));
+            stmt.execute("ALTER TABLE inventory.products RENAME COLUMN weight TO weighta");
+            expected.add(
+                    new RenameColumnEvent(tableId, Collections.singletonMap("weight", "weighta")));
+        }
+
+        List<Event> actual = fetchResults(events, expected.size());
+        assertEqualsInAnyOrder(
+                expected.stream().map(Object::toString).collect(Collectors.toList()),
+                actual.stream().map(Object::toString).collect(Collectors.toList()));
     }
 
     // Helper method to trigger a savepoint with retry mechanism
@@ -725,5 +789,15 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                         .physicalColumn("weight", DataTypes.DOUBLE())
                         .primaryKey(Collections.singletonList("id"))
                         .build());
+    }
+
+    public static <T> List<T> fetchResults(Iterator<T> iter, int size) {
+        List<T> result = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            T event = iter.next();
+            result.add(event);
+            size--;
+        }
+        return result;
     }
 }

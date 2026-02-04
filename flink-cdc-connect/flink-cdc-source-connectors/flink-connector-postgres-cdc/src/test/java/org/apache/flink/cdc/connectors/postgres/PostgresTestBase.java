@@ -46,7 +46,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -143,26 +142,53 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
         try (Connection connection = getJdbcConnection(container);
                 Statement statement = connection.createStatement()) {
-            final List<String> statements =
-                    Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                            .map(String::trim)
-                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                            .map(
-                                                    x -> {
-                                                        final Matcher m =
-                                                                COMMENT_PATTERN.matcher(x);
-                                                        return m.matches() ? m.group(1) : x;
-                                                    })
-                                            .collect(Collectors.joining("\n"))
-                                            .split(";\n"))
-                            .collect(Collectors.toList());
+            final List<String> statements = parseSqlStatements(ddlTestFile);
             for (String stmt : statements) {
                 statement.execute(stmt);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private List<String> parseSqlStatements(URL ddlTestFile) throws Exception {
+        String ddlSql =
+                Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                        .map(String::trim)
+                        .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                        .map(
+                                x -> {
+                                    final Matcher m = COMMENT_PATTERN.matcher(x);
+                                    return m.matches() ? m.group(1) : x;
+                                })
+                        .collect(Collectors.joining("\n"));
+
+        List<String> statements = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inDollar = false;
+        for (int i = 0; i < ddlSql.length(); i++) {
+            char ch = ddlSql.charAt(i);
+            if (ch == '$' && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '$') {
+                inDollar = !inDollar;
+                current.append("$$");
+                i++;
+                continue;
+            }
+            if (ch == ';' && !inDollar) {
+                String sql = current.toString().trim();
+                if (!sql.isEmpty()) {
+                    statements.add(sql);
+                }
+                current.setLength(0);
+            } else {
+                current.append(ch);
+            }
+        }
+        String tail = current.toString().trim();
+        if (!tail.isEmpty()) {
+            statements.add(tail);
+        }
+        return statements;
     }
 
     protected PostgresConnection createConnection(Map<String, String> properties) {
