@@ -401,8 +401,8 @@ public class TransformSqlOperatorTable extends ReflectiveSqlOperatorTable {
     // ---------------------
     // Struct Functions
     // ---------------------
-    // Supports accessing elements of ARRAY[index], ROW[index] and MAP[key]
-    public static final SqlOperator ITEM = SqlStdOperatorTable.ITEM;
+    // Supports accessing elements of ARRAY[index], ROW[index], MAP[key], and VARIANT[index/key]
+    public static final SqlOperator ITEM = new VariantAwareItemOperator();
 
     public static final SqlFunction AI_CHAT_PREDICT =
             new SqlFunction(

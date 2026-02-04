@@ -17,6 +17,9 @@
 
 package org.apache.flink.cdc.runtime.functions.impl;
 
+import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.types.variant.VariantBuilder;
+
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -155,6 +158,157 @@ class StructFunctionsTest {
 
             assertThat(StructFunctions.itemAccess(mapWithNullValue, "key1")).isEqualTo("value1");
             assertThat(StructFunctions.itemAccess(mapWithNullValue, "key2")).isNull();
+        }
+    }
+
+    // ========================================
+    // Variant Access Tests
+    // ========================================
+    @Nested
+    class VariantAccessTests {
+
+        private final VariantBuilder builder = Variant.newBuilder();
+
+        @Test
+        void testVariantArrayAccessByIndex() {
+            // Build a variant array: [1, 2, 3]
+            Variant arrayVariant =
+                    builder.array()
+                            .add(builder.of(1))
+                            .add(builder.of(2))
+                            .add(builder.of(3))
+                            .build();
+
+            // SQL uses 1-based indexing
+            Variant first = StructFunctions.itemAccess(arrayVariant, 1);
+            assertThat(first).isNotNull();
+            assertThat(first.getInt()).isEqualTo(1);
+
+            Variant second = StructFunctions.itemAccess(arrayVariant, 2);
+            assertThat(second).isNotNull();
+            assertThat(second.getInt()).isEqualTo(2);
+
+            Variant third = StructFunctions.itemAccess(arrayVariant, 3);
+            assertThat(third).isNotNull();
+            assertThat(third.getInt()).isEqualTo(3);
+        }
+
+        @Test
+        void testVariantArrayOutOfBoundsAccess() {
+            Variant arrayVariant =
+                    builder.array()
+                            .add(builder.of(10))
+                            .add(builder.of(20))
+                            .add(builder.of(30))
+                            .build();
+
+            // Index 0 is invalid in SQL (1-based indexing)
+            assertThat(StructFunctions.itemAccess(arrayVariant, 0)).isNull();
+            // Negative index
+            assertThat(StructFunctions.itemAccess(arrayVariant, -1)).isNull();
+            // Index beyond size
+            assertThat(StructFunctions.itemAccess(arrayVariant, 4)).isNull();
+            assertThat(StructFunctions.itemAccess(arrayVariant, 100)).isNull();
+        }
+
+        @Test
+        void testVariantObjectAccessByFieldName() {
+            // Build a variant object: {"name": "Alice", "age": 30}
+            Variant objectVariant =
+                    builder.object()
+                            .add("name", builder.of("Alice"))
+                            .add("age", builder.of(30))
+                            .build();
+
+            Variant name = StructFunctions.itemAccess(objectVariant, "name");
+            assertThat(name).isNotNull();
+            assertThat(name.getString()).isEqualTo("Alice");
+
+            Variant age = StructFunctions.itemAccess(objectVariant, "age");
+            assertThat(age).isNotNull();
+            assertThat(age.getInt()).isEqualTo(30);
+        }
+
+        @Test
+        void testVariantObjectMissingField() {
+            Variant objectVariant = builder.object().add("exists", builder.of("value")).build();
+
+            assertThat(StructFunctions.itemAccess(objectVariant, "nonexistent")).isNull();
+        }
+
+        @Test
+        void testVariantNullHandling() {
+            Variant arrayVariant = builder.array().add(builder.of(1)).build();
+            Variant objectVariant = builder.object().add("key", builder.of("value")).build();
+
+            // Null variant returns null
+            assertThat(StructFunctions.itemAccess((Variant) null, 1)).isNull();
+            assertThat(StructFunctions.itemAccess((Variant) null, "key")).isNull();
+
+            // Null index returns null
+            assertThat(StructFunctions.itemAccess(arrayVariant, (Integer) null)).isNull();
+
+            // Null field name returns null
+            assertThat(StructFunctions.itemAccess(objectVariant, (String) null)).isNull();
+        }
+
+        @Test
+        void testVariantTypeMismatch() {
+            Variant arrayVariant = builder.array().add(builder.of(1)).build();
+            Variant objectVariant = builder.object().add("key", builder.of("value")).build();
+
+            // Accessing array with string key returns null
+            assertThat(StructFunctions.itemAccess(arrayVariant, "key")).isNull();
+
+            // Accessing object with integer index returns null
+            assertThat(StructFunctions.itemAccess(objectVariant, 1)).isNull();
+        }
+
+        @Test
+        void testNestedVariantAccess() {
+            // Build a nested variant: {"data": [1, {"nested": "value"}]}
+            Variant nestedVariant =
+                    builder.object()
+                            .add(
+                                    "data",
+                                    builder.array()
+                                            .add(builder.of(1))
+                                            .add(
+                                                    builder.object()
+                                                            .add("nested", builder.of("value"))
+                                                            .build())
+                                            .build())
+                            .build();
+
+            // Access "data" field
+            Variant data = StructFunctions.itemAccess(nestedVariant, "data");
+            assertThat(data).isNotNull();
+            assertThat(data.isArray()).isTrue();
+
+            // Access second element of the array (index 2 in 1-based SQL standard)
+            Variant secondElement = StructFunctions.itemAccess(data, 2);
+            assertThat(secondElement).isNotNull();
+            assertThat(secondElement.isObject()).isTrue();
+
+            // Access "nested" field
+            Variant nestedValue = StructFunctions.itemAccess(secondElement, "nested");
+            assertThat(nestedValue).isNotNull();
+            assertThat(nestedValue.getString()).isEqualTo("value");
+        }
+
+        @Test
+        void testPrimitiveVariantAccess() {
+            // Primitive variants are neither arrays nor objects
+            Variant intVariant = builder.of(42);
+            Variant stringVariant = builder.of("hello");
+
+            // Accessing primitive variant with index returns null
+            assertThat(StructFunctions.itemAccess(intVariant, 1)).isNull();
+            assertThat(StructFunctions.itemAccess(stringVariant, 1)).isNull();
+
+            // Accessing primitive variant with field name returns null
+            assertThat(StructFunctions.itemAccess(intVariant, "key")).isNull();
+            assertThat(StructFunctions.itemAccess(stringVariant, "key")).isNull();
         }
     }
 }
