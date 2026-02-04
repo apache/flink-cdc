@@ -1053,8 +1053,10 @@ class PostgresSourceITCase extends PostgresTestBase {
             collectedSnapshotData.add(rowStr);
 
             // Insert test record right after Table 3 starts its snapshot phase
-            // This ensures the insert happens while Table 3's backfill slot may have altered the publication
-            if (collectedSnapshotData.size() == recordsWhenTable3Starts && !insertedDuringSnapshot) {
+            // This ensures the insert happens while Table 3's backfill slot may have altered the
+            // publication
+            if (collectedSnapshotData.size() == recordsWhenTable3Starts
+                    && !insertedDuringSnapshot) {
                 Thread.sleep(1000L); // Give Table 3's backfill slot time to alter the publication
                 try (PostgresConnection connection = getConnection()) {
                     connection.setAutoCommit(false);
@@ -1090,9 +1092,11 @@ class PostgresSourceITCase extends PostgresTestBase {
             }
         }
 
-        boolean insertFound = collectedStreamData.contains("+I[9999, test_user, TestCity, 123456789]");
+        boolean insertFound =
+                collectedStreamData.contains("+I[9999, test_user, TestCity, 123456789]");
         assertThat(insertFound)
-                .as("The insert into Customers table during Table 3 snapshot phase should be captured.")
+                .as(
+                        "The insert into Customers table during Table 3 snapshot phase should be captured.")
                 .isTrue();
     }
 

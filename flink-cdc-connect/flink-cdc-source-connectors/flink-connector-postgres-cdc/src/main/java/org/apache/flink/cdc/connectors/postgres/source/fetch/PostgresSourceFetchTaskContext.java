@@ -127,37 +127,41 @@ public class PostgresSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         PostgresConnectorConfig dbzConfig = getDbzConnectorConfig();
         if (sourceSplitBase instanceof SnapshotSplit) {
 
-            Configuration.Builder builder = dbzConfig
-                    .getConfig()
-                    .edit()
-                    .with(
-                            "table.include.list",
-                            getTableList(
-                                    ((SnapshotSplit) sourceSplitBase).getTableId()))
-                    .with(
-                            SLOT_NAME.name(),
-                            ((PostgresSourceConfig) sourceConfig)
-                                    .getSlotNameForBackfillTask())
-                    // drop slot for backfill stream split
-                    .with(DROP_SLOT_ON_STOP.name(), true)
-                    // Disable heartbeat event in snapshot split fetcher
-                    .with(Heartbeat.HEARTBEAT_INTERVAL, 0);
+            Configuration.Builder builder =
+                    dbzConfig
+                            .getConfig()
+                            .edit()
+                            .with(
+                                    "table.include.list",
+                                    getTableList(((SnapshotSplit) sourceSplitBase).getTableId()))
+                            .with(
+                                    SLOT_NAME.name(),
+                                    ((PostgresSourceConfig) sourceConfig)
+                                            .getSlotNameForBackfillTask())
+                            // drop slot for backfill stream split
+                            .with(DROP_SLOT_ON_STOP.name(), true)
+                            // Disable heartbeat event in snapshot split fetcher
+                            .with(Heartbeat.HEARTBEAT_INTERVAL, 0);
 
             try {
-                String autoCreateMode = dbzConfig.getConfig().getString(PUBLICATION_AUTOCREATE_MODE.name());
+                String autoCreateMode =
+                        dbzConfig.getConfig().getString(PUBLICATION_AUTOCREATE_MODE.name());
                 if ("filtered".equalsIgnoreCase(autoCreateMode)) {
-                    // disable publication auto create for snapshot split when auto create mode is filtered
+                    // disable publication auto create for snapshot split when auto create mode is
+                    // filtered
                     // Prevent backfill slots from modifying the shared publication.
-                    // Without this, each backfill slot would SET the publication to only include its current table
-                    builder = builder.with(PUBLICATION_AUTOCREATE_MODE.name(),
-                            PostgresConnectorConfig.AutoCreateMode.DISABLED);
+                    // Without this, each backfill slot would SET the publication to only include
+                    // its current table
+                    builder =
+                            builder.with(
+                                    PUBLICATION_AUTOCREATE_MODE.name(),
+                                    PostgresConnectorConfig.AutoCreateMode.DISABLED);
                 }
             } catch (Exception e) {
                 // ignore
             }
 
-            dbzConfig =
-                    new PostgresConnectorConfig(builder.build());
+            dbzConfig = new PostgresConnectorConfig(builder.build());
         } else {
 
             Configuration.Builder builder = dbzConfig.getConfig().edit();
