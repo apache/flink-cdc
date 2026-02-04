@@ -1042,16 +1042,22 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
         Assertions.assertThat(snapshotRow).contains("90");
         Assertions.assertThat(snapshotRow).contains("78");
         Assertions.assertThat(snapshotRow).contains("42");
+        Assertions.assertThat(snapshotRow)
+                .containsIgnoringCase("227496ad-fde9-ccfb-1f04-892fc505afd5");
+        Assertions.assertThat(snapshotRow)
+                .containsIgnoringCase("9d33f9e2-dfc7-fdef-9478-bcc5dbf7a6d7");
 
         // wait a bit to make sure the replication slot is ready
         Thread.sleep(5000);
 
-        // Test incremental (WAL) path - UPDATE array data
+        // Test incremental (WAL) path - UPDATE array data including uuid_a1
         try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
                 Statement statement = connection.createStatement()) {
             statement.execute(
                     "UPDATE inventory.array_types SET text_a1=ARRAY['updated', 'array'], "
-                            + "int_a1='{100, 200}' WHERE id=1;");
+                            + "int_a1='{100, 200}', "
+                            + "uuid_a1=ARRAY['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'ffffffff-1111-2222-3333-444444444444']::UUID[] "
+                            + "WHERE id=1;");
         }
 
         // Wait for update event (-D and +I, total 3 records including initial +I)
@@ -1064,14 +1070,15 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
         // verify updated array data is present in results
         String allResults = String.join(",", incrementalResults);
-        // Should contain delete (-D) and insert (+I) for the update
         Assertions.assertThat(allResults).contains("-D(");
-        // Updated values
         Assertions.assertThat(allResults).contains("updated");
         Assertions.assertThat(allResults).contains("array");
         Assertions.assertThat(allResults).contains("100");
         Assertions.assertThat(allResults).contains("200");
-        // Unchanged values still present
+        Assertions.assertThat(allResults)
+                .containsIgnoringCase("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        Assertions.assertThat(allResults)
+                .containsIgnoringCase("ffffffff-1111-2222-3333-444444444444");
         Assertions.assertThat(allResults).contains("42");
 
         tableResult.getJobClient().get().cancel().get();
