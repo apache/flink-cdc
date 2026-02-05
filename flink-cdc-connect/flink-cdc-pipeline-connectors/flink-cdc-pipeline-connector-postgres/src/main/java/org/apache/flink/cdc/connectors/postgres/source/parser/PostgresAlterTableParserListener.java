@@ -19,13 +19,10 @@ package org.apache.flink.cdc.connectors.postgres.source.parser;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
-import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TruncateTableEvent;
-import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 
@@ -65,37 +62,6 @@ public class PostgresAlterTableParserListener extends PostgreSQLParserBaseListen
         this.dbzConfig = dbzConfig;
     }
 
-    @Override
-    public void enterCreatestmt(PostgreSQLParser.CreatestmtContext ctx) {
-        TableId tableId = parser.parseQualifiedTableId(ctx.qualified_name(0));
-        if (!ctx.opttableelementlist().isEmpty()) {
-            tableEditor = parser.databaseTables().editOrCreateTable(tableId);
-            columnDefinitionListener = new ColumnDefinitionParserListener(parser, tableEditor);
-            listeners.add(columnDefinitionListener);
-        }
-        super.exitCreatestmt(ctx);
-    }
-
-    @Override
-    public void exitCreatestmt(PostgreSQLParser.CreatestmtContext ctx) {
-        parser.runIfNotNull(
-                () -> {
-                    Schema.Builder builder = Schema.newBuilder();
-                    tableEditor.columns().forEach(column -> builder.column(toCdcColumn(column)));
-                    if (tableEditor.hasPrimaryKey()) {
-                        builder.primaryKey(tableEditor.primaryKeyColumnNames());
-                    }
-                    builder.comment(tableEditor.create().comment());
-                    changes.add(
-                            new CreateTableEvent(
-                                    toCdcTableId(tableEditor.tableId()), builder.build()));
-                    tableEditor = null;
-                    listeners.remove(columnDefinitionListener);
-                },
-                tableEditor);
-        super.exitCreatestmt(ctx);
-    }
-
     // Currently, Postgres event triggers do not support the `truncate table` command.
     @Override
     public void exitTruncatestmt(PostgreSQLParser.TruncatestmtContext ctx) {
@@ -104,20 +70,6 @@ public class PostgresAlterTableParserListener extends PostgreSQLParserBaseListen
                         ctx.relation_expr_list().relation_expr(0).qualified_name());
         changes.add(new TruncateTableEvent(toCdcTableId(tableId)));
         super.exitTruncatestmt(ctx);
-    }
-
-    @Override
-    public void exitDropstmt(PostgreSQLParser.DropstmtContext ctx) {
-        if (ctx.object_type_any_name() != null && ctx.object_type_any_name().TABLE() != null) {
-            ctx.any_name_list_()
-                    .any_name()
-                    .forEach(
-                            anyNameCtx -> {
-                                TableId tableId = parser.parseQualifiedTableId(anyNameCtx);
-                                changes.add(new DropTableEvent(toCdcTableId(tableId)));
-                            });
-        }
-        super.exitDropstmt(ctx);
     }
 
     @Override

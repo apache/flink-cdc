@@ -26,7 +26,6 @@ import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
-import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
@@ -357,16 +356,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
             stmt.execute("ALTER TABLE inventory.products RENAME COLUMN weight TO weighta");
             expected.add(
                     new RenameColumnEvent(tableId, Collections.singletonMap("weight", "weighta")));
-            stmt.execute("DROP TABLE inventory.products CASCADE");
-            expected.add(new DropTableEvent(tableId));
-            stmt.execute(
-                    "CREATE TABLE products ("
-                            + "  id SERIAL NOT NULL PRIMARY KEY,"
-                            + "  name VARCHAR(255) NOT NULL DEFAULT 'flink',"
-                            + "  description VARCHAR(512),"
-                            + "  weight FLOAT(38)"
-                            + ")");
-            expected.add(getProductsCreateTableEvent(tableId));
         }
 
         List<Event> actual = fetchResults(events, expected.size());
