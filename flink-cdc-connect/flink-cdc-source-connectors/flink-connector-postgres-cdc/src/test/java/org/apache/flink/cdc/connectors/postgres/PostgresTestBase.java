@@ -137,10 +137,26 @@ public abstract class PostgresTestBase extends AbstractTestBase {
      * connection.
      */
     protected void initializePostgresTable(PostgreSQLContainer container, String sqlFile) {
+        initializePostgresTable(container, null, sqlFile);
+    }
+
+    /**
+     * Executes a JDBC statement on the specified database without autocommitting the connection.
+     */
+    protected void initializePostgresTable(
+            PostgreSQLContainer container, String databaseName, String sqlFile) {
+        executeSqlStatements(container, databaseName, sqlFile);
+    }
+
+    private void executeSqlStatements(
+            PostgreSQLContainer container, String databaseName, String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = PostgresTestBase.class.getClassLoader().getResource(ddlFile);
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
-        try (Connection connection = getJdbcConnection(container);
+        try (Connection connection =
+                        databaseName == null
+                                ? getJdbcConnection(container)
+                                : getJdbcConnection(container, databaseName);
                 Statement statement = connection.createStatement()) {
             final List<String> statements = parseSqlStatements(ddlTestFile);
             for (String stmt : statements) {

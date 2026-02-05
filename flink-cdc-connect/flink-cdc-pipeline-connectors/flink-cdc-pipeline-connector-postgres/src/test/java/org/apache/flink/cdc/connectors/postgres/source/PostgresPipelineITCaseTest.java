@@ -299,6 +299,8 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
     @Test
     public void testSchemaChangeEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
+        initializePostgresTable(
+                POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName(), "ddl_audit");
         PostgresSourceConfigFactory configFactory =
                 (PostgresSourceConfigFactory)
                         new PostgresSourceConfigFactory()
@@ -330,7 +332,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                         .executeAndCollect();
 
         List<Event> expected = new ArrayList<>();
-        initializePostgresTable(POSTGRES_CONTAINER, "ddl_audit");
         TableId tableId = TableId.tableId("inventory", "products");
         try (Connection conn =
                         getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
