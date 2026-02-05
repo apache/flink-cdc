@@ -357,7 +357,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
             stmt.execute("ALTER TABLE inventory.products RENAME COLUMN weight TO weighta");
             expected.add(
                     new RenameColumnEvent(tableId, Collections.singletonMap("weight", "weighta")));
-            stmt.execute("DROP TABLE inventory.products");
+            stmt.execute("DROP TABLE inventory.products CASCADE");
             expected.add(new DropTableEvent(tableId));
             stmt.execute(
                     "CREATE TABLE products ("
