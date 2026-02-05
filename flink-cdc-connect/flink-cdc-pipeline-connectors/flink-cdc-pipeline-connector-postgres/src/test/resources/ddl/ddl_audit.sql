@@ -13,7 +13,7 @@
 -- See the License for the specific language governing permissions and
 -- limitations under the License.
 
--- Create event listener table and associate it with event triggers to listen for ddl_command_end and sql_drop events
+-- Create event listener table and associate it with event triggers to listen for ddl_command_end and sql_drop events.
 DROP SCHEMA IF EXISTS audit CASCADE;
 CREATE SCHEMA audit;
 
@@ -62,6 +62,9 @@ DECLARE
 BEGIN
     FOR r IN SELECT * FROM pg_event_trigger_dropped_objects()
     LOOP
+        IF r.object_type = 'table column' THEN
+            CONTINUE;
+        END IF;
         IF r.schema_name = 'audit' AND r.object_identity LIKE 'audit.ddl_log%' THEN
             CONTINUE;
         END IF;
