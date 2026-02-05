@@ -14,7 +14,8 @@
 -- limitations under the License.
 
 -- Create event listener table and associate it with event triggers to listen for ddl_command_end and sql_drop events
-CREATE SCHEMA IF NOT EXISTS audit;
+DROP SCHEMA IF EXISTS audit CASCADE;
+CREATE SCHEMA audit;
 
 CREATE TABLE audit.ddl_log (
   id BIGSERIAL PRIMARY KEY,

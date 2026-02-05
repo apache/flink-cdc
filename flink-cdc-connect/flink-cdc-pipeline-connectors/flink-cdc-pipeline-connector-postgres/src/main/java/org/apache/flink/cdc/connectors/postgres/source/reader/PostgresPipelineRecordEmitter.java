@@ -263,7 +263,7 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
 
     // The DDL log table is used to retrieve DDL events, so there is no need to create it.
     private boolean isDDLLogTable(TableId tableId) {
-        return !sourceConfig.getDdlLogTable().isEmpty()
+        return sourceConfig.getDdlLogTable() != null
                 && sourceConfig.getDdlLogTable().equals(tableId.schema() + "." + tableId.table());
     }
 }
