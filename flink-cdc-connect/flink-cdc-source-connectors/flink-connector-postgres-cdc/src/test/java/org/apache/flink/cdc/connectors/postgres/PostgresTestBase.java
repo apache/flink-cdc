@@ -166,6 +166,8 @@ public abstract class PostgresTestBase extends AbstractTestBase {
         List<String> statements = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inDollar = false;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
         for (int i = 0; i < ddlSql.length(); i++) {
             char ch = ddlSql.charAt(i);
             if (ch == '$' && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '$') {
@@ -174,7 +176,24 @@ public abstract class PostgresTestBase extends AbstractTestBase {
                 i++;
                 continue;
             }
-            if (ch == ';' && !inDollar) {
+            if (!inDollar) {
+                if (ch == '\'' && !inDoubleQuote) {
+                    if (inSingleQuote && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '\'') {
+                        current.append("''");
+                        i++;
+                        continue;
+                    }
+                    inSingleQuote = !inSingleQuote;
+                } else if (ch == '"' && !inSingleQuote) {
+                    if (inDoubleQuote && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '"') {
+                        current.append("\"\"");
+                        i++;
+                        continue;
+                    }
+                    inDoubleQuote = !inDoubleQuote;
+                }
+            }
+            if (ch == ';' && !inDollar && !inSingleQuote && !inDoubleQuote) {
                 String sql = current.toString().trim();
                 if (!sql.isEmpty()) {
                     statements.add(sql);

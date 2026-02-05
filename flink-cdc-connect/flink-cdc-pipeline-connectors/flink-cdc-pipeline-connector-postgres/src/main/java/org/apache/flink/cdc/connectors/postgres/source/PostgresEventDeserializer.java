@@ -112,20 +112,18 @@ public class PostgresEventDeserializer extends DebeziumEventDeserializationSchem
     protected boolean isDataChangeRecord(SourceRecord record) {
         Schema valueSchema = record.valueSchema();
         Struct value = (Struct) record.value();
-        TableId tableId = getTableId(record);
         return value != null
                 && valueSchema != null
                 && valueSchema.field(Envelope.FieldName.OPERATION) != null
                 && value.getString(Envelope.FieldName.OPERATION) != null
-                && (ddlLogTable == null || !tableId.toString().equals(ddlLogTable));
+                && (ddlLogTable == null || !getTableId(record).toString().equals(ddlLogTable));
     }
 
     @Override
     protected boolean isSchemaChangeRecord(SourceRecord record) {
         Envelope.Operation op = Envelope.operationFor(record);
-        TableId tableId = getTableId(record);
         if (ddlLogTable != null
-                && tableId.toString().equals(ddlLogTable)
+                && getTableId(record).toString().equals(ddlLogTable)
                 && (op == Envelope.Operation.CREATE || op == Envelope.Operation.READ)) {
             return true;
         }

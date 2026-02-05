@@ -299,7 +299,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
     @Test
     public void testSchemaChangeEvents() throws Exception {
         inventoryDatabase.createAndInitialize();
-        initializePostgresTable(POSTGRES_CONTAINER, "ddl_audit");
         PostgresSourceConfigFactory configFactory =
                 (PostgresSourceConfigFactory)
                         new PostgresSourceConfigFactory()
