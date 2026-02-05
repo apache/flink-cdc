@@ -432,19 +432,19 @@ class TransformParserTest {
         List<Column> variantColumns = List.of(Column.physicalColumn("v", DataTypes.VARIANT()));
         testFilterExpressionWithColumns(
                 "v['key']",
-                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) v, \"key\")",
+                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess(v, \"key\")",
                 variantColumns);
         testFilterExpressionWithColumns(
                 "v[1]",
-                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) v, 1)",
+                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess(v, 1)",
                 variantColumns);
         testFilterExpressionWithColumns(
                 "v['a']['b']",
-                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) (org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) v, \"a\"), \"b\")",
+                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) itemAccess(v, \"a\"), \"b\")",
                 variantColumns);
         testFilterExpressionWithColumns(
                 "parse_json('{\"key\": \"value\"}')['key']",
-                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess((org.apache.flink.cdc.common.types.variant.Variant) parseJson(\"{\\\"key\\\": \\\"value\\\"}\"), \"key\")",
+                "(org.apache.flink.cdc.common.types.variant.Variant) itemAccess(parseJson(\"{\\\"key\\\": \\\"value\\\"}\"), \"key\")",
                 Collections.emptyList());
     }
 
