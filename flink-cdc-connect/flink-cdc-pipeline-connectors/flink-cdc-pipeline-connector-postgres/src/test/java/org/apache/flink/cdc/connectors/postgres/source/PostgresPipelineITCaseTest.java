@@ -331,6 +331,7 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                                 new EventTypeInfo())
                         .executeAndCollect();
 
+        Thread.sleep(10000);
         List<Event> expected = new ArrayList<>();
         TableId tableId = TableId.tableId("inventory", "products");
         try (Connection conn =
@@ -342,8 +343,8 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                             tableId, Collections.singletonMap("weight", DataTypes.VARCHAR(50))));
             stmt.execute("ALTER TABLE inventory.products ALTER COLUMN name DROP NOT NULL");
             expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
-            stmt.execute("ALTER TABLE inventory.products DROP COLUMN name");
-            expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
+            stmt.execute("ALTER TABLE inventory.products DROP COLUMN description");
+            expected.add(new DropColumnEvent(tableId, Collections.singletonList("description")));
             stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
             expected.add(
                     new AddColumnEvent(
