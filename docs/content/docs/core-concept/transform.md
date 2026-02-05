@@ -229,13 +229,15 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 
 ## Struct Functions
 
-Struct functions are used to access elements in ARRAY, MAP and ROW types using subscript syntax.
+Struct functions are used to access elements in ARRAY, MAP, ROW, and VARIANT types using subscript syntax.
 
 | Function | Janino Code | Description |
 | -------- | ----------- | ----------- |
 | array[index] | itemAccess(array, index) | Returns the element at position `index` in the array. Index is 1-based (SQL standard). Returns NULL if the index is out of bounds or if the array is NULL. |
 | map[key] | itemAccess(map, key) | Returns the value associated with `key` in the map. Returns NULL if the key does not exist or if the map is NULL. |
 | row[index] | itemAccess(row, index) | Returns the field at position `index` in the row. Index is 1-based. The index must be a constant (not a computed expression) since the return type must be statically determined. |
+| variant[index] | itemAccess(variant, index) | Returns the element at position `index` in the variant (if it's an array). Index is 1-based (SQL standard). Returns NULL if the index is out of bounds or if the variant is not an array. |
+| variant[key] | itemAccess(variant, key) | Returns the value associated with `key` in the variant (if it's an object). Returns NULL if the key does not exist or if the variant is not an object. |
 
 # Example
 ## Add computed columns

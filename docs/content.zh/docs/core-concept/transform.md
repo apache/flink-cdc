@@ -228,11 +228,15 @@ You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXP
 
 ## Struct Functions
 
+结构函数用于使用下标语法访问 ARRAY、MAP、ROW 和 VARIANT 类型中的元素。
+
 | Function | Janino Code | Description |
 | -------- | ----------- | ----------- |
 | array[index] | itemAccess(array, index) | 返回数组中位置 `index` 的元素。索引从 1 开始（SQL 标准）。如果索引超出范围或数组为 NULL，则返回 NULL。 |
 | map[key] | itemAccess(map, key) | 返回 map 中与 `key` 关联的值。如果 key 不存在或 map 为 NULL，则返回 NULL。 |
 | row[index] | itemAccess(row, index) | 返回 row 中位置 `index` 的字段。索引从 1 开始。索引必须是常量（不能是计算表达式），因为返回类型必须在静态阶段确定。 |
+| variant[index] | itemAccess(variant, index) | 返回 variant 中位置 `index` 的元素（如果是数组）。索引从 1 开始（SQL 标准）。如果索引超出范围或 variant 不是数组，则返回 NULL。 |
+| variant[key] | itemAccess(variant, key) | 返回 variant 中与 `key` 关联的值（如果是对象）。如果 key 不存在或 variant 不是对象，则返回 NULL。 |
 
 # 示例
 ## 添加计算列
