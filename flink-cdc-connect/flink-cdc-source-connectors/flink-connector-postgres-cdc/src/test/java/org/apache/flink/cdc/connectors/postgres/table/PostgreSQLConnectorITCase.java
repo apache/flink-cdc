@@ -970,6 +970,122 @@ class PostgreSQLConnectorITCase extends PostgresTestBase {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    void testArrayTypes(boolean parallelismSnapshot) throws Throwable {
+        setup(parallelismSnapshot);
+        initializePostgresTable(POSTGIS_CONTAINER, "column_type_test");
+
+        String sourceDDL =
+                String.format(
+                        "CREATE TABLE array_types ("
+                                + "    id INTEGER NOT NULL,"
+                                + "    text_a1 ARRAY<STRING>,"
+                                + "    int_a1 ARRAY<INT>,"
+                                + "    int_s1 ARRAY<INT>,"
+                                + "    uuid_a1 ARRAY<STRING>"
+                                + ") WITH ("
+                                + " 'connector' = 'postgres-cdc',"
+                                + " 'hostname' = '%s',"
+                                + " 'port' = '%s',"
+                                + " 'username' = '%s',"
+                                + " 'password' = '%s',"
+                                + " 'database-name' = '%s',"
+                                + " 'schema-name' = '%s',"
+                                + " 'table-name' = '%s',"
+                                + " 'scan.incremental.snapshot.enabled' = '%s',"
+                                + " 'decoding.plugin.name' = 'pgoutput', "
+                                + " 'slot.name' = '%s'"
+                                + ")",
+                        POSTGIS_CONTAINER.getHost(),
+                        POSTGIS_CONTAINER.getMappedPort(POSTGRESQL_PORT),
+                        POSTGIS_CONTAINER.getUsername(),
+                        POSTGIS_CONTAINER.getPassword(),
+                        POSTGIS_CONTAINER.getDatabaseName(),
+                        "inventory",
+                        "array_types",
+                        parallelismSnapshot,
+                        getSlotName());
+
+        tEnv.executeSql(sourceDDL);
+
+        String sinkDDL =
+                "CREATE TABLE array_sink ("
+                        + "    id INTEGER NOT NULL,"
+                        + "    text_a1 ARRAY<STRING>,"
+                        + "    int_a1 ARRAY<INT>,"
+                        + "    int_s1 ARRAY<INT>,"
+                        + "    uuid_a1 ARRAY<STRING>,"
+                        + "    PRIMARY KEY (id) NOT ENFORCED"
+                        + ") WITH ("
+                        + "  'connector' = 'values',"
+                        + "  'sink-insert-only' = 'false'"
+                        + ")";
+        tEnv.executeSql(sinkDDL);
+
+        // async submit job
+        TableResult tableResult =
+                tEnv.executeSql("INSERT INTO array_sink SELECT * FROM array_types");
+
+        // wait for snapshot to complete
+        waitForSinkSize("array_sink", 1);
+
+        // verify snapshot data
+        List<String> snapshotResults = TestValuesTableFactory.getRawResultsAsStrings("array_sink");
+        Assertions.assertThat(snapshotResults).hasSize(1);
+
+        // verify snapshot contains expected array data patterns (insert record)
+        String snapshotRow = snapshotResults.get(0);
+        Assertions.assertThat(snapshotRow).startsWith("+I(");
+        Assertions.assertThat(snapshotRow).contains("electronics");
+        Assertions.assertThat(snapshotRow).contains("gadget");
+        Assertions.assertThat(snapshotRow).contains("sale");
+        Assertions.assertThat(snapshotRow).contains("85");
+        Assertions.assertThat(snapshotRow).contains("90");
+        Assertions.assertThat(snapshotRow).contains("78");
+        Assertions.assertThat(snapshotRow).contains("42");
+        Assertions.assertThat(snapshotRow)
+                .containsIgnoringCase("227496ad-fde9-ccfb-1f04-892fc505afd5");
+        Assertions.assertThat(snapshotRow)
+                .containsIgnoringCase("9d33f9e2-dfc7-fdef-9478-bcc5dbf7a6d7");
+
+        // wait a bit to make sure the replication slot is ready
+        Thread.sleep(5000);
+
+        // Test incremental (WAL) path - UPDATE array data including uuid_a1
+        try (Connection connection = getJdbcConnection(POSTGIS_CONTAINER);
+                Statement statement = connection.createStatement()) {
+            statement.execute(
+                    "UPDATE inventory.array_types SET text_a1=ARRAY['updated', 'array'], "
+                            + "int_a1='{100, 200}', "
+                            + "uuid_a1=ARRAY['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'ffffffff-1111-2222-3333-444444444444']::UUID[] "
+                            + "WHERE id=1;");
+        }
+
+        // Wait for update event (-D and +I, total 3 records including initial +I)
+        waitForSinkSize("array_sink", 3);
+
+        // verify incremental update data with raw changelog
+        List<String> incrementalResults =
+                TestValuesTableFactory.getRawResultsAsStrings("array_sink");
+        Assertions.assertThat(incrementalResults).hasSize(3);
+
+        // verify updated array data is present in results
+        String allResults = String.join(",", incrementalResults);
+        Assertions.assertThat(allResults).contains("-D(");
+        Assertions.assertThat(allResults).contains("updated");
+        Assertions.assertThat(allResults).contains("array");
+        Assertions.assertThat(allResults).contains("100");
+        Assertions.assertThat(allResults).contains("200");
+        Assertions.assertThat(allResults)
+                .containsIgnoringCase("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        Assertions.assertThat(allResults)
+                .containsIgnoringCase("ffffffff-1111-2222-3333-444444444444");
+        Assertions.assertThat(allResults).contains("42");
+
+        tableResult.getJobClient().get().cancel().get();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     void testUniqueIndexIncludingFunction(boolean parallelismSnapshot) throws Exception {
         setup(parallelismSnapshot);
         // Clear the influence of usesLegacyRows which set USE_LEGACY_TO_STRING = true.

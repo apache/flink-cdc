@@ -736,6 +736,7 @@ Data Type Mapping
         CHARACTER(n)<br>
         VARCHAR(n)<br>
         CHARACTER VARYING(n)<br>
+        UUID<br>
         TEXT</td>
       <td>STRING</td>
     </tr>
