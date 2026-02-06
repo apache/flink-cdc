@@ -47,6 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
+      max-parallel: 20
       fail-fast: false
       matrix:
         java-version: ${{ fromJSON(inputs.java-versions) }}
