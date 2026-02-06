@@ -512,6 +512,63 @@ Applications can use change streams to subscribe to all data changes on a single
 By the way, Debezium's MongoDB change streams exploration mentioned by [DBZ-435](https://issues.redhat.com/browse/DBZ-435) is on roadmap.<br> 
 If it's done, we can consider integrating two kinds of source connector for users to choose.
 
+### Scan Newly Added Tables
+
+**Note:** This feature is available since Flink CDC 3.1.0.
+
+The Scan Newly Added Tables feature enables you to add new collections to monitor for existing running pipeline. The newly added collections will read their snapshot data firstly and then read their change stream automatically.
+
+Imagine this scenario: At the beginning, a Flink job monitors collections `[product, user, address]`, but after some days we would like the job can also monitor collections `[order, custom]` which contain history data, and we need the job can still reuse existing state of the job. This feature can resolve this case gracefully.
+
+The following operations show how to enable this feature to resolve above scenario. An existing Flink job which uses MongoDB CDC Source like:
+
+```java
+    MongoDBSource<String> mongoSource = MongoDBSource.<String>builder()
+        .hosts("yourHostname:27017")
+        .databaseList("db") // set captured database
+        .collectionList("db.product", "db.user", "db.address") // set captured collections
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // enable scan the newly added tables feature
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+
+If we would like to add new collections `[order, custom]` to an existing Flink job, we just need to update the `collectionList()` value of the job to include `[order, custom]` and restore the job from previous savepoint.
+
+_Step 1_: Stop the existing Flink job with savepoint.
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: Update the collection list option for the existing Flink job.
+1. update `collectionList()` value.
+2. build the jar of updated job.
+```java
+    MongoDBSource<String> mongoSource = MongoDBSource.<String>builder()
+        .hosts("yourHostname:27017")
+        .databaseList("db")
+        .collectionList("db.product", "db.user", "db.address", "db.order", "db.custom") // set captured collections [product, user, address, order, custom]
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+_Step 3_: Restore the updated Flink job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+
 ### DataStream Source
 
 The MongoDB CDC connector can also be a DataStream source. You can create a SourceFunction as the following shows:

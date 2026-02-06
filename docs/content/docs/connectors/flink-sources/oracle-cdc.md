@@ -559,6 +559,67 @@ _Note: the mechanism of `scan.startup.mode` option relying on Debezium's `snapsh
 
 The Oracle CDC source can't work in parallel reading, because there is only one task can receive change events.
 
+### Scan Newly Added Tables
+
+**Note:** This feature is available since Flink CDC 3.1.0.
+
+Scan Newly Added Tables feature enables you to add new tables to monitor for an existing running pipeline. The newly added tables will read their snapshot data first and then read their redo log automatically.
+
+Imagine this scenario: At the beginning, a Flink job monitors tables `[product, user, address]`, but after some days we would like the job can also monitor tables `[order, custom]` which contain history data, and we need the job can still reuse existing state of the job. This feature can resolve this case gracefully.
+
+The following operations show how to enable this feature to resolve above scenario. An existing Flink job which uses Oracle CDC Source like:
+
+```java
+    JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
+        .hostname("yourHostname")
+        .port(1521)
+        .databaseList("ORCLCDB") // set captured database
+        .schemaList("INVENTORY") // set captured schema
+        .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS") // set captured tables
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true) // enable scan newly added tables feature
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+
+If we would like to add new tables `[INVENTORY.ORDER, INVENTORY.CUSTOM]` to an existing Flink job, we just need to update the `tableList()` value of the job to include `[INVENTORY.ORDER, INVENTORY.CUSTOM]` and restore the job from previous savepoint.
+
+_Step 1_: Stop the existing Flink job with savepoint.
+```shell
+$ ./bin/flink stop $Existing_Flink_JOB_ID
+```
+```shell
+Suspending job "cca7bc1061d61cf15238e92312c2fc20" with a savepoint.
+Savepoint completed. Path: file:/tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab
+```
+_Step 2_: Update the table list option for the existing Flink job.
+1. update `tableList()` value.
+2. build the jar of updated job.
+```java
+    JdbcIncrementalSource<String> oracleSource = new OracleSourceBuilder()
+        .hostname("yourHostname")
+        .port(1521)
+        .databaseList("ORCLCDB")
+        .schemaList("INVENTORY")
+        .tableList("INVENTORY.PRODUCT", "INVENTORY.USER", "INVENTORY.ADDRESS", "INVENTORY.ORDER", "INVENTORY.CUSTOM") // set captured tables [PRODUCT, USER, ADDRESS, ORDER, CUSTOM]
+        .username("yourUsername")
+        .password("yourPassword")
+        .scanNewlyAddedTableEnabled(true)
+        .deserializer(new JsonDebeziumDeserializationSchema()) // converts SourceRecord to JSON String
+        .build();
+   // your business code
+```
+_Step 3_: Restore the updated Flink job from savepoint.
+```shell
+$ ./bin/flink run \
+      --detached \
+      --from-savepoint /tmp/flink-savepoints/savepoint-cca7bc-bb1e257f0dab \
+      ./FlinkCDCExample.jar
+```
+**Note:** Please refer the doc [Restore the job from previous savepoint](https://nightlies.apache.org/flink/flink-docs-release-1.17/docs/deployment/cli/#command-line-interface) for more details.
+
 ### DataStream Source
 
 The Oracle CDC connector can also be a DataStream source. There are two modes for the DataStream source:
