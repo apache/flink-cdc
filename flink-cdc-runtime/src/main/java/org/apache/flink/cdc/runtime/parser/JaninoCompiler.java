@@ -174,7 +174,10 @@ public class JaninoCompiler {
         Object value = sqlLiteral.getValue();
         if (sqlLiteral instanceof SqlCharStringLiteral) {
             // Double quotation marks represent strings in Janino.
-            value = "\"" + sqlLiteral.getValueAs(NlsString.class).getValue() + "\"";
+            // Escape backslashes first, then double quotes for proper Janino string literals.
+            String stringValue = sqlLiteral.getValueAs(NlsString.class).getValue();
+            stringValue = stringValue.replace("\\", "\\\\").replace("\"", "\\\"");
+            value = "\"" + stringValue + "\"";
         } else if (sqlLiteral instanceof SqlNumericLiteral) {
             if (((SqlNumericLiteral) sqlLiteral).isInteger()) {
                 long longValue = sqlLiteral.longValue(true);
