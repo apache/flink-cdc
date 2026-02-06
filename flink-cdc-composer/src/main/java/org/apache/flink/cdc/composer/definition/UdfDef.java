@@ -17,6 +17,8 @@
 
 package org.apache.flink.cdc.composer.definition;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -27,15 +29,22 @@ import java.util.Objects;
  * <ul>
  *   <li>name: Static method name of user-defined functions.
  *   <li>classpath: Fully-qualified class path of package containing given function.
+ *   <li>options: Configuration options for the user-defined function.
  * </ul>
  */
 public class UdfDef {
     private final String name;
     private final String classpath;
+    private final Map<String, String> options;
 
     public UdfDef(String name, String classpath) {
+        this(name, classpath, new HashMap<>());
+    }
+
+    public UdfDef(String name, String classpath, Map<String, String> options) {
         this.name = name;
         this.classpath = classpath;
+        this.options = options != null ? options : new HashMap<>();
     }
 
     public String getName() {
@@ -44,6 +53,10 @@ public class UdfDef {
 
     public String getClasspath() {
         return classpath;
+    }
+
+    public Map<String, String> getOptions() {
+        return options;
     }
 
     @Override
@@ -56,16 +69,27 @@ public class UdfDef {
         }
 
         UdfDef udfDef = (UdfDef) o;
-        return Objects.equals(name, udfDef.name) && Objects.equals(classpath, udfDef.classpath);
+        return Objects.equals(name, udfDef.name)
+                && Objects.equals(classpath, udfDef.classpath)
+                && Objects.equals(options, udfDef.options);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, classpath);
+        return Objects.hash(name, classpath, options);
     }
 
     @Override
     public String toString() {
-        return "UdfDef{" + "name='" + name + '\'' + ", classpath='" + classpath + '\'' + '}';
+        return "UdfDef{"
+                + "name='"
+                + name
+                + '\''
+                + ", classpath='"
+                + classpath
+                + '\''
+                + ", options="
+                + options
+                + '}';
     }
 }
