@@ -17,7 +17,8 @@
 
 package org.apache.flink.cdc.connectors.tidb.table.utils;
 
-import org.apache.flink.cdc.connectors.tidb.TDBSourceOptions;
+import org.apache.flink.cdc.connectors.tidb.source.config.TiDBSourceOptions;
+import org.apache.flink.cdc.connectors.tidb.utils.UriHostMapping;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -26,36 +27,35 @@ import org.tikv.common.TiConfiguration;
 import java.util.HashMap;
 
 /** Unit test for {@link UriHostMapping}. * */
-class UriHostMappingTest {
+public class UriHostMappingTest {
 
     @Test
-    void uriHostMappingTest() {
+    public void uriHostMappingTest() {
         final TiConfiguration tiConf =
-                TDBSourceOptions.getTiConfiguration(
+                TiDBSourceOptions.getTiConfiguration(
                         "http://0.0.0.0:2347", "host1:1;host2:2;host3:3", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
-        Assertions.assertThat(uriHostMapping.getHostMapping())
-                .hasSize(3)
-                .containsEntry("host1", "1");
+        Assertions.assertThat(uriHostMapping.getHostMapping().size()).isEqualTo(3);
+        Assertions.assertThat(uriHostMapping.getHostMapping().get("host1")).isEqualTo("1");
     }
 
     @Test
-    void uriHostMappingEmpty() {
+    public void uriHostMappingEmpty() {
         final TiConfiguration tiConf =
-                TDBSourceOptions.getTiConfiguration("http://0.0.0.0:2347", "", new HashMap<>());
+                TiDBSourceOptions.getTiConfiguration("http://0.0.0.0:2347", "", new HashMap<>());
         UriHostMapping uriHostMapping = (UriHostMapping) tiConf.getHostMapping();
-        Assertions.assertThat(uriHostMapping.getHostMapping()).isNull();
+        Assertions.assertThat(uriHostMapping.getHostMapping()).isEqualTo(null);
     }
 
     @Test
-    void uriHostMappingError() {
-        Assertions.assertThatThrownBy(
-                        () ->
-                                TDBSourceOptions.getTiConfiguration(
-                                        "http://0.0.0.0:2347",
-                                        "host1=1;host2=2;host3=3",
-                                        new HashMap<>()))
-                .isExactlyInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Invalid host mapping string: host1=1;host2=2;host3=3");
+    public void uriHostMappingError() {
+        try {
+            final TiConfiguration tiConf =
+                    TiDBSourceOptions.getTiConfiguration(
+                            "http://0.0.0.0:2347", "host1=1;host2=2;host3=3", new HashMap<>());
+        } catch (IllegalArgumentException e) {
+            Assertions.assertThat(e.getMessage())
+                    .isEqualTo("Invalid host mapping string: host1=1;host2=2;host3=3");
+        }
     }
 }
