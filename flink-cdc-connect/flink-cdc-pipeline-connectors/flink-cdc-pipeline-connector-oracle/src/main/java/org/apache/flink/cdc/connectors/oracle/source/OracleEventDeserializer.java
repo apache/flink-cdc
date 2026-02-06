@@ -27,7 +27,8 @@ import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.table.data.TimestampData;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.debezium.data.Envelope;
 import io.debezium.data.geometry.Geometry;
 import io.debezium.relational.Tables;
