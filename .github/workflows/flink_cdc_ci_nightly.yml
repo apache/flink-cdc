@@ -71,6 +71,7 @@ jobs:
   pipeline_e2e:
     if: github.repository == 'apache/flink-cdc'
     strategy:
+      max-parallel: 2
       fail-fast: false
       matrix:
         parallelism: [ 1, 4 ]
