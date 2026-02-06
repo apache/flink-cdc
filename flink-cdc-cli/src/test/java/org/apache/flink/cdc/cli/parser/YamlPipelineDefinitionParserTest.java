@@ -253,6 +253,52 @@ class YamlPipelineDefinitionParserTest {
                         TRUNCATE_TABLE));
     }
 
+    /**
+     * Test that CreateTableEvent is automatically added when user specifies include.schema.changes
+     * without create.table. This ensures the foundational CreateTableEvent is always included for
+     * proper schema handling. See FLINK-37837.
+     */
+    @Test
+    void testCreateTableAutoAddedToIncludedSchemaChanges() throws Exception {
+        // Test case 1: User specifies only add.column, create.table should be auto-added
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[add.column]", null, ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
+
+        // Test case 2: User specifies column family, create.table should be auto-added
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[column]",
+                null,
+                ImmutableSet.of(
+                        ADD_COLUMN, ALTER_COLUMN_TYPE, DROP_COLUMN, RENAME_COLUMN, CREATE_TABLE));
+
+        // Test case 3: User explicitly excludes create.table, should NOT auto-add
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[add.column]", "[create.table]", ImmutableSet.of(ADD_COLUMN));
+
+        // Test case 4: User excludes via "create" family tag, should NOT auto-add
+        testSchemaEvolutionTypesParsing(
+                "evolve", "[add.column]", "[create]", ImmutableSet.of(ADD_COLUMN));
+
+        // Test case 5: User excludes via "table" family tag, should NOT auto-add
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[add.column, alter.column.type]",
+                "[table]",
+                ImmutableSet.of(ADD_COLUMN, ALTER_COLUMN_TYPE));
+
+        // Test case 6: User already includes create.table, no duplicate should be added
+        testSchemaEvolutionTypesParsing(
+                "evolve",
+                "[add.column, create.table]",
+                null,
+                ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
+
+        // Test case 7: Lenient mode with specified include, create.table should be auto-added
+        testSchemaEvolutionTypesParsing(
+                "lenient", "[add.column]", null, ImmutableSet.of(ADD_COLUMN, CREATE_TABLE));
+    }
+
     private void testSchemaEvolutionTypesParsing(
             String behavior, String included, String excluded, Set<SchemaChangeEventType> expected)
             throws Exception {
