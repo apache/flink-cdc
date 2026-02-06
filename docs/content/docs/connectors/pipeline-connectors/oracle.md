@@ -273,7 +273,7 @@ The max retry times that the connector should retry to build oracle database ser
       <td style="word-wrap: break-word;">false</td>
       <td>Boolean</td>
       <td>
-      Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in binlog reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some binlog events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed binlog events should be handled specially.
+      Whether to skip backfill in snapshot reading phase. If backfill is skipped, changes on captured tables during snapshot phase will be consumed later in incremental reading phase instead of being merged into the snapshot.WARNING: Skipping backfill might lead to data inconsistency because some incremental events happened within the snapshot phase might be replayed (only at-least-once semantic is promised). For example updating an already updated value in snapshot, or deleting an already deleted entry in snapshot. These replayed binlog events should be handled specially.
       </td>
     </tr>
     </tbody>
