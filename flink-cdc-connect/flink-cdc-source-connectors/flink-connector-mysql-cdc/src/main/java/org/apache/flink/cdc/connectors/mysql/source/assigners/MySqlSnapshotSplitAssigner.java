@@ -222,6 +222,16 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     }
 
     private void captureNewlyAddedTables() {
+        // Binlog-only mode: no action needed in Assigner, BinlogSplitReader handles it
+        if (sourceConfig.isScanBinlogNewlyAddedTableEnabled()) {
+            LOG.info(
+                    "Binlog-only newly added table capture is enabled. "
+                            + "New tables matching the pattern will be automatically captured "
+                            + "in binlog phase without snapshot.");
+            // No action needed here, BinlogSplitReader will handle the auto-capture
+            return;
+        }
+
         // Don't scan newly added table in snapshot mode.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
                 && !sourceConfig.getStartupOptions().isSnapshotOnly()
