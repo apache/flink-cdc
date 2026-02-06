@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDialect;
 import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConfig;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRouter;
 
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
@@ -101,7 +102,7 @@ public class PostgresSchemaUtils {
     }
 
     public static PostgresDialect getPostgresDialect(PostgresSourceConfig sourceConfig) {
-        String key = sourceConfig.getJdbcUrl();
+        String key = sourceConfig.getJdbcUrl() + "|" + sourceConfig.getUsername();
         return dialectCache.computeIfAbsent(key, k -> new PostgresDialect(sourceConfig));
     }
 
@@ -159,13 +160,16 @@ public class PostgresSchemaUtils {
                     PostgresTopicSelector.create(sourceConfig.getDbzConnectorConfig());
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                     newPostgresValueConverterBuilder(sourceConfig.getDbzConnectorConfig());
+            // Create router from config to ensure partition tables are properly handled
+            PostgresPartitionRouter router = PostgresPartitionRouter.fromConfig(sourceConfig);
             PostgresSchema postgresSchema =
                     PostgresObjectUtils.newSchema(
                             jdbc,
                             sourceConfig.getDbzConnectorConfig(),
                             jdbc.getTypeRegistry(),
                             topicSelector,
-                            valueConverterBuilder.build(jdbc.getTypeRegistry()));
+                            valueConverterBuilder.build(jdbc.getTypeRegistry()),
+                            router);
             Table tableSchema = postgresSchema.tableFor(tableId);
             return toSchema(
                     tableSchema, sourceConfig.getDbzConnectorConfig(), jdbc.getTypeRegistry());
@@ -222,7 +226,7 @@ public class PostgresSchemaUtils {
             boolean includeDatabaseInTableId) {
         String schema = dbzTableId.schema();
         String table = dbzTableId.table();
-        if (includeDatabaseInTableId && databaseName != null) {
+        if (includeDatabaseInTableId && databaseName != null && schema != null) {
             return org.apache.flink.cdc.common.event.TableId.tableId(databaseName, schema, table);
         } else if (schema != null) {
             return org.apache.flink.cdc.common.event.TableId.tableId(schema, table);

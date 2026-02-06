@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent;
 import org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkKind;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRoutingSchema;
 
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
@@ -31,8 +32,6 @@ import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.pipeline.source.spi.EventMetadataProvider;
 import io.debezium.pipeline.spi.ChangeEventCreator;
 import io.debezium.relational.TableId;
-import io.debezium.schema.DataCollectionFilters;
-import io.debezium.schema.DatabaseSchema;
 import io.debezium.schema.TopicSelector;
 import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.source.SourceRecord;
@@ -45,12 +44,29 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
     private final String topic;
     private final ChangeEventQueue<DataChangeEvent> queue;
 
+    /**
+     * Creates a new CDCPostgresDispatcher with partition routing support.
+     *
+     * <p>This dispatcher uses {@link PostgresPartitionRoutingSchema} to handle PostgreSQL partition
+     * table routing, ensuring that events from partition child tables are correctly routed to their
+     * parent tables. The data collection filter is obtained from the schema to maintain consistency
+     * with the routing logic.
+     *
+     * @param connectorConfig the PostgreSQL connector configuration
+     * @param topicSelector the topic selector for routing events to Kafka topics
+     * @param schema the partition routing schema that handles partition table routing and provides
+     *     consistent data collection filtering
+     * @param queue the change event queue for buffering events
+     * @param changeEventCreator the creator for change events
+     * @param metadataProvider the provider for event metadata
+     * @param heartbeatFactory the factory for creating heartbeat events
+     * @param schemaNameAdjuster the adjuster for schema names
+     */
     public CDCPostgresDispatcher(
             PostgresConnectorConfig connectorConfig,
             TopicSelector topicSelector,
-            DatabaseSchema schema,
+            PostgresPartitionRoutingSchema schema,
             ChangeEventQueue queue,
-            DataCollectionFilters.DataCollectionFilter filter,
             ChangeEventCreator changeEventCreator,
             EventMetadataProvider metadataProvider,
             HeartbeatFactory heartbeatFactory,
@@ -60,7 +76,7 @@ public class CDCPostgresDispatcher extends PostgresEventDispatcher<TableId>
                 topicSelector,
                 schema,
                 queue,
-                filter,
+                schema.getDataCollectionFilter(),
                 changeEventCreator,
                 metadataProvider,
                 heartbeatFactory,

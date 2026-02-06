@@ -32,6 +32,6 @@ public class PostgresSchemaChangeEventHandler implements SchemaChangeEventHandle
 
     @Override
     public Map<String, Object> parseSource(SchemaChangeEvent event) {
-        return new HashMap<>();
+        return new HashMap<>(4);
     }
 }

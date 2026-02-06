@@ -47,7 +47,7 @@ public class PostgresOffset extends Offset {
     }
 
     PostgresOffset(Long lsn, Long txId, Instant lastCommitTs) {
-        Map<String, String> offsetMap = new HashMap<>();
+        Map<String, String> offsetMap = new HashMap<>(8);
         // keys are from io.debezium.connector.postgresql.PostgresOffsetContext.Loader.load
         offsetMap.put(SourceInfo.LSN_KEY, lsn.toString());
         if (txId != null) {
@@ -66,7 +66,7 @@ public class PostgresOffset extends Offset {
     }
 
     public static PostgresOffset of(Map<String, ?> offsetMap) {
-        Map<String, String> offsetStrMap = new HashMap<>();
+        Map<String, String> offsetStrMap = new HashMap<>(8);
         for (Map.Entry<String, ?> entry : offsetMap.entrySet()) {
             offsetStrMap.put(
                     entry.getKey(), entry.getValue() == null ? null : entry.getValue().toString());
