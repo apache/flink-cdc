@@ -110,6 +110,9 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                     split.getTableSchemas().entrySet()) {
                 TableId tableId =
                         entry.getKey(); // Use the TableId from the map key which contains full info
+                if (isDDLLogTable(tableId)) {
+                    continue;
+                }
                 TableChanges.TableChange tableChange = entry.getValue();
                 CreateTableEvent createTableEvent =
                         new CreateTableEvent(
@@ -137,7 +140,7 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
             shouldEmitAllCreateTableEventsInSnapshotMode = false;
         } else if (isLowWatermarkEvent(element) && splitState.isSnapshotSplitState()) {
             TableId tableId = splitState.asSnapshotSplitState().toSourceSplit().getTableId();
-            if (!alreadySendCreateTableTables.contains(tableId)) {
+            if (!alreadySendCreateTableTables.contains(tableId) && !isDDLLogTable(tableId)) {
                 sendCreateTableEvent(tableId, (SourceOutput<Event>) output);
                 alreadySendCreateTableTables.add(tableId);
             }
@@ -154,7 +157,9 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                 }
                 // In rare case, we may miss some CreateTableEvents before DataChangeEvents.
                 // Don't send CreateTableEvent for SchemaChangeEvents as it's the latest schema.
-                if (isDataChangeRecord && !createTableEventCache.containsKey(tableId)) {
+                if (isDataChangeRecord
+                        && !createTableEventCache.containsKey(tableId)
+                        && !isDDLLogTable(tableId)) {
                     CreateTableEvent createTableEvent = getCreateTableEvent(sourceConfig, tableId);
                     output.collect((T) createTableEvent);
                     createTableEventCache.put(tableId, createTableEvent);
@@ -237,6 +242,9 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
                             sourceConfig.getTableFilters(),
                             sourceConfig.includePartitionedTables());
             for (TableId tableId : capturedTableIds) {
+                if (isDDLLogTable(tableId)) {
+                    continue;
+                }
                 Schema schema = PostgresSchemaUtils.getTableSchema(tableId, sourceConfig, jdbc);
                 createTableEventCache.put(
                         tableId,
@@ -251,5 +259,11 @@ public class PostgresPipelineRecordEmitter<T> extends IncrementalSourceRecordEmi
         } catch (SQLException e) {
             throw new RuntimeException("Cannot start emitter to fetch table schema.", e);
         }
+    }
+
+    // The DDL log table is used to retrieve DDL events, so there is no need to create it.
+    private boolean isDDLLogTable(TableId tableId) {
+        return sourceConfig.getDdlLogTable() != null
+                && sourceConfig.getDdlLogTable().equals(tableId.schema() + "." + tableId.table());
     }
 }

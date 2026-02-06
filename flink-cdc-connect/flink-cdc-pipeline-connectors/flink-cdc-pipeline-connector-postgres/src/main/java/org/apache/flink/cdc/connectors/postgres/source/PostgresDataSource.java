@@ -72,7 +72,8 @@ public class PostgresDataSource implements DataSource {
                         DebeziumChangelogMode.ALL,
                         readableMetadataList,
                         includeDatabaseInTableId,
-                        databaseName);
+                        databaseName,
+                        postgresSourceConfig);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);

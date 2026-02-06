@@ -64,6 +64,31 @@ public class PostgresDataSourceOptions {
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
 
+    public static final ConfigOption<String> DDL_LOG_TABLE =
+            ConfigOptions.key("ddl.log.table")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Event listener table, if not configured, DDL synchronization will not be enabled.");
+
+    public static final ConfigOption<String> DDL_FIELD_OBJECT_TYPE =
+            ConfigOptions.key("ddl.field.object_type")
+                    .stringType()
+                    .defaultValue("object_type")
+                    .withDescription("The object type field name in the event listener table.");
+
+    public static final ConfigOption<String> DDL_FIELD_OBJECT_IDENTITY =
+            ConfigOptions.key("ddl.field.object_identity")
+                    .stringType()
+                    .defaultValue("object_identity")
+                    .withDescription("The identity field name in the event listener table.");
+
+    public static final ConfigOption<String> DDL_FIELD_COMMAND_TEXT =
+            ConfigOptions.key("ddl.field.command_text")
+                    .stringType()
+                    .defaultValue("command_text")
+                    .withDescription("Event Listener Table DDL commad Field Name");
+
     public static final ConfigOption<String> DECODING_PLUGIN_NAME =
             ConfigOptions.key("decoding.plugin.name")
                     .stringType()
