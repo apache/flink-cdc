@@ -128,15 +128,15 @@ pipeline:
       <td>sink.connect.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
+      <td>Integer</td>
       <td>与 FE 建立 HTTP 连接的超时时间。取值范围：[100, 60000]。</td>
     </tr>
     <tr>
       <td>sink.wait-for-continue.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
-      <td>等待 FE HTTP 100-continue 应答的超时时间。取值范围：[3000, 60000]。</td>
+      <td>Integer</td>
+      <td>等待 FE HTTP 100-continue 应答的超时时间。取值范围：[3000, 600000]。</td>
     </tr>
     <tr>
       <td>sink.buffer-flush.max-bytes</td>
@@ -173,6 +173,13 @@ pipeline:
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>at-least-once 下是否使用 transaction stream load。</td>
+    </tr>
+    <tr>
+      <td>sink.metric.histogram-window-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">100</td>
+      <td>Integer</td>
+      <td>直方图指标的窗口大小。</td>
     </tr>
     <tr>
       <td>sink.properties.*</td>
@@ -296,6 +303,11 @@ pipeline:
       <td>DATE</td>
       <td>DATE</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>TIME</td>
+      <td>VARCHAR</td>
+      <td>StarRocks 不支持 TIME 类型，因此映射为 VARCHAR。TIME 值以字符串形式存储，格式为 "HH:mm:ss"（精度为 0）或 "HH:mm:ss.SSS"（精度 > 0）。</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>

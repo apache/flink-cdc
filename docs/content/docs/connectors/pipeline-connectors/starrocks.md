@@ -128,14 +128,14 @@ pipeline:
       <td>sink.connect.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
+      <td>Integer</td>
       <td>The timeout for establishing HTTP connection. Valid values: 100 to 60000.</td>
     </tr>
     <tr>
       <td>sink.wait-for-continue.timeout-ms</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">30000</td>
-      <td>String</td>
+      <td>Integer</td>
       <td>Timeout in millisecond to wait for 100-continue response from FE http server.
             Valid values: 3000 to 600000.</td>
     </tr>
@@ -176,6 +176,13 @@ pipeline:
       <td style="word-wrap: break-word;">true</td>
       <td>Boolean</td>
       <td>Whether to use transaction stream load for at-least-once when it's available.</td>
+    </tr>
+    <tr>
+      <td>sink.metric.histogram-window-size</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">100</td>
+      <td>Integer</td>
+      <td>Window size of histogram metrics.</td>
     </tr>
     <tr>
       <td>sink.properties.*</td>
@@ -305,6 +312,11 @@ pipeline:
       <td>DATE</td>
       <td>DATE</td>
       <td></td>
+    </tr>
+    <tr>
+      <td>TIME</td>
+      <td>VARCHAR</td>
+      <td>StarRocks does not support TIME type, so it is mapped to VARCHAR. TIME values are stored as strings in format "HH:mm:ss" (precision 0) or "HH:mm:ss.SSS" (precision > 0).</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>
