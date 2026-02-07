@@ -79,13 +79,18 @@ public class StatementUtils {
     }
 
     // PreparedStatement#setObject method will be converted to long type when handling bigint
-    // unsigned, which poses a data overflow issue.
-    // Therefore, we need to handle the overflow issue by converting the bigint unsigned to
-    // BigDecimal.
+    // unsigned, which poses a data overflow issue for values exceeding Long.MAX_VALUE.
+    // Therefore, we need to convert to BigDecimal when the value is outside the long range
     public static void setSafeObject(PreparedStatement ps, int parameterIndex, Object value)
             throws SQLException {
         if (value instanceof BigInteger) {
-            ps.setBigDecimal(parameterIndex, new BigDecimal((BigInteger) value));
+            BigInteger bigIntValue = (BigInteger) value;
+            if (bigIntValue.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0
+                    || bigIntValue.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) < 0) {
+                ps.setBigDecimal(parameterIndex, new BigDecimal(bigIntValue));
+            } else {
+                ps.setObject(parameterIndex, bigIntValue.longValueExact());
+            }
         } else {
             ps.setObject(parameterIndex, value);
         }
