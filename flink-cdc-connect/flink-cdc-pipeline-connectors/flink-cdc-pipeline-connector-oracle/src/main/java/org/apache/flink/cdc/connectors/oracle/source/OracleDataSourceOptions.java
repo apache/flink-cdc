@@ -47,7 +47,7 @@ public class OracleDataSourceOptions {
     public static final ConfigOption<Integer> PORT =
             ConfigOptions.key("port")
                     .intType()
-                    .defaultValue(3306)
+                    .defaultValue(1521)
                     .withDescription("Integer port number of the oracle database server.");
 
     public static final ConfigOption<String> USERNAME =
