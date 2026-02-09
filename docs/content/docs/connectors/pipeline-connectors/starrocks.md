@@ -316,7 +316,7 @@ pipeline:
     <tr>
       <td>TIME</td>
       <td>VARCHAR</td>
-      <td>StarRocks does not support TIME type, so it is mapped to VARCHAR. TIME values are stored as strings in format "HH:mm:ss" (precision 0) or "HH:mm:ss.SSS" (precision > 0).</td>
+      <td>StarRocks does not support TIME type, so it is mapped to VARCHAR. TIME values are stored as strings in format "HH:mm:ss" when the precision p = 0, or "HH:mm:ss.&lt;p digits&gt;" when p &gt; 0 (for example, p = 3 uses "HH:mm:ss.SSS").</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>

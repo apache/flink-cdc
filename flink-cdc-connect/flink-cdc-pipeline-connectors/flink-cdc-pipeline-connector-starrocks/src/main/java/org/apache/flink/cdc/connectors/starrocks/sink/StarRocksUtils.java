@@ -416,7 +416,7 @@ public class StarRocksUtils {
         @Override
         public StarRocksColumn.Builder visit(TimeType timeType) {
             // StarRocks does not support TIME type, so map it to VARCHAR.
-            // Format: HH:mm:ss for precision 0, HH:mm:ss.SSS for precision > 0
+            // Format: HH:mm:ss for precision 0, HH:mm:ss.<p digits> for precision > 0
             // Maximum length: 8 (HH:mm:ss) + 1 (.) + precision = 8 + 1 + precision
             // For precision 0: "HH:mm:ss" = 8 characters
             // For precision > 0: "HH:mm:ss." + precision digits

@@ -354,7 +354,7 @@ class StarRocksMetadataApplierTest {
                         .physicalColumn("time_default", new TimeType()) // Default precision
                         .physicalColumn("time_0", new TimeType(0)) // Second precision
                         .physicalColumn("time_3", new TimeType(3)) // Millisecond precision
-                        .physicalColumn("time_max", new TimeType(3)) // Maximum supported precision
+                        .physicalColumn("time_max", new TimeType(3)) // Example precision 3
                         .primaryKey("id")
                         .build();
         CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);

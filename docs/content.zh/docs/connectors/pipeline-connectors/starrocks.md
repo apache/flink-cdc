@@ -307,7 +307,7 @@ pipeline:
     <tr>
       <td>TIME</td>
       <td>VARCHAR</td>
-      <td>StarRocks 不支持 TIME 类型，因此映射为 VARCHAR。TIME 值以字符串形式存储，格式为 "HH:mm:ss"（精度为 0）或 "HH:mm:ss.SSS"（精度 > 0）。</td>
+      <td>StarRocks 不支持 TIME 类型，因此映射为 VARCHAR。TIME(p) 值以字符串形式存储：当 p = 0 时格式为 "HH:mm:ss"，当 p > 0 时格式为 "HH:mm:ss.&lt;p 位小数&gt;"（例如 p = 3 时为 "HH:mm:ss.SSS"）。</td>
     </tr>
     <tr>
       <td>TIMESTAMP</td>

@@ -432,7 +432,10 @@ class EventRecordSerializationSchemaTest {
                                 new Object[] {
                                     1,
                                     TimeData.fromLocalTime(LocalTime.MIN), // 00:00:00
-                                    TimeData.fromLocalTime(LocalTime.MAX), // 23:59:59.999999999
+                                    TimeData.fromLocalTime(
+                                            LocalTime
+                                                    .MAX), // 23:59:59.999 (truncated to millisecond
+                                    // precision)
                                     TimeData.fromLocalTime(LocalTime.MIDNIGHT) // 00:00:00
                                 }));
 
