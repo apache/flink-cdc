@@ -37,6 +37,13 @@ import java.util.Map;
 public class PostgresConnectionUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
+    /**
+     * PostgreSQL 11 introduced declarative partitioning with improved partition table handling. In
+     * PostgreSQL 10 and earlier, replication cannot be created on partition parent tables, so these
+     * tables must be excluded when determining captured tables for CDC.
+     */
+    private static final int PG_DECLARATIVE_PARTITION_MIN_VERSION = 11;
+
     public static PostgresOffset committedOffset(
             PostgresConnection jdbcConnection, String slotName, String pluginName) {
         Long lsn;
@@ -62,7 +69,7 @@ public class PostgresConnectionUtils {
                     "JDBC connection fails to commit: " + e.getMessage(), e);
         }
 
-        Map<String, String> offsetMap = new HashMap<>();
+        Map<String, String> offsetMap = new HashMap<>(8);
         offsetMap.put(SourceInfo.LSN_KEY, lsn.toString());
         if (txId != null) {
             offsetMap.put(SourceInfo.TXID_KEY, txId.toString());
@@ -71,5 +78,22 @@ public class PostgresConnectionUtils {
                 SourceInfo.TIMESTAMP_USEC_KEY,
                 String.valueOf(Conversions.toEpochMicros(Instant.MIN)));
         return PostgresOffset.of(offsetMap);
+    }
+
+    /**
+     * Checks if partition parent tables should be excluded from CDC replication. In PostgreSQL 10
+     * and earlier versions, logical replication (publications) cannot be created on partition
+     * parent tables, only on the actual partition child tables. Starting from PostgreSQL 11,
+     * declarative partitioning was improved to allow replication on parent tables.
+     *
+     * @param jdbcConnection the PostgresConnection instance
+     * @return true if partitioned parent tables should be excluded (for PG 10 and earlier), false
+     *     otherwise (for PG 11+)
+     * @throws SQLException if unable to retrieve server information
+     */
+    public static boolean shouldExcludePartitionTables(PostgresConnection jdbcConnection)
+            throws SQLException {
+        int majorVersion = jdbcConnection.connection().getMetaData().getDatabaseMajorVersion();
+        return majorVersion < PG_DECLARATIVE_PARTITION_MIN_VERSION;
     }
 }

@@ -53,6 +53,18 @@ public class PostgresDataSourceOptions {
                     .withDescription(
                             "Password to use when connecting to the PostgreSQL database server.");
 
+    /**
+     * Optional database name to connect. When provided, the database prefix in 'tables' can be
+     * omitted (e.g. use 'public.my_table' instead of 'db.public.my_table'). If both this option and
+     * a database prefix in 'tables' are provided, they must be consistent.
+     */
+    public static final ConfigOption<String> DATABASE =
+            ConfigOptions.key("database")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Name of the PostgreSQL database to connect to. If set, the database prefix in 'tables' may be omitted. When present, any database specified in 'tables' must match this value.");
+
     public static final ConfigOption<String> TABLES =
             ConfigOptions.key("tables")
                     .stringType()
@@ -63,6 +75,29 @@ public class PostgresDataSourceOptions {
                                     + "If there is a need to use a dot (.) in a regular expression to match any character, "
                                     + "it is necessary to escape the dot with a backslash."
                                     + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*");
+
+    /**
+     * Optional default schema. When provided, entries in 'tables' and 'partition.tables' that omit
+     * schema will be qualified with this schema. For example, 'orders' becomes 'public.orders'.
+     */
+    public static final ConfigOption<String> SCHEMA =
+            ConfigOptions.key("schema")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Default schema name. When set, patterns in 'tables' and 'partition.tables' without schema will be auto-qualified with this schema (e.g., 'orders' -> 'public.orders').");
+
+    public static final ConfigOption<String> PARTITION_TABLES =
+            ConfigOptions.key("partition.tables")
+                    .stringType()
+                    .noDefaultValue()
+                    .withDescription(
+                            "Table names of the PostgreSQL 10 partitioned tables to monitor. Regular expressions are supported. "
+                                    + "It is important to note that the dot (.) is treated as a delimiter for database and table names. "
+                                    + "If there is a need to use a dot (.) in a regular expression to match any character, "
+                                    + "it is necessary to escape the dot with a backslash."
+                                    + "eg. db0.\\.*, db1.user_table_[0-9]+, db[1-2].[app|web]_order_\\.*. "
+                                    + "When configured, partition table events will be automatically routed to their parent table.");
 
     public static final ConfigOption<String> DECODING_PLUGIN_NAME =
             ConfigOptions.key("decoding.plugin.name")
@@ -273,4 +308,14 @@ public class PostgresDataSourceOptions {
                             "Whether to include database in the generated Table ID. "
                                     + "If set to true, the Table ID will be in the format (database, schema, table). "
                                     + "If set to false, the Table ID will be in the format (schema, table). Defaults to false.");
+
+    public static final ConfigOption<Boolean> SCAN_INCLUDE_PARTITIONED_TABLES_ENABLED =
+            ConfigOptions.key("scan.include-partitioned-tables.enabled")
+                    .booleanType()
+                    .defaultValue(Boolean.FALSE)
+                    .withDescription(
+                            "Enable reading from partitioned table via partition root.\n"
+                                    + "If enabled:\n"
+                                    + "(1) PUBLICATION must be created beforehand with parameter publish_via_partition_root=true\n"
+                                    + "(2) Table list (regex or predefined list) should only match the parent table name, if table list matches both parent and child tables, snapshot data will be read twice.");
 }

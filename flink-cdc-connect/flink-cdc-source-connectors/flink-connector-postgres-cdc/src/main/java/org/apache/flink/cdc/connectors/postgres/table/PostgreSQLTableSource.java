@@ -88,6 +88,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
     private final boolean assignUnboundedChunkFirst;
     private final boolean appendOnly;
     private final boolean includePartitionedTables;
+    private final String partitionTables;
 
     // --------------------------------------------------------------------------------------------
     // Mutable attributes
@@ -130,7 +131,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean appendOnly,
-            boolean includePartitionedTables) {
+            boolean includePartitionedTables,
+            @Nullable String partitionTables) {
         this.physicalSchema = physicalSchema;
         this.port = port;
         this.hostname = checkNotNull(hostname);
@@ -165,6 +167,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
         this.assignUnboundedChunkFirst = assignUnboundedChunkFirst;
         this.appendOnly = appendOnly;
         this.includePartitionedTables = includePartitionedTables;
+        this.partitionTables = partitionTables;
     }
 
     @Override
@@ -204,7 +207,7 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         .build();
 
         if (enableParallelRead) {
-            JdbcIncrementalSource<RowData> parallelSource =
+            PostgresSourceBuilder<RowData> sourceBuilder =
                     PostgresSourceBuilder.PostgresIncrementalSource.<RowData>builder()
                             .hostname(hostname)
                             .port(port)
@@ -233,8 +236,13 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                             .scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled)
                             .lsnCommitCheckpointsDelay(lsnCommitCheckpointsDelay)
                             .assignUnboundedChunkFirst(assignUnboundedChunkFirst)
-                            .includePartitionedTables(includePartitionedTables)
-                            .build();
+                            .includePartitionedTables(includePartitionedTables);
+
+            if (partitionTables != null && !partitionTables.isEmpty()) {
+                sourceBuilder.partitionTables(partitionTables);
+            }
+
+            JdbcIncrementalSource<RowData> parallelSource = sourceBuilder.build();
             return SourceProvider.of(parallelSource);
         } else {
             DebeziumSourceFunction<RowData> sourceFunction =
@@ -305,7 +313,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                         lsnCommitCheckpointsDelay,
                         assignUnboundedChunkFirst,
                         appendOnly,
-                        includePartitionedTables);
+                        includePartitionedTables,
+                        partitionTables);
         source.metadataKeys = metadataKeys;
         source.producedDataType = producedDataType;
         return source;
@@ -351,7 +360,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 && Objects.equals(scanNewlyAddedTableEnabled, that.scanNewlyAddedTableEnabled)
                 && Objects.equals(assignUnboundedChunkFirst, that.assignUnboundedChunkFirst)
                 && Objects.equals(appendOnly, that.appendOnly)
-                && Objects.equals(includePartitionedTables, that.includePartitionedTables);
+                && Objects.equals(includePartitionedTables, that.includePartitionedTables)
+                && Objects.equals(partitionTables, that.partitionTables);
     }
 
     @Override
@@ -388,7 +398,8 @@ public class PostgreSQLTableSource implements ScanTableSource, SupportsReadingMe
                 scanNewlyAddedTableEnabled,
                 assignUnboundedChunkFirst,
                 appendOnly,
-                includePartitionedTables);
+                includePartitionedTables,
+                partitionTables);
     }
 
     @Override

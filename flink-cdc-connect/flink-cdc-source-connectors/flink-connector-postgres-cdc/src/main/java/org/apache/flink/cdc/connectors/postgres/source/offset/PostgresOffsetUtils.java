@@ -34,7 +34,7 @@ public class PostgresOffsetUtils {
                 Objects.requireNonNull(offset, "offset is null for the sourceSplitBase")
                         .getOffset();
         // all the keys happen to be long type for PostgresOffsetContext.Loader.load
-        Map<String, Object> offsetMap = new HashMap<>();
+        Map<String, Object> offsetMap = new HashMap<>(8);
         for (String key : offsetStrMap.keySet()) {
             String value = offsetStrMap.get(key);
             if (value != null) {

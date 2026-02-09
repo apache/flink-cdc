@@ -32,12 +32,14 @@ import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresScanFetchTa
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.postgres.source.fetch.PostgresStreamFetchTask;
 import org.apache.flink.cdc.connectors.postgres.source.utils.CustomPostgresSchema;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionInclusionDecider;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRouter;
+import org.apache.flink.cdc.connectors.postgres.source.utils.PostgresPartitionRoutingSchema;
 import org.apache.flink.cdc.connectors.postgres.source.utils.TableDiscoveryUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.connector.postgresql.PostgresConnectorConfig;
 import io.debezium.connector.postgresql.PostgresObjectUtils;
-import io.debezium.connector.postgresql.PostgresSchema;
 import io.debezium.connector.postgresql.PostgresTaskContext;
 import io.debezium.connector.postgresql.PostgresTopicSelector;
 import io.debezium.connector.postgresql.connection.PostgresConnection;
@@ -45,13 +47,13 @@ import io.debezium.connector.postgresql.connection.PostgresConnectionUtils;
 import io.debezium.connector.postgresql.connection.PostgresReplicationConnection;
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.TableId;
-import io.debezium.relational.Tables;
 import io.debezium.relational.history.TableChanges.TableChange;
 import io.debezium.schema.TopicSelector;
 
 import javax.annotation.Nullable;
 
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -67,12 +69,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     private static final String CONNECTION_NAME = "postgres-cdc-connector";
 
     private final PostgresSourceConfig sourceConfig;
-    private transient Tables.TableFilter filters;
-    private transient CustomPostgresSchema schema;
     @Nullable private PostgresStreamFetchTask streamFetchTask;
+    @Nullable private final PostgresPartitionRouter partitionRouter;
+    @Nullable private transient PostgresPartitionInclusionDecider inclusionDecider;
+    @Nullable private transient CustomPostgresSchema cachedSchema;
 
     public PostgresDialect(PostgresSourceConfig sourceConfig) {
         this.sourceConfig = sourceConfig;
+        this.partitionRouter = PostgresPartitionRouter.fromConfig(sourceConfig);
     }
 
     @Override
@@ -108,13 +112,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
             TopicSelector<TableId> topicSelector = PostgresTopicSelector.create(pgConnectorConfig);
             PostgresConnection.PostgresValueConverterBuilder valueConverterBuilder =
                     newPostgresValueConverterBuilder(pgConnectorConfig);
-            PostgresSchema schema =
+            PostgresPartitionRoutingSchema schema =
                     PostgresObjectUtils.newSchema(
                             jdbcConnection,
                             pgConnectorConfig,
                             jdbcConnection.getTypeRegistry(),
                             topicSelector,
-                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()));
+                            valueConverterBuilder.build(jdbcConnection.getTypeRegistry()),
+                            partitionRouter);
             PostgresTaskContext taskContext =
                     PostgresObjectUtils.newTaskContext(pgConnectorConfig, schema, topicSelector);
             return (PostgresReplicationConnection)
@@ -178,11 +183,14 @@ public class PostgresDialect implements JdbcDataSourceDialect {
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
             boolean includePartitionedTables =
                     ((PostgresSourceConfig) sourceConfig).includePartitionedTables();
+            // Use partition-aware inclusion decider for consistent filtering
+            PostgresPartitionInclusionDecider decider = getOrCreateInclusionDecider(sourceConfig);
             return TableDiscoveryUtils.listTables(
                     // there is always a single database provided
                     sourceConfig.getDatabaseList().get(0),
                     jdbc,
                     sourceConfig.getTableFilters(),
+                    decider,
                     includePartitionedTables);
         } catch (SQLException e) {
             throw new FlinkRuntimeException("Error to discover tables: " + e.getMessage(), e);
@@ -192,15 +200,23 @@ public class PostgresDialect implements JdbcDataSourceDialect {
     @Override
     public Map<TableId, TableChange> discoverDataCollectionSchemas(JdbcSourceConfig sourceConfig) {
         final List<TableId> capturedTableIds = discoverDataCollections(sourceConfig);
-
         try (JdbcConnection jdbc = openJdbcConnection(sourceConfig)) {
-            // fetch table schemas
-            Map<TableId, TableChange> tableSchemas = queryTableSchema(jdbc, capturedTableIds);
-            return tableSchemas;
+            // Route child tables to parent tables for schema discovery
+            List<TableId> schemaTableIds =
+                    partitionRouter != null
+                            ? toList(partitionRouter.routeRepresentativeTables(capturedTableIds))
+                            : capturedTableIds;
+            return queryTableSchema(jdbc, schemaTableIds);
         } catch (Exception e) {
             throw new FlinkRuntimeException(
                     "Error to discover table schemas: " + e.getMessage(), e);
         }
+    }
+
+    private static List<TableId> toList(Iterable<TableId> iterable) {
+        List<TableId> list = new ArrayList<>();
+        iterable.forEach(list::add);
+        return list;
     }
 
     @Override
@@ -210,18 +226,19 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Override
     public TableChange queryTableSchema(JdbcConnection jdbc, TableId tableId) {
-        if (schema == null) {
-            schema = new CustomPostgresSchema((PostgresConnection) jdbc, sourceConfig);
-        }
-        return schema.getTableSchema(tableId);
+        return getOrCreateSchema().getTableSchema((PostgresConnection) jdbc, tableId);
     }
 
     private Map<TableId, TableChange> queryTableSchema(
             JdbcConnection jdbc, List<TableId> tableIds) {
-        if (schema == null) {
-            schema = new CustomPostgresSchema((PostgresConnection) jdbc, sourceConfig);
+        return getOrCreateSchema().getTableSchema((PostgresConnection) jdbc, tableIds);
+    }
+
+    private CustomPostgresSchema getOrCreateSchema() {
+        if (cachedSchema == null) {
+            cachedSchema = new CustomPostgresSchema(sourceConfig, partitionRouter);
         }
-        return schema.getTableSchema(tableIds);
+        return cachedSchema;
     }
 
     @Override
@@ -248,11 +265,23 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     @Override
     public boolean isIncludeDataCollection(JdbcSourceConfig sourceConfig, TableId tableId) {
-        if (filters == null) {
-            this.filters = sourceConfig.getTableFilters().dataCollectionFilter();
-        }
+        return getOrCreateInclusionDecider(sourceConfig).isIncluded(tableId);
+    }
 
-        return filters.isIncluded(tableId);
+    /**
+     * Gets or creates the partition inclusion decider.
+     *
+     * <p>This method ensures consistent filtering logic across discoverDataCollections and
+     * isIncludeDataCollection.
+     */
+    public PostgresPartitionInclusionDecider getOrCreateInclusionDecider(
+            JdbcSourceConfig sourceConfig) {
+        if (inclusionDecider == null) {
+            this.inclusionDecider =
+                    new PostgresPartitionInclusionDecider(
+                            sourceConfig.getTableFilters().dataCollectionFilter(), partitionRouter);
+        }
+        return inclusionDecider;
     }
 
     public String getSlotName() {
@@ -261,6 +290,11 @@ public class PostgresDialect implements JdbcDataSourceDialect {
 
     public String getPluginName() {
         return sourceConfig.getDbzProperties().getProperty(PLUGIN_NAME.name());
+    }
+
+    @Nullable
+    public PostgresPartitionRouter getPartitionRouter() {
+        return partitionRouter;
     }
 
     public boolean removeSlot(String slotName) {

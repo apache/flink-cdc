@@ -36,10 +36,14 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     private static final long serialVersionUID = 1L;
 
+    /** Debezium configuration key for partition tables. */
+    public static final String PARTITION_TABLES_CONFIG_KEY = "partition.tables";
+
     private final int subtaskId;
     private final int lsnCommitCheckpointsDelay;
     private final boolean includePartitionedTables;
     private final boolean includeDatabaseInTableId;
+    private final String partitionTables;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -71,7 +75,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             int lsnCommitCheckpointsDelay,
             boolean assignUnboundedChunkFirst,
             boolean includePartitionedTables,
-            boolean includeDatabaseInTableId) {
+            boolean includeDatabaseInTableId,
+            String partitionTables) {
         super(
                 startupOptions,
                 databaseList,
@@ -102,6 +107,7 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
         this.includePartitionedTables = includePartitionedTables;
+        this.partitionTables = partitionTables;
         this.includeDatabaseInTableId = includeDatabaseInTableId;
     }
 
@@ -145,6 +151,11 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     public String getJdbcUrl() {
         return String.format(
                 "jdbc:postgresql://%s:%d/%s", getHostname(), getPort(), getDatabaseList().get(0));
+    }
+
+    /** Returns the partition tables. */
+    public String getPartitionTables() {
+        return partitionTables;
     }
 
     @Override

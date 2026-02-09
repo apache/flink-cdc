@@ -58,7 +58,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static io.debezium.connector.postgresql.PostgresObjectUtils.waitForReplicationSlotReady;
-import static io.debezium.connector.postgresql.Utils.refreshSchema;
 
 /** A {@link FetchTask} implementation for Postgres to read snapshot split. */
 public class PostgresScanFetchTask extends AbstractScanFetchTask {
@@ -250,8 +249,11 @@ public class PostgresScanFetchTask extends AbstractScanFetchTask {
                 throws Exception {
             final PostgresSnapshotContext ctx = (PostgresSnapshotContext) snapshotContext;
             ctx.offset = offsetContext;
-
-            refreshSchema(databaseSchema, jdbcConnection, true);
+            // It's not necessary to refresh schema again, which is very time-consuming.
+            // The databaseSchema is the reference of PostgresSourceFetchTaskContext#schema, and has
+            // been initialized when submit SnapshotSplit fetch task by
+            // IncrementalSourceScanFetcher#submitTask -> PostgresSourceFetchTaskContext#configure.
+            // refreshSchema(databaseSchema, jdbcConnection, true);
             createDataEvents(ctx, snapshotSplit.getTableId());
 
             return SnapshotResult.completed(ctx.offset);

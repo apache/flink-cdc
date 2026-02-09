@@ -58,7 +58,7 @@ public final class Utils {
                     "JDBC connection fails to commit: " + e.getMessage(), e);
         }
 
-        Map<String, String> offsetMap = new HashMap<>();
+        Map<String, String> offsetMap = new HashMap<>(8);
         offsetMap.put(SourceInfo.LSN_KEY, lsn.toString());
         if (txId != null) {
             offsetMap.put(SourceInfo.TXID_KEY, txId.toString());
