@@ -404,12 +404,14 @@ public class PostgresDataSourceFactory implements DataSourceFactory {
     private boolean isValidPostgresDbName(String dbName) {
         // PostgreSQL database name conventions:
         // 1. Length does not exceed 63 characters
-        // 2. Can contain letters, numbers, underscores, and dollar signs
-        // 3. Cannot start with a dollar sign
+        // 2. Can contain letters, numbers, underscores, dollar signs, and hyphens
+        // 3. Must start with a letter, underscore, or dollar sign (cannot start with a hyphen)
+        // Note: While SQL identifiers have strict rules, database names created
+        // via createdb command can contain hyphens (e.g., createdb foo-bar)
         if (dbName == null || dbName.length() > 63) {
             return false;
         }
-        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$]*")) {
+        if (!dbName.matches("[a-zA-Z_$][a-zA-Z0-9_$-]*")) {
             return false;
         }
         return true;
