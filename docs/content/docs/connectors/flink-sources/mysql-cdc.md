@@ -391,6 +391,13 @@ Only valid for cdc 1.x version. During a snapshot operation, the connector will 
       </td>
     </tr>
     <tr>
+      <td>debezium.binlog.ssl.protocol</td>
+      <td>optional</td>
+      <td style="word-wrap: break-word;">(none)</td>
+      <td>String</td>
+      <td>Override the auto-detected TLS protocol for binlog SSL connections. Example: <code>'debezium.binlog.ssl.protocol' = 'TLSv1.2'</code>.</td>
+    </tr>
+    <tr>
       <td>debezium.binary.handling.mode</td>
       <td>optional</td>
       <td style="word-wrap: break-word;">(none)</td>
