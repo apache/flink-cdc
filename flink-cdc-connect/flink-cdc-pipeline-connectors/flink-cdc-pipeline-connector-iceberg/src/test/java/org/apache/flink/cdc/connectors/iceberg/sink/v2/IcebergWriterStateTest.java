@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
-/** A test for {@link IcebergWriterStateTest}. */
+/** Tests for {@link IcebergWriterState} and {@link IcebergWriterStateSerializer}. */
 public class IcebergWriterStateTest {
 
     @Test
