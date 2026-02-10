@@ -29,6 +29,8 @@ limitations under the License.
     <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
 
     <properties>
+        <antlr.source.directory>${project.basedir}/src/main/antlr4</antlr.source.directory>
+        <version.antlr>4.10.1</version.antlr>
     </properties>
 
     <dependencies>
@@ -138,6 +140,23 @@ limitations under the License.
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${version.antlr}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.debezium</groupId>
+            <artifactId>debezium-ddl-parser</artifactId>
+            <version>${debezium.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.antlr</groupId>
+                    <artifactId>antlr4-runtime</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>
@@ -160,6 +179,7 @@ limitations under the License.
                                     <include>io.debezium:debezium-api</include>
                                     <include>io.debezium:debezium-embedded</include>
                                     <include>io.debezium:debezium-core</include>
+                                    <include>io.debezium:debezium-ddl-parser</include>
                                     <include>io.debezium:debezium-connector-postgres</include>
                                     <include>org.apache.flink:flink-cdc-base</include>
                                     <include>org.apache.flink:flink-connector-debezium</include>
@@ -221,6 +241,21 @@ limitations under the License.
                         <id>test-jar</id>
                         <goals>
                             <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>${version.antlr}</version>
+                <configuration>
+                    <sourceDirectory>${antlr.source.directory}</sourceDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>antlr4</goal>
                         </goals>
                     </execution>
                 </executions>

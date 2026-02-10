@@ -46,7 +46,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -138,31 +137,93 @@ public abstract class PostgresTestBase extends AbstractTestBase {
      * connection.
      */
     protected void initializePostgresTable(PostgreSQLContainer container, String sqlFile) {
+        initializePostgresTable(container, null, sqlFile);
+    }
+
+    /**
+     * Executes a JDBC statement on the specified database without autocommitting the connection.
+     */
+    protected void initializePostgresTable(
+            PostgreSQLContainer container, String databaseName, String sqlFile) {
+        executeSqlStatements(container, databaseName, sqlFile);
+    }
+
+    private void executeSqlStatements(
+            PostgreSQLContainer container, String databaseName, String sqlFile) {
         final String ddlFile = String.format("ddl/%s.sql", sqlFile);
         final URL ddlTestFile = PostgresTestBase.class.getClassLoader().getResource(ddlFile);
         Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
-        try (Connection connection = getJdbcConnection(container);
+        try (Connection connection =
+                        databaseName == null
+                                ? getJdbcConnection(container)
+                                : getJdbcConnection(container, databaseName);
                 Statement statement = connection.createStatement()) {
-            final List<String> statements =
-                    Arrays.stream(
-                                    Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
-                                            .map(String::trim)
-                                            .filter(x -> !x.startsWith("--") && !x.isEmpty())
-                                            .map(
-                                                    x -> {
-                                                        final Matcher m =
-                                                                COMMENT_PATTERN.matcher(x);
-                                                        return m.matches() ? m.group(1) : x;
-                                                    })
-                                            .collect(Collectors.joining("\n"))
-                                            .split(";\n"))
-                            .collect(Collectors.toList());
+            final List<String> statements = parseSqlStatements(ddlTestFile);
             for (String stmt : statements) {
                 statement.execute(stmt);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private List<String> parseSqlStatements(URL ddlTestFile) throws Exception {
+        String ddlSql =
+                Files.readAllLines(Paths.get(ddlTestFile.toURI())).stream()
+                        .map(String::trim)
+                        .filter(x -> !x.startsWith("--") && !x.isEmpty())
+                        .map(
+                                x -> {
+                                    final Matcher m = COMMENT_PATTERN.matcher(x);
+                                    return m.matches() ? m.group(1) : x;
+                                })
+                        .collect(Collectors.joining("\n"));
+
+        List<String> statements = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inDollar = false;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+        for (int i = 0; i < ddlSql.length(); i++) {
+            char ch = ddlSql.charAt(i);
+            if (ch == '$' && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '$') {
+                inDollar = !inDollar;
+                current.append("$$");
+                i++;
+                continue;
+            }
+            if (!inDollar) {
+                if (ch == '\'' && !inDoubleQuote) {
+                    if (inSingleQuote && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '\'') {
+                        current.append("''");
+                        i++;
+                        continue;
+                    }
+                    inSingleQuote = !inSingleQuote;
+                } else if (ch == '"' && !inSingleQuote) {
+                    if (inDoubleQuote && i + 1 < ddlSql.length() && ddlSql.charAt(i + 1) == '"') {
+                        current.append("\"\"");
+                        i++;
+                        continue;
+                    }
+                    inDoubleQuote = !inDoubleQuote;
+                }
+            }
+            if (ch == ';' && !inDollar && !inSingleQuote && !inDoubleQuote) {
+                String sql = current.toString().trim();
+                if (!sql.isEmpty()) {
+                    statements.add(sql);
+                }
+                current.setLength(0);
+            } else {
+                current.append(ch);
+            }
+        }
+        String tail = current.toString().trim();
+        if (!tail.isEmpty()) {
+            statements.add(tail);
+        }
+        return statements;
     }
 
     protected PostgresConnection createConnection(Map<String, String> properties) {

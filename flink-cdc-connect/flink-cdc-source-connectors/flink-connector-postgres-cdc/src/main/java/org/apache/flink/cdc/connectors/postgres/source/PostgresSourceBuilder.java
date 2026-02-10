@@ -109,6 +109,26 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    public PostgresSourceBuilder<T> ddlLogTable(String ddlLogTable) {
+        this.configFactory.ddlLogTable(ddlLogTable);
+        return this;
+    }
+
+    public PostgresSourceBuilder<T> ddlFieldObjectType(String ddlFieldObjectType) {
+        this.configFactory.setDdlFieldObjectType(ddlFieldObjectType);
+        return this;
+    }
+
+    public PostgresSourceBuilder<T> ddlFieldObjectIdentity(String ddlFieldObjectIdentity) {
+        this.configFactory.setDdlFieldObjectIdentity(ddlFieldObjectIdentity);
+        return this;
+    }
+
+    public PostgresSourceBuilder<T> ddlFieldCommandText(String ddlFieldCommandText) {
+        this.configFactory.setDdlFieldCommandText(ddlFieldCommandText);
+        return this;
+    }
+
     /** Name of the Postgres database to use when connecting to the Postgres database server. */
     public PostgresSourceBuilder<T> username(String username) {
         this.configFactory.username(username);
