@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.IntType;
 import org.apache.flink.cdc.common.types.SmallIntType;
+import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
@@ -225,5 +226,151 @@ class StarRocksMetadataApplierTest {
                         .setTableProperties(Collections.singletonMap("replication_num", "5"))
                         .build();
         Assertions.assertThat(actualTable).isEqualTo(expectTable);
+    }
+
+    @Test
+    void testCreateTableWithTimeType() throws Exception {
+        TableId tableId = TableId.parse("test.time_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("start_time", new TimeType())
+                        .physicalColumn(
+                                "end_time", new TimeType(3)) // TIME with millisecond precision
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+
+        List<StarRocksColumn> columns = new ArrayList<>();
+        columns.add(
+                new StarRocksColumn.Builder()
+                        .setColumnName("id")
+                        .setOrdinalPosition(0)
+                        .setDataType("int")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new StarRocksColumn.Builder()
+                        .setColumnName("start_time")
+                        .setOrdinalPosition(1)
+                        .setDataType("varchar")
+                        .setNullable(true)
+                        .setColumnSize(8)
+                        .build());
+        columns.add(
+                new StarRocksColumn.Builder()
+                        .setColumnName("end_time")
+                        .setOrdinalPosition(2)
+                        .setDataType("varchar")
+                        .setNullable(true)
+                        .setColumnSize(12)
+                        .build());
+        StarRocksTable expectTable =
+                new StarRocksTable.Builder()
+                        .setDatabaseName(tableId.getSchemaName())
+                        .setTableName(tableId.getTableName())
+                        .setTableType(StarRocksTable.TableType.PRIMARY_KEY)
+                        .setColumns(columns)
+                        .setTableKeys(schema.primaryKeys())
+                        .setDistributionKeys(schema.primaryKeys())
+                        .setNumBuckets(10)
+                        .setTableProperties(Collections.singletonMap("replication_num", "5"))
+                        .build();
+        Assertions.assertThat(actualTable).isEqualTo(expectTable);
+    }
+
+    @Test
+    void testAddTimeTypeColumn() throws Exception {
+        TableId tableId = TableId.parse("test.add_time_column");
+        Schema schema =
+                Schema.newBuilder().physicalColumn("id", new IntType()).primaryKey("id").build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        // Add TIME type column through schema evolution
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("duration", new TimeType())),
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("precision_time", new TimeType(3)))));
+        metadataApplier.applySchemaChange(addColumnEvent);
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+
+        List<StarRocksColumn> columns = new ArrayList<>();
+        columns.add(
+                new StarRocksColumn.Builder()
+                        .setColumnName("id")
+                        .setOrdinalPosition(0)
+                        .setDataType("int")
+                        .setNullable(true)
+                        .build());
+        columns.add(
+                new StarRocksColumn.Builder()
+                        .setColumnName("duration")
+                        .setOrdinalPosition(1)
+                        .setDataType("varchar")
+                        .setNullable(true)
+                        .setColumnSize(8)
+                        .build());
+        columns.add(
+                new StarRocksColumn.Builder()
+                        .setColumnName("precision_time")
+                        .setOrdinalPosition(2)
+                        .setDataType("varchar")
+                        .setNullable(true)
+                        .setColumnSize(12)
+                        .build());
+        StarRocksTable expectTable =
+                new StarRocksTable.Builder()
+                        .setDatabaseName(tableId.getSchemaName())
+                        .setTableName(tableId.getTableName())
+                        .setTableType(StarRocksTable.TableType.PRIMARY_KEY)
+                        .setColumns(columns)
+                        .setTableKeys(schema.primaryKeys())
+                        .setDistributionKeys(schema.primaryKeys())
+                        .setNumBuckets(10)
+                        .setTableProperties(Collections.singletonMap("replication_num", "5"))
+                        .build();
+        Assertions.assertThat(actualTable).isEqualTo(expectTable);
+    }
+
+    @Test
+    void testTimeTypeWithDifferentPrecisions() throws Exception {
+        TableId tableId = TableId.parse("test.time_precision_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("time_default", new TimeType()) // Default precision
+                        .physicalColumn("time_0", new TimeType(0)) // Second precision
+                        .physicalColumn("time_3", new TimeType(3)) // Millisecond precision
+                        .physicalColumn("time_max", new TimeType(3)) // Example precision 3
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        metadataApplier.applySchemaChange(createTableEvent);
+
+        StarRocksTable actualTable =
+                catalog.getTable(tableId.getSchemaName(), tableId.getTableName()).orElse(null);
+        Assertions.assertThat(actualTable).isNotNull();
+
+        // Verify all TIME columns are correctly mapped to StarRocks VARCHAR type
+        // since StarRocks doesn't support TIME type
+        List<String> timeColumns = Arrays.asList("time_default", "time_0", "time_3", "time_max");
+        for (StarRocksColumn column : actualTable.getColumns()) {
+            if (timeColumns.contains(column.getColumnName())) {
+                Assertions.assertThat(column.getDataType().toLowerCase()).isEqualTo("varchar");
+            }
+        }
     }
 }

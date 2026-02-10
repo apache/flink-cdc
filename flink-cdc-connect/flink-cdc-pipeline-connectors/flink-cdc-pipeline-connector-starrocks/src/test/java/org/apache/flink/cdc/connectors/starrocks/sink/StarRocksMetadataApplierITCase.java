@@ -213,10 +213,10 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         .column(new PhysicalColumn("string", DataTypes.STRING(), "String"))
                         .column(new PhysicalColumn("decimal", DataTypes.DECIMAL(17, 7), "Decimal"))
                         .column(new PhysicalColumn("date", DataTypes.DATE(), "Date"))
-                        // StarRocks sink doesn't support TIME type yet.
-                        // .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
-                        // .column(new PhysicalColumn("time_3", DataTypes.TIME(3), "Time With
-                        // Precision"))
+                        .column(new PhysicalColumn("time", DataTypes.TIME(), "Time"))
+                        .column(
+                                new PhysicalColumn(
+                                        "time_3", DataTypes.TIME(3), "Time With Precision"))
                         .column(new PhysicalColumn("timestamp", DataTypes.TIMESTAMP(), "Timestamp"))
                         .column(
                                 new PhysicalColumn(
@@ -256,6 +256,9 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         "string | varchar(1048576) | YES | false | null",
                         "decimal | decimal(17,7) | YES | false | null",
                         "date | date | YES | false | null",
+                        // TIME type mapped to VARCHAR since StarRocks doesn't support TIME type
+                        "time | varchar(8) | YES | false | null",
+                        "time_3 | varchar(12) | YES | false | null",
                         "timestamp | datetime | YES | false | null",
                         "timestamp_3 | datetime | YES | false | null",
                         "timestampltz | datetime | YES | false | null",
