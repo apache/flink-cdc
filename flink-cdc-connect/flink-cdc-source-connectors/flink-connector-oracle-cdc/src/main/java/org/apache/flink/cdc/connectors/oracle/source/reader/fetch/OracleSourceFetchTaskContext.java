@@ -27,6 +27,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.reader.external.JdbcSourceFetchTaskContext;
 import org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils;
 import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
+import org.apache.flink.cdc.connectors.oracle.connection.OracleSourceConnection;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import org.apache.flink.cdc.connectors.oracle.source.handler.OracleSchemaChangeEventHandler;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
@@ -36,7 +37,6 @@ import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.connector.base.ChangeEventQueue;
 import io.debezium.connector.oracle.OracleChangeEventSourceMetricsFactory;
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleErrorHandler;
@@ -79,7 +79,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(OracleSourceFetchTaskContext.class);
 
-    private final OracleConnection connection;
+    private final OracleSourceConnection connection;
     private final OracleEventMetadataProvider metadataProvider;
 
     private OracleDatabaseSchema databaseSchema;
@@ -168,7 +168,7 @@ public class OracleSourceFetchTaskContext extends JdbcSourceFetchTaskContext {
         return (OracleSourceConfig) sourceConfig;
     }
 
-    public OracleConnection getConnection() {
+    public OracleSourceConnection getConnection() {
         return connection;
     }
 
