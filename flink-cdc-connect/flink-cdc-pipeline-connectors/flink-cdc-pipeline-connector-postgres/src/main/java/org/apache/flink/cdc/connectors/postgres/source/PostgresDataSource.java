@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.postgres.source;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
@@ -34,13 +35,16 @@ import org.apache.flink.cdc.connectors.postgres.source.config.PostgresSourceConf
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresPipelineRecordEmitter;
 import org.apache.flink.cdc.connectors.postgres.table.PostgreSQLReadableMetadata;
+import org.apache.flink.cdc.connectors.postgres.utils.PostgresSchemaUtils;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
 import org.apache.flink.cdc.debezium.event.DebeziumEventDeserializationSchema;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** A {@link DataSource} for Postgres cdc connector. */
 @Internal
@@ -50,6 +54,7 @@ public class PostgresDataSource implements DataSource {
     private final PostgresSourceConfig postgresSourceConfig;
 
     private final List<PostgreSQLReadableMetadata> readableMetadataList;
+    Map<TableId, Map<String, Integer>> beforeTableColumnsOidMaps = new HashMap<>();
 
     public PostgresDataSource(PostgresSourceConfigFactory configFactory) {
         this(configFactory, new ArrayList<>());
@@ -67,12 +72,17 @@ public class PostgresDataSource implements DataSource {
     public EventSourceProvider getEventSourceProvider() {
         String databaseName = postgresSourceConfig.getDatabaseList().get(0);
         boolean includeDatabaseInTableId = postgresSourceConfig.isIncludeDatabaseInTableId();
+        beforeTableColumnsOidMaps =
+                PostgresSchemaUtils.getAllTablesColumnOids(
+                        postgresSourceConfig, postgresSourceConfig.getTableList());
         DebeziumEventDeserializationSchema deserializer =
                 new PostgresEventDeserializer(
                         DebeziumChangelogMode.ALL,
                         readableMetadataList,
                         includeDatabaseInTableId,
-                        databaseName);
+                        databaseName,
+                        postgresSourceConfig,
+                        beforeTableColumnsOidMaps);
 
         PostgresOffsetFactory postgresOffsetFactory = new PostgresOffsetFactory();
         PostgresDialect postgresDialect = new PostgresDialect(postgresSourceConfig);

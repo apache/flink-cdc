@@ -273,4 +273,12 @@ public class PostgresDataSourceOptions {
                             "Whether to include database in the generated Table ID. "
                                     + "If set to true, the Table ID will be in the format (database, schema, table). "
                                     + "If set to false, the Table ID will be in the format (schema, table). Defaults to false.");
+
+    @Experimental
+    public static final ConfigOption<Boolean> SCHEMA_CHANGE_ENABLED =
+            ConfigOptions.key("schema-change.enabled")
+                    .booleanType()
+                    .defaultValue(true)
+                    .withDescription(
+                            "Whether send schema change events, by default is true. If set to false, the schema changes will not be sent.");
 }

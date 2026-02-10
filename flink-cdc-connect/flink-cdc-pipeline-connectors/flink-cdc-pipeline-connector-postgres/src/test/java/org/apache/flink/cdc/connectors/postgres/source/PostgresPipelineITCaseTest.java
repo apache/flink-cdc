@@ -22,13 +22,18 @@ import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
+import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
+import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.common.types.DataType;
@@ -60,6 +65,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -157,6 +163,278 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         assertThat(actual.subList(0, expectedSnapshot.size()))
                 .containsExactlyInAnyOrder(expectedSnapshot.toArray(new Event[0]));
         assertThat(inventoryDatabase.checkSlot(slotName)).isEqualTo(slotName);
+    }
+
+    @ParameterizedTest(name = "testType: {0}")
+    @ValueSource(
+            strings = {
+                "modifyType",
+                "drop,add",
+                "rename",
+                "drop,add,rename",
+                "add,rename",
+                "add2column,rename2column",
+                "add,rename,add2column,rename2column",
+                "add,rename,drop,add"
+            })
+    public void testPostgresSchemaEvolution(String testType) throws Exception {
+        inventoryDatabase.createAndInitialize();
+        PostgresSourceConfigFactory configFactory =
+                (PostgresSourceConfigFactory)
+                        new PostgresSourceConfigFactory()
+                                .hostname(POSTGRES_CONTAINER.getHost())
+                                .port(POSTGRES_CONTAINER.getMappedPort(POSTGRESQL_PORT))
+                                .username(TEST_USER)
+                                .password(TEST_PASSWORD)
+                                .databaseList(inventoryDatabase.getDatabaseName())
+                                .tableList("inventory.products")
+                                .startupOptions(StartupOptions.initial())
+                                .serverTimeZone("UTC");
+        configFactory.database(inventoryDatabase.getDatabaseName());
+        configFactory.slotName(slotName);
+        configFactory.decodingPluginName("pgoutput");
+        configFactory.includeSchemaChanges(true);
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider)
+                        new PostgresDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                PostgresDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+
+        TableId tableId = TableId.tableId("inventory", "products");
+        CreateTableEvent createTableEvent = getProductsCreateTableEvent(tableId);
+
+        // generate snapshot data
+        List<Event> expectedSnapshot = getSnapshotExpected(tableId);
+
+        // In this configuration, several subtasks might emit their corresponding CreateTableEvent
+        // to downstream. Since it is not possible to predict how many CreateTableEvents should we
+        // expect, we simply filter them out from expected sets, and assert there's at least one.
+        fetchResultsExcept(events, expectedSnapshot.size(), createTableEvent);
+        try (Connection conn =
+                        getJdbcConnection(POSTGRES_CONTAINER, inventoryDatabase.getDatabaseName());
+                Statement stmt = conn.createStatement()) {
+            stmt.execute(
+                    "INSERT INTO inventory.products (name, description, weight) "
+                            + "VALUES ('scooter', 'Small 2-wheel scooter', 3.14)");
+            List<Event> actual;
+            List<Event> expected;
+            Map<String, String> renameMap = new HashMap<>();
+            switch (testType) {
+                case "modifyType":
+                    stmt.execute(
+                            "ALTER TABLE inventory.products ALTER COLUMN weight TYPE VARCHAR(50)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name,description, weight) "
+                                    + "VALUES ('football','A leather football', '0.45')");
+                    actual = fetchResults(events, 3);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new AlterColumnTypeEvent(
+                                    tableId,
+                                    Collections.singletonMap("weight", DataTypes.VARCHAR(50))));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "drop,add":
+                    stmt.execute("ALTER TABLE inventory.products DROP COLUMN name");
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products ( description, weight,age) "
+                                    + "VALUES ('A leather football', 0.45,11)");
+                    actual = fetchResults(events, 4);
+                    expected = new ArrayList<>();
+                    expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age", DataTypes.VARCHAR(100))))));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "rename":
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN weight TO weighta");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weighta) "
+                                    + "VALUES ('football','A leather football', 0.45)");
+                    actual = fetchResults(events, 3);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("weight", "weighta")));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "drop,add,rename":
+                    stmt.execute("ALTER TABLE inventory.products DROP COLUMN name");
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN weight TO weighta");
+                    stmt.execute(
+                            "INSERT INTO inventory.products ( description, weighta,age) "
+                                    + "VALUES ( 'A leather football', 0.45,11)");
+                    actual = fetchResults(events, 4);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("weight", "weighta")));
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age", DataTypes.VARCHAR(100))))));
+                    expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "add,rename":
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age) "
+                                    + "VALUES ('football', 'A leather football', 0.45,11)");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age TO age1");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age1) "
+                                    + "VALUES ('football2', 'A leather football', 0.45,12)");
+                    actual = fetchResults(events, 5);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("age", "age1")));
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age", DataTypes.STRING())))));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "add2column,rename2column":
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age1 varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age,age1) "
+                                    + "VALUES ('football', 'A leather football', 0.45,11,11)");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age TO agea");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age1 TO age1a");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,agea,age1a) "
+                                    + "VALUES ('football2', 'A leather football', 0.45,12,12)");
+                    actual = fetchResults(events, 6);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age", DataTypes.STRING())))));
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age1", DataTypes.STRING())))));
+                    renameMap.put("age", "agea");
+                    renameMap.put("age1", "age1a");
+                    expected.add(new RenameColumnEvent(tableId, renameMap));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "add,rename,add2column,rename2column":
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age) "
+                                    + "VALUES ('football', 'A leather football', 0.45,11)");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age TO age1");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age1) "
+                                    + "VALUES ('football2', 'A leather football', 0.45,12)");
+
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age2 varchar(100)");
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age3 varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age1,age2,age3) "
+                                    + "VALUES ('football', 'A leather football', 0.45,11,11,11)");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age2 TO age2a");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age3 TO age3a");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age1,age2a,age3a) "
+                                    + "VALUES ('football2', 'A leather football', 0.45,12,12,12)");
+                    actual = fetchResults(events, 10);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age", DataTypes.STRING())))));
+
+                    expected.add(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("age", "age1")));
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age2", DataTypes.STRING())))));
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age3", DataTypes.STRING())))));
+                    renameMap = new HashMap<>();
+                    renameMap.put("age2", "age2a");
+                    renameMap.put("age3", "age3a");
+                    expected.add(new RenameColumnEvent(tableId, renameMap));
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                case "add,rename,drop,add":
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age) "
+                                    + "VALUES ('football', 'A leather football', 0.45,11)");
+                    stmt.execute("ALTER TABLE inventory.products RENAME COLUMN age TO age1");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,age1) "
+                                    + "VALUES ('football2', 'A leather football', 0.45,12)");
+                    stmt.execute("ALTER TABLE inventory.products DROP COLUMN age1");
+                    stmt.execute("ALTER TABLE inventory.products ADD COLUMN email varchar(100)");
+                    stmt.execute(
+                            "INSERT INTO inventory.products (name, description, weight,email) "
+                                    + "VALUES ('football', 'A leather football', 0.45,'aaa')");
+                    actual = fetchResults(events, 7);
+                    expected = new ArrayList<>();
+                    expected.add(
+                            new AddColumnEvent(
+                                    tableId,
+                                    Collections.singletonList(
+                                            new AddColumnEvent.ColumnWithPosition(
+                                                    Column.physicalColumn(
+                                                            "age", DataTypes.STRING())))));
+                    expected.add(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("age", "age1")));
+                    expected.add(
+                            new RenameColumnEvent(
+                                    tableId, Collections.singletonMap("age1", "email")));
+
+                    assertThat(actual).contains(expected.toArray(new Event[0]));
+                    break;
+                default:
+            }
+        }
     }
 
     @Test
@@ -742,6 +1020,16 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
         }
         // Also ensure we've received at least one or many side events.
         assertThat(sideResults).isNotEmpty();
+        return result;
+    }
+
+    private static <T> List<T> fetchResults(Iterator<T> iter, int size) {
+        List<T> result = new ArrayList<>(size);
+        while (size > 0 && iter.hasNext()) {
+            T event = iter.next();
+            result.add(event);
+            size--;
+        }
         return result;
     }
 

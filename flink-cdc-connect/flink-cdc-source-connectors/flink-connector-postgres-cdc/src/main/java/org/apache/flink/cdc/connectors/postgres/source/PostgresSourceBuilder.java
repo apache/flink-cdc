@@ -99,6 +99,12 @@ public class PostgresSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link PostgresIncrementalSource} should output the schema changes or not. */
+    public PostgresSourceBuilder<T> includeSchemaChanges(boolean includeSchemaChanges) {
+        this.configFactory.includeSchemaChanges(includeSchemaChanges);
+        return this;
+    }
+
     /**
      * An required list of regular expressions that match fully-qualified table identifiers for
      * tables to be monitored; any table not included in the list will be excluded from monitoring.
