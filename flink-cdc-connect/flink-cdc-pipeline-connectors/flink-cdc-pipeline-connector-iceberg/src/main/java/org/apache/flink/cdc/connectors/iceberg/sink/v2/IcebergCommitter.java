@@ -57,7 +57,7 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
     public static final String TABLE_GROUP_KEY = "table";
 
-    private static final String CHECKPOINT_SUMMARY_NAME = "flink-cdc-checkpoint-id";
+    public static final String CHECKPOINT_SUMMARY_NAME = "flink-cdc-checkpoint-id";
 
     private final Catalog catalog;
 
