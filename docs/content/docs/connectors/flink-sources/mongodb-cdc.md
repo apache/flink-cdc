@@ -409,6 +409,11 @@ The following format metadata can be exposed as read-only (VIRTUAL) columns in a
       <td>It indicates the time that the change was made in the database. <br>If the record is read from snapshot of the table instead of the change stream, the value is always 0.</td>
     </tr>
     <tr>
+      <td>full_document</td>
+      <td>STRING</td>
+      <td>The full document of the change event as a JSON string raw data. For insert events, this is the new document. For update events, this is the full document after the update. For delete events, this is null.</td>
+    </tr>
+    <tr>
       <td>row_kind</td>
       <td>STRING NOT NULL</td>
       <td>It indicates the row kind of the changelog,Note: The downstream SQL operator may fail to compare due to this new added column when processing the row retraction if 
@@ -424,6 +429,7 @@ CREATE TABLE products (
     db_name         STRING METADATA FROM 'database_name' VIRTUAL,
     collection_name STRING METADATA  FROM 'collection_name' VIRTUAL,
     operation_ts    TIMESTAMP_LTZ(3) METADATA FROM 'op_ts' VIRTUAL,
+    raw_data        STRING METADATA FROM 'full_document' VIRTUAL,
     operation       STRING METADATA FROM 'row_kind' VIRTUAL,
     _id             STRING, // must be declared
     name            STRING,
