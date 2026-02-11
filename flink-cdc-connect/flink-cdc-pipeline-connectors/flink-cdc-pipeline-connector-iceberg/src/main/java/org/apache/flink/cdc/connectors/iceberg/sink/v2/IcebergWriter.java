@@ -81,12 +81,18 @@ public class IcebergWriter
 
     private long lastCheckpointId;
 
+    private final String jobId;
+
+    private final String operatorId;
+
     public IcebergWriter(
             Map<String, String> catalogOptions,
             int taskId,
             int attemptId,
             ZoneId zoneId,
-            long lastCheckpointId) {
+            long lastCheckpointId,
+            String jobId,
+            String operatorId) {
         catalog =
                 CatalogUtil.buildIcebergCatalog(
                         this.getClass().getSimpleName(), catalogOptions, new Configuration());
@@ -98,15 +104,24 @@ public class IcebergWriter
         this.attemptId = attemptId;
         this.zoneId = zoneId;
         this.lastCheckpointId = lastCheckpointId;
+        this.jobId = jobId;
+        this.operatorId = operatorId;
+        LOGGER.info(
+                "IcebergWriter created, taskId: {}, attemptId: {}, lastCheckpointId: {}, jobId: {}, operatorId: {}",
+                taskId,
+                attemptId,
+                lastCheckpointId,
+                jobId,
+                operatorId);
     }
 
     @Override
-    public List<IcebergWriterState> snapshotState(long checkpointId) throws IOException {
-        return Collections.singletonList(new IcebergWriterState(checkpointId));
+    public List<IcebergWriterState> snapshotState(long checkpointId) {
+        return Collections.singletonList(new IcebergWriterState(jobId, operatorId));
     }
 
     @Override
-    public Collection<WriteResultWrapper> prepareCommit() throws IOException, InterruptedException {
+    public Collection<WriteResultWrapper> prepareCommit() throws IOException {
         List<WriteResultWrapper> list = new ArrayList<>();
         list.addAll(temporaryWriteResult);
         list.addAll(getWriteResult());
@@ -171,7 +186,11 @@ public class IcebergWriter
         for (Map.Entry<TableId, TaskWriter<RowData>> entry : writerMap.entrySet()) {
             WriteResultWrapper writeResultWrapper =
                     new WriteResultWrapper(
-                            entry.getValue().complete(), entry.getKey(), currentCheckpointId);
+                            entry.getValue().complete(),
+                            entry.getKey(),
+                            currentCheckpointId,
+                            jobId,
+                            operatorId);
             writeResults.add(writeResultWrapper);
             LOGGER.info(writeResultWrapper.buildDescription());
         }

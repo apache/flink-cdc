@@ -50,6 +50,7 @@ import org.apache.iceberg.data.IcebergGenerics;
 import org.apache.iceberg.data.Record;
 import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.expressions.Expressions;
+import org.apache.iceberg.flink.sink.SinkUtil;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.types.Types;
 import org.assertj.core.api.Assertions;
@@ -88,8 +89,11 @@ public class IcebergWriterTest {
         Catalog catalog =
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
-                new IcebergWriter(catalogOptions, 1, 1, ZoneId.systemDefault(), 0);
+                new IcebergWriter(
+                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
 
@@ -277,7 +281,10 @@ public class IcebergWriterTest {
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
         ZoneId pipelineZoneId = ZoneId.systemDefault();
-        IcebergWriter icebergWriter = new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId, 0);
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+        IcebergWriter icebergWriter =
+                new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId, 0, jobId, operatorId);
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
 
@@ -382,8 +389,11 @@ public class IcebergWriterTest {
         Catalog catalog =
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
         IcebergWriter icebergWriter =
-                new IcebergWriter(catalogOptions, 1, 1, ZoneId.systemDefault(), 0);
+                new IcebergWriter(
+                        catalogOptions, 1, 1, ZoneId.systemDefault(), 0, jobId, operatorId);
 
         TableId tableId = TableId.parse("test.iceberg_table");
         Map<TableId, List<String>> partitionMaps = new HashMap<>();
@@ -469,7 +479,10 @@ public class IcebergWriterTest {
                 CatalogUtil.buildIcebergCatalog(
                         "cdc-iceberg-catalog", catalogOptions, new Configuration());
         ZoneId pipelineZoneId = ZoneId.systemDefault();
-        IcebergWriter icebergWriter = new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId, 0);
+        String jobId = UUID.randomUUID().toString();
+        String operatorId = UUID.randomUUID().toString();
+        IcebergWriter icebergWriter =
+                new IcebergWriter(catalogOptions, 1, 1, pipelineZoneId, 0, jobId, operatorId);
         IcebergMetadataApplier icebergMetadataApplier = new IcebergMetadataApplier(catalogOptions);
         TableId tableId = TableId.parse("test.iceberg_table");
         TableIdentifier tableIdentifier =
@@ -510,7 +523,9 @@ public class IcebergWriterTest {
         Assertions.assertThat(result).containsExactlyInAnyOrder("1, char1");
         Map<String, String> summary =
                 catalog.loadTable(tableIdentifier).currentSnapshot().summary();
-        Assertions.assertThat(summary.get(IcebergCommitter.CHECKPOINT_SUMMARY_NAME)).isEqualTo("1");
+        Assertions.assertThat(summary.get(SinkUtil.MAX_COMMITTED_CHECKPOINT_ID)).isEqualTo("1");
+        Assertions.assertThat(summary.get(SinkUtil.FLINK_JOB_ID)).isEqualTo(jobId);
+        Assertions.assertThat(summary.get(SinkUtil.OPERATOR_ID)).isEqualTo(operatorId);
 
         // repeat commit with same committables, should not cause duplicate data.
         BinaryRecordData record2 =
@@ -528,7 +543,9 @@ public class IcebergWriterTest {
         summary = catalog.loadTable(tableIdentifier).currentSnapshot().summary();
         Assertions.assertThat(summary.get("total-data-files")).isEqualTo("2");
         Assertions.assertThat(summary.get("added-records")).isEqualTo("1");
-        Assertions.assertThat(summary.get(IcebergCommitter.CHECKPOINT_SUMMARY_NAME)).isEqualTo("2");
+        Assertions.assertThat(summary.get(SinkUtil.MAX_COMMITTED_CHECKPOINT_ID)).isEqualTo("2");
+        Assertions.assertThat(summary.get(SinkUtil.FLINK_JOB_ID)).isEqualTo(jobId);
+        Assertions.assertThat(summary.get(SinkUtil.OPERATOR_ID)).isEqualTo(operatorId);
 
         result = fetchTableContent(catalog, tableId, null);
         Assertions.assertThat(result.size()).isEqualTo(2);

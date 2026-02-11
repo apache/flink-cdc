@@ -23,13 +23,15 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 /** Tests for {@link IcebergWriterState} and {@link IcebergWriterStateSerializer}. */
-public class IcebergWriterStateTest {
+public class IcebergWriterStateSerializerTest {
 
     @Test
     public void testSerializer() throws IOException {
-        IcebergWriterState obj = new IcebergWriterState(1L);
-        byte[] jsonBytes = obj.toBytes();
-        IcebergWriterState objTest = IcebergWriterState.fromBytes(jsonBytes);
-        Assertions.assertThat(objTest.getCheckpointId()).isEqualTo(1L);
+        IcebergWriterState icebergWriterState = new IcebergWriterState("jobId", "operatorId");
+        IcebergWriterStateSerializer icebergWriterStateSerializer =
+                new IcebergWriterStateSerializer();
+        byte[] bytes = icebergWriterStateSerializer.serialize(icebergWriterState);
+        Assertions.assertThat(icebergWriterStateSerializer.deserialize(0, bytes))
+                .isEqualTo(icebergWriterState);
     }
 }

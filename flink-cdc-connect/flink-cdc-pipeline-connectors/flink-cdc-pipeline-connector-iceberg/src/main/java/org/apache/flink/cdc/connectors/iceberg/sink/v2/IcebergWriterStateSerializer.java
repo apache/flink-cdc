@@ -18,24 +18,37 @@
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
 import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.core.memory.DataInputDeserializer;
+import org.apache.flink.core.memory.DataOutputSerializer;
 
 import java.io.IOException;
 
-/** A {@link IcebergWriterStateSerializer} for Apache Iceberg. */
+/** A {@link IcebergWriterStateSerializer} for {@link IcebergWriterState}. */
 public class IcebergWriterStateSerializer implements SimpleVersionedSerializer<IcebergWriterState> {
+
+    private static final int VERSION = 0;
+
+    private static final ThreadLocal<DataOutputSerializer> SERIALIZER_CACHE =
+            ThreadLocal.withInitial(() -> new DataOutputSerializer(64));
 
     @Override
     public int getVersion() {
-        return IcebergWriterState.VERSION;
+        return VERSION;
     }
 
     @Override
-    public byte[] serialize(IcebergWriterState obj) throws IOException {
-        return obj.toBytes();
+    public byte[] serialize(IcebergWriterState icebergWriterState) throws IOException {
+        final DataOutputSerializer out = SERIALIZER_CACHE.get();
+        out.writeUTF(icebergWriterState.getJobId());
+        out.writeUTF(icebergWriterState.getOperatorId());
+        final byte[] result = out.getCopyOfBuffer();
+        out.clear();
+        return result;
     }
 
     @Override
     public IcebergWriterState deserialize(int version, byte[] serialized) throws IOException {
-        return IcebergWriterState.fromBytes(serialized);
+        final DataInputDeserializer in = new DataInputDeserializer(serialized);
+        return new IcebergWriterState(in.readUTF(), in.readUTF());
     }
 }

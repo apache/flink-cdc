@@ -17,39 +17,56 @@
 
 package org.apache.flink.cdc.connectors.iceberg.sink.v2;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Objects;
 
-import java.io.IOException;
-
-/** A {@link IcebergWriterState} for Apache Iceberg. */
+/** The state of the {@link IcebergWriter}. */
 public class IcebergWriterState {
-    public static final int VERSION = 0;
 
-    public static final ObjectMapper MAPPER = new ObjectMapper();
+    // The job ID associated with this writer state
+    private final String jobId;
 
-    private final Long checkpointId;
+    // The operator ID associated with this writer state
+    private final String operatorId;
 
-    @JsonCreator
-    public IcebergWriterState(@JsonProperty("checkpointId") Long checkpointId) {
-        this.checkpointId = checkpointId;
+    public IcebergWriterState(String jobId, String operatorId) {
+        this.jobId = jobId;
+        this.operatorId = operatorId;
     }
 
-    public Long getCheckpointId() {
-        return checkpointId;
+    public String getJobId() {
+        return jobId;
     }
 
-    public byte[] toBytes() throws IOException {
-        return MAPPER.writeValueAsBytes(this);
+    public String getOperatorId() {
+        return operatorId;
     }
 
-    public static IcebergWriterState fromBytes(byte[] bytes) throws IOException {
-        return MAPPER.readValue(bytes, IcebergWriterState.class);
+    @Override
+    public int hashCode() {
+        return Objects.hash(jobId, operatorId);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        IcebergWriterState that = (IcebergWriterState) obj;
+        return Objects.equals(jobId, that.jobId) && Objects.equals(operatorId, that.operatorId);
     }
 
     @Override
     public String toString() {
-        return "IcebergWriterState{" + "checkpointId=" + checkpointId + '}';
+        return "IcebergWriterState{"
+                + "jobId='"
+                + jobId
+                + '\''
+                + ", operatorId='"
+                + operatorId
+                + '\''
+                + '}';
     }
 }

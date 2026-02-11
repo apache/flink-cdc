@@ -45,6 +45,7 @@ import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /** A {@link Sink} implementation for Apache Iceberg. */
 public class IcebergSink
@@ -62,15 +63,22 @@ public class IcebergSink
 
     private final CompactionOptions compactionOptions;
 
+    private String jobId;
+
+    private String operatorId;
+
     public IcebergSink(
             Map<String, String> catalogOptions,
             Map<String, String> tableOptions,
             ZoneId zoneId,
-            CompactionOptions compactionOptions) {
+            CompactionOptions compactionOptions,
+            String jobIdPrefix) {
         this.catalogOptions = catalogOptions;
         this.tableOptions = tableOptions;
         this.zoneId = zoneId;
         this.compactionOptions = compactionOptions;
+        this.jobId = jobIdPrefix + UUID.randomUUID();
+        this.operatorId = UUID.randomUUID().toString();
     }
 
     @Override
@@ -105,7 +113,9 @@ public class IcebergSink
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
                 zoneId,
-                lastCheckpointId);
+                lastCheckpointId,
+                jobId,
+                operatorId);
     }
 
     @Override
@@ -118,22 +128,32 @@ public class IcebergSink
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
                 zoneId,
-                lastCheckpointId);
+                lastCheckpointId,
+                jobId,
+                operatorId);
     }
 
     @Override
     public StatefulSinkWriter<Event, IcebergWriterState> restoreWriter(
             WriterInitContext context, Collection<IcebergWriterState> writerStates) {
-        // No need to read checkpointId  from state
+        // No need to read checkpointId from state
         long lastCheckpointId =
                 context.getRestoredCheckpointId()
                         .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+        if (writerStates != null && !writerStates.isEmpty()) {
+            IcebergWriterState icebergWriterState = writerStates.iterator().next();
+            jobId = icebergWriterState.getJobId();
+            operatorId = icebergWriterState.getOperatorId();
+        }
+
         return new IcebergWriter(
                 catalogOptions,
                 context.getTaskInfo().getIndexOfThisSubtask(),
                 context.getTaskInfo().getAttemptNumber(),
                 zoneId,
-                lastCheckpointId);
+                lastCheckpointId,
+                jobId,
+                operatorId);
     }
 
     @Override

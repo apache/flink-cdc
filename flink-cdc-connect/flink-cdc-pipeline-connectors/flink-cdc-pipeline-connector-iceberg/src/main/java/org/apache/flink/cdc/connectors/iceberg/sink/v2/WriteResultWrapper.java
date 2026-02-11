@@ -36,10 +36,21 @@ public class WriteResultWrapper implements Serializable {
 
     private final long checkpointId;
 
-    public WriteResultWrapper(WriteResult writeResult, TableId tableId, long checkpointId) {
+    private final String jobId;
+
+    private final String operatorId;
+
+    public WriteResultWrapper(
+            WriteResult writeResult,
+            TableId tableId,
+            long checkpointId,
+            String jobId,
+            String operatorId) {
         this.writeResult = writeResult;
         this.tableId = tableId;
         this.checkpointId = checkpointId;
+        this.jobId = jobId;
+        this.operatorId = operatorId;
     }
 
     public WriteResult getWriteResult() {
@@ -52,6 +63,14 @@ public class WriteResultWrapper implements Serializable {
 
     public long getCheckpointId() {
         return checkpointId;
+    }
+
+    public String getJobId() {
+        return jobId;
+    }
+
+    public String getOperatorId() {
+        return operatorId;
     }
 
     /** Build a simple description for the write result. */
@@ -72,6 +91,10 @@ public class WriteResultWrapper implements Serializable {
                 + tableId
                 + ", CheckpointId: "
                 + checkpointId
+                + ", JobId: "
+                + jobId
+                + ", OperatorId: "
+                + operatorId
                 + ", AddCount: "
                 + addCount
                 + ", DeleteCount: "
