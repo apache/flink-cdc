@@ -17,23 +17,43 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink.v2.metrics;
 
-import org.apache.flink.metrics.Gauge;
+import org.apache.flink.metrics.Counter;
 
 /* This file is based on source code of Apache Fluss Project (https://fluss.apache.org/), licensed by the Apache
  * Software Foundation (ASF) under the Apache License, Version 2.0. See the NOTICE file distributed with this work for
  * additional information regarding copyright ownership. */
 
-/** An implementation of Flink's {@link Gauge} which wraps Fluss's Gauge. */
-public class WrappedFlussGauge<T> implements Gauge<T> {
+/** An implementation of Flink's {@link Counter} which wraps Fluss's Counter. */
+public class WrapperFlussCounter implements Counter {
 
-    private final com.alibaba.fluss.metrics.Gauge<T> flussGauge;
+    private final com.alibaba.fluss.metrics.Counter flussCounter;
 
-    public WrappedFlussGauge(com.alibaba.fluss.metrics.Gauge<T> flussGauge) {
-        this.flussGauge = flussGauge;
+    public WrapperFlussCounter(com.alibaba.fluss.metrics.Counter flussCounter) {
+        this.flussCounter = flussCounter;
     }
 
     @Override
-    public T getValue() {
-        return flussGauge.getValue();
+    public void inc() {
+        flussCounter.inc();
+    }
+
+    @Override
+    public void inc(long n) {
+        flussCounter.inc(n);
+    }
+
+    @Override
+    public void dec() {
+        flussCounter.dec();
+    }
+
+    @Override
+    public void dec(long n) {
+        flussCounter.dec(n);
+    }
+
+    @Override
+    public long getCount() {
+        return flussCounter.getCount();
     }
 }

@@ -145,14 +145,14 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
 
     static Map<Integer, Integer> sanityCheckAndGenerateIndexMapping(
             com.alibaba.fluss.metadata.Schema inferredFlussSchema,
-            com.alibaba.fluss.metadata.Schema currentFlussnewSchema) {
+            com.alibaba.fluss.metadata.Schema currentFlussNewSchema) {
         List<String> inferredSchemaColumnNames = inferredFlussSchema.getColumnNames();
         Map<String, Integer> reverseIndex = new HashMap<>();
         for (int i = 0; i < inferredSchemaColumnNames.size(); i++) {
             reverseIndex.put(inferredSchemaColumnNames.get(i), i);
         }
 
-        List<String> currentSchemaColumnNames = currentFlussnewSchema.getColumnNames();
+        List<String> currentSchemaColumnNames = currentFlussNewSchema.getColumnNames();
         Map<Integer, Integer> indexMapping = new HashMap<>();
         for (int newSchemaIndex = 0;
                 newSchemaIndex < currentSchemaColumnNames.size();
@@ -167,7 +167,7 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
                 // changes.
                 // In the future, meta applier will be used to handle column changes.
                 DataType oldDataType = inferredFlussSchema.getRowType().getTypeAt(oldSchemaIndex);
-                DataType newDataType = currentFlussnewSchema.getRowType().getTypeAt(newSchemaIndex);
+                DataType newDataType = currentFlussNewSchema.getRowType().getTypeAt(newSchemaIndex);
                 if (!oldDataType.copy(false).equals(newDataType.copy(false))) {
                     throw new IllegalArgumentException(
                             "The data type of column "
