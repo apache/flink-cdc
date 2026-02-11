@@ -161,7 +161,7 @@ public class IcebergCommitter implements Committer<WriteResultWrapper> {
 
     private static long getMaxCommittedCheckpointId(
             Iterable<Snapshot> ancestors, String flinkJobId, String operatorId) {
-        long lastCommittedCheckpointId = INITIAL_CHECKPOINT_ID;
+        long lastCommittedCheckpointId = INITIAL_CHECKPOINT_ID - 1;
 
         for (Snapshot ancestor : ancestors) {
             Map<String, String> summary = ancestor.summary();
