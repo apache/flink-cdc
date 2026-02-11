@@ -48,6 +48,9 @@ public class IcebergWriterStateSerializer implements SimpleVersionedSerializer<I
 
     @Override
     public IcebergWriterState deserialize(int version, byte[] serialized) throws IOException {
+        if (version != VERSION) {
+            throw new IOException("Unknown version: " + version);
+        }
         final DataInputDeserializer in = new DataInputDeserializer(serialized);
         return new IcebergWriterState(in.readUTF(), in.readUTF());
     }
