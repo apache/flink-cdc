@@ -116,13 +116,13 @@ public class WrapperFlussMetricRegistry implements MetricRegistry {
     private void registerMetric(MetricGroup metricGroup, Metric metric, String metricName) {
         switch (metric.getMetricType()) {
             case COUNTER:
-                metricGroup.counter(metricName, new WrapperFlussCounter((Counter) metric));
+                metricGroup.counter(metricName, new WrappedFlussCounter((Counter) metric));
                 break;
             case METER:
                 metricGroup.meter(metricName, new WrapperFlussMeter((Meter) metric));
                 break;
             case GAUGE:
-                metricGroup.gauge(metricName, new WrapperFlussGauge<>((Gauge<?>) metric));
+                metricGroup.gauge(metricName, new WrappedFlussGauge<>((Gauge<?>) metric));
                 break;
             case HISTOGRAM:
                 metricGroup.histogram(metricName, new WrapperFlussHistogram((Histogram) metric));
