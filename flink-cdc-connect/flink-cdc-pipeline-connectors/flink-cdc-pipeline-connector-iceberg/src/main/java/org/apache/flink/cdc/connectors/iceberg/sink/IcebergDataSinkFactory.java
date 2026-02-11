@@ -106,6 +106,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 }
             }
         }
+        String jobIdPrefix =
+                context.getFactoryConfiguration().get(IcebergDataSinkOptions.SINK_JOB_ID_PREFIX);
 
         return new IcebergDataSink(
                 catalogOptions,
@@ -113,7 +115,8 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
                 partitionMaps,
                 zoneId,
                 schemaOperatorUid,
-                compactionOptions);
+                compactionOptions,
+                jobIdPrefix);
     }
 
     private CompactionOptions getCompactionStrategy(Configuration configuration) {
@@ -144,6 +147,7 @@ public class IcebergDataSinkFactory implements DataSinkFactory {
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_ENABLED);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_COMMIT_INTERVAL);
         options.add(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM);
+        options.add(IcebergDataSinkOptions.SINK_JOB_ID_PREFIX);
         return options;
     }
 }
