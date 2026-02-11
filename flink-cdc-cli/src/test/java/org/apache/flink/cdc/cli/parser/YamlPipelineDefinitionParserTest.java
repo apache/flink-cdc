@@ -38,9 +38,11 @@ import org.junit.jupiter.api.Test;
 import java.net.URL;
 import java.time.Duration;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
@@ -290,25 +292,36 @@ class YamlPipelineDefinitionParserTest {
                                                 .build())));
     }
 
+    @Test
+    void testMultipleSourceDefinition() throws Exception {
+        URL resource = Resources.getResource("definitions/multiple_source_mtd.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isInstanceOf(PipelineDef.class);
+    }
+
+    SourceDef sourceDef =
+            new SourceDef(
+                    "mysql",
+                    "source-database",
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("host", "localhost")
+                                    .put("port", "3306")
+                                    .put("username", "admin")
+                                    .put("password", "pass")
+                                    .put(
+                                            "tables",
+                                            "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                    .put("chunk-column", "app_order_.*:id,web_order:product_id")
+                                    .put("capture-new-tables", "true")
+                                    .build()));
+    List<SourceDef> sourceDefs = new ArrayList<>(Arrays.asList(new SourceDef[] {sourceDef}));
+
     private final PipelineDef fullDef =
             new PipelineDef(
-                    new SourceDef(
-                            "mysql",
-                            "source-database",
-                            Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
-                                            .put("host", "localhost")
-                                            .put("port", "3306")
-                                            .put("username", "admin")
-                                            .put("password", "pass")
-                                            .put(
-                                                    "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
-                                            .put(
-                                                    "chunk-column",
-                                                    "app_order_.*:id,web_order:product_id")
-                                            .put("capture-new-tables", "true")
-                                            .build())),
+                    null,
+                    sourceDef,
                     new SinkDef(
                             "kafka",
                             "sink-queue",
@@ -428,25 +441,27 @@ class YamlPipelineDefinitionParserTest {
         assertThat(pipelineDef).isEqualTo(fullDef);
     }
 
+    SourceDef fullsourceDef =
+            new SourceDef(
+                    "mysql",
+                    "source-database",
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("host", "localhost")
+                                    .put("port", "3306")
+                                    .put("username", "admin")
+                                    .put("password", "pass")
+                                    .put(
+                                            "tables",
+                                            "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                    .put("chunk-column", "app_order_.*:id,web_order:product_id")
+                                    .put("capture-new-tables", "true")
+                                    .build()));
+
     private final PipelineDef fullDefWithGlobalConf =
             new PipelineDef(
-                    new SourceDef(
-                            "mysql",
-                            "source-database",
-                            Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
-                                            .put("host", "localhost")
-                                            .put("port", "3306")
-                                            .put("username", "admin")
-                                            .put("password", "pass")
-                                            .put(
-                                                    "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
-                                            .put(
-                                                    "chunk-column",
-                                                    "app_order_.*:id,web_order:product_id")
-                                            .put("capture-new-tables", "true")
-                                            .build())),
+                    null,
+                    fullsourceDef,
                     new SinkDef(
                             "kafka",
                             "sink-queue",
@@ -507,21 +522,24 @@ class YamlPipelineDefinitionParserTest {
                                     .put("execution.runtime-mode", "STREAMING")
                                     .build()));
 
+    SourceDef defSourceDef =
+            new SourceDef(
+                    "mysql",
+                    null,
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("host", "localhost")
+                                    .put("port", "3306")
+                                    .put("username", "admin")
+                                    .put("password", "pass")
+                                    .put(
+                                            "tables",
+                                            "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                    .build()));
+
     private final PipelineDef defWithOptional =
             new PipelineDef(
-                    new SourceDef(
-                            "mysql",
-                            null,
-                            Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
-                                            .put("host", "localhost")
-                                            .put("port", "3306")
-                                            .put("username", "admin")
-                                            .put("password", "pass")
-                                            .put(
-                                                    "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
-                                            .build())),
+                    defSourceDef,
                     new SinkDef(
                             "kafka",
                             null,
@@ -548,9 +566,11 @@ class YamlPipelineDefinitionParserTest {
                                     .put("parallelism", "4")
                                     .build()));
 
+    SourceDef mysqlSourceDef = new SourceDef("mysql", null, new Configuration());
+
     private final PipelineDef minimizedDef =
             new PipelineDef(
-                    new SourceDef("mysql", null, new Configuration()),
+                    mysqlSourceDef,
                     new SinkDef(
                             "kafka",
                             null,
@@ -568,25 +588,26 @@ class YamlPipelineDefinitionParserTest {
                             Collections.singletonMap(
                                     "local-time-zone", ZoneId.systemDefault().toString())));
 
+    SourceDef routeRepSymDef =
+            new SourceDef(
+                    "mysql",
+                    "source-database",
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("host", "localhost")
+                                    .put("port", "3306")
+                                    .put("username", "admin")
+                                    .put("password", "pass")
+                                    .put(
+                                            "tables",
+                                            "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
+                                    .put("chunk-column", "app_order_.*:id,web_order:product_id")
+                                    .put("capture-new-tables", "true")
+                                    .build()));
+
     private final PipelineDef fullDefWithRouteRepSym =
             new PipelineDef(
-                    new SourceDef(
-                            "mysql",
-                            "source-database",
-                            Configuration.fromMap(
-                                    ImmutableMap.<String, String>builder()
-                                            .put("host", "localhost")
-                                            .put("port", "3306")
-                                            .put("username", "admin")
-                                            .put("password", "pass")
-                                            .put(
-                                                    "tables",
-                                                    "adb.*, bdb.user_table_[0-9]+, [app|web]_order_.*")
-                                            .put(
-                                                    "chunk-column",
-                                                    "app_order_.*:id,web_order:product_id")
-                                            .put("capture-new-tables", "true")
-                                            .build())),
+                    routeRepSymDef,
                     new SinkDef(
                             "kafka",
                             "sink-queue",

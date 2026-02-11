@@ -41,6 +41,7 @@ public class FactoryHelper {
 
     private final Factory factory;
     private final Factory.Context context;
+    private static final String MULTIPLE_SOURCE_UNIQUE_ID = "source.unique.id";
 
     private FactoryHelper(Factory factory, Factory.Context context) {
         this.factory = factory;
@@ -94,6 +95,10 @@ public class FactoryHelper {
         final Set<String> remainingOptionKeys = new HashSet<>(allOptionKeys);
         remainingOptionKeys.removeAll(consumedOptionKeys);
         if (!remainingOptionKeys.isEmpty()) {
+            if (remainingOptionKeys.size() == 1
+                    && remainingOptionKeys.iterator().next().equals(MULTIPLE_SOURCE_UNIQUE_ID)) {
+                return;
+            }
             throw new ValidationException(
                     String.format(
                             "Unsupported options found for '%s'.\n\n"
