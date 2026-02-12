@@ -57,7 +57,7 @@ public class IcebergDataSinkFactoryTest {
         Configuration conf = Configuration.fromMap(ImmutableMap.<String, String>builder().build());
         conf.set(IcebergDataSinkOptions.WAREHOUSE, "/tmp/warehouse");
         conf.set(IcebergDataSinkOptions.SINK_COMPACTION_PARALLELISM, 4);
-        conf.set(IcebergDataSinkOptions.SINK_JOB_ID_PREFIX, "FlinkCDC");
+        conf.set(IcebergDataSinkOptions.JOB_ID_PREFIX, "FlinkCDC");
         DataSink dataSink =
                 sinkFactory.createDataSink(
                         new FactoryHelper.DefaultContext(
