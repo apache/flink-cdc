@@ -31,7 +31,6 @@ import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.connectors.base.utils.SourceRecordUtils.rowToArray;
 
@@ -156,17 +155,16 @@ public class PostgresQueryUtils {
             boolean isFirstSplit,
             boolean isLastSplit,
             List<String> uuidFields) {
-        return buildSplitQuery(tableId, pkRowType, isFirstSplit, isLastSplit, uuidFields, -1, true);
+        return buildSplitScanQuery(tableId, pkRowType, isFirstSplit, isLastSplit, null, uuidFields);
     }
 
-    private static String buildSplitQuery(
+    public static String buildSplitScanQuery(
             TableId tableId,
             RowType pkRowType,
             boolean isFirstSplit,
             boolean isLastSplit,
-            List<String> uuidFields,
-            int limitSize,
-            boolean isScanningData) {
+            List<String> columnNames,
+            List<String> uuidFields) {
         final String condition;
 
         if (isFirstSplit && isLastSplit) {
@@ -174,11 +172,9 @@ public class PostgresQueryUtils {
         } else if (isFirstSplit) {
             final StringBuilder sql = new StringBuilder();
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ", uuidFields);
-            if (isScanningData) {
-                sql.append(" AND NOT (");
-                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ", uuidFields);
-                sql.append(")");
-            }
+            sql.append(" AND NOT (");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ", uuidFields);
+            sql.append(")");
             condition = sql.toString();
         } else if (isLastSplit) {
             final StringBuilder sql = new StringBuilder();
@@ -187,30 +183,19 @@ public class PostgresQueryUtils {
         } else {
             final StringBuilder sql = new StringBuilder();
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " >= ", uuidFields);
-            if (isScanningData) {
-                sql.append(" AND NOT (");
-                addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ", uuidFields);
-                sql.append(")");
-            }
+            sql.append(" AND NOT (");
+            addPrimaryKeyColumnsToCondition(pkRowType, sql, " = ", uuidFields);
+            sql.append(")");
             sql.append(" AND ");
             addPrimaryKeyColumnsToCondition(pkRowType, sql, " <= ", uuidFields);
             condition = sql.toString();
         }
 
-        if (isScanningData) {
-            return buildSelectWithRowLimits(
-                    tableId, limitSize, "*", Optional.ofNullable(condition), Optional.empty());
-        } else {
-            final String orderBy =
-                    pkRowType.getFieldNames().stream().collect(Collectors.joining(", "));
-            return buildSelectWithBoundaryRowLimits(
-                    tableId,
-                    limitSize,
-                    getPrimaryKeyColumnsProjection(pkRowType),
-                    getMaxPrimaryKeyColumnsProjection(pkRowType),
-                    Optional.ofNullable(condition),
-                    orderBy);
-        }
+        return buildSelectWithRowLimits(
+                tableId,
+                columnNames == null ? "*" : String.join(",", columnNames),
+                Optional.ofNullable(condition),
+                Optional.empty());
     }
 
     public static PreparedStatement readTableSplitDataStatement(
@@ -330,7 +315,6 @@ public class PostgresQueryUtils {
 
     private static String buildSelectWithRowLimits(
             TableId tableId,
-            int limit,
             String projection,
             Optional<String> condition,
             Optional<String> orderBy) {
@@ -342,9 +326,6 @@ public class PostgresQueryUtils {
         }
         if (orderBy.isPresent()) {
             sql.append(" ORDER BY ").append(orderBy.get());
-        }
-        if (limit > 0) {
-            sql.append(" LIMIT ").append(limit);
         }
         return sql.toString();
     }
