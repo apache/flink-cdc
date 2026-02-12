@@ -244,6 +244,22 @@ public class MySqlSourceOptions {
                             "Whether capture the scan the newly added tables or not, by default is false. This option is only useful when we start the job from a savepoint/checkpoint.");
 
     @Experimental
+    public static final ConfigOption<Boolean> SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED =
+            ConfigOptions.key("scan.binlog.newly-added-table.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "In binlog reading stage, whether to capture newly added tables "
+                                    + "that match the table patterns. When enabled, new tables will be "
+                                    + "captured without snapshot, only binlog events will be emitted. "
+                                    + "Cannot be enabled together with 'scan.newly-added-table.enabled'. "
+                                    + "table-name pattern examples: "
+                                    + "'db\\.*' (all tables in database 'db'), "
+                                    + "'db\\.user_\\.*' (tables like 'user_orders', 'user_profiles'), "
+                                    + "'db\\.order_[0-9]+' (tables like 'order_1', 'order_2'), "
+                                    + "'db1\\.*,db2\\.user_\\.*' (all tables in 'db1' and 'user_*' tables in 'db2').");
+
+    @Experimental
     public static final ConfigOption<String> SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN =
             ConfigOptions.key("scan.incremental.snapshot.chunk.key-column")
                     .stringType()
