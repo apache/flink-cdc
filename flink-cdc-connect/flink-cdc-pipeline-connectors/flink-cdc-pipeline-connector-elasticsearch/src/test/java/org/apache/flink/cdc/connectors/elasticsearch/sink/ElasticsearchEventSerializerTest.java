@@ -90,6 +90,21 @@ public class ElasticsearchEventSerializerTest {
         assertThat(index).isEqualTo("test$2025-01-01");
     }
 
+    @Test
+    void testSchemaChangeEventReturnsNull() {
+        Schema tableSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
+                        .primaryKey("id")
+                        .build();
+
+        ElasticsearchEventSerializer serializer =
+                new ElasticsearchEventSerializer(ZoneId.of("UTC"));
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, tableSchema);
+        assertThat(serializer.apply(createTableEvent, new MockContext())).isNull();
+    }
+
     private String getShardingString(Map<TableId, String> shardingKey, String shardingSeparator) {
         RowType rowType =
                 RowType.of(
