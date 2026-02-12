@@ -149,8 +149,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     void testReadSingleBinlogSplit() throws Exception {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -202,8 +204,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
             throws Exception {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {tableName}, true);
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -300,8 +304,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     void testReadAllBinlogSplitsForOneTable() throws Exception {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customers_even_dist"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -348,8 +354,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
     void testReadAllBinlogForTableWithSingleLine() throws Exception {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig = getConfig(new String[] {"customer_card_single_line"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         final DataType dataType =
                 DataTypes.ROW(
@@ -384,8 +392,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(new String[] {"customer_card", "customer_card_single_line"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
         final DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("card_no", DataTypes.BIGINT()),
@@ -441,8 +451,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(StartupOptions.latest(), new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         // Create reader and submit splits
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
@@ -488,8 +500,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         customerDatabaseNoGtid,
                         StartupOptions.latest(),
                         new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         // Create reader and submit splits
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
@@ -531,8 +545,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(StartupOptions.earliest(), new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         // Create reader and submit splits
         MySqlBinlogSplit split = createBinlogSplit(sourceConfig);
@@ -595,8 +611,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(StartupOptions.earliest(), new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
         String tableId = customerDatabase.qualifiedTableName("customers");
         DataType dataType =
                 DataTypes.ROW(
@@ -629,8 +647,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         customerDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -683,8 +703,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         customerDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -738,8 +760,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         customerDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -874,8 +898,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         customerDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -929,8 +955,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Preparations
         customerDatabase.createAndInitialize();
         MySqlSourceConfig connectionConfig = getConfig(new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
         DataType dataType =
                 DataTypes.ROW(
                         DataTypes.FIELD("id", DataTypes.BIGINT()),
@@ -1011,8 +1039,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
                         .heartbeatInterval(heartbeatInterval)
                         .debeziumProperties(dbzProps)
                         .createConfig(0);
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         // Create binlog reader and submit split
         BinlogSplitReader binlogReader = createBinlogReader(sourceConfig);
@@ -1045,8 +1075,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         inventoryDatabase8.createAndInitialize();
         MySqlSourceConfig connectionConfig =
                 getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
 
         // Capture the current binlog offset, and we will start the reader from here
         BinlogOffset startingOffset = DebeziumUtils.currentBinlogOffset(mySqlConnection);
@@ -1104,8 +1136,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         inventoryDatabase8.createAndInitialize();
         MySqlSourceConfig connectionConfig =
                 getConfig(MYSQL8_CONTAINER, inventoryDatabase8, new String[] {"products"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(connectionConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(connectionConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        connectionConfig.getDbzConfiguration(), mySqlConnection);
 
         // Capture the current binlog offset, and use it to mock restoring from checkpoint
         BinlogOffset checkpointOffset = DebeziumUtils.currentBinlogOffset(mySqlConnection);
@@ -1149,8 +1183,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         MySqlSourceConfig sourceConfig =
                 getConfig(
                         MYSQL_CONTAINER_NOGTID, customerDatabaseNoGtid, new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         // step-1: split snapshot
         List<MySqlSnapshotSplit> snapshotSplits =
@@ -1208,8 +1244,10 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         customerDatabase.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(StartupOptions.latest(), new String[] {"customers"});
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
 
         // Create reader and submit splits
         StatefulTaskContext statefulTaskContext =

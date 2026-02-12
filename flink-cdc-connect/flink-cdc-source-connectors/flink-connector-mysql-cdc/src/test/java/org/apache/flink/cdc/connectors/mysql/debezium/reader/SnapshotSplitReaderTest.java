@@ -70,8 +70,10 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
         customer3_0Database.createAndInitialize();
         MySqlSourceConfig sourceConfig =
                 getConfig(customerDatabase, new String[] {"customers"}, 10);
-        binaryLogClient = DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
     }
 
     @AfterAll
@@ -115,9 +117,10 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
     void testReadSingleSnapshotSplitWithDotName() throws Exception {
         MySqlSourceConfig sourceConfig =
                 getConfig(customer3_0Database, new String[] {"customers3.0"}, 4);
-        BinaryLogClient binaryLogClient =
-                DebeziumUtils.createBinaryClient(sourceConfig.getDbzConfiguration());
         MySqlConnection mySqlConnection = DebeziumUtils.createMySqlConnection(sourceConfig);
+        BinaryLogClient binaryLogClient =
+                DebeziumUtils.createBinaryClient(
+                        sourceConfig.getDbzConfiguration(), mySqlConnection);
         StatefulTaskContext statefulTaskContext =
                 new StatefulTaskContext(sourceConfig, binaryLogClient, mySqlConnection);
         final DataType dataType =

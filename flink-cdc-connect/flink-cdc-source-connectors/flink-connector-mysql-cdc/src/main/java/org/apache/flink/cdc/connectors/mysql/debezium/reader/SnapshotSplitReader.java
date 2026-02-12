@@ -37,6 +37,7 @@ import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadF
 
 import io.debezium.config.Configuration;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.connector.mysql.MySqlOffsetContext;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
@@ -99,13 +100,15 @@ public class SnapshotSplitReader implements DebeziumReader<SourceRecords, MySqlS
 
     public SnapshotSplitReader(
             MySqlSourceConfig sourceConfig, int subtaskId, SnapshotPhaseHooks hooks) {
-        this(
-                new StatefulTaskContext(
-                        sourceConfig,
-                        createBinaryClient(sourceConfig.getDbzConfiguration()),
-                        createMySqlConnection(sourceConfig)),
-                subtaskId,
-                hooks);
+        this(createStatefulTaskContext(sourceConfig), subtaskId, hooks);
+    }
+
+    private static StatefulTaskContext createStatefulTaskContext(MySqlSourceConfig sourceConfig) {
+        MySqlConnection connection = createMySqlConnection(sourceConfig);
+        return new StatefulTaskContext(
+                sourceConfig,
+                createBinaryClient(sourceConfig.getDbzConfiguration(), connection),
+                connection);
     }
 
     public SnapshotSplitReader(

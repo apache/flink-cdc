@@ -39,6 +39,7 @@ import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadF
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import io.debezium.connector.base.ChangeEventQueue;
+import io.debezium.connector.mysql.MySqlConnection;
 import io.debezium.connector.mysql.MySqlStreamingChangeEventSourceMetrics;
 import io.debezium.pipeline.DataChangeEvent;
 import io.debezium.relational.TableId;
@@ -96,12 +97,15 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private static final long READER_CLOSE_TIMEOUT = 30L;
 
     public BinlogSplitReader(MySqlSourceConfig sourceConfig, int subtaskId) {
-        this(
-                new StatefulTaskContext(
-                        sourceConfig,
-                        createBinaryClient(sourceConfig.getDbzConfiguration()),
-                        createMySqlConnection(sourceConfig)),
-                subtaskId);
+        this(createStatefulTaskContext(sourceConfig), subtaskId);
+    }
+
+    private static StatefulTaskContext createStatefulTaskContext(MySqlSourceConfig sourceConfig) {
+        MySqlConnection connection = createMySqlConnection(sourceConfig);
+        return new StatefulTaskContext(
+                sourceConfig,
+                createBinaryClient(sourceConfig.getDbzConfiguration(), connection),
+                connection);
     }
 
     public BinlogSplitReader(StatefulTaskContext statefulTaskContext, int subtaskId) {
