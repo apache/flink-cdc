@@ -24,6 +24,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.reader.SnapshotSplitReader
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSnapshotSplit;
+import org.apache.flink.cdc.connectors.mysql.source.utils.SnapshotFilterUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.StatementUtils;
 import org.apache.flink.cdc.connectors.mysql.source.utils.hooks.SnapshotPhaseHooks;
 
@@ -242,12 +243,24 @@ public class MySqlSnapshotSplitReadTask
         long exportStart = clock.currentTimeInMillis();
         LOG.info("Exporting data from split '{}' of table {}", snapshotSplit.splitId(), table.id());
 
+        String filter =
+                SnapshotFilterUtils.getSnapshotFilter(
+                        sourceConfig.getSnapshotFilters(), table.id());
+        if (filter != null) {
+            LOG.info(
+                    "Filter for split '{}' of table {} is: {}",
+                    snapshotSplit.splitId(),
+                    table.id(),
+                    filter);
+        }
+
         final String selectSql =
                 StatementUtils.buildSplitScanQuery(
                         snapshotSplit.getTableId(),
                         snapshotSplit.getSplitKeyType(),
                         snapshotSplit.getSplitStart() == null,
-                        snapshotSplit.getSplitEnd() == null);
+                        snapshotSplit.getSplitEnd() == null,
+                        filter);
         LOG.info(
                 "For split '{}' of table {} using select statement: '{}'",
                 snapshotSplit.splitId(),
