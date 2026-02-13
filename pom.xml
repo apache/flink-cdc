@@ -564,6 +564,7 @@ limitations under the License.
                     <trimStackTrace>false</trimStackTrace>
                     <systemPropertyVariables>
                         <forkNumber>0${surefire.forkNumber}</forkNumber>
+                        <api.version>1.44</api.version>
                     </systemPropertyVariables>
                     <!-- Prevent ORA-01882: timezone region not found errors due to the Oracle DB
                          does not understand some time zone which used in Ubuntu OS -->
