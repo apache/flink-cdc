@@ -20,27 +20,16 @@
 # file with configuration.  For more information, see:
 # https://github.com/actions/labeler
 
-name: Labeler
-
+name: Labeler-Trigger
 on:
-  workflow_run:
-    workflows: [Labeler-Trigger]
-    types: [requested]
-
-permissions:
-  checks: write
-  contents: read
-  pull-requests: write
+  pull_request:
+    branches:
+      - master
+      - release-*
 
 jobs:
   label:
     runs-on: ubuntu-latest
-    permissions:
-      checks: write
-      contents: read
-      pull-requests: write
-
     steps:
-      - uses: actions/labeler@v6
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+      - name: "Do nothing. Just triggers corresponding workflow."
+        run: echo
