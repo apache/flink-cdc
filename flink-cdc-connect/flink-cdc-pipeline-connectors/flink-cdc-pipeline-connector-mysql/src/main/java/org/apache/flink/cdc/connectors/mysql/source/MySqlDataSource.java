@@ -67,6 +67,7 @@ public class MySqlDataSource implements DataSource {
                                 RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS.name(),
                                 false);
 
+        boolean isTableIdCaseInsensitive = MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig);
         MySqlEventDeserializer deserializer =
                 new MySqlEventDeserializer(
                         DebeziumChangelogMode.ALL,
@@ -74,7 +75,7 @@ public class MySqlDataSource implements DataSource {
                         readableMetadataList,
                         includeComments,
                         sourceConfig.isTreatTinyInt1AsBoolean(),
-                        MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig));
+                        isTableIdCaseInsensitive);
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
@@ -82,7 +83,10 @@ public class MySqlDataSource implements DataSource {
                         deserializer,
                         (sourceReaderMetrics, sourceConfig) ->
                                 new MySqlPipelineRecordEmitter(
-                                        deserializer, sourceReaderMetrics, sourceConfig));
+                                        deserializer,
+                                        sourceReaderMetrics,
+                                        sourceConfig,
+                                        isTableIdCaseInsensitive));
 
         return FlinkSourceProvider.of(source);
     }
