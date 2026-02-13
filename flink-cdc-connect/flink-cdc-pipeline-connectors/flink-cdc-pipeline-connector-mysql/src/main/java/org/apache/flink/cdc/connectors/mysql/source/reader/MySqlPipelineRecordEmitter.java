@@ -238,7 +238,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                             meta.setUnique("UNI".equalsIgnoreCase(rs.getString("Key")));
                             meta.setDefaultValue(rs.getString("Default"));
                             meta.setExtra(rs.getString("Extra"));
-                            if (meta.isKey()) {
+                            if (meta.isKey() && !sourceConfig.isScanReadChangelogAsAppendOnly()) {
                                 primaryKeys.add(meta.getColumnName());
                             }
                             fieldMetas.add(meta);
@@ -276,7 +276,9 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
         tableBuilder.comment(table.comment());
 
         List<String> primaryKey = table.primaryKeyColumnNames();
-        if (Objects.nonNull(primaryKey) && !primaryKey.isEmpty()) {
+        if (Objects.nonNull(primaryKey)
+                && !primaryKey.isEmpty()
+                && !sourceConfig.isScanReadChangelogAsAppendOnly()) {
             tableBuilder.primaryKey(primaryKey);
         }
         return tableBuilder.build();
@@ -299,6 +301,7 @@ public class MySqlPipelineRecordEmitter extends MySqlRecordEmitter<Event> {
                                     RelationalDatabaseConnectorConfig.INCLUDE_SCHEMA_COMMENTS
                                             .name(),
                                     false);
+            boolean appendOnly = sourceConfig.isScanReadChangelogAsAppendOnly();
             mySqlAntlrDdlParser =
                     new MySqlAntlrDdlParser(
                             true, false, includeComments, null, Tables.TableFilter.includeAll());

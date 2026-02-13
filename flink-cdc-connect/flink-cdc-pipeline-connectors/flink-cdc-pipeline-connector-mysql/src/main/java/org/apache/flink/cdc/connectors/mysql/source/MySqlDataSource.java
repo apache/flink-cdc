@@ -74,7 +74,8 @@ public class MySqlDataSource implements DataSource {
                         readableMetadataList,
                         includeComments,
                         sourceConfig.isTreatTinyInt1AsBoolean(),
-                        MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig));
+                        MySqlSchemaUtils.isTableIdCaseInsensitive(sourceConfig),
+                        sourceConfig.isScanReadChangelogAsAppendOnly());
 
         MySqlSource<Event> source =
                 new MySqlSource<>(
@@ -99,7 +100,9 @@ public class MySqlDataSource implements DataSource {
 
     @Override
     public SupportedMetadataColumn[] supportedMetadataColumns() {
-        return new SupportedMetadataColumn[] {new OpTsMetadataColumn()};
+        return new SupportedMetadataColumn[] {
+            new OpTsMetadataColumn(), new RowKindMetadataColumn()
+        };
     }
 
     @Override
