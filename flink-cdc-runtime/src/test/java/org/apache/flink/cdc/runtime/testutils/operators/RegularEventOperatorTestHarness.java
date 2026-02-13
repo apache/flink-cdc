@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
@@ -121,6 +122,7 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
                         new CollectingMetadataApplier(
                                 schemaEvolveDuration, enabledEventTypes, errorsOnEventTypes),
                         new ArrayList<>(),
+                        RouteMode.ALL_MATCH,
                         behavior,
                         rpcTimeout);
         schemaRegistryGateway = new TestingSchemaRegistryGateway(schemaRegistry);

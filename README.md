@@ -100,6 +100,7 @@ SELECT * FROM test_table;
    pipeline:
      name: Sync MySQL Database to Doris
      parallelism: 2
+     route-mode: ALL_MATCH
      user-defined-function:
        - name: addone
          classpath: com.example.functions.AddOneFunctionClass

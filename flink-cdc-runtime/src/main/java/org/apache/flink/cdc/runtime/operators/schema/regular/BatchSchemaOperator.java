@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
@@ -58,6 +59,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     // Final fields that are set in constructor
     private final String timezone;
     private final List<RouteRule> routingRules;
+    private final RouteMode routeMode;
 
     // Transient fields that are set during open()
     private transient volatile Map<TableId, Schema> originalSchemaMap;
@@ -69,10 +71,14 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
     private boolean alreadyMergedCreateTableTables = false;
 
     public BatchSchemaOperator(
-            List<RouteRule> routingRules, MetadataApplier metadataApplier, String timezone) {
+            List<RouteRule> routingRules,
+            RouteMode routeMode,
+            MetadataApplier metadataApplier,
+            String timezone) {
         this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.metadataApplier = metadataApplier;
     }
 
@@ -89,7 +95,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
         super.open();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
-        this.router = new TableIdRouter(routingRules);
+        this.router = new TableIdRouter(routingRules, routeMode);
         this.derivator = new SchemaDerivator();
         this.schemaManager = new SchemaManager(SchemaChangeBehavior.IGNORE);
     }

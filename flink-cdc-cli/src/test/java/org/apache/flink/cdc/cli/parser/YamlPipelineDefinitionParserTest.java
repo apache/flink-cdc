@@ -198,6 +198,15 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testRouteMode() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-route-mode.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithRouteMode);
+    }
+
+    @Test
     void testSchemaEvolutionTypesConfiguration() throws Exception {
         testSchemaEvolutionTypesParsing(
                 "evolve",
@@ -668,5 +677,61 @@ class YamlPipelineDefinitionParserTest {
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "1")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithRouteMode =
+            new PipelineDef(
+                    new SourceDef(
+                            "mysql",
+                            null,
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("hostname", "localhost")
+                                            .put("port", "3306")
+                                            .put("username", "root")
+                                            .put("password", "123456")
+                                            .put("tables", "mydb.\\.*")
+                                            .put("server-id", "5400-5404")
+                                            .put("server-time-zone", "UTC")
+                                            .build())),
+                    new SinkDef(
+                            "doris",
+                            null,
+                            Configuration.fromMap(
+                                    ImmutableMap.<String, String>builder()
+                                            .put("fenodes", "127.0.0.1:8030")
+                                            .put("username", "root")
+                                            .put("password", "")
+                                            .build()),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Arrays.asList(
+                            new RouteDef(
+                                    "mydb.order_.*",
+                                    "ods_db.ods_orders",
+                                    null,
+                                    "Merge all order sharded tables"),
+                            new RouteDef(
+                                    "mydb.product_.*",
+                                    "ods_db.ods_products",
+                                    null,
+                                    "Merge all product sharded tables"),
+                            new RouteDef(
+                                    "mydb.*",
+                                    "ods_db.ods_<>",
+                                    "<>",
+                                    "One-to-one mapping for other tables")),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Collections.emptyList(),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("name", "mysql_to_doris_with_route_match_mode")
+                                    .put("parallelism", "2")
+                                    .put("route-mode", "FIRST_MATCH")
                                     .build()));
 }

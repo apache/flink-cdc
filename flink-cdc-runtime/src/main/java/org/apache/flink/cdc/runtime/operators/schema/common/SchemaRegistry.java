@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.schema.common;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
@@ -87,6 +88,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
     protected final MetadataApplier metadataApplier;
     protected final Duration rpcTimeout;
     protected final List<RouteRule> routingRules;
+    protected final RouteMode routeMode;
     protected final SchemaChangeBehavior behavior;
 
     // -------------------------
@@ -104,6 +106,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
             ExecutorService coordinatorExecutor,
             MetadataApplier metadataApplier,
             List<RouteRule> routingRules,
+            RouteMode routeMode,
             SchemaChangeBehavior schemaChangeBehavior,
             Duration rpcTimeout) {
         this.context = context;
@@ -111,6 +114,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.coordinatorExecutor = coordinatorExecutor;
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
+        this.routeMode = routeMode;
         this.rpcTimeout = rpcTimeout;
         this.behavior = schemaChangeBehavior;
     }
@@ -127,7 +131,7 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         if (this.schemaManager == null) {
             this.schemaManager = new SchemaManager();
         }
-        this.router = new TableIdRouter(routingRules);
+        this.router = new TableIdRouter(routingRules, routeMode);
     }
 
     @Override

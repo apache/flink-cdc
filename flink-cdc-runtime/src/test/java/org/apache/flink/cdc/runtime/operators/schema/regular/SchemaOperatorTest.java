@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
@@ -122,7 +123,7 @@ class SchemaOperatorTest {
     @Test
     void testProcessSchemaChangeEventWithTimeOut() throws Exception {
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(1));
+                new SchemaOperator(new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(1));
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDuration(
                         schemaOperator, 1, Duration.ofSeconds(3));
@@ -141,7 +142,7 @@ class SchemaOperatorTest {
     @Test
     void testProcessSchemaChangeEventWithOutTimeOut() throws Exception {
         SchemaOperator schemaOperator =
-                new SchemaOperator(new ArrayList<>(), Duration.ofSeconds(30));
+                new SchemaOperator(new ArrayList<>(), RouteMode.ALL_MATCH, Duration.ofSeconds(30));
         RegularEventOperatorTestHarness<SchemaOperator, Event> harness =
                 RegularEventOperatorTestHarness.withDuration(
                         schemaOperator, 1, Duration.ofSeconds(3));
