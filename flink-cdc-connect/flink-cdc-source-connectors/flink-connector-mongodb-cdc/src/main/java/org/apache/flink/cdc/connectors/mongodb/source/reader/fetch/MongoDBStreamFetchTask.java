@@ -221,6 +221,10 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         } catch (Exception e) {
             LOG.error("Poll change stream records failed ", e);
             throw e;
+        } catch (Throwable t) {
+            // Handle error
+            LOG.error("Fatal error when polling change stream records: ", t);
+            throw new RuntimeException("Fatal error when polling change stream records", t);
         } finally {
             taskRunning = false;
             if (changeStreamCursor != null) {
