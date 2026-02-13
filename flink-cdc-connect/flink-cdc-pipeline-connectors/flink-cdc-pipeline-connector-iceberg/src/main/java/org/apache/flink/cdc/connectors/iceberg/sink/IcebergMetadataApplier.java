@@ -183,7 +183,6 @@ public class IcebergMetadataApplier implements MetadataApplier {
                         catalog.createTable(
                                 tableIdentifier, icebergSchema, partitionSpec, tableOptions);
 
-                // Step3: Apply default values if any columns have them.
                 applyDefaultValues(table, cdcSchema);
 
                 LOG.info(
