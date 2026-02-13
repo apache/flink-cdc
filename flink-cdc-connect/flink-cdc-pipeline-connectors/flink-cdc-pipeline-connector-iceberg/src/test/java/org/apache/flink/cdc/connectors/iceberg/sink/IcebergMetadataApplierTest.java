@@ -35,6 +35,7 @@ import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -149,17 +150,20 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                // id: "AUTO_DECREMENT()" is unparseable, no default
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                // name: "John Smith" is a valid string default
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
                                 Types.NestedField.builder()
                                         .withId(2)
                                         .asRequired()
                                         .withName("name")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for name")
-                                        .withWriteDefault("John Smith")
+                                        .withWriteDefault(Literal.of("John Smith"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(3)
@@ -167,7 +171,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("tinyIntCol")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("column for tinyIntCol")
-                                        .withWriteDefault(1)
+                                        .withWriteDefault(Literal.of(1))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(4)
@@ -175,7 +179,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("description")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for descriptions")
-                                        .withWriteDefault("not important")
+                                        .withWriteDefault(Literal.of("not important"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(5)
@@ -183,7 +187,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("bool_column")
                                         .ofType(Types.BooleanType.get())
                                         .withDoc("column for bool")
-                                        .withWriteDefault(false)
+                                        .withWriteDefault(Literal.of(false))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(6)
@@ -191,7 +195,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("float_column")
                                         .ofType(Types.FloatType.get())
                                         .withDoc("column for float")
-                                        .withWriteDefault(1.0f)
+                                        .withWriteDefault(Literal.of(1.0f))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(7)
@@ -199,7 +203,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("double_column")
                                         .ofType(Types.DoubleType.get())
                                         .withDoc("column for double")
-                                        .withWriteDefault(1.0d)
+                                        .withWriteDefault(Literal.of(1.0d))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(8)
@@ -207,7 +211,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("decimal_column")
                                         .ofType(Types.DecimalType.of(10, 2))
                                         .withDoc("column for decimal")
-                                        .withWriteDefault(new BigDecimal("1.00"))
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
                                         .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
@@ -229,15 +233,20 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
                                 Types.NestedField.builder()
                                         .withId(2)
                                         .asRequired()
                                         .withName("name")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for name")
-                                        .withWriteDefault("John Smith")
+                                        .withWriteDefault(Literal.of("John Smith"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(3)
@@ -245,7 +254,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("tinyIntCol")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("column for tinyIntCol")
-                                        .withWriteDefault(1)
+                                        .withWriteDefault(Literal.of(1))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(4)
@@ -253,7 +262,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("description")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for descriptions")
-                                        .withWriteDefault("not important")
+                                        .withWriteDefault(Literal.of("not important"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(5)
@@ -261,7 +270,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("bool_column")
                                         .ofType(Types.BooleanType.get())
                                         .withDoc("column for bool")
-                                        .withWriteDefault(false)
+                                        .withWriteDefault(Literal.of(false))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(6)
@@ -269,7 +278,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("float_column")
                                         .ofType(Types.FloatType.get())
                                         .withDoc("column for float")
-                                        .withWriteDefault(1.0f)
+                                        .withWriteDefault(Literal.of(1.0f))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(7)
@@ -277,7 +286,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("double_column")
                                         .ofType(Types.DoubleType.get())
                                         .withDoc("column for double")
-                                        .withWriteDefault(1.0d)
+                                        .withWriteDefault(Literal.of(1.0d))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(8)
@@ -285,7 +294,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("decimal_column")
                                         .ofType(Types.DecimalType.of(10, 2))
                                         .withDoc("column for decimal")
-                                        .withWriteDefault(new BigDecimal("1.00"))
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(9)
@@ -293,7 +302,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("newIntColumn")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("comment for newIntColumn")
-                                        .withWriteDefault(42)
+                                        .withWriteDefault(Literal.of(42))
                                         .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
@@ -307,15 +316,20 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
                                 Types.NestedField.builder()
                                         .withId(2)
                                         .asRequired()
                                         .withName("name")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for name")
-                                        .withWriteDefault("John Smith")
+                                        .withWriteDefault(Literal.of("John Smith"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(3)
@@ -323,7 +337,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("tinyIntCol")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("column for tinyIntCol")
-                                        .withWriteDefault(1)
+                                        .withWriteDefault(Literal.of(1))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(5)
@@ -331,7 +345,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("bool_column")
                                         .ofType(Types.BooleanType.get())
                                         .withDoc("column for bool")
-                                        .withWriteDefault(false)
+                                        .withWriteDefault(Literal.of(false))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(6)
@@ -339,7 +353,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("float_column")
                                         .ofType(Types.FloatType.get())
                                         .withDoc("column for float")
-                                        .withWriteDefault(1.0f)
+                                        .withWriteDefault(Literal.of(1.0f))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(7)
@@ -347,7 +361,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("double_column")
                                         .ofType(Types.DoubleType.get())
                                         .withDoc("column for double")
-                                        .withWriteDefault(1.0d)
+                                        .withWriteDefault(Literal.of(1.0d))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(8)
@@ -355,7 +369,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("decimal_column")
                                         .ofType(Types.DecimalType.of(10, 2))
                                         .withDoc("column for decimal")
-                                        .withWriteDefault(new BigDecimal("1.00"))
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(9)
@@ -363,7 +377,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("newIntColumn")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("comment for newIntColumn")
-                                        .withWriteDefault(42)
+                                        .withWriteDefault(Literal.of(42))
                                         .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
@@ -377,15 +391,20 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
                                 Types.NestedField.builder()
                                         .withId(2)
                                         .asRequired()
                                         .withName("name")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for name")
-                                        .withWriteDefault("John Smith")
+                                        .withWriteDefault(Literal.of("John Smith"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(3)
@@ -393,7 +412,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("tinyIntCol")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("column for tinyIntCol")
-                                        .withWriteDefault(1)
+                                        .withWriteDefault(Literal.of(1))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(5)
@@ -401,7 +420,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("bool_column")
                                         .ofType(Types.BooleanType.get())
                                         .withDoc("column for bool")
-                                        .withWriteDefault(false)
+                                        .withWriteDefault(Literal.of(false))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(6)
@@ -409,7 +428,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("float_column")
                                         .ofType(Types.FloatType.get())
                                         .withDoc("column for float")
-                                        .withWriteDefault(1.0f)
+                                        .withWriteDefault(Literal.of(1.0f))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(7)
@@ -417,7 +436,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("double_column")
                                         .ofType(Types.DoubleType.get())
                                         .withDoc("column for double")
-                                        .withWriteDefault(1.0d)
+                                        .withWriteDefault(Literal.of(1.0d))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(8)
@@ -425,7 +444,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("decimal_column")
                                         .ofType(Types.DecimalType.of(10, 2))
                                         .withDoc("column for decimal")
-                                        .withWriteDefault(new BigDecimal("1.00"))
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(9)
@@ -433,7 +452,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("renamedIntColumn")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("comment for newIntColumn")
-                                        .withWriteDefault(42)
+                                        .withWriteDefault(Literal.of(42))
                                         .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
@@ -448,15 +467,20 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
                                 Types.NestedField.builder()
                                         .withId(2)
                                         .asRequired()
                                         .withName("name")
                                         .ofType(Types.StringType.get())
                                         .withDoc("column for name")
-                                        .withWriteDefault("John Smith")
+                                        .withWriteDefault(Literal.of("John Smith"))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(3)
@@ -464,7 +488,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("tinyIntCol")
                                         .ofType(Types.IntegerType.get())
                                         .withDoc("column for tinyIntCol")
-                                        .withWriteDefault(1)
+                                        .withWriteDefault(Literal.of(1))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(5)
@@ -472,7 +496,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("bool_column")
                                         .ofType(Types.BooleanType.get())
                                         .withDoc("column for bool")
-                                        .withWriteDefault(false)
+                                        .withWriteDefault(Literal.of(false))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(6)
@@ -480,7 +504,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("float_column")
                                         .ofType(Types.FloatType.get())
                                         .withDoc("column for float")
-                                        .withWriteDefault(1.0f)
+                                        .withWriteDefault(Literal.of(1.0f))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(7)
@@ -488,7 +512,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("double_column")
                                         .ofType(Types.DoubleType.get())
                                         .withDoc("column for double")
-                                        .withWriteDefault(1.0d)
+                                        .withWriteDefault(Literal.of(1.0d))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(8)
@@ -496,7 +520,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("decimal_column")
                                         .ofType(Types.DecimalType.of(10, 2))
                                         .withDoc("column for decimal")
-                                        .withWriteDefault(new BigDecimal("1.00"))
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
                                         .build(),
                                 Types.NestedField.builder()
                                         .withId(9)
@@ -504,7 +528,7 @@ public class IcebergMetadataApplierTest {
                                         .withName("renamedIntColumn")
                                         .ofType(Types.LongType.get())
                                         .withDoc("comment for newIntColumn")
-                                        .withWriteDefault(42L)
+                                        .withWriteDefault(Literal.of(42L))
                                         .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
