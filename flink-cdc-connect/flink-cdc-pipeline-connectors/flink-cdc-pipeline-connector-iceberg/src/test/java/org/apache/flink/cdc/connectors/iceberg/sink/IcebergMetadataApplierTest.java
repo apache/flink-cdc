@@ -216,6 +216,70 @@ public class IcebergMetadataApplierTest {
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
+        // Verify that schema without default values is NOT the same.
+        org.apache.iceberg.Schema schemaWithoutDefaults =
+                new org.apache.iceberg.Schema(
+                        0,
+                        Arrays.asList(
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(4)
+                                        .asOptional()
+                                        .withName("description")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for descriptions")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .build()),
+                        new HashSet<>(Collections.singletonList(1)));
+        assertThat(table.schema().sameSchema(schemaWithoutDefaults)).isFalse();
+
         // Add column with default value.
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(
