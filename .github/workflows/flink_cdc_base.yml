@@ -18,18 +18,18 @@ name: Flink CDC Base Workflow
 on:
   workflow_call:
     inputs:
-      java-version:
+      java-versions:
         description: "Jdk versions to test against."
         required: false
         type: string
-        default: "['8']"
-      flink-version:
+        default: "['11']"
+      flink-versions:
         description: "Flink versions to test against."
         required: false
         type: string
         default: "['generic']"
-      module:
-        description: "Flink CDC module to test against."
+      modules:
+        description: "Flink CDC modules to test against."
         required: true
         type: string
       parallelism:
@@ -42,76 +42,17 @@ on:
         required: false
         type: string
 
-env:
-  MODULES_CORE: "\
-  flink-cdc-cli,\
-  flink-cdc-common,\
-  flink-cdc-composer,\
-  flink-cdc-runtime,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-cdc-base"
-
-  MODULES_PIPELINE_CONNECTORS: "\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-mysql,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-starrocks,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-kafka,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-paimon,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-oceanbase,\
-  flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-maxcompute"
-
-  MODULES_MYSQL: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mysql-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mysql-cdc"
-
-  MODULES_POSTGRES: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-postgres-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-postgres-cdc"
-
-  MODULES_ORACLE: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oracle-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oracle-cdc"
-
-  MODULES_MONGODB: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-mongodb-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-mongodb-cdc"
-
-  MODULES_SQLSERVER: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-sqlserver-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-sqlserver-cdc"
-
-  MODULES_TIDB: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-tidb-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-tidb-cdc"
-
-  MODULES_OCEANBASE: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-oceanbase-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-oceanbase-cdc"
-
-  MODULES_DB2: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-db2-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-db2-cdc"
-
-  MODULES_VITESS: "\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-connector-vitess-cdc,\
-  flink-cdc-connect/flink-cdc-source-connectors/flink-sql-connector-vitess-cdc"
-
-  MODULES_PIPELINE_E2E: "\
-  flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
-
-  MODULES_SOURCE_E2E: "\
-  flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
-
 jobs:
-  compile_and_test:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
+      max-parallel: 20
       fail-fast: false
       matrix:
-        java-version: ${{ fromJSON(inputs.java-version) }}
-        flink-version: ${{ fromJSON(inputs.flink-version) }}
+        java-version: ${{ fromJSON(inputs.java-versions) }}
+        flink-version: ${{ fromJSON(inputs.flink-versions) }}
+        module: ${{ fromJSON(inputs.modules) }}
     steps:
       - run: echo "Running CI pipeline for JDK version ${{ matrix.java-version }}"
       - name: Clean up disk space
@@ -132,12 +73,12 @@ jobs:
           df -h
 
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
 
       - name: Set JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
@@ -149,72 +90,18 @@ jobs:
           maven-version: 3.8.6
 
       - name: Compile and test
-        timeout-minutes: 60
+        timeout-minutes: 90
         run: |
           . .github/workflows/utils.sh
           jvm_timezone=$(random_timezone)
           echo "JVM timezone is set to $jvm_timezone"
           set -o pipefail
 
-          case ${{ inputs.module }} in
-              ("core")
-               modules=${{ env.MODULES_CORE }}
-              ;;
-              ("pipeline_connectors")
-               modules=${{ env.MODULES_PIPELINE_CONNECTORS }}
-              ;;
-              ("mysql")
-               modules=${{ env.MODULES_MYSQL }}
-              ;;
-              ("postgres")
-               modules=${{ env.MODULES_POSTGRES }}
-              ;;
-              ("oracle")
-               modules=${{ env.MODULES_ORACLE }}
-              ;;
-              ("mongodb6")
-               modules=${{ env.MODULES_MONGODB }}
-              ;;
-              ("mongodb7")
-               modules=${{ env.MODULES_MONGODB }}
-              ;;
-              ("sqlserver")
-               modules=${{ env.MODULES_SQLSERVER }}
-              ;;
-              ("tidb")
-               modules=${{ env.MODULES_TIDB }}
-              ;;
-              ("oceanbase")
-               modules=${{ env.MODULES_OCEANBASE }}
-              ;;
-              ("db2")
-               modules=${{ env.MODULES_DB2 }}
-              ;;
-              ("vitess")
-               modules=${{ env.MODULES_VITESS }}
-              ;;
-              ("pipeline_e2e")
-               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_PIPELINE_E2E }}"
-               modules=${{ env.MODULES_PIPELINE_E2E }}
-              ;;
-              ("source_e2e")
-               compile_modules="${{ env.MODULES_CORE }},${{ env.MODULES_PIPELINE_CONNECTORS }},${{ env.MODULES_MYSQL }},${{ env.MODULES_POSTGRES }},${{ env.MODULES_ORACLE }},${{ env.MODULES_MONGODB }},${{ env.MODULES_SQLSERVER }},${{ env.MODULES_TIDB }},${{ env.MODULES_OCEANBASE }},${{ env.MODULES_DB2 }},${{ env.MODULES_VITESS }},${{ env.MODULES_SOURCE_E2E }}"
-               modules=${{ env.MODULES_SOURCE_E2E }}
-              ;;
-          esac
+          modules=$(./.github/workflows/modules.py test "${{ matrix.module }}")
+          compile_modules=$(./.github/workflows/modules.py compile "${{ matrix.module }}")
           
-          if [ ${{ inputs.module }} != "pipeline_e2e" ] && [ ${{ inputs.module }} != "source_e2e" ]; then
-            compile_modules=$modules
-          fi
-          
-          build_maven_parameter=""
+          build_maven_parameter="-DspecifiedMongoVersion=8.0.14"
 
-          if [ ${{ inputs.module }} == "mongodb6" ]; then
-            build_maven_parameter="-DspecifiedMongoVersion=6.0.16"
-          elif [ ${{ inputs.module }} == "mongodb7" ]; then
-            build_maven_parameter="-DspecifiedMongoVersion=7.0.12"
-          fi
-          
           if [ ! -z "${{ matrix.flink-version }}" ]; then
             build_maven_parameter="${build_maven_parameter:+$build_maven_parameter }-DspecifiedFlinkVersion=${{ matrix.flink-version }}"
           fi

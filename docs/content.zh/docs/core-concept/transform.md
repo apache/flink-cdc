@@ -29,20 +29,20 @@ under the License.
 更进一步的，这也也可以帮助用户在同步过程中过滤一些不需要的数据。
 
 # 参数
-为了定义一个transform规则，可以使用以下参数：
+为了定义一个 transform 规则，可以使用以下参数：
 
-| 参数                        | 含义                                                                                | Optional/Required |
-|---------------------------|-----------------------------------------------------------------------------------|-------------------|
-| source-table              | Source table id, supports regular expressions                                     | required          |
-| projection                | Projection rule, supports syntax similar to the select clause in SQL              | optional          |
-| filter                    | Filter rule, supports syntax similar to the where clause in SQL                   | optional          |
-| primary-keys              | Sink table primary keys, separated by commas                                      | optional          |
-| partition-keys            | Sink table partition keys, separated by commas                                    | optional          |
-| table-options             | used to the configure table creation statement when automatically creating tables | optional          |
-| converter-after-transform | used to add a converter to change DataChangeEvent after transform                 | optional          |
-| description               | Transform rule description                                                        | optional          |
+| 参数                        | 含义                                                     | 是否必填     |
+|---------------------------|--------------------------------------------------------|----------|
+| source-table              | 源表 ID，支持正则表达式                                         | 必填       |
+| projection                | 投影规则，支持类似 SQL 中 SELECT 子句的语法                           | 可选       |
+| filter                    | 过滤规则，支持类似 SQL 中 WHERE 子句的语法                            | 可选       |
+| primary-keys              | 目标表主键，以逗号分隔                                            | 可选       |
+| partition-keys            | 目标表分区键，以逗号分隔                                           | 可选       |
+| table-options             | 用于配置自动建表时的建表语句                                         | 可选       |
+| converter-after-transform | 用于在 transform 处理后添加转换器来修改 DataChangeEvent                | 可选       |
+| description               | Transform 规则描述                                         | 可选       |
 
-多个transform规则可以声明在一个pipeline YAML文件中。
+多个 transform 规则可以声明在一个 pipeline YAML 文件中。
 
 ## converter-after-transform
 
@@ -61,16 +61,16 @@ transform:
 
 # 元数据字段
 ## 字段定义
-有一些隐藏列可以用来访问元数据信息。它们仅在显式引用在 transform 规则中时才会生效。
+有一些隐藏列可以用来访问元数据信息。它们仅在 transform 规则中显式引用时才会生效。
 
-| Field               | Data Type | Description                                  |
-|---------------------|-----------|----------------------------------------------|
-| __namespace_name__  | String    | Name of the namespace that contains the row. |
-| __schema_name__     | String    | Name of the schema that contains the row.    |
-| __table_name__      | String    | Name of the table that contains the row.     |
-| __data_event_type__ | String    | Operation type of data change event.         |
+| 字段                  | 数据类型   | 描述                  |
+|---------------------|--------|---------------------|
+| __namespace_name__  | String | 包含该行数据的命名空间名称。      |
+| __schema_name__     | String | 包含该行数据的 schema 名称。  |
+| __table_name__      | String | 包含该行数据的表名称。         |
+| __data_event_type__ | String | 数据变更事件的操作类型。        |
 
-除了以上的元数据字段，连接器也可以解析额外的元数据并放入 DataChangeEvent 的 meta map中，这些元数据也可以在transform使用。
+除了以上的元数据字段，连接器也可以解析额外的元数据并放入 DataChangeEvent 的 meta map 中，这些元数据也可以在 transform 中使用。
 例如如下的作业，MySQL 连接器可以解析 `op_ts` 元数据并在transform中使用。
 
 ```yaml
@@ -93,9 +93,9 @@ sink:
   type: values
 ```
 
-## Metadata relationship
+## 元数据关系
 
-| Type                 | Namespace | SchemaName | Table |
+| 类型                   | Namespace | SchemaName | Table |
 |----------------------|-----------|------------|-------|
 | JDBC                 | Catalog   | Schema     | Table |
 | Debezium             | Catalog   | Schema     | Table |
@@ -111,108 +111,132 @@ Flink CDC 使用 [Calcite](https://calcite.apache.org/) 来解析表达式并且
 
 ## 比较函数
 
-| Function                             | Janino Code                                  | Description                                                                                           |
-|--------------------------------------|----------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| value1 = value2                      | valueEquals(value1, value2)                  | Returns TRUE if value1 is equal to value2; returns FALSE if value1 or value2 is NULL.                 |
-| value1 <> value2                     | !valueEquals(value1, value2)                 | Returns TRUE if value1 is not equal to value2; returns FALSE if value1 or value2 is NULL.             |
-| value1 > value2                      | greaterThan(value1, value2)                  | Returns TRUE if value1 is greater than value2; returns FALSE if value1 or value2 is NULL.             |
-| value1 >= value2                     | greaterThanOrEqual(value1, value2)           | Returns TRUE if value1 is greater than or equal to value2; returns FALSE if value1 or value2 is NULL. |
-| value1 < value2                      | lessThan(value1, value2)                     | Returns TRUE if value1 is less than value2; returns FALSE if value1 or value2 is NULL.                |
-| value1 <= value2                     | lessThanOrEqual(value1, value2)              | Returns TRUE if value1 is less than or equal to value2; returns FALSE if value1 or value2 is NULL.    |
-| value IS NULL                        | null == value                                | Returns TRUE if value is NULL.                                                                        |
-| value IS NOT NULL                    | null != value                                | Returns TRUE if value is not NULL.                                                                    |
-| value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | Returns TRUE if value1 is greater than or equal to value2 and less than or equal to value3.           |
-| value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | Returns TRUE if value1 is less than value2 or greater than value3.                                    |
-| string1 LIKE string2                 | like(string1, string2)                       | Returns TRUE if string1 matches pattern string2.                                                      |
-| string1 NOT LIKE string2             | notLike(string1, string2)                    | Returns TRUE if string1 does not match pattern string2.                                               |
-| value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | Returns TRUE if value1 exists in the given list (value2, value3, …).                                  |
-| value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | Returns TRUE if value1 does not exist in the given list (value2, value3, …).                          |
+| 函数                                   | Janino 代码                                    | 描述                                                          |
+|--------------------------------------|----------------------------------------------|-------------------------------------------------------------|
+| value1 = value2                      | valueEquals(value1, value2)                  | 如果 value1 等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。   |
+| value1 <> value2                     | !valueEquals(value1, value2)                 | 如果 value1 不等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。  |
+| value1 > value2                      | greaterThan(value1, value2)                  | 如果 value1 大于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。   |
+| value1 >= value2                     | greaterThanOrEqual(value1, value2)           | 如果 value1 大于等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。 |
+| value1 < value2                      | lessThan(value1, value2)                     | 如果 value1 小于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。   |
+| value1 <= value2                     | lessThanOrEqual(value1, value2)              | 如果 value1 小于等于 value2，返回 TRUE；如果 value1 或 value2 为 NULL，返回 FALSE。 |
+| value IS NULL                        | null == value                                | 如果 value 为 NULL，返回 TRUE。                                      |
+| value IS NOT NULL                    | null != value                                | 如果 value 不为 NULL，返回 TRUE。                                     |
+| value1 BETWEEN value2 AND value3     | betweenAsymmetric(value1, value2, value3)    | 如果 value1 大于等于 value2 且小于等于 value3，返回 TRUE。                    |
+| value1 NOT BETWEEN value2 AND value3 | notBetweenAsymmetric(value1, value2, value3) | 如果 value1 小于 value2 或大于 value3，返回 TRUE。                        |
+| string1 LIKE string2                 | like(string1, string2)                       | 如果 string1 匹配模式 string2，返回 TRUE。                              |
+| string1 NOT LIKE string2             | notLike(string1, string2)                    | 如果 string1 不匹配模式 string2，返回 TRUE。                             |
+| value1 IN (value2 [, value3]* )      | in(value1, value2 [, value3]*)               | 如果 value1 存在于给定列表 (value2, value3, …) 中，返回 TRUE。              |
+| value1 NOT IN (value2 [, value3]* )  | notIn(value1, value2 [, value3]*)            | 如果 value1 不存在于给定列表 (value2, value3, …) 中，返回 TRUE。             |
 
 ## 逻辑函数
 
-| Function              | Janino Code                    | Description                                                         |
-|-----------------------|--------------------------------|---------------------------------------------------------------------|
-| boolean1 OR boolean2  | boolean1 &#124;&#124; boolean2 | Returns TRUE if BOOLEAN1 is TRUE or BOOLEAN2 is TRUE.               |
-| boolean1 AND boolean2 | boolean1 && boolean2           | Returns TRUE if BOOLEAN1 and BOOLEAN2 are both TRUE.                |
-| NOT boolean           | !boolean                       | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS FALSE      | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
-| boolean IS NOT FALSE  | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS TRUE       | true == boolean                | Returns TRUE if BOOLEAN is TRUE; returns FALSE if BOOLEAN is FALSE. |
-| boolean IS NOT TRUE   | false == boolean               | Returns TRUE if boolean is FALSE; returns FALSE if boolean is TRUE. |
+| 函数                    | Janino 代码                      | 描述                                        |
+|-----------------------|--------------------------------|-------------------------------------------|
+| boolean1 OR boolean2  | boolean1 &#124;&#124; boolean2 | 如果 BOOLEAN1 为 TRUE 或 BOOLEAN2 为 TRUE，返回 TRUE。 |
+| boolean1 AND boolean2 | boolean1 && boolean2           | 如果 BOOLEAN1 和 BOOLEAN2 都为 TRUE，返回 TRUE。      |
+| NOT boolean           | !boolean                       | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。 |
+| boolean IS FALSE      | false == boolean               | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。 |
+| boolean IS NOT FALSE  | true == boolean                | 如果 BOOLEAN 为 TRUE，返回 TRUE；如果 BOOLEAN 为 FALSE，返回 FALSE。 |
+| boolean IS TRUE       | true == boolean                | 如果 BOOLEAN 为 TRUE，返回 TRUE；如果 BOOLEAN 为 FALSE，返回 FALSE。 |
+| boolean IS NOT TRUE   | false == boolean               | 如果 boolean 为 FALSE，返回 TRUE；如果 boolean 为 TRUE，返回 FALSE。 |
 
 ## 数学函数
 
-| Function            | Janino Code         | Description                                                                                                                                                          |
-|---------------------|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| numeric1 + numeric2 | numeric1 + numeric2 | Returns NUMERIC1 plus NUMERIC2.                                                                                                                                      |
-| numeric1 - numeric2 | numeric1 - numeric2 | Returns NUMERIC1 minus NUMERIC2.                                                                                                                                     |
-| numeric1 * numeric2 | numeric1 * numeric2 | Returns NUMERIC1 multiplied by NUMERIC2.                                                                                                                             |
-| numeric1 / numeric2 | numeric1 / numeric2 | Returns NUMERIC1 divided by NUMERIC2.                                                                                                                                |
-| numeric1 % numeric2 | numeric1 % numeric2 | Returns the remainder (modulus) of numeric1 divided by numeric2.                                                                                                     |
-| ABS(numeric)        | abs(numeric)        | Returns the absolute value of numeric.                                                                                                                               |
-| CEIL(numeric)<br/>CEILING(numeric)       | ceil(numeric)       | Rounds numeric up, and returns the smallest number that is greater than or equal to numeric.                                                                         |
-| FLOOR(numeric)      | floor(numeric)      | Rounds numeric down, and returns the largest number that is less than or equal to numeric.                                                                           |
-| ROUND(numeric, int) | round(numeric)      | Returns a number rounded to INT decimal places for NUMERIC.                                                                                                          |
-| UUID()              | uuid()              | Returns an UUID (Universally Unique Identifier) string (e.g., "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e") according to RFC 4122 type 4 (pseudo randomly generated) UUID. |
+| 函数                                 | Janino 代码           | 描述                                                                                          |
+|------------------------------------|---------------------|---------------------------------------------------------------------------------------------|
+| numeric1 + numeric2                | numeric1 + numeric2 | 返回 NUMERIC1 加 NUMERIC2 的结果。                                                                  |
+| numeric1 - numeric2                | numeric1 - numeric2 | 返回 NUMERIC1 减 NUMERIC2 的结果。                                                                  |
+| numeric1 * numeric2                | numeric1 * numeric2 | 返回 NUMERIC1 乘 NUMERIC2 的结果。                                                                  |
+| numeric1 / numeric2                | numeric1 / numeric2 | 返回 NUMERIC1 除以 NUMERIC2 的结果。                                                                 |
+| numeric1 % numeric2                | numeric1 % numeric2 | 返回 numeric1 除以 numeric2 的余数（取模）。                                                             |
+| ABS(numeric)                       | abs(numeric)        | 返回 numeric 的绝对值。                                                                            |
+| CEIL(numeric)<br/>CEILING(numeric) | ceil(numeric)       | 向上取整，返回大于或等于 numeric 的最小整数。                                                                  |
+| FLOOR(numeric)                     | floor(numeric)      | 向下取整，返回小于或等于 numeric 的最大整数。                                                                  |
+| ROUND(numeric, int)                | round(numeric)      | 返回 NUMERIC 四舍五入到 INT 位小数的数字。                                                                 |
+| UUID()                             | uuid()              | 根据 RFC 4122 类型 4（伪随机生成）返回一个 UUID（通用唯一标识符）字符串（例如 "3d3c68f7-f608-473f-b60c-b0c44ad4cc4e"）。 |
 
 ## 字符串函数
 
-| Function                                         | Janino Code                              | Description                                                                                                                                                                                       |
-|--------------------------------------------------|------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| string1 &#124;&#124; string2                     | concat(string1, string2)                 | Returns the concatenation of STRING1 and STRING2.                                                                                                                                                 |
-| CHAR_LENGTH(string)                              | charLength(string)                       | Returns the number of characters in STRING.                                                                                                                                                       |
-| UPPER(string)                                    | upper(string)                            | Returns string in uppercase.                                                                                                                                                                      |
-| LOWER(string)                                    | lower(string)                            | Returns string in lowercase.                                                                                                                                                                      |
-| TRIM(string1)                                    | trim('BOTH',string1)                     | Returns a string that removes whitespaces at both sides.                                                                                                                                          |
-| REGEXP_REPLACE(string1, string2, string3)        | regexpReplace(string1, string2, string3) | Returns a string from STRING1 with all the substrings that match a regular expression STRING2 consecutively being replaced with STRING3. E.g., 'foobar'.regexpReplace('oo\|ar', '') returns "fb". |
-| SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
-| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | Returns a substring of STRING starting from position integer1 with length integer2 (to the end by default).                                                                                       |
-| CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | Returns a string that concatenates string1, string2, …. E.g., CONCAT('AA', 'BB', 'CC') returns 'AABBCC'.                                                                                          |
+| 函数                                               | Janino 代码                                | 描述                                                                                                             |
+|--------------------------------------------------|------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| string1 &#124;&#124; string2                     | concat(string1, string2)                 | 返回 STRING1 和 STRING2 连接后的字符串。                                                                                  |
+| CHAR_LENGTH(string)                              | charLength(string)                       | 返回 STRING 中的字符数。                                                                                               |
+| UPPER(string)                                    | upper(string)                            | 返回大写形式的字符串。                                                                                                    |
+| LOWER(string)                                    | lower(string)                            | 返回小写形式的字符串。                                                                                                    |
+| TRIM(string1)                                    | trim('BOTH',string1)                     | 返回去除两端空格的字符串。                                                                                                  |
+| REGEXP_REPLACE(string1, string2, string3)        | regexpReplace(string1, string2, string3) | 返回将 STRING1 中所有匹配正则表达式 STRING2 的子串替换为 STRING3 后的字符串。例如，'foobar'.regexpReplace('oo\|ar', '') 返回 "fb"。         |
+| SUBSTR(string, integer1[, integer2])             | substr(string,integer1,integer2)         | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
+| SUBSTRING(string FROM integer1 [ FOR integer2 ]) | substring(string,integer1,integer2)      | 返回 STRING 从位置 integer1 开始、长度为 integer2（默认到末尾）的子串。                                                              |
+| CONCAT(string1, string2,…)                       | concat(string1, string2,…)               | 返回连接 string1、string2、… 后的字符串。例如，CONCAT('AA', 'BB', 'CC') 返回 'AABBCC'。                                          |
 
 ## 时间函数
 
-| Function                                             | Janino Code                                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-|------------------------------------------------------|------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| LOCALTIME                                            | localtime()                                          | Returns the current SQL time in the local time zone, the return type is TIME(0).                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| LOCALTIMESTAMP                                       | localtimestamp()                                     | Returns the current SQL timestamp in local time zone, the return type is TIMESTAMP(3).                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| CURRENT_TIME                                         | currentTime()                                        | Returns the current SQL time in the local time zone, this is a synonym of LOCAL_TIME.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| CURRENT_DATE                                         | currentDate()                                        | Returns the current SQL date in the local time zone.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| CURRENT_TIMESTAMP                                    | currentTimestamp()                                   | Returns the current SQL timestamp in the local time zone, the return type is TIMESTAMP_LTZ(3).                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| NOW()                                                | now()                                                | Returns the current SQL timestamp in the local time zone, this is a synonym of CURRENT_TIMESTAMP.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| DATE_FORMAT(timestamp, string)                       | dateFormat(timestamp, string)                        | Converts timestamp to a value of string in the format specified by the date format string. The format string is compatible with Java's SimpleDateFormat.                                                                                                                                                                                                                                                                                                                                                                                            |
-| TIMESTAMPADD(timeintervalunit, interval, timepoint)  | timestampadd(timeintervalunit, interval, timepoint)  | Returns the timestamp of timepoint2 after timepoint added interval. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.                                                                                                                                                                                                                                                                                                                               |
-| TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | Returns the (signed) number of timepointunit between timepoint1 and timepoint2. The unit for the interval is given by the first argument, which should be one of the following values: SECOND, MINUTE, HOUR, DAY, MONTH, or YEAR.                                                                                                                                                                                                                                                                                                                   |
-| TO_DATE(string1[, string2])                          | toDate(string1[, string2])                           | Converts a date string string1 with format string2 (by default 'yyyy-MM-dd') to a date.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| TO_TIMESTAMP(string1[, string2])                     | toTimestamp(string1[, string2])                      | Converts date time string string1 with format string2 (by default: 'yyyy-MM-dd HH:mm:ss') to a timestamp, without time zone.                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| FROM_UNIXTIME(numeric[, string])                     | fromUnixtime(NUMERIC[, STRING])                      | Returns a representation of the numeric argument as a value in string format (default is ‘yyyy-MM-dd HH:mm:ss’). numeric is an internal timestamp value representing seconds since ‘1970-01-01 00:00:00’ UTC, such as produced by the UNIX_TIMESTAMP() function. The return value is expressed in the session time zone (specified in TableConfig). E.g., FROM_UNIXTIME(44) returns ‘1970-01-01 00:00:44’ if in UTC time zone, but returns ‘1970-01-01 09:00:44’ if in ‘Asia/Tokyo’ time zone.                                                      |
-| UNIX_TIMESTAMP()                                     | unixTimestamp()                                      | Gets current Unix timestamp in seconds. This function is not deterministic which means the value would be recalculated for each record.                                                                                                                                                                                                                                                                                                                                                                                                             |
-| UNIX_TIMESTAMP(string1[, string2])                   | unixTimestamp(STRING1[, STRING2])                    | Converts a date time string string1 with format string2 (by default: yyyy-MM-dd HH:mm:ss if not specified) to Unix timestamp (in seconds), using the specified timezone in table config.<br/>If a time zone is specified in the date time string and parsed by UTC+X format such as “yyyy-MM-dd HH:mm:ss.SSS X”, this function will use the specified timezone in the date time string instead of the timezone in table config. If the date time string can not be parsed, the default value Long.MIN_VALUE(-9223372036854775808) will be returned. |
+| 函数                                                   | Janino 代码                                            | 描述                                                                                                                                                                                                                                                                                               |
+|------------------------------------------------------|------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| LOCALTIME                                            | localtime()                                          | 返回本地时区的当前 SQL 时间，返回类型为 TIME(0)。                                                                                                                                                                                                                                                                  |
+| LOCALTIMESTAMP                                       | localtimestamp()                                     | 返回本地时区的当前 SQL 时间戳，返回类型为 TIMESTAMP(3)。                                                                                                                                                                                                                                                            |
+| CURRENT_TIME                                         | currentTime()                                        | 返回本地时区的当前 SQL 时间，是 LOCAL_TIME 的同义词。                                                                                                                                                                                                                                                              |
+| CURRENT_DATE                                         | currentDate()                                        | 返回本地时区的当前 SQL 日期。                                                                                                                                                                                                                                                                                |
+| CURRENT_TIMESTAMP                                    | currentTimestamp()                                   | 返回本地时区的当前 SQL 时间戳，返回类型为 TIMESTAMP_LTZ(3)。                                                                                                                                                                                                                                                        |
+| NOW()                                                | now()                                                | 返回本地时区的当前 SQL 时间戳，是 CURRENT_TIMESTAMP 的同义词。                                                                                                                                                                                                                                                      |
+| DATE_FORMAT(timestamp, string)                       | dateFormat(timestamp, string)                        | 将时间戳转换为指定日期格式字符串的值。格式字符串与 Java 的 SimpleDateFormat 兼容。                                                                                                                                                                                                                                            |
+| DATE_FORMAT(date, string)                            | dateFormat(date, string)                             | 将给定日期转换为指定格式字符串的值。格式字符串与 Java 的 SimpleDateFormat 兼容。                                                                                                                                                                                                                                             |
+| DATE_FORMAT(time, string)                            | dateFormat(time, string)                             | 将给定时间转换为指定格式字符串的值。格式字符串与 Java 的 SimpleDateFormat 兼容。                                                                                                                                                                                                                                             |
+| DATE_FORMAT_TZ(timestamp, format, timezone)          | dateFormatTz(timestamp, format, timezone)            | 使用给定的模式和指定的时区将时间戳或日期时间值格式化为字符串。timezone 参数可以是时区 ID（例如 'UTC'、'Asia/Shanghai'）或偏移量（如 '+08:00'）。                                                                                                                                                                                                       |
+| TIMESTAMPADD(timeintervalunit, interval, timepoint)  | timestampadd(timeintervalunit, interval, timepoint)  | 返回 timepoint 加上 interval 后的时间戳。时间间隔的单位由第一个参数指定，应为以下值之一：SECOND、MINUTE、HOUR、DAY、MONTH 或 YEAR。                                                                                                                                                                                                     |
+| TIMESTAMPDIFF(timepointunit, timepoint1, timepoint2) | timestampDiff(timepointunit, timepoint1, timepoint2) | 返回 timepoint1 和 timepoint2 之间的（有符号）时间单位数。时间间隔的单位由第一个参数指定，应为以下值之一：SECOND、MINUTE、HOUR、DAY、MONTH 或 YEAR。                                                                                                                                                                                             |
+| TO_DATE(string1[, string2])                          | toDate(string1[, string2])                           | 将日期字符串 string1 按格式 string2（默认为 'yyyy-MM-dd'）转换为日期。                                                                                                                                                                                                                                               |
+| TO_TIMESTAMP(string1[, string2])                     | toTimestamp(string1[, string2])                      | 将日期时间字符串 string1 按格式 string2（默认为 'yyyy-MM-dd HH:mm:ss'）转换为时间戳，不带时区。                                                                                                                                                                                                                              |
+| TO_TIMESTAMP_LTZ(string1[, string2])                 | toTimestampLtz(string1[, string2])                   | 将日期时间字符串 string1 按格式 string2（默认为 'yyyy-MM-dd HH:mm:ss'）转换为时间戳，带本地时区。                                                                                                                                                                                                                             |
+| FROM_UNIXTIME(numeric[, string])                     | fromUnixtime(NUMERIC[, STRING])                      | 返回 numeric 参数的字符串格式表示（默认为 'yyyy-MM-dd HH:mm:ss'）。numeric 是表示自 '1970-01-01 00:00:00' UTC 以来秒数的内部时间戳值，例如由 UNIX_TIMESTAMP() 函数产生的值。返回值以会话时区（在 TableConfig 中指定）表示。例如，如果在 UTC 时区，FROM_UNIXTIME(44) 返回 '1970-01-01 00:00:44'，但如果在 'Asia/Tokyo' 时区则返回 '1970-01-01 09:00:44'。                                   |
+| UNIX_TIMESTAMP()                                     | unixTimestamp()                                      | 获取当前 Unix 时间戳（秒）。此函数是非确定性的，意味着每条记录都会重新计算该值。                                                                                                                                                                                                                                                      |
+| UNIX_TIMESTAMP(string1[, string2])                   | unixTimestamp(STRING1[, STRING2])                    | 将日期时间字符串 string1 按格式 string2（如果未指定，默认为 yyyy-MM-dd HH:mm:ss）转换为 Unix 时间戳（秒），使用表配置中指定的时区。<br/>如果日期时间字符串中指定了时区并以 UTC+X 格式（如 "yyyy-MM-dd HH:mm:ss.SSS X"）解析，则此函数将使用日期时间字符串中指定的时区而不是表配置中的时区。如果无法解析日期时间字符串，将返回默认值 Long.MIN_VALUE(-9223372036854775808)。 |
+| DATE_ADD(date, int)                                  | dateAdd(date, int)                                   | 将 N 天添加到给定日期，返回格式为 'yyyy-MM-dd' 的字符串。                                                                                                                                                                                                                                                            |
 
 ## 条件函数
 
-| Function                                                                                                              | Janino Code                          | Description                                                                                                                                                                                                                                       |
-|-----------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| CASE value WHEN value1_1 [, value1_2]* THEN RESULT1 (WHEN value2_1 [, value2_2 ]* THEN result_2)* (ELSE result_z) END | Nested ternary expression            | Returns resultX when the first time value is contained in (valueX_1, valueX_2, …). When no value matches, returns result_z if it is provided and returns NULL otherwise.                                                                          |
-| CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | Nested ternary expression            | Returns resultX when the first conditionX is met. When no condition is met, returns result_z if it is provided and returns NULL otherwise.                                                                                                        |
-| COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)          | Returns the first argument that is not NULL.If all arguments are NULL, it returns NULL as well. The return type is the least restrictive, common type of all of its arguments. The return type is nullable if all arguments are nullable as well. |
-| IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | Returns the true_value if condition is met, otherwise false_value. E.g., IF(5 > 3, 5, 3) returns 5.                                                                                                                                               |
+| 函数                                                                                                                    | Janino 代码                        | 描述                                                                                                         |
+|-----------------------------------------------------------------------------------------------------------------------|----------------------------------|------------------------------------------------------------------------------------------------------------|
+| CASE value WHEN value1_1 [, value1_2]* THEN RESULT1 (WHEN value2_1 [, value2_2 ]* THEN result_2)* (ELSE result_z) END | 嵌套三元表达式                          | 当 value 第一次匹配到 (valueX_1, valueX_2, …) 中的值时，返回 resultX。如果没有匹配的值，如果提供了 result_z 则返回 result_z，否则返回 NULL。     |
+| CASE WHEN condition1 THEN result1 (WHEN condition2 THEN result2)* (ELSE result_z) END                                 | 嵌套三元表达式                          | 当第一个 conditionX 满足时，返回 resultX。如果没有条件满足，如果提供了 result_z 则返回 result_z，否则返回 NULL。                              |
+| COALESCE(value1 [, value2]*)                                                                                          | coalesce(Object... objects)      | 返回第一个不为 NULL 的参数。如果所有参数都为 NULL，则返回 NULL。返回类型是所有参数中限制最少的公共类型。如果所有参数都可为空，则返回类型也可为空。                          |
+| IF(condition, true_value, false_value)                                                                                | condition ? true_value : false_value | 如果条件满足，返回 true_value，否则返回 false_value。例如，IF(5 > 3, 5, 3) 返回 5。                                              |
 
 ## 转换函数
 
-You can use `CAST( <EXPR> AS <T> )` syntax to convert any valid expression `<EXPR>` to a specific type `<T>`. Possible conversion paths are:
+你可以使用 `CAST( <EXPR> AS <T> )` 语法将任何有效的表达式 `<EXPR>` 转换为特定类型 `<T>`。可能的转换路径如下：
 
-| Source Type                         | Target Type | Notes                                                                                      |
-|-------------------------------------|-------------|--------------------------------------------------------------------------------------------|
-| ANY                                 | STRING      | All types can be cast to STRING.                                                           |
-| NUMERIC, STRING                     | BOOLEAN     | Any non-zero numerics will be evaluated to `TRUE`.                                         |
-| NUMERIC                             | BYTE        | Value must be in the range of Byte (-128 ~ 127).                                           |
-| NUMERIC                             | SHORT       | Value must be in the range of Short (-32768 ~ 32767).                                      |
-| NUMERIC                             | INTEGER     | Value must be in the range of Integer (-2147483648 ~ 2147483647).                          |
-| NUMERIC                             | LONG        | Value must be in the range of Long (-9223372036854775808 ~ 9223372036854775807).           |
-| NUMERIC                             | FLOAT       | Value must be in the range of Float (1.40239846e-45f ~ 3.40282347e+38f).                   |
-| NUMERIC                             | DOUBLE      | Value must be in the range of Double (4.94065645841246544e-324 ~ 1.79769313486231570e+308) |
-| NUMERIC                             | DECIMAL     | Value must be in the range of BigDecimal(10, 0).                                           |
-| STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP   | String type value must be a valid `ISO_LOCAL_DATE_TIME` string.                            |
+| 源类型                                 | 目标类型      | 说明                                               |
+|-------------------------------------|-----------|--------------------------------------------------|
+| ANY                                 | STRING    | 所有类型都可以转换为 STRING。                               |
+| NUMERIC, STRING                     | BOOLEAN   | 任何非零数字将被计算为 `TRUE`。                              |
+| NUMERIC                             | BYTE      | 值必须在 Byte 范围内 (-128 ~ 127)。                      |
+| NUMERIC                             | SHORT     | 值必须在 Short 范围内 (-32768 ~ 32767)。                 |
+| NUMERIC                             | INTEGER   | 值必须在 Integer 范围内 (-2147483648 ~ 2147483647)。     |
+| NUMERIC                             | LONG      | 值必须在 Long 范围内 (-9223372036854775808 ~ 9223372036854775807)。 |
+| NUMERIC                             | FLOAT     | 值必须在 Float 范围内 (1.40239846e-45f ~ 3.40282347e+38f)。 |
+| NUMERIC                             | DOUBLE    | 值必须在 Double 范围内 (4.94065645841246544e-324 ~ 1.79769313486231570e+308)。 |
+| NUMERIC                             | DECIMAL   | 值必须在 BigDecimal(10, 0) 范围内。                      |
+| STRING, TIMESTAMP_TZ, TIMESTAMP_LTZ | TIMESTAMP | 字符串类型的值必须是有效的 `ISO_LOCAL_DATE_TIME` 格式字符串。       |
+
+## Variant 函数
+
+| 函数 | Janino 代码 | 描述 |
+| -------- | ----------- | ----------- |
+| PARSE_JSON(string[, allowDuplicateKeys]) | parseJson(string[, allowDuplicateKeys]) | 将 JSON 字符串解析为 Variant。如果 JSON 字符串无效，将抛出错误。如需返回 NULL 而不是抛出错误，请使用 TRY_PARSE_JSON 函数。<br><br>如果输入的 JSON 字符串中存在重复的键，当 `allowDuplicateKeys` 为 true 时，解析器将保留所有相同键的最后一个出现的字段，否则将抛出错误。`allowDuplicateKeys` 的默认值为 false。 |
+| TRY_PARSE_JSON(string[, allowDuplicateKeys]) | tryParseJson(string[, allowDuplicateKeys]) | 如果可能，将 JSON 字符串解析为 Variant。如果 JSON 字符串无效，返回 NULL。如需抛出错误而不是返回 NULL，请使用 PARSE_JSON 函数。<br><br>如果输入的 JSON 字符串中存在重复的键，当 `allowDuplicateKeys` 为 true 时，解析器将保留所有相同键的最后一个出现的字段，否则将返回 NULL。`allowDuplicateKeys` 的默认值为 false。 |
+
+## 结构函数
+
+结构函数用于使用下标语法访问 ARRAY、MAP、ROW 和 VARIANT 类型中的元素。
+
+| 函数 | Janino 代码 | 描述 |
+| -------- | ----------- | ----------- |
+| array[index] | itemAccess(array, index) | 返回数组中位置 `index` 的元素。索引从 1 开始（SQL 标准）。如果索引超出范围或数组为 NULL，则返回 NULL。 |
+| map[key] | itemAccess(map, key) | 返回 map 中与 `key` 关联的值。如果 key 不存在或 map 为 NULL，则返回 NULL。 |
+| row[index] | itemAccess(row, index) | 返回 row 中位置 `index` 的字段。索引从 1 开始。索引必须是常量（不能是计算表达式），因为返回类型必须在静态阶段确定。 |
+| variant[index] | itemAccess(variant, index) | 返回 variant 中位置 `index` 的元素（如果是数组）。索引从 1 开始（SQL 标准）。如果索引超出范围或 variant 不是数组，则返回 NULL。 |
+| variant[key] | itemAccess(variant, key) | 返回 variant 中与 `key` 关联的值（如果是对象）。如果 key 不存在或 variant 不是对象，则返回 NULL。 |
 
 # 示例
 ## 添加计算列
@@ -313,7 +337,7 @@ transform:
 ```
 小技巧：table-options 的格式是 `key1=value1,key2=value2`。
 
-## Classification mapping
+## 分类映射
 多个转换规则可以定义为分类映射。
 只有第一个匹配的转换规则将应用。
 举个例子，我们可以定义一个转换规则如下：
@@ -372,7 +396,7 @@ public class AddOneFunctionClass implements UserDefinedFunction {
 为了兼容 Flink SQL，UDF 类也可以是 Flink `ScalarFunction`，但有一些限制:
 
 * 包含有参构造方法的 `ScalarFunction` 是不支持的。
-* FLink 的 `DataType` 提示在 `ScalarFunction` 中将被忽略。
+* Flink 的 `DataType` 提示在 `ScalarFunction` 中将被忽略。
 * `open` / `close` 生命周期钩子不会被调用。
 
 UDF 类可以通过 `user-defined-function` 块进行注册：
@@ -397,12 +421,12 @@ transform:
     filter: inc(id) < 100
 ```
 
-## 内置 AI 模型
+## Embedding AI 模型
 
-内置AI模型可以在transform规则中使用。
-为了使用内置AI模型，你需要下载内置模型的jar，然后在flink-cdc.sh命令中添加`--jar {$BUILT_IN_MODEL_PATH}`。
+Embedding AI 模型可以在 transform 规则中使用。
+为了使用 Embedding AI 模型，你需要下载内置模型的 jar，然后在 `flink-cdc.sh` 命令中添加 `--jar {$BUILT_IN_MODEL_PATH}`。
 
-如何定义一个Embedding AI模型：
+如何定义一个 Embedding AI 模型：
 
 ```yaml
 pipeline:
@@ -420,11 +444,11 @@ pipeline:
       openai.apikey: abcd1234
 ```
 注意：
-* `model-name` 是一个通用的必填参数，用于所有支持的模型，表示在`projection`或`filter`中调用的函数名称。
+* `model-name` 是一个通用的必填参数，用于所有支持的模型，表示在 `projection` 或 `filter` 中调用的函数名称。
 * `class-name` 是一个通用的必填参数，用于所有支持的模型，可用值可以在[所有支持的模型](#all-support-models)中找到。
-* `openai.model`，`openai.host`， `openai.apiKey` 和 `openai.chat.prompt` 是在各个模型中特别的可选参数。
+* `openai.model`，`openai.host`，`openai.apiKey` 和 `openai.chat.prompt` 是在各个模型中特别的可选参数。
 
-如何使用一个内置的 AI 模型：
+如何使用一个 Embedding AI 模型：
 
 ```yaml
 transform:
@@ -445,7 +469,7 @@ pipeline:
       openai.host: http://langchain4j.dev/demo/openai/v1
       openai.apikey: demo
 ```
-这里，GET_EMBEDDING 是通过`model-name`在`pipeline`中定义的。
+这里，GET_EMBEDDING 是通过 `model-name` 在 `pipeline` 中定义的。
 
 ### 所有支持的模型
 
@@ -453,22 +477,17 @@ pipeline:
 
 #### OpenAIChatModel
 
-| 参数                 | 类型     | optional/required | 含义                                                                                                                                   |
-|--------------------|--------|-------------------|--------------------------------------------------------------------------------------------------------------------------------------|
-| openai.model       | STRING | required          | Name of model to be called, for example: "gpt-4o-mini", Available options are "gpt-4o-mini", "gpt-4o", "gpt-4-32k", "gpt-3.5-turbo". |
-| openai.host        | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                      |
-| openai.apikey      | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                   |
-| openai.chat.prompt | STRING | optional          | Prompt for chatting with OpenAI, for example: "Please summary this ".                                                                |
+| 参数                 | 类型     | 是否必填     | 含义                                                                                                 |
+|--------------------|--------|----------|-----------------------------------------------------------------------------------------------------|
+| openai.model       | STRING | 必填       | 要调用的模型名称，例如："gpt-4o-mini"，可用选项有 "gpt-4o-mini"、"gpt-4o"、"gpt-4-32k"、"gpt-3.5-turbo"。 |
+| openai.host        | STRING | 必填       | 要连接的模型服务器地址，例如：`http://langchain4j.dev/demo/openai/v1`。                                 |
+| openai.apikey      | STRING | 必填       | 模型服务器验证的 API Key，例如："demo"。                                                                |
+| openai.chat.prompt | STRING | 可选       | 与 OpenAI 聊天的提示词，例如："Please summary this"。                                                   |
 
 #### OpenAIEmbeddingModel
 
-| 参数            | 类型     | optional/required | 含义                                                                                                                                                                     |
-|---------------|--------|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| openai.model  | STRING | required          | Name of model to be called, for example: "text-embedding-3-small", Available options are "text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002". |
-| openai.host   | STRING | required          | Host of the Model server to be connected, for example: `http://langchain4j.dev/demo/openai/v1`.                                                                        |
-| openai.apikey | STRING | required          | Api Key for verification of the Model server, for example, "demo".                                                                                                     |
-
-# 已知的限制
-* 目前，transform 不能与路由规则一起使用。这将会在未来版本中支持。
-* 计算列不能引用没有出现在最终投影结果中的被裁剪的列。这将在将来的版本中解决。
-* 正则匹配不同schema的表不支持。如果需要，需要编写多个规则。
+| 参数            | 类型     | 是否必填     | 含义                                                                                                                   |
+|---------------|--------|----------|----------------------------------------------------------------------------------------------------------------------|
+| openai.model  | STRING | 必填       | 要调用的模型名称，例如："text-embedding-3-small"，可用选项有 "text-embedding-3-small"、"text-embedding-3-large"、"text-embedding-ada-002"。 |
+| openai.host   | STRING | 必填       | 要连接的模型服务器地址，例如：`http://langchain4j.dev/demo/openai/v1`。                                                   |
+| openai.apikey | STRING | 必填       | 模型服务器验证的 API Key，例如："demo"。                                                                                  |

@@ -61,6 +61,7 @@ public class PostgresTypeUtils {
     private static final String PG_CHARACTER_VARYING = "varchar";
     private static final String PG_CHARACTER_VARYING_ARRAY = "_varchar";
     private static final String PG_UUID = "uuid";
+    private static final String PG_UUID_ARRAY = "_uuid";
 
     /** Returns a corresponding Flink data type from a debezium {@link Column}. */
     public static DataType fromDbzColumn(Column column) {
@@ -140,6 +141,7 @@ public class PostgresTypeUtils {
             case PG_UUID:
                 return DataTypes.STRING();
             case PG_TEXT_ARRAY:
+            case PG_UUID_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
             case PG_TIMESTAMP:
                 return DataTypes.TIMESTAMP(scale);

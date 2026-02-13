@@ -40,7 +40,6 @@ import org.apache.flink.cdc.common.types.VarCharType;
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
 import com.starrocks.connector.flink.catalog.StarRocksTable;
 
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -52,6 +51,9 @@ import static org.apache.flink.cdc.common.types.DataTypeChecks.getScale;
 
 /** Utilities for conversion from source table to StarRocks table. */
 public class StarRocksUtils {
+
+    public static final String DEFAULT_DATETIME = "1970-01-01 00:00:00";
+    public static final String INVALID_OR_MISSING_DATATIME = "0000-00-00 00:00:00";
 
     /** Convert a source table to {@link StarRocksTable}. */
     public static StarRocksTable toStarRocksTable(
@@ -85,7 +87,9 @@ public class StarRocksUtils {
                             .setColumnName(column.getName())
                             .setOrdinalPosition(i)
                             .setColumnComment(column.getComment())
-                            .setDefaultValue(column.getDefaultValueExpression());
+                            .setDefaultValue(
+                                    convertInvalidTimestampDefaultValue(
+                                            column.getDefaultValueExpression(), column.getType()));
             toStarRocksDataType(column, i < primaryKeyCount, builder);
             starRocksColumns.add(builder.build());
         }
@@ -109,10 +113,15 @@ public class StarRocksUtils {
 
     /** Convert CDC data type to StarRocks data type. */
     public static void toStarRocksDataType(
-            Column cdcColumn, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+            DataType cdcDataType, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
         CdcDataTypeTransformer dataTypeTransformer =
                 new CdcDataTypeTransformer(isPrimaryKeys, builder);
-        cdcColumn.getType().accept(dataTypeTransformer);
+        cdcDataType.accept(dataTypeTransformer);
+    }
+
+    public static void toStarRocksDataType(
+            Column cdcColumn, boolean isPrimaryKeys, StarRocksColumn.Builder builder) {
+        toStarRocksDataType(cdcColumn.getType(), isPrimaryKeys, builder);
     }
 
     /** Format DATE type data. */
@@ -172,9 +181,7 @@ public class StarRocksUtils {
                 break;
             case DATE:
                 fieldGetter =
-                        record ->
-                                LocalDate.ofEpochDay(record.getInt(fieldPos))
-                                        .format(DATE_FORMATTER);
+                        record -> record.getDate(fieldPos).toLocalDate().format(DATE_FORMATTER);
                 break;
             case TIMESTAMP_WITHOUT_TIME_ZONE:
                 fieldGetter =
@@ -385,5 +392,23 @@ public class StarRocksUtils {
         protected StarRocksColumn.Builder defaultMethod(DataType dataType) {
             throw new UnsupportedOperationException("Unsupported CDC data type " + dataType);
         }
+    }
+
+    public static String convertInvalidTimestampDefaultValue(
+            String defaultValue, org.apache.flink.cdc.common.types.DataType dataType) {
+        if (defaultValue == null) {
+            return null;
+        }
+
+        if (dataType instanceof org.apache.flink.cdc.common.types.LocalZonedTimestampType
+                || dataType instanceof org.apache.flink.cdc.common.types.TimestampType
+                || dataType instanceof org.apache.flink.cdc.common.types.ZonedTimestampType) {
+
+            if (INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+                return DEFAULT_DATETIME;
+            }
+        }
+
+        return defaultValue;
     }
 }

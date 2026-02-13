@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.udf.examples.scala.precision
 
-import org.apache.flink.cdc.common.data.DecimalData
 import org.apache.flink.cdc.common.types.DataType
 import org.apache.flink.cdc.common.types.DataTypes
 import org.apache.flink.cdc.common.udf.UserDefinedFunction
@@ -27,5 +26,5 @@ import java.math.BigDecimal
 /** This is an example UDF class for testing purposes only. */
 class DecimalTypeReturningClass extends UserDefinedFunction {
   override def getReturnType: DataType = DataTypes.DECIMAL(10, 3)
-  def eval: DecimalData = DecimalData.fromBigDecimal(new BigDecimal("12.315"), 10, 3)
+  def eval: BigDecimal = new BigDecimal("12.315")
 }

@@ -198,6 +198,13 @@ public class MySqlSourceBuilder<T> {
         return this;
     }
 
+    /** Whether the {@link MySqlSource} should output the transaction metadata events or not. */
+    public MySqlSourceBuilder<T> includeTransactionMetadataEvents(
+            boolean includeTransactionMetadataEvents) {
+        this.configFactory.includeTransactionMetadataEvents(includeTransactionMetadataEvents);
+        return this;
+    }
+
     /** Whether the {@link MySqlSource} should scan the newly added tables or not. */
     public MySqlSourceBuilder<T> scanNewlyAddedTableEnabled(boolean scanNewlyAddedTableEnabled) {
         this.configFactory.scanNewlyAddedTableEnabled(scanNewlyAddedTableEnabled);
@@ -234,6 +241,19 @@ public class MySqlSourceBuilder<T> {
     /** The interval of heartbeat event. */
     public MySqlSourceBuilder<T> heartbeatInterval(Duration heartbeatInterval) {
         this.configFactory.heartbeatInterval(heartbeatInterval);
+        return this;
+    }
+
+    /**
+     * The interval of heartbeat event and whether to emit heartbeat events.
+     *
+     * @param heartbeatInterval the interval of heartbeat event
+     * @param includeHeartbeatEvents whether to emit heartbeat events
+     */
+    public MySqlSourceBuilder<T> heartbeatInterval(
+            Duration heartbeatInterval, boolean includeHeartbeatEvents) {
+        this.configFactory.heartbeatInterval(heartbeatInterval);
+        this.configFactory.includeHeartbeatEvents(includeHeartbeatEvents);
         return this;
     }
 

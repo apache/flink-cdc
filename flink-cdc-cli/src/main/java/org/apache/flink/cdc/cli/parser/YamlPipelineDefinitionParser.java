@@ -30,6 +30,9 @@ import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.definition.TransformDef;
 import org.apache.flink.cdc.composer.definition.UdfDef;
+import org.apache.flink.core.fs.FSDataInputStream;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
@@ -37,9 +40,11 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,6 +57,8 @@ import static org.apache.flink.cdc.common.utils.Preconditions.checkNotNull;
 
 /** Parser for converting YAML formatted pipeline definition to {@link PipelineDef}. */
 public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
+
+    private static final String TOP_LEVEL_NAME = "top-level";
 
     // Parent node keys
     private static final String SOURCE_KEY = "source";
@@ -103,7 +110,9 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     @Override
     public PipelineDef parse(Path pipelineDefPath, Configuration globalPipelineConfig)
             throws Exception {
-        return parse(mapper.readTree(pipelineDefPath.toFile()), globalPipelineConfig);
+        FileSystem fileSystem = FileSystem.get(pipelineDefPath.toUri());
+        FSDataInputStream pipelineInStream = fileSystem.open(pipelineDefPath);
+        return parse(mapper.readTree(pipelineInStream), globalPipelineConfig);
     }
 
     @Override
@@ -114,6 +123,11 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
 
     private PipelineDef parse(JsonNode pipelineDefJsonNode, Configuration globalPipelineConfig)
             throws Exception {
+        validateJsonNodeKeys(
+                TOP_LEVEL_NAME,
+                pipelineDefJsonNode,
+                Arrays.asList(SOURCE_KEY, SINK_KEY),
+                Arrays.asList(ROUTE_KEY, TRANSFORM_KEY, PIPELINE_KEY));
 
         // UDFs are optional. We parse UDF first and remove it from the pipelineDefJsonNode since
         // it's not of plain data types and must be removed before calling toPipelineConfig.
@@ -122,10 +136,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         if (pipelineDefJsonNode.get(PIPELINE_KEY) != null) {
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(UDF_KEY))
+                    .map(node -> validateArray("UDF", node))
                     .ifPresent(node -> node.forEach(udf -> udfDefs.add(toUdfDef(udf))));
 
             Optional.ofNullable(
                             ((ObjectNode) pipelineDefJsonNode.get(PIPELINE_KEY)).remove(MODEL_KEY))
+                    .map(node -> validateArray("model", node))
                     .ifPresent(node -> modelDefs.addAll(parseModels(node)));
         }
 
@@ -155,6 +171,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // Transforms are optional
         List<TransformDef> transformDefs = new ArrayList<>();
         Optional.ofNullable(pipelineDefJsonNode.get(TRANSFORM_KEY))
+                .map(node -> validateArray("transform", node))
                 .ifPresent(
                         node ->
                                 node.forEach(
@@ -163,6 +180,7 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
         // Routes are optional
         List<RouteDef> routeDefs = new ArrayList<>();
         Optional.ofNullable(pipelineDefJsonNode.get(ROUTE_KEY))
+                .map(node -> validateArray("route", node))
                 .ifPresent(node -> node.forEach(route -> routeDefs.add(toRouteDef(route))));
 
         // Merge user config into global config
@@ -243,6 +261,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private RouteDef toRouteDef(JsonNode routeNode) {
+        validateJsonNodeKeys(
+                "route",
+                routeNode,
+                Arrays.asList(ROUTE_SOURCE_TABLE_KEY, ROUTE_SINK_TABLE_KEY),
+                Arrays.asList(ROUTE_REPLACE_SYMBOL, ROUTE_DESCRIPTION_KEY));
+
         String sourceTable =
                 checkNotNull(
                                 routeNode.get(ROUTE_SOURCE_TABLE_KEY),
@@ -267,6 +291,12 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private UdfDef toUdfDef(JsonNode udfNode) {
+        validateJsonNodeKeys(
+                "UDF",
+                udfNode,
+                Arrays.asList(UDF_FUNCTION_NAME_KEY, UDF_CLASSPATH_KEY),
+                Collections.emptyList());
+
         String functionName =
                 checkNotNull(
                                 udfNode.get(UDF_FUNCTION_NAME_KEY),
@@ -284,6 +314,19 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
     }
 
     private TransformDef toTransformDef(JsonNode transformNode) {
+        validateJsonNodeKeys(
+                "transform",
+                transformNode,
+                Collections.singletonList(TRANSFORM_SOURCE_TABLE_KEY),
+                Arrays.asList(
+                        TRANSFORM_PROJECTION_KEY,
+                        TRANSFORM_FILTER_KEY,
+                        TRANSFORM_PRIMARY_KEY_KEY,
+                        TRANSFORM_PARTITION_KEY_KEY,
+                        TRANSFORM_TABLE_OPTION_KEY,
+                        TRANSFORM_DESCRIPTION_KEY,
+                        TRANSFORM_CONVERTER_AFTER_TRANSFORM_KEY));
+
         String sourceTable =
                 checkNotNull(
                                 transformNode.get(TRANSFORM_SOURCE_TABLE_KEY),
@@ -372,5 +415,58 @@ public class YamlPipelineDefinitionParser implements PipelineDefinitionParser {
                         .asText();
         Map<String, String> properties = mapper.convertValue(modelNode, Map.class);
         return new ModelDef(name, model, properties);
+    }
+
+    private void validateJsonNodeKeys(
+            String contextName,
+            JsonNode jsonNode,
+            List<String> requiredKeys,
+            List<String> optionalKeys)
+            throws IllegalArgumentException {
+        List<String> validKeys = new ArrayList<>(requiredKeys);
+        Set<String> presentedKeys = new HashSet<>();
+        validKeys.addAll(optionalKeys);
+
+        for (Iterator<String> it = jsonNode.fieldNames(); it.hasNext(); ) {
+            String key = it.next();
+            presentedKeys.add(key);
+            if (!validKeys.contains(key)) {
+                if (TOP_LEVEL_NAME.equals(contextName)) {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "Unexpected key `%s` in YAML top-level block.\n"
+                                            + "Allowed keys in this context are: %s\n"
+                                            + "Note: Flink configurations should be defined in \"Runtime Configurations\" instead of YAML scripts.",
+                                    key, validKeys));
+                } else {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "Unexpected key `%s` in YAML %s block.\n"
+                                            + "Allowed keys in this context are: %s\n"
+                                            + "Note: option %s: %s is unexpected. It was silently ignored in previous versions, and probably should be removed.",
+                                    key, contextName, validKeys, key, jsonNode.get(key)));
+                }
+            }
+        }
+
+        for (String key : requiredKeys) {
+            if (!presentedKeys.contains(key)) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Missing required field \"%s\" in %s configuration",
+                                key, contextName));
+            }
+        }
+    }
+
+    private JsonNode validateArray(String contextName, JsonNode jsonNode) {
+        if (jsonNode.isArray()) {
+            return jsonNode;
+        } else {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "YAML %s block is expecting an array children, but got an %s (%s). Perhaps you missed a dash prefix `-`?",
+                            contextName, jsonNode.getNodeType(), jsonNode));
+        }
     }
 }

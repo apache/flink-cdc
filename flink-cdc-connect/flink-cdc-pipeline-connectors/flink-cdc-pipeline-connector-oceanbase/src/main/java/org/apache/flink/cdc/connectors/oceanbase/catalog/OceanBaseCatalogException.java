@@ -19,12 +19,16 @@ package org.apache.flink.cdc.connectors.oceanbase.catalog;
 
 /** A catalog-related, runtime exception. */
 public class OceanBaseCatalogException extends RuntimeException {
-    /** @param message the detail message. */
+    /**
+     * @param message the detail message.
+     */
     public OceanBaseCatalogException(String message) {
         super(message);
     }
 
-    /** @param cause the cause. */
+    /**
+     * @param cause the cause.
+     */
     public OceanBaseCatalogException(Throwable cause) {
         super(cause);
     }

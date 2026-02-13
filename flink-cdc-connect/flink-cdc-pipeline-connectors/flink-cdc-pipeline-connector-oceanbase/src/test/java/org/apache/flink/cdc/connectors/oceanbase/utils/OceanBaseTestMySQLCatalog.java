@@ -122,8 +122,9 @@ public class OceanBaseTestMySQLCatalog extends OceanBaseMySQLCatalog {
     }
 
     @Override
-    public List<String> executeSingleColumnStatement(String sql) throws SQLException {
-        return super.executeSingleColumnStatement(sql);
+    public List<String> executeSingleColumnStatement(String sql, Object... params)
+            throws SQLException {
+        return super.executeSingleColumnStatement(sql, params);
     }
 
     @Override

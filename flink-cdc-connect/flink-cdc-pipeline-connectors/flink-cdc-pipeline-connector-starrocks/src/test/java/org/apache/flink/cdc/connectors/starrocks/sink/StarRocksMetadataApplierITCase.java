@@ -42,21 +42,20 @@ import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.coordination.OperatorIDGenerator;
 import org.apache.flink.cdc.composer.flink.translator.DataSinkTranslator;
+import org.apache.flink.cdc.composer.flink.translator.OperatorUidGenerator;
 import org.apache.flink.cdc.composer.flink.translator.SchemaOperatorTranslator;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksContainer;
 import org.apache.flink.cdc.connectors.starrocks.sink.utils.StarRocksSinkTestBase;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
-import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,18 +70,18 @@ import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOp
 import static org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkOptions.USERNAME;
 
 /** IT tests for {@link StarRocksMetadataApplier}. */
-public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
+class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     private static final StreamExecutionEnvironment env =
             StreamExecutionEnvironment.getExecutionEnvironment();
 
-    @BeforeClass
+    @BeforeAll
     public static void before() {
         env.setParallelism(DEFAULT_PARALLELISM);
         env.enableCheckpointing(3000);
         env.setRestartStrategy(RestartStrategies.noRestart());
     }
 
-    @Before
+    @BeforeEach
     public void initializeDatabase() {
         executeSql(
                 String.format(
@@ -91,7 +90,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         LOG.info("Database {} created.", StarRocksContainer.STARROCKS_DATABASE_NAME);
     }
 
-    @After
+    @AfterEach
     public void destroyDatabase() {
         executeSql(String.format("DROP DATABASE %s;", StarRocksContainer.STARROCKS_DATABASE_NAME));
         LOG.info("Database {} destroyed.", StarRocksContainer.STARROCKS_DATABASE_NAME);
@@ -163,7 +162,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
                         .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
-                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17).notNull(), null))
                         .primaryKey("id")
                         .build();
 
@@ -190,7 +189,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    public void testStarRocksDataType() throws Exception {
+    void testStarRocksDataType() throws Exception {
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,
@@ -266,7 +265,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    public void testStarRocksAddColumn() throws Exception {
+    void testStarRocksAddColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,
@@ -289,7 +288,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    public void testStarRocksDropColumn() throws Exception {
+    void testStarRocksDropColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,
@@ -307,8 +306,7 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Ignore("Rename column is not supported currently.")
-    public void testStarRocksRenameColumn() throws Exception {
+    void testStarRocksRenameColumn() throws Exception {
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,
@@ -328,15 +326,14 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
     }
 
     @Test
-    @Ignore("Alter column type is not supported currently.")
-    public void testStarRocksAlterColumnType() throws Exception {
+    void testStarRocksAlterColumnType() throws Exception {
         TableId tableId =
                 TableId.tableId(
                         StarRocksContainer.STARROCKS_DATABASE_NAME,
                         StarRocksContainer.STARROCKS_TABLE_NAME);
 
         runJobWithEvents(generateAlterColumnTypeEvents(tableId));
-
+        waitAlterDone(tableId, 60000L);
         List<String> actual = inspectTableSchema(tableId);
 
         List<String> expected =
@@ -348,15 +345,17 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         assertEqualsInOrder(expected, actual);
     }
 
-    @Test(expected = JobExecutionException.class)
-    @Ignore("Alter column type is not supported currently.")
-    public void testStarRocksNarrowingAlterColumnType() throws Exception {
-        TableId tableId =
-                TableId.tableId(
-                        StarRocksContainer.STARROCKS_DATABASE_NAME,
-                        StarRocksContainer.STARROCKS_TABLE_NAME);
+    @Test
+    void testStarRocksNarrowingAlterColumnType() throws Exception {
+        Assertions.assertThatThrownBy(
+                () -> {
+                    TableId tableId =
+                            TableId.tableId(
+                                    StarRocksContainer.STARROCKS_DATABASE_NAME,
+                                    StarRocksContainer.STARROCKS_TABLE_NAME);
 
-        runJobWithEvents(generateNarrowingAlterColumnTypeEvents(tableId));
+                    runJobWithEvents(generateNarrowingAlterColumnTypeEvents(tableId));
+                });
     }
 
     @Test
@@ -412,12 +411,12 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                         new DropTableEvent(tableId));
         runJobWithEvents(dropTableTestingEvents);
 
-        Assert.assertThrows(
-                String.format(
-                        "Getting analyzing error. Detail message: Unknown table '%s.%s'.",
-                        tableId.getSchemaName(), tableId.getTableName()),
-                MySQLSyntaxErrorException.class,
-                () -> fetchTableContent(tableId, 3));
+        Assertions.assertThatThrownBy(() -> fetchTableContent(tableId, 3))
+                .isExactlyInstanceOf(MySQLSyntaxErrorException.class)
+                .hasMessageContaining(
+                        String.format(
+                                "Getting analyzing error. Detail message: Unknown table '%s.%s'.",
+                                tableId.getSchemaName(), tableId.getTableName()));
     }
 
     private void runJobWithEvents(List<Event> events) throws Exception {
@@ -433,15 +432,16 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
 
         DataSink starRocksSink = createStarRocksDataSink(config);
 
+        String schemaOperatorUid = "$$_schema_operator_$$";
+
         SchemaOperatorTranslator schemaOperatorTranslator =
                 new SchemaOperatorTranslator(
                         SchemaChangeBehavior.EVOLVE,
-                        "$$_schema_operator_$$",
+                        schemaOperatorUid,
                         DEFAULT_SCHEMA_OPERATOR_RPC_TIMEOUT,
                         "UTC");
 
-        OperatorIDGenerator schemaOperatorIDGenerator =
-                new OperatorIDGenerator(schemaOperatorTranslator.getSchemaOperatorUid());
+        OperatorIDGenerator schemaOperatorIDGenerator = new OperatorIDGenerator(schemaOperatorUid);
 
         stream =
                 schemaOperatorTranslator.translateRegular(
@@ -459,7 +459,8 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                 new SinkDef("starrocks", "Dummy StarRocks Sink", config),
                 stream,
                 starRocksSink,
-                schemaOperatorIDGenerator.generate());
+                schemaOperatorIDGenerator.generate(),
+                new OperatorUidGenerator());
 
         env.execute("StarRocks Schema Evolution Test");
     }
@@ -474,5 +475,106 @@ public class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
                                                         ? BinaryStringData.fromString((String) e)
                                                         : e)
                                 .toArray());
+    }
+
+    @Test
+    void testMysqlDefaultTimestampValueConversionInCreateTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "created_time",
+                                        DataTypes.TIMESTAMP(),
+                                        null,
+                                        StarRocksUtils.INVALID_OR_MISSING_DATATIME))
+                        .column(
+                                new PhysicalColumn(
+                                        "updated_time",
+                                        DataTypes.TIMESTAMP_LTZ(),
+                                        null,
+                                        StarRocksUtils.INVALID_OR_MISSING_DATATIME))
+                        .primaryKey("id")
+                        .build();
+
+        runJobWithEvents(Collections.singletonList(new CreateTableEvent(tableId, schema)));
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "name | varchar(150) | YES | false | null",
+                        "created_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME,
+                        "updated_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
+    void testMysqlDefaultTimestampValueConversionInAddColumn() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(tableId, initialSchema));
+
+        PhysicalColumn createdTimeCol =
+                new PhysicalColumn(
+                        "created_time",
+                        DataTypes.TIMESTAMP(),
+                        null,
+                        StarRocksUtils.INVALID_OR_MISSING_DATATIME);
+
+        PhysicalColumn updatedTimeCol =
+                new PhysicalColumn(
+                        "updated_time",
+                        DataTypes.TIMESTAMP_LTZ(),
+                        null,
+                        StarRocksUtils.INVALID_OR_MISSING_DATATIME);
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(createdTimeCol))));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(updatedTimeCol))));
+
+        runJobWithEvents(events);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "name | varchar(150) | YES | false | null",
+                        "created_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME,
+                        "updated_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
     }
 }

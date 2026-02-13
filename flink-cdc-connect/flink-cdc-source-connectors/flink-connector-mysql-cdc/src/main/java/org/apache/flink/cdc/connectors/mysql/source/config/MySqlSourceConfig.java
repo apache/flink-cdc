@@ -26,6 +26,7 @@ import io.debezium.config.Configuration;
 import io.debezium.connector.mysql.MySqlConnectorConfig;
 import io.debezium.relational.RelationalTableFilters;
 import io.debezium.relational.TableId;
+import io.debezium.relational.Tables;
 
 import javax.annotation.Nullable;
 
@@ -61,6 +62,8 @@ public class MySqlSourceConfig implements Serializable {
     private final double distributionFactorUpper;
     private final double distributionFactorLower;
     private final boolean includeSchemaChanges;
+    private final boolean includeHeartbeatEvents;
+    private final boolean includeTransactionMetadataEvents;
     private final boolean scanNewlyAddedTableEnabled;
     private final boolean closeIdleReaders;
     private final Properties jdbcProperties;
@@ -98,6 +101,8 @@ public class MySqlSourceConfig implements Serializable {
             double distributionFactorUpper,
             double distributionFactorLower,
             boolean includeSchemaChanges,
+            boolean includeHeartbeatEvents,
+            boolean includeTransactionMetadataEvents,
             boolean scanNewlyAddedTableEnabled,
             boolean closeIdleReaders,
             Properties dbzProperties,
@@ -127,11 +132,25 @@ public class MySqlSourceConfig implements Serializable {
         this.distributionFactorUpper = distributionFactorUpper;
         this.distributionFactorLower = distributionFactorLower;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.includeHeartbeatEvents = includeHeartbeatEvents;
+        this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
         this.scanNewlyAddedTableEnabled = scanNewlyAddedTableEnabled;
         this.closeIdleReaders = closeIdleReaders;
         this.dbzProperties = checkNotNull(dbzProperties);
         this.dbzConfiguration = Configuration.from(dbzProperties);
         this.dbzMySqlConfig = new MySqlConnectorConfig(dbzConfiguration);
+        Selectors excludeTableFilter =
+                (excludeTableList == null
+                        ? null
+                        : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
+        Tables.TableFilter tableFilter = dbzMySqlConfig.getTableFilters().dataCollectionFilter();
+        dbzMySqlConfig
+                .getTableFilters()
+                .setDataCollectionFilters(
+                        (TableId tableId) ->
+                                tableFilter.isIncluded(tableId)
+                                        && (excludeTableFilter == null
+                                                || !excludeTableFilter.isMatch(tableId)));
         this.jdbcProperties = jdbcProperties;
         this.chunkKeyColumns = chunkKeyColumns;
         this.skipSnapshotBackfill = skipSnapshotBackfill;
@@ -214,6 +233,14 @@ public class MySqlSourceConfig implements Serializable {
         return includeSchemaChanges;
     }
 
+    public boolean isIncludeHeartbeatEvents() {
+        return includeHeartbeatEvents;
+    }
+
+    public boolean isIncludeTransactionMetadataEvents() {
+        return includeTransactionMetadataEvents;
+    }
+
     public boolean isScanNewlyAddedTableEnabled() {
         return scanNewlyAddedTableEnabled;
     }
@@ -254,13 +281,7 @@ public class MySqlSourceConfig implements Serializable {
 
     public Predicate<TableId> getTableFilter() {
         RelationalTableFilters tableFilters = dbzMySqlConfig.getTableFilters();
-        Selectors excludeTableFilter =
-                (excludeTableList == null
-                        ? null
-                        : new Selectors.SelectorsBuilder().includeTables(excludeTableList).build());
-        return (TableId tableId) ->
-                tableFilters.dataCollectionFilter().isIncluded(tableId)
-                        && (excludeTableFilter == null || !excludeTableFilter.isMatch(tableId));
+        return tableId -> tableFilters.dataCollectionFilter().isIncluded(tableId);
     }
 
     public Properties getJdbcProperties() {

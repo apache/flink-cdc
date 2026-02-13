@@ -26,11 +26,11 @@ import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
-import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
@@ -51,7 +51,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -168,10 +167,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         output.collect(
                 new StreamRecord<>(new FlushEvent(subTaskId, sinkTables, originalEvent.getType())));
 
+        LOG.info("{}> Going to request schema change...", subTaskId);
+
         // Then, queue to request schema change to SchemaCoordinator.
         SchemaChangeResponse response = requestSchemaChange(tableId, originalEvent);
 
-        LOG.info("{}> Successfully requested schema change.", subTaskId);
         LOG.info(
                 "{}> Finished schema change events: {}",
                 subTaskId,
@@ -240,12 +240,6 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             throw new IllegalStateException(
                     "Failed to send request to coordinator: " + request.toString(), e);
         }
-    }
-
-    /** Visible for mocking in test cases. */
-    @VisibleForTesting
-    protected int getCurrentTimestamp() {
-        return (int) Instant.now().getEpochSecond();
     }
 
     @VisibleForTesting

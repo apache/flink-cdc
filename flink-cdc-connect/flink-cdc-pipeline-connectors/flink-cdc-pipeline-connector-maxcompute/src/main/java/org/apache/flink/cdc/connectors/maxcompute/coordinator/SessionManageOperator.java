@@ -94,6 +94,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
 
     private transient Future<CoordinationResponse> snapshotFlushSuccess;
     private transient int indexOfThisSubtask;
+
     /**
      * trigger endOfInput is ahead of prepareSnapshotPreBarrier, so we need this flag to handle when
      * endOfInput, send WaitForSuccessRequest in advance.
@@ -194,7 +195,7 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {
-        Optional<Schema> schema = schemaEvolutionClient.getLatestOriginalSchema(tableId);
+        Optional<Schema> schema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
         if (schema.isPresent()) {
             Schema latestSchema = schema.get();
             schemaMaps.put(tableId, latestSchema);

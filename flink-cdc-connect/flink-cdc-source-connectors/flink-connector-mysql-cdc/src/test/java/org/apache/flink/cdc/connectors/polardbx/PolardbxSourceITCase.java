@@ -26,8 +26,8 @@ import org.apache.flink.table.planner.factories.TestValuesTableFactory;
 import org.apache.flink.types.Row;
 import org.apache.flink.util.CloseableIterator;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.Statement;
@@ -42,16 +42,16 @@ import static java.lang.String.format;
  * we added fallback in {@link MySqlSchema} when parsing ddl failed and provided these cases to
  * test.
  */
-public class PolardbxSourceITCase extends PolardbxSourceTestBase {
+class PolardbxSourceITCase extends PolardbxSourceTestBase {
     private static final String DATABASE = "polardbx_ddl_test";
 
-    @BeforeClass
+    @BeforeAll
     public static void beforeClass() throws InterruptedException {
         initializePolardbxTables(DATABASE, null);
     }
 
     @Test
-    public void testSingleKey() throws Exception {
+    void testSingleKey() throws Exception {
         int parallelism = 1;
         String[] captureCustomerTables = new String[] {"orders"};
 
@@ -161,7 +161,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
     }
 
     @Test
-    public void testFullTypesDdl() throws Exception {
+    void testFullTypesDdl() throws Exception {
         int parallelism = 1;
         String[] captureCustomerTables = new String[] {"polardbx_full_types"};
 
@@ -269,7 +269,7 @@ public class PolardbxSourceITCase extends PolardbxSourceTestBase {
     }
 
     @Test
-    public void testMultiKeys() throws Exception {
+    void testMultiKeys() throws Exception {
         int parallelism = 1;
         String[] captureCustomerTables = new String[] {"orders_with_multi_pks"};
 

@@ -17,8 +17,10 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -29,6 +31,7 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.source.SupportedMetadataColumn;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
+import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTestHarness;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -40,10 +43,9 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
-import java.time.format.DateTimeParseException;
 
 /** Unit tests for the {@link PostTransformOperator}. */
-public class PostTransformOperatorTest {
+class PostTransformOperatorTest {
     private static final TableId CUSTOMERS_TABLEID =
             TableId.tableId("my_company", "my_branch", "customers");
     private static final Schema CUSTOMERS_SCHEMA =
@@ -600,18 +602,18 @@ public class PostTransformOperatorTest {
                         DATATYPE_TABLEID,
                         recordDataGenerator.generate(
                                 new Object[] {
-                                    new BinaryStringData("3.14"),
-                                    new Boolean(true),
-                                    new Byte("1"),
-                                    new Short("1"),
-                                    new Integer(1),
-                                    new Long(1),
-                                    new Integer(1704471599),
-                                    new Integer(1704471599),
+                                    BinaryStringData.fromString("3.14"),
+                                    true,
+                                    (byte) 1,
+                                    (short) 1,
+                                    1,
+                                    1L,
+                                    DateData.fromEpochDay(1704471599),
+                                    TimeData.fromMillisOfDay(1704471),
                                     TimestampData.fromMillis(1704471599),
-                                    new Float(3.14f),
-                                    new Double(3.14d),
-                                    DecimalData.fromBigDecimal(new BigDecimal(3.14), 6, 2),
+                                    3.14f,
+                                    3.14d,
+                                    DecimalData.fromBigDecimal(new BigDecimal("3.14"), 6, 2),
                                 }));
         transform.processElement(new StreamRecord<>(createTableEvent));
         Assertions.assertThat(
@@ -1668,7 +1670,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    void testTimestampaddTransform() throws Exception {
+    void testTimestampAddTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
@@ -2083,6 +2085,7 @@ public class PostTransformOperatorTest {
                                         + ",cast(colString as DECIMAL(4,2)) as nullDecimal"
                                         + ",cast(colString as TIMESTAMP(3)) as nullTimestamp",
                                 null)
+                        .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -2278,6 +2281,7 @@ public class PostTransformOperatorTest {
                                         + ",castDecimal"
                                         + ",cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '10'")
+                        .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -2715,6 +2719,7 @@ public class PostTransformOperatorTest {
                                         + ",cast(castFloat as DECIMAL(4,2)) as castDecimal"
                                         + ",cast(castFloat as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '1'")
+                        .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -2749,12 +2754,25 @@ public class PostTransformOperatorTest {
                         transformFunctionEventEventOperatorTestHarness.getOutputRecords().poll())
                 .isEqualTo(new StreamRecord<>(new CreateTableEvent(CAST_TABLEID, CAST_SCHEMA)));
         Assertions.assertThatThrownBy(
-                        () -> {
-                            transform.processElement(new StreamRecord<>(insertEvent1));
-                        })
-                .isExactlyInstanceOf(RuntimeException.class)
-                .hasRootCauseInstanceOf(DateTimeParseException.class)
-                .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
+                        () -> transform.processElement(new StreamRecord<>(insertEvent1)))
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessageContaining(
+                        "Failed to post-transform with\n"
+                                + "\tDataChangeEvent{tableId=my_company.my_branch.data_cast, before=null, after={col1: STRING NOT NULL -> 1, castInt: INT -> null, castBoolean: BOOLEAN -> null, castTinyint: TINYINT -> null, castSmallint: SMALLINT -> null, castBigint: BIGINT -> null, castFloat: FLOAT -> 1.0, castDouble: DOUBLE -> null, castChar: STRING -> null, castVarchar: STRING -> null, castDecimal: DECIMAL(4, 2) -> null, castTimestamp: TIMESTAMP(3) -> null}, op=INSERT, meta=()}\n"
+                                + "for table\n"
+                                + "\tmy_company.my_branch.data_cast\n"
+                                + "from schema\n"
+                                + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=()\n"
+                                + "to schema\n"
+                                + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=().")
+                .cause()
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Failed to evaluate projection expression `CAST(`TB`.`castFloat` AS TIMESTAMP(3))` for column `castTimestamp` in table `my_company.my_branch.data_cast`.\n"
+                                + "\tCompiled expression: castToTimestamp($0, __time_zone__)\n"
+                                + "\tColumn name map: {$0 -> castFloat}")
+                .hasRootCauseMessage("Unable to parse given string as timestamp: 1.0");
+
         transformFunctionEventEventOperatorTestHarness.close();
     }
 
@@ -2850,6 +2868,17 @@ public class PostTransformOperatorTest {
                         () -> {
                             transform.processElement(new StreamRecord<>(createTableEvent));
                         })
+                .isExactlyInstanceOf(TransformException.class)
+                .hasMessageContaining(
+                        "Failed to post-transform with\n"
+                                + "\tCreateTableEvent{tableId=my_company.my_branch.compare_table, schema=columns={`col1` STRING NOT NULL,`numerical_equal` BOOLEAN,`string_equal` BOOLEAN,`time_equal` BOOLEAN,`timestamp_equal` BOOLEAN,`date_equal` BOOLEAN}, primaryKeys=col1, options=()}\n"
+                                + "for table\n"
+                                + "\tmy_company.my_branch.compare_table\n"
+                                + "from schema\n"
+                                + "\t(Unknown)\n"
+                                + "to schema\n"
+                                + "\t(Unknown).")
+                .cause()
                 .isExactlyInstanceOf(CalciteContextException.class)
                 .hasRootCauseInstanceOf(SqlValidatorException.class)
                 .hasRootCauseMessage(
@@ -3065,7 +3094,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    public void testReduceSchemaTransform() throws Exception {
+    void testReduceSchemaTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(
@@ -3168,7 +3197,7 @@ public class PostTransformOperatorTest {
     }
 
     @Test
-    public void testWildcardSchemaTransform() throws Exception {
+    void testWildcardSchemaTransform() throws Exception {
         PostTransformOperator transform =
                 PostTransformOperator.newBuilder()
                         .addTransform(

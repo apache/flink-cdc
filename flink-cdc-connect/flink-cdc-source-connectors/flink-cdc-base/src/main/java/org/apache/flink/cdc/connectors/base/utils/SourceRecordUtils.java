@@ -17,24 +17,18 @@
 
 package org.apache.flink.cdc.connectors.base.utils;
 
-import org.apache.flink.table.types.logical.RowType;
-
 import io.debezium.data.Envelope;
 import io.debezium.document.DocumentReader;
 import io.debezium.relational.TableId;
 import io.debezium.relational.history.HistoryRecord;
-import io.debezium.util.SchemaNameAdjuster;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
 
 import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 
 import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
 import static io.debezium.connector.AbstractSourceInfo.SCHEMA_NAME_KEY;
@@ -127,78 +121,6 @@ public class SourceRecordUtils {
         }
         String tableName = source.getString(TABLE_NAME_KEY);
         return new TableId(dbName, schemaName, tableName);
-    }
-
-    public static Object[] getSplitKey(
-            RowType splitBoundaryType, SourceRecord dataRecord, SchemaNameAdjuster nameAdjuster) {
-        // the split key field contains single field now
-        String splitFieldName = nameAdjuster.adjust(splitBoundaryType.getFieldNames().get(0));
-        Struct key = (Struct) dataRecord.key();
-        return new Object[] {key.get(splitFieldName)};
-    }
-
-    /** Returns the specific key contains in the split key range or not. */
-    public static boolean splitKeyRangeContains(
-            Object[] key, Object[] splitKeyStart, Object[] splitKeyEnd) {
-        // for all range
-        if (splitKeyStart == null && splitKeyEnd == null) {
-            return true;
-        }
-        // first split
-        if (splitKeyStart == null) {
-            int[] upperBoundRes = new int[key.length];
-            for (int i = 0; i < key.length; i++) {
-                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i]);
-            }
-            return Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
-                    && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0);
-        }
-        // last split
-        else if (splitKeyEnd == null) {
-            int[] lowerBoundRes = new int[key.length];
-            for (int i = 0; i < key.length; i++) {
-                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i]);
-            }
-            return Arrays.stream(lowerBoundRes).allMatch(value -> value >= 0);
-        }
-        // other split
-        else {
-            int[] lowerBoundRes = new int[key.length];
-            int[] upperBoundRes = new int[key.length];
-            for (int i = 0; i < key.length; i++) {
-                lowerBoundRes[i] = compareObjects(key[i], splitKeyStart[i]);
-                upperBoundRes[i] = compareObjects(key[i], splitKeyEnd[i]);
-            }
-            return Arrays.stream(lowerBoundRes).anyMatch(value -> value >= 0)
-                    && (Arrays.stream(upperBoundRes).anyMatch(value -> value < 0)
-                            && Arrays.stream(upperBoundRes).allMatch(value -> value <= 0));
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static int compareObjects(Object o1, Object o2) {
-        if (o1 instanceof Comparable && o1.getClass().equals(o2.getClass())) {
-            return ((Comparable) o1).compareTo(o2);
-        } else if (isNumericObject(o1) && isNumericObject(o2)) {
-            return toBigDecimal(o1).compareTo(toBigDecimal(o2));
-        } else {
-            return o1.toString().compareTo(o2.toString());
-        }
-    }
-
-    private static boolean isNumericObject(Object obj) {
-        return obj instanceof Byte
-                || obj instanceof Short
-                || obj instanceof Integer
-                || obj instanceof Long
-                || obj instanceof Float
-                || obj instanceof Double
-                || obj instanceof BigInteger
-                || obj instanceof BigDecimal;
-    }
-
-    private static BigDecimal toBigDecimal(Object numericObj) {
-        return new BigDecimal(numericObj.toString());
     }
 
     public static HistoryRecord getHistoryRecord(SourceRecord schemaRecord) throws IOException {

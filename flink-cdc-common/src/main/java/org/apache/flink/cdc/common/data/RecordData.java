@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.data;
 
 import org.apache.flink.cdc.common.annotation.PublicEvolving;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.variant.Variant;
 
 import javax.annotation.Nullable;
 
@@ -163,6 +164,15 @@ public interface RecordData {
      */
     RecordData getRow(int pos, int numFields);
 
+    /** Returns the Date data at the given position. */
+    DateData getDate(int pos);
+
+    /** Returns the Time data at the given position. */
+    TimeData getTime(int pos);
+
+    /** Returns the variant value at the given position. */
+    Variant getVariant(int pos);
+
     /**
      * Creates an accessor for getting elements in an internal RecordData structure at the given
      * position.
@@ -197,9 +207,13 @@ public interface RecordData {
                 fieldGetter = record -> record.getShort(fieldPos);
                 break;
             case INTEGER:
-            case DATE:
-            case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter = record -> record.getInt(fieldPos);
+                break;
+            case DATE:
+                fieldGetter = record -> record.getDate(fieldPos);
+                break;
+            case TIME_WITHOUT_TIME_ZONE:
+                fieldGetter = record -> record.getTime(fieldPos);
                 break;
             case BIGINT:
                 fieldGetter = record -> record.getLong(fieldPos);
@@ -231,6 +245,9 @@ public interface RecordData {
             case ROW:
                 final int rowFieldCount = getFieldCount(fieldType);
                 fieldGetter = row -> row.getRow(fieldPos, rowFieldCount);
+                break;
+            case VARIANT:
+                fieldGetter = row -> row.getVariant(fieldPos);
                 break;
             default:
                 throw new IllegalArgumentException();

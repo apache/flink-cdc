@@ -21,6 +21,7 @@ import org.apache.flink.cdc.composer.PipelineComposer;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.core.execution.RestoreMode;
+import org.apache.flink.core.fs.Path;
 
 import org.apache.flink.shaded.guava31.com.google.common.io.Resources;
 
@@ -37,6 +38,9 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Map;
 
+import static org.apache.flink.configuration.StateRecoveryOptions.RESTORE_MODE;
+import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_IGNORE_UNCLAIMED_STATE;
+import static org.apache.flink.configuration.StateRecoveryOptions.SAVEPOINT_PATH;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -54,14 +58,14 @@ class CliFrontendTest {
     @Test
     void testNoArgument() throws Exception {
         CliFrontend.main(new String[] {});
-        assertThat(out.toString()).isEqualTo(HELP_MESSAGE);
+        assertThat(out).hasToString(HELP_MESSAGE);
         assertThat(err.toString()).isEmpty();
     }
 
     @Test
     void testGeneratingHelpMessage() throws Exception {
         CliFrontend.main(new String[] {"--help"});
-        assertThat(out.toString()).isEqualTo(HELP_MESSAGE);
+        assertThat(out).hasToString(HELP_MESSAGE);
         assertThat(err.toString()).isEmpty();
     }
 
@@ -84,9 +88,9 @@ class CliFrontendTest {
                         flinkHome(),
                         "--global-config",
                         globalPipelineConfig());
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("parallelism")).isEqualTo("1");
-        assertThat(executor.getGlobalPipelineConfig().toMap().get("schema.change.behavior"))
-                .isEqualTo("ignore");
+        assertThat(executor.getGlobalPipelineConfig().toMap())
+                .containsEntry("parallelism", "1")
+                .containsEntry("schema.change.behavior", "ignore");
     }
 
     @Test
@@ -101,11 +105,10 @@ class CliFrontendTest {
                         "-cm",
                         "no_claim",
                         "-n");
-        assertThat(executor.getSavepointSettings().getRestorePath())
+        assertThat(executor.getFlinkConfig().get(SAVEPOINT_PATH))
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getSavepointSettings().getRestoreMode())
-                .isEqualTo(RestoreMode.NO_CLAIM);
-        assertThat(executor.getSavepointSettings().allowNonRestoredState()).isTrue();
+        assertThat(executor.getFlinkConfig().get(RESTORE_MODE)).isEqualTo(RestoreMode.NO_CLAIM);
+        assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
     }
 
     @Test
@@ -119,6 +122,11 @@ class CliFrontendTest {
                         "kubernetes-application",
                         "-n");
         assertThat(executor.getDeploymentTarget()).isEqualTo("kubernetes-application");
+
+        executor =
+                createExecutor(
+                        pipelineDef(), "--flink-home", flinkHome(), "-t", "yarn-application", "-n");
+        assertThat(executor.getDeploymentTarget()).isEqualTo("yarn-application");
     }
 
     @Test
@@ -128,7 +136,7 @@ class CliFrontendTest {
         CliExecutor executor =
                 createExecutor(
                         pipelineDef(), "--flink-home", flinkHome(), "--jar", aJar, "--jar", bJar);
-        assertThat(executor.getAdditionalJars()).contains(Paths.get(aJar), Paths.get(bJar));
+        assertThat(executor.getAdditionalJars()).contains(new Path(aJar), new Path(bJar));
     }
 
     @Test
@@ -142,7 +150,7 @@ class CliFrontendTest {
                         globalPipelineConfig());
         NoOpComposer composer = new NoOpComposer();
         executor.setComposer(composer);
-        PipelineExecution.ExecutionInfo executionInfo = executor.run();
+        PipelineExecution.ExecutionInfo executionInfo = executor.deployWithNoOpComposer();
         assertThat(executionInfo.getId()).isEqualTo("fake-id");
         assertThat(executionInfo.getDescription()).isEqualTo("fake-description");
     }

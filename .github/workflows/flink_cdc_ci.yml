@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
       - name: Set up Ruby environment
@@ -48,47 +48,50 @@ jobs:
         with:
           ruby-version: '3.3'
       - name: Set JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
           cache: 'maven'
       - name: Compiling jar packages
         run: mvn --no-snapshot-updates -B package -DskipTests
       - name: Run license check
         run: gem install rubyzip -v 2.3.0 && ./tools/ci/license_check.rb
-  ut:
-    strategy:
-      fail-fast: false
-      matrix:
-        module: [ 'core', 'pipeline_connectors', 'mysql', 'postgres', 'oracle', 'mongodb6', 'mongodb7', 'sqlserver', 'tidb', 'oceanbase', 'db2', 'vitess' ]
-    name: Unit Tests
+  common:
+    name: Common Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-version: "[8]"
-      module: ${{ matrix.module }}
+      java-versions: "[11]"
+      modules: "['core']"
+  pipeline-ut:
+    name: Pipeline Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      modules: "['doris, elasticsearch, fluss, hudi, iceberg, kafka, maxcompute, mysql-pipeline, oceanbase-pipeline, paimon, postgres-pipeline, starrocks, oracle-pipeline']"
+  source-ut:
+    name: Source Unit Tests
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      modules: "['mysql-source', 'postgres-source, oceanbase-source, tidb, vitess', 'oracle, sqlserver', 'db2, mongodb']"
   pipeline_e2e:
     strategy:
+      max-parallel: 2
       fail-fast: false
       matrix:
         parallelism: [ 1, 4 ]
     name: Pipeline E2E Tests (${{ matrix.parallelism }}-Parallelism)
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-version: "[8]"
-      flink-version: "['1.19.2', '1.20.1']"
-      module: pipeline_e2e
+      java-versions: "[11]"
+      flink-versions: "['1.19.3', '1.20.3']"
+      modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
     name: Source E2E Tests
     uses: ./.github/workflows/flink_cdc_base.yml
     with:
-      java-version: "[8]"
-      flink-version: "['1.19.2', '1.20.1']"
-      module: source_e2e
-  migration_test:
-    name: Migration Tests
-    uses: ./.github/workflows/flink_cdc_migration_test_base.yml
-    with:
-      java-version: "[8]"
-      flink-version: "['1.19.2', '1.20.1']"
+      java-versions: "[11]"
+      flink-versions: "['1.19.3', '1.20.3']"
+      modules: "['source_e2e']"

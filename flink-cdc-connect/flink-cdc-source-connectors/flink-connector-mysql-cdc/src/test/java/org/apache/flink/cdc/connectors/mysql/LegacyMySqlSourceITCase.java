@@ -33,7 +33,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.connect.json.JsonConverterConfig;
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -50,23 +50,23 @@ import java.util.Map;
 import java.util.Objects;
 
 /** Integration tests for the legacy {@link MySqlSource}. */
-public class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
+class LegacyMySqlSourceITCase extends LegacyMySqlTestBase {
 
     private final UniqueDatabase fullTypesDatabase =
             new UniqueDatabase(MYSQL_CONTAINER, "column_type_test", "mysqluser", "mysqlpw");
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
+    void testConsumingAllEventsWithJsonFormatIncludeSchema() throws Exception {
         testConsumingAllEventsWithJsonFormat(true);
     }
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
+    void testConsumingAllEventsWithJsonFormatExcludeSchema() throws Exception {
         testConsumingAllEventsWithJsonFormat(false);
     }
 
     @Test
-    public void testConsumingAllEventsWithJsonFormatWithNumericDecimal() throws Exception {
+    void testConsumingAllEventsWithJsonFormatWithNumericDecimal() throws Exception {
         Map<String, Object> customConverterConfigs = new HashMap<>();
         customConverterConfigs.put(JsonConverterConfig.DECIMAL_FORMAT_CONFIG, "numeric");
         testConsumingAllEventsWithJsonFormat(

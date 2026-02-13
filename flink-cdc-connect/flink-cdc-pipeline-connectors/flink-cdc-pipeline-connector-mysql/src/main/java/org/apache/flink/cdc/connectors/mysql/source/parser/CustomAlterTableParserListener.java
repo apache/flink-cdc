@@ -34,6 +34,7 @@ import io.debezium.ddl.parser.mysql.generated.MySqlParser;
 import io.debezium.ddl.parser.mysql.generated.MySqlParserBaseListener;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
+import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
@@ -45,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -65,18 +67,49 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     private List<ColumnEditor> columnEditors;
     private CustomColumnDefinitionParserListener columnDefinitionListener;
     private TableEditor tableEditor;
-
+    private boolean isTableIdCaseInsensitive;
     private int parsingColumnIndex = STARTING_INDEX;
 
     public CustomAlterTableParserListener(
             MySqlAntlrDdlParser parser,
             List<ParseTreeListener> listeners,
             LinkedList<SchemaChangeEvent> changes,
-            boolean tinyInt1isBit) {
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         this.parser = parser;
         this.listeners = listeners;
         this.changes = changes;
         this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
+    }
+
+    @Override
+    public void exitCopyCreateTable(MySqlParser.CopyCreateTableContext ctx) {
+        TableId tableId = parser.parseQualifiedTableId(ctx.tableName(0).fullId());
+        TableId originalTableId = parser.parseQualifiedTableId(ctx.tableName(1).fullId());
+        Table original = parser.databaseTables().forTable(originalTableId);
+        if (original != null) {
+            parser.databaseTables()
+                    .overwriteTable(
+                            tableId,
+                            original.columns(),
+                            original.primaryKeyColumnNames(),
+                            original.defaultCharsetName());
+            parser.signalCreateTable(tableId, ctx);
+            Schema.Builder builder = Schema.newBuilder();
+            original.columns().forEach(column -> builder.column(toCdcColumn(column)));
+            if (!original.primaryKeyColumnNames().isEmpty()) {
+                builder.primaryKey(original.primaryKeyColumnNames());
+            }
+            changes.add(new CreateTableEvent(toCdcTableId(tableId), builder.build()));
+        } else {
+            LOG.warn(
+                    "Could not find schema of {} while parsing sql of `CREATE TABLE {} LIKE {}`",
+                    originalTableId,
+                    tableId,
+                    originalTableId);
+        }
+        super.exitCopyCreateTable(ctx);
     }
 
     @Override
@@ -223,6 +256,9 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                                                         null))));
                     } else if (ctx.AFTER() != null) {
                         String afterColumn = parser.parseName(ctx.uid(1));
+                        if (isTableIdCaseInsensitive) {
+                            afterColumn = afterColumn.toLowerCase(Locale.ROOT);
+                        }
                         changes.add(
                                 new AddColumnEvent(
                                         currentTable,
@@ -316,15 +352,23 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
+                    String oldColumnName =
+                            isTableIdCaseInsensitive
+                                    ? column.name().toLowerCase(Locale.ROOT)
+                                    : column.name();
                     String newColumnName = parser.parseName(ctx.newColumn);
+                    if (isTableIdCaseInsensitive && newColumnName != null) {
+                        newColumnName = newColumnName.toLowerCase(Locale.ROOT);
+                    }
 
                     Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
+
+                    typeMapping.put(oldColumnName, fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
 
-                    if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
+                    if (newColumnName != null && !oldColumnName.equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
-                        renameMap.put(column.name(), newColumnName);
+                        renameMap.put(oldColumnName, newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
                     }
                     listeners.remove(columnDefinitionListener);
@@ -336,6 +380,9 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
     @Override
     public void enterAlterByDropColumn(MySqlParser.AlterByDropColumnContext ctx) {
         String removedColName = parser.parseName(ctx.uid());
+        if (isTableIdCaseInsensitive && removedColName != null) {
+            removedColName = removedColName.toLowerCase(Locale.ROOT);
+        }
         changes.add(new DropColumnEvent(currentTable, Collections.singletonList(removedColName)));
         super.enterAlterByDropColumn(ctx);
     }
@@ -370,7 +417,11 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
                     Map<String, DataType> typeMapping = new HashMap<>();
-                    typeMapping.put(column.name(), fromDbzColumn(column, tinyInt1isBit));
+                    typeMapping.put(
+                            isTableIdCaseInsensitive
+                                    ? column.name().toLowerCase(Locale.ROOT)
+                                    : column.name(),
+                            fromDbzColumn(column, tinyInt1isBit));
                     changes.add(new AlterColumnTypeEvent(currentTable, typeMapping));
                     listeners.remove(columnDefinitionListener);
                 },
@@ -383,10 +434,17 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
         parser.runIfNotNull(
                 () -> {
                     Column column = columnDefinitionListener.getColumn();
+                    String oldColumnName =
+                            isTableIdCaseInsensitive
+                                    ? column.name().toLowerCase(Locale.ROOT)
+                                    : column.name();
                     String newColumnName = parser.parseName(ctx.newColumn);
+                    if (isTableIdCaseInsensitive && newColumnName != null) {
+                        newColumnName = newColumnName.toLowerCase(Locale.ROOT);
+                    }
                     if (newColumnName != null && !column.name().equalsIgnoreCase(newColumnName)) {
                         Map<String, String> renameMap = new HashMap<>();
-                        renameMap.put(column.name(), newColumnName);
+                        renameMap.put(oldColumnName, newColumnName);
                         changes.add(new RenameColumnEvent(currentTable, renameMap));
                     }
                     listeners.remove(columnDefinitionListener);
@@ -431,14 +489,22 @@ public class CustomAlterTableParserListener extends MySqlParserBaseListener {
 
     private org.apache.flink.cdc.common.schema.Column toCdcColumn(Column dbzColumn) {
         return org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                dbzColumn.name(),
+                isTableIdCaseInsensitive
+                        ? dbzColumn.name().toLowerCase(Locale.ROOT)
+                        : dbzColumn.name(),
                 fromDbzColumn(dbzColumn, tinyInt1isBit),
                 dbzColumn.comment(),
                 dbzColumn.defaultValueExpression().orElse(null));
     }
 
     private org.apache.flink.cdc.common.event.TableId toCdcTableId(TableId dbzTableId) {
-        return org.apache.flink.cdc.common.event.TableId.tableId(
-                dbzTableId.catalog(), dbzTableId.table());
+        if (isTableIdCaseInsensitive) {
+            return org.apache.flink.cdc.common.event.TableId.tableId(
+                    dbzTableId.catalog().toLowerCase(Locale.ROOT),
+                    dbzTableId.table().toLowerCase(Locale.ROOT));
+        } else {
+            return org.apache.flink.cdc.common.event.TableId.tableId(
+                    dbzTableId.catalog(), dbzTableId.table());
+        }
     }
 }

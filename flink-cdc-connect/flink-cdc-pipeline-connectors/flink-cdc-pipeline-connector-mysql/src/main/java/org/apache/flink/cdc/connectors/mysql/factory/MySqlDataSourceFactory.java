@@ -24,11 +24,12 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
+import org.apache.flink.cdc.common.pipeline.PipelineOptions;
+import org.apache.flink.cdc.common.pipeline.RuntimeExecutionMode;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.utils.StringUtils;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSource;
-import org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfigFactory;
 import org.apache.flink.cdc.connectors.mysql.source.config.ServerIdRange;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
@@ -43,7 +44,6 @@ import org.apache.flink.table.catalog.ObjectPath;
 
 import com.mysql.cj.conf.PropertyKey;
 import io.debezium.relational.RelationalDatabaseConnectorConfig;
-import io.debezium.relational.Tables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +61,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.common.route.TableIdRouter.convertTableListToRegExpPattern;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_LOWER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CHUNK_KEY_EVEN_DISTRIBUTION_FACTOR_UPPER_BOUND;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.CHUNK_META_GROUP_SIZE;
@@ -76,6 +77,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.PORT;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_SIZE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
@@ -128,7 +130,18 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         String serverId = validateAndGetServerId(config);
         ZoneId serverTimeZone = getServerTimeZone(config);
         StartupOptions startupOptions = getStartupOptions(config);
-
+        // Batch mode only supports StartupMode.SNAPSHOT.
+        Configuration pipelineConfiguration = context.getPipelineConfiguration();
+        if (pipelineConfiguration != null
+                && pipelineConfiguration.contains(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE)
+                && RuntimeExecutionMode.BATCH.equals(
+                        pipelineConfiguration.get(PipelineOptions.PIPELINE_EXECUTION_RUNTIME_MODE))
+                && !StartupOptions.snapshot().equals(startupOptions)) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Only \"snapshot\" of MySQLDataSource StartupOption is supported in BATCH pipeline, but actual MySQLDataSource StartupOption is {}.",
+                            startupOptions.startupMode));
+        }
         boolean includeSchemaChanges = config.get(SCHEMA_CHANGE_ENABLED);
 
         int fetchSize = config.get(SCAN_SNAPSHOT_FETCH_SIZE);
@@ -141,6 +154,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         boolean closeIdleReaders = config.get(SCAN_INCREMENTAL_CLOSE_IDLE_READER_ENABLED);
         boolean includeComments = config.get(INCLUDE_COMMENTS_ENABLED);
         boolean treatTinyInt1AsBoolean = config.get(TREAT_TINYINT1_AS_BOOLEAN_ENABLED);
+        boolean skipSnapshotBackfill = config.get(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
 
         Duration heartbeatInterval = config.get(HEARTBEAT_INTERVAL);
         Duration connectTimeout = config.get(CONNECT_TIMEOUT);
@@ -205,7 +219,8 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         .parseOnLineSchemaChanges(isParsingOnLineSchemaChanges)
                         .treatTinyInt1AsBoolean(treatTinyInt1AsBoolean)
                         .useLegacyJsonFormat(useLegacyJsonFormat)
-                        .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst);
+                        .assignUnboundedChunkFirst(isAssignUnboundedChunkFirst)
+                        .skipSnapshotBackfill(skipSnapshotBackfill);
 
         List<TableId> tableIds = MySqlSchemaUtils.listTables(configFactory.createConfig(0), null);
 
@@ -215,7 +230,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         }
 
         if (scanBinlogNewlyAddedTableEnabled) {
-            String newTables = validateTableAndReturnDebeziumStyle(tables);
+            String newTables = convertTableListToRegExpPattern(tables);
             configFactory.tableList(newTables);
             configFactory.excludeTableList(tablesExclude);
 
@@ -342,6 +357,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
         options.add(TREAT_TINYINT1_AS_BOOLEAN_ENABLED);
         options.add(PARSE_ONLINE_SCHEMA_CHANGES);
         options.add(SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED);
+        options.add(SCAN_INCREMENTAL_SNAPSHOT_BACKFILL_SKIP);
         return options;
     }
 
@@ -497,32 +513,7 @@ public class MySqlDataSourceFactory implements DataSourceFactory {
                         distributionFactorLower));
     }
 
-    /**
-     * Currently, The supported regular syntax is not exactly the same in {@link Selectors} and
-     * {@link Tables.TableFilter}.
-     *
-     * <p>The main distinction are :
-     *
-     * <p>1) {@link Selectors} use `,` to split table names and {@link Tables.TableFilter} use use
-     * `|` to split table names.
-     *
-     * <p>2) If there is a need to use a dot (.) in a regular expression to match any character, it
-     * is necessary to escape the dot with a backslash, refer to {@link
-     * MySqlDataSourceOptions#TABLES}.
-     */
-    private String validateTableAndReturnDebeziumStyle(String tables) {
-        // MySQL table names are not allowed to have `,` character.
-        if (tables.contains(",")) {
-            throw new IllegalArgumentException(
-                    "the `,` in "
-                            + tables
-                            + " is not supported when "
-                            + SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED
-                            + " was enabled.");
-        }
-
-        return tables.replace("\\.", ".");
-    }
+    private static final String DOT_PLACEHOLDER = "_$dot_placeholder$_";
 
     /** Replaces the default timezone placeholder with session timezone, if applicable. */
     private static ZoneId getServerTimeZone(Configuration config) {

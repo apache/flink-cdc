@@ -35,9 +35,9 @@ jobs:
     if: github.repository == 'apache/flink-cdc'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
       - name: Check dead links
-        uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225
         with:
           config-file: '.dlc.json'
       - name: Build doc
@@ -54,11 +54,11 @@ jobs:
       matrix:
         branch:
           - master
-          - release-3.3
-          - release-3.2
+          - release-3.5
+          - release-3.4
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           ref: ${{ matrix.branch }}
 
@@ -69,13 +69,13 @@ jobs:
           echo "flink_branch=${currentBranch}" >> ${GITHUB_ENV}
           
           if [ "${currentBranch}" = "master" ]; then
-          echo "flink_alias=release-3.4" >> ${GITHUB_ENV}
-          elif [ "${currentBranch}" = "release-3.3" ]; then
+          echo "flink_alias=release-3.6" >> ${GITHUB_ENV}
+          elif [ "${currentBranch}" = "release-3.5" ]; then
           echo "flink_alias=stable" >> ${GITHUB_ENV}
           fi
 
       - name: Check dead links
-        uses: gaurav-nelson/github-action-markdown-link-check@1.0.15
+        uses: tcort/github-action-markdown-link-check@e7c7a18363c842693fadde5d41a3bd3573a7a225
         with:
           config-file: '.dlc.json'
 
@@ -84,7 +84,7 @@ jobs:
           docker run --rm --volume "$PWD:/root/flink-cdc" chesnay/flink-ci:java_8_11_17_21_maven_386 bash -c "cd /root/flink-cdc && chmod +x ./.github/workflows/docs.sh && ./.github/workflows/docs.sh"
 
       - name: Upload documentation
-        uses: burnett01/rsync-deployments@5.2
+        uses: burnett01/rsync-deployments@0dc935cdecc5f5e571865e60d2a6cdc673704823
         with:
           switches: --archive --compress --delete
           path: docs/target/
@@ -96,7 +96,7 @@ jobs:
 
       - name: Upload documentation alias
         if: env.flink_alias != ''
-        uses: burnett01/rsync-deployments@5.2
+        uses: burnett01/rsync-deployments@0dc935cdecc5f5e571865e60d2a6cdc673704823
         with:
           switches: --archive --compress --delete
           path: docs/target/

@@ -29,7 +29,8 @@ import org.apache.flink.table.catalog.UniqueConstraint;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.FactoryUtil;
 
-import org.junit.Test;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,10 +38,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-
 /** Unit tests for TiDB table source factory. */
-public class TiDBTableSourceFactoryTest {
+class TiDBTableSourceFactoryTest {
 
     private static final ResolvedSchema SCHEMA =
             new ResolvedSchema(
@@ -75,7 +74,7 @@ public class TiDBTableSourceFactoryTest {
     private static final Map<String, String> OPTIONS = new HashMap<>();
 
     @Test
-    public void testCommonProperties() {
+    void testCommonProperties() {
         Map<String, String> properties = getAllOptions();
 
         // validation for source
@@ -89,11 +88,11 @@ public class TiDBTableSourceFactoryTest {
                         HOST_MAPPING,
                         StartupOptions.latest(),
                         OPTIONS);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     @Test
-    public void testOptionalProperties() {
+    void testOptionalProperties() {
         Map<String, String> properties = getAllOptions();
         properties.put("host-mapping", "host1:1;host2:2;host3:3");
         properties.put("tikv.grpc.timeout_in_ms", "20000");
@@ -121,7 +120,7 @@ public class TiDBTableSourceFactoryTest {
                         HOST_MAPPING,
                         StartupOptions.latest(),
                         options);
-        assertEquals(expectedSource, actualSource);
+        Assertions.assertThat(actualSource).isEqualTo(expectedSource);
     }
 
     private Map<String, String> getAllOptions() {

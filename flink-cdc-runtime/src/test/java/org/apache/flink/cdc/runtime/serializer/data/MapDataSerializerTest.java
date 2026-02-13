@@ -64,7 +64,9 @@ public class MapDataSerializerTest extends SerializerTestBase<MapData> {
                                                                 (MapData) o2, INT, STRING))));
     }
 
-    /** @return MapDataSerializer */
+    /**
+     * @return MapDataSerializer
+     */
     @Override
     protected TypeSerializer<MapData> createSerializer() {
         return new MapDataSerializer(INT, STRING);
@@ -81,13 +83,17 @@ public class MapDataSerializerTest extends SerializerTestBase<MapData> {
         return -1;
     }
 
-    /** @return MapData clazz */
+    /**
+     * @return MapData clazz
+     */
     @Override
     protected Class<MapData> getTypeClass() {
         return MapData.class;
     }
 
-    /** @return MapData[] */
+    /**
+     * @return MapData[]
+     */
     @Override
     protected MapData[] getTestData() {
         Map<Object, Object> first = new HashMap<>();

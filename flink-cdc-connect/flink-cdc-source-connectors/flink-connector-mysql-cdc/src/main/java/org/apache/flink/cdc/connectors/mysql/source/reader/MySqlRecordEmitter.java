@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.mysql.source.reader;
 import org.apache.flink.api.connector.source.SourceOutput;
 import org.apache.flink.cdc.connectors.mysql.source.metrics.MySqlSourceReaderMetrics;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplitState;
 import org.apache.flink.cdc.connectors.mysql.source.split.SourceRecords;
 import org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils;
@@ -52,15 +53,21 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
     private final DebeziumDeserializationSchema<T> debeziumDeserializationSchema;
     private final MySqlSourceReaderMetrics sourceReaderMetrics;
     private final boolean includeSchemaChanges;
+    private final boolean includeHeartbeatEvents;
+    private final boolean includeTransactionMetadataEvents;
     private final OutputCollector<T> outputCollector;
 
     public MySqlRecordEmitter(
             DebeziumDeserializationSchema<T> debeziumDeserializationSchema,
             MySqlSourceReaderMetrics sourceReaderMetrics,
-            boolean includeSchemaChanges) {
+            boolean includeSchemaChanges,
+            boolean includeHeartbeatEvents,
+            boolean includeTransactionMetadataEvents) {
         this.debeziumDeserializationSchema = debeziumDeserializationSchema;
         this.sourceReaderMetrics = sourceReaderMetrics;
         this.includeSchemaChanges = includeSchemaChanges;
+        this.includeHeartbeatEvents = includeHeartbeatEvents;
+        this.includeTransactionMetadataEvents = includeTransactionMetadataEvents;
         this.outputCollector = new OutputCollector<>();
     }
 
@@ -101,6 +108,14 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
             emitElement(element, output);
         } else if (RecordUtils.isHeartbeatEvent(element)) {
             updateStartingOffsetForSplit(splitState, element);
+            if (includeHeartbeatEvents) {
+                emitElement(element, output);
+            }
+        } else if (RecordUtils.isTransactionMetadataEvent(element)) {
+            updateStartingOffsetForSplit(splitState, element);
+            if (includeTransactionMetadataEvents) {
+                emitElement(element, output);
+            }
         } else {
             // unknown element
             LOG.info("Meet unknown element {}, just skip.", element);
@@ -119,6 +134,8 @@ public class MySqlRecordEmitter<T> implements RecordEmitter<SourceRecords, T, My
         outputCollector.currentMessageTimestamp = RecordUtils.getMessageTimestamp(element);
         debeziumDeserializationSchema.deserialize(element, outputCollector);
     }
+
+    public void applySplit(MySqlSplit split) {}
 
     private void reportMetrics(SourceRecord element) {
 

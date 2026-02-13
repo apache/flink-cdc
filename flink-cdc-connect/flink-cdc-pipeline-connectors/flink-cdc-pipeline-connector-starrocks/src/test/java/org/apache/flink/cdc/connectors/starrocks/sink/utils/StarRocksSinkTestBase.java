@@ -23,20 +23,23 @@ import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSink;
 import org.apache.flink.cdc.connectors.starrocks.sink.StarRocksDataSinkFactory;
+import org.apache.flink.cdc.connectors.utils.ExternalResourceProxy;
 import org.apache.flink.runtime.minicluster.RpcServiceSharing;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.lifecycle.Startables;
 
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -45,12 +48,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /** Basic class for testing {@link StarRocksDataSink}. */
 public class StarRocksSinkTestBase extends TestLogger {
@@ -66,17 +64,18 @@ public class StarRocksSinkTestBase extends TestLogger {
         return new StarRocksContainer();
     }
 
-    @Rule
-    public final MiniClusterWithClientResource miniClusterResource =
-            new MiniClusterWithClientResource(
-                    new MiniClusterResourceConfiguration.Builder()
-                            .setNumberTaskManagers(1)
-                            .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
-                            .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
-                            .withHaLeadershipControl()
-                            .build());
+    @RegisterExtension
+    public final ExternalResourceProxy<MiniClusterWithClientResource> miniClusterResource =
+            new ExternalResourceProxy<>(
+                    new MiniClusterWithClientResource(
+                            new MiniClusterResourceConfiguration.Builder()
+                                    .setNumberTaskManagers(1)
+                                    .setNumberSlotsPerTaskManager(DEFAULT_PARALLELISM)
+                                    .setRpcServiceSharing(RpcServiceSharing.DEDICATED)
+                                    .withHaLeadershipControl()
+                                    .build()));
 
-    @BeforeClass
+    @BeforeAll
     public static void startContainers() {
         LOG.info("Starting containers...");
         Startables.deepStart(Stream.of(STARROCKS_CONTAINER)).join();
@@ -85,7 +84,7 @@ public class StarRocksSinkTestBase extends TestLogger {
         long startWaitingTimestamp = System.currentTimeMillis();
 
         new LogMessageWaitStrategy()
-                .withRegEx(".*Enjoy the journal to StarRocks blazing-fast lake-house engine!.*\\s")
+                .withRegEx(".*Enjoy the journey to StarRocks blazing-fast lake-house engine!.*\\s")
                 .withTimes(1)
                 .withStartupTimeout(
                         Duration.of(DEFAULT_STARTUP_TIMEOUT_SECONDS, ChronoUnit.SECONDS))
@@ -106,7 +105,7 @@ public class StarRocksSinkTestBase extends TestLogger {
         LOG.info("Containers are started.");
     }
 
-    @AfterClass
+    @AfterAll
     public static void stopContainers() {
         LOG.info("Stopping containers...");
         STARROCKS_CONTAINER.stop();
@@ -229,24 +228,42 @@ public class StarRocksSinkTestBase extends TestLogger {
         return results;
     }
 
-    public static void assertEqualsInAnyOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEqualsInOrder(
-                expected.stream().sorted().collect(Collectors.toList()),
-                actual.stream().sorted().collect(Collectors.toList()));
-    }
-
-    public static void assertEqualsInOrder(List<String> expected, List<String> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        assertArrayEquals(expected.toArray(new String[0]), actual.toArray(new String[0]));
-    }
-
-    public static void assertMapEquals(Map<String, ?> expected, Map<String, ?> actual) {
-        assertTrue(expected != null && actual != null);
-        assertEquals(expected.size(), actual.size());
-        for (String key : expected.keySet()) {
-            assertEquals(expected.get(key), actual.get(key));
+    // Starrocks alter column is asynchronous and does not support Light mode.
+    public void waitAlterDone(TableId tableId, long timeout)
+            throws SQLException, InterruptedException {
+        Connection conn = STARROCKS_CONTAINER.createConnection("");
+        conn.createStatement().execute(String.format("USE `%s`", tableId.getSchemaName()));
+        long t0 = System.currentTimeMillis();
+        while (System.currentTimeMillis() - t0 < timeout) {
+            ResultSet rs =
+                    conn.createStatement()
+                            .executeQuery(
+                                    String.format(
+                                            "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY CreateTime DESC LIMIT 1",
+                                            tableId.getTableName()));
+            if (rs.next()) {
+                String state = rs.getString("State");
+                if ("FINISHED".equals(state)) {
+                    return;
+                }
+                if ("CANCELLED".equals(state)) {
+                    throw new RuntimeException("Alter failed: " + rs.getString("Msg"));
+                }
+            }
+            Thread.sleep(1000L);
         }
+        throw new RuntimeException("Alter job timeout");
+    }
+
+    public static <T> void assertEqualsInAnyOrder(List<T> expected, List<T> actual) {
+        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    public static <T> void assertEqualsInOrder(List<T> expected, List<T> actual) {
+        Assertions.assertThat(actual).containsExactlyElementsOf(expected);
+    }
+
+    public static <K, V> void assertMapEquals(Map<K, V> expected, Map<K, V> actual) {
+        Assertions.assertThat(actual).containsExactlyEntriesOf(expected);
     }
 }

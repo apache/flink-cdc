@@ -17,3 +17,5 @@ org.apache.flink.cdc.composer.utils.factory.DataSinkFactory2
 org.apache.flink.cdc.composer.utils.factory.DataSourceFactory1
 org.apache.flink.cdc.composer.utils.factory.DataSourceFactory2
 org.apache.flink.cdc.composer.testsource.factory.DistributedDataSourceFactory
+org.apache.flink.cdc.composer.flink.FlinkPipelineComposerTest$TestDataSinkFactory
+org.apache.flink.cdc.composer.flink.FlinkPipelineComposerTest$TestDataSourceFactory

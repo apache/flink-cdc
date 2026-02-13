@@ -79,6 +79,8 @@ public class MongoUtils {
     public static final int FAILED_TO_PARSE_ERROR = 9;
     public static final int UNAUTHORIZED_ERROR = 13;
     public static final int ILLEGAL_OPERATION_ERROR = 20;
+    public static final int CLOSE_CHANGE_STREAM = 222;
+    public static final int RETRY_CHANGE_STREAM = 234;
     public static final int INVALIDATED_RESUME_TOKEN_ERROR = 260;
     public static final int CHANGE_STREAM_FATAL_ERROR = 280;
     public static final int CHANGE_STREAM_HISTORY_LOST = 286;
@@ -88,6 +90,8 @@ public class MongoUtils {
     private static final Set<Integer> INVALID_CHANGE_STREAM_ERRORS =
             new HashSet<>(
                     asList(
+                            CLOSE_CHANGE_STREAM,
+                            RETRY_CHANGE_STREAM,
                             INVALIDATED_RESUME_TOKEN_ERROR,
                             CHANGE_STREAM_FATAL_ERROR,
                             CHANGE_STREAM_HISTORY_LOST,
@@ -96,10 +100,34 @@ public class MongoUtils {
     private static final String RESUME_TOKEN = "resume token";
     private static final String NOT_FOUND = "not found";
     private static final String DOES_NOT_EXIST = "does not exist";
-    private static final String INVALID_RESUME_TOKEN = "invalid resume token";
     private static final String NO_LONGER_IN_THE_OPLOG = "no longer be in the oplog";
 
     private MongoUtils() {}
+
+    /**
+     * MongoDB allows dots to be presented in collection names, but not in database names (see <a
+     * href="https://www.mongodb.com/docs/manual/reference/limits/">docs</a> for more details). <br>
+     * So, for a canonical TableId with multiple dots in it (like {@code foo.bar.baz}, it is
+     * guaranteed that the first part ({@code foo}) is the database name and the latter part ({@code
+     * bar.baz}) is the table name.
+     */
+    public static TableId parseTableId(String str) {
+        return parseTableId(str, true);
+    }
+
+    public static TableId parseTableId(String str, boolean useCatalogBeforeSchema) {
+        String[] parts = str.split("[.]", 2);
+        int numParts = parts.length;
+        if (numParts == 1) {
+            return new TableId(null, null, parts[0]);
+        } else if (numParts == 2) {
+            return useCatalogBeforeSchema
+                    ? new TableId(parts[0], null, parts[1])
+                    : new TableId(null, parts[0], parts[1]);
+        } else {
+            return null;
+        }
+    }
 
     public static ChangeStreamDescriptor getChangeStreamDescriptor(
             MongoDBSourceConfig sourceConfig,
@@ -115,7 +143,7 @@ public class MongoUtils {
                     collectionList, discoveredCollections)) {
                 changeStreamFilter =
                         ChangeStreamDescriptor.collection(
-                                TableId.parse(discoveredCollections.get(0)));
+                                parseTableId(discoveredCollections.get(0)));
             } else {
                 Pattern namespaceRegex =
                         CollectionDiscoveryUtils.includeListAsFlatPattern(collectionList);
@@ -430,14 +458,13 @@ public class MongoUtils {
     // This check is stricter than checkIfChangeStreamCursorExpires, which specifically
     // checks if given exception is caused by an expired resume token.
     public static boolean checkIfResumeTokenExpires(final MongoCommandException e) {
-        if (e.getCode() != CHANGE_STREAM_FATAL_ERROR) {
+        if (e.getCode() != CHANGE_STREAM_FATAL_ERROR && e.getCode() != CHANGE_STREAM_HISTORY_LOST) {
             return false;
         }
         String errorMessage = e.getErrorMessage().toLowerCase(Locale.ROOT);
-        return (errorMessage.contains(RESUME_TOKEN))
-                && (errorMessage.contains(NOT_FOUND)
-                        || errorMessage.contains(DOES_NOT_EXIST)
-                        || errorMessage.contains(INVALID_RESUME_TOKEN)
-                        || errorMessage.contains(NO_LONGER_IN_THE_OPLOG));
+        return errorMessage.contains(RESUME_TOKEN)
+                || errorMessage.contains(NOT_FOUND)
+                || errorMessage.contains(DOES_NOT_EXIST)
+                || errorMessage.contains(NO_LONGER_IN_THE_OPLOG);
     }
 }

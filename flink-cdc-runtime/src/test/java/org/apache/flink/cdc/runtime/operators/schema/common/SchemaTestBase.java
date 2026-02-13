@@ -23,6 +23,7 @@ import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
@@ -62,7 +63,14 @@ public abstract class SchemaTestBase {
                     new RouteRule("db_5.table_\\.*", "db_5.prefix_<>_suffix", "<>"),
 
                     // Irrelevant routes
-                    new RouteRule("foo", "bar", null));
+                    new RouteRule("foo", "bar", null),
+
+                    // Standard RegExp capturing rules
+                    new RouteRule(
+                            "re_\\d+.table_(\\.*)",
+                            "database.another_table_with_$1$1$1_index",
+                            null),
+                    new RouteRule("(inv_\\d+).(table_\\.*)", "$2.$1", null));
 
     protected static final TableIdRouter TABLE_ID_ROUTER = new TableIdRouter(ROUTING_RULES);
 

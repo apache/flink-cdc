@@ -26,12 +26,7 @@ import org.apache.flink.table.types.DataType;
 import io.debezium.data.Envelope;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.source.SourceRecord;
-
-import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import org.assertj.core.api.Assertions;
 
 /** Utilities for asserting {@link SourceRecord} and {@link DebeziumSourceFunction}. */
 public class AssertUtils {
@@ -43,20 +38,20 @@ public class AssertUtils {
      */
     public static void assertInsert(SourceRecord record, boolean keyExpected) {
         if (keyExpected) {
-            assertNotNull(record.key());
-            assertNotNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNotNull();
+            Assertions.assertThat(record.keySchema()).isNotNull();
         } else {
-            assertNull(record.key());
-            assertNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNull();
+            Assertions.assertThat(record.keySchema()).isNull();
         }
 
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(
-                Envelope.Operation.CREATE.code(), value.getString(Envelope.FieldName.OPERATION));
-        assertNotNull(value.get(Envelope.FieldName.AFTER));
-        assertNull(value.get(Envelope.FieldName.BEFORE));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString(Envelope.FieldName.OPERATION))
+                .isEqualTo(Envelope.Operation.CREATE.code());
+        Assertions.assertThat(value.get(Envelope.FieldName.AFTER)).isNotNull();
+        Assertions.assertThat(value.get(Envelope.FieldName.BEFORE)).isNull();
     }
 
     /**
@@ -65,14 +60,15 @@ public class AssertUtils {
      * @param record the source record; may not be null
      */
     public static void assertRead(SourceRecord record) {
-        assertNotNull(record.key());
-        assertNotNull(record.keySchema());
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.key()).isNotNull();
+        Assertions.assertThat(record.keySchema()).isNotNull();
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(Envelope.Operation.READ.code(), value.getString(Envelope.FieldName.OPERATION));
-        assertNotNull(value.get(Envelope.FieldName.AFTER));
-        assertNull(value.get(Envelope.FieldName.BEFORE));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString(Envelope.FieldName.OPERATION))
+                .isEqualTo(Envelope.Operation.READ.code());
+        Assertions.assertThat(value.get(Envelope.FieldName.AFTER)).isNotNull();
+        Assertions.assertThat(value.get(Envelope.FieldName.BEFORE)).isNull();
     }
 
     /**
@@ -83,18 +79,18 @@ public class AssertUtils {
      */
     public static void assertUpdate(SourceRecord record, boolean keyExpected) {
         if (keyExpected) {
-            assertNotNull(record.key());
-            assertNotNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNotNull();
+            Assertions.assertThat(record.keySchema()).isNotNull();
         } else {
-            assertNull(record.key());
-            assertNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNull();
+            Assertions.assertThat(record.keySchema()).isNull();
         }
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(
-                Envelope.Operation.UPDATE.code(), value.getString(Envelope.FieldName.OPERATION));
-        assertNotNull(value.get(Envelope.FieldName.AFTER));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString(Envelope.FieldName.OPERATION))
+                .isEqualTo(Envelope.Operation.UPDATE.code());
+        Assertions.assertThat(value.get(Envelope.FieldName.AFTER)).isNotNull();
     }
 
     /**
@@ -105,19 +101,19 @@ public class AssertUtils {
      */
     public static void assertDelete(SourceRecord record, boolean keyExpected) {
         if (keyExpected) {
-            assertNotNull(record.key());
-            assertNotNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNotNull();
+            Assertions.assertThat(record.keySchema()).isNotNull();
         } else {
-            assertNull(record.key());
-            assertNull(record.keySchema());
+            Assertions.assertThat(record.key()).isNull();
+            Assertions.assertThat(record.keySchema()).isNull();
         }
-        assertNotNull(record.valueSchema());
+        Assertions.assertThat(record.valueSchema()).isNotNull();
         Struct value = (Struct) record.value();
-        assertNotNull(value);
-        assertEquals(
-                Envelope.Operation.DELETE.code(), value.getString(Envelope.FieldName.OPERATION));
-        assertNotNull(value.get(Envelope.FieldName.BEFORE));
-        assertNull(value.get(Envelope.FieldName.AFTER));
+        Assertions.assertThat(value).isNotNull();
+        Assertions.assertThat(value.getString(Envelope.FieldName.OPERATION))
+                .isEqualTo(Envelope.Operation.DELETE.code());
+        Assertions.assertThat(value.get(Envelope.FieldName.BEFORE)).isNotNull();
+        Assertions.assertThat(value.get(Envelope.FieldName.AFTER)).isNull();
     }
 
     /**
@@ -127,10 +123,10 @@ public class AssertUtils {
      * @param record the source record; may not be null
      */
     public static void assertTombstone(SourceRecord record) {
-        assertNotNull(record.key());
-        assertNotNull(record.keySchema());
-        assertNull(record.value());
-        assertNull(record.valueSchema());
+        Assertions.assertThat(record.key()).isNotNull();
+        Assertions.assertThat(record.keySchema()).isNotNull();
+        Assertions.assertThat(record.value()).isNull();
+        Assertions.assertThat(record.valueSchema()).isNull();
     }
 
     /**
@@ -143,7 +139,7 @@ public class AssertUtils {
      */
     public static void hasValidKey(SourceRecord record, String pkField, int pk) {
         Struct key = (Struct) record.key();
-        assertEquals(pk, key.get(pkField));
+        Assertions.assertThat(key.get(pkField)).isEqualTo(pk);
     }
 
     /**
@@ -238,10 +234,10 @@ public class AssertUtils {
     public static void assertProducedTypeOfSourceFunction(
             DebeziumSourceFunction<RowData> debeziumSourceFunction, DataType expectedProducedType) {
         TypeInformation<RowData> producedType = debeziumSourceFunction.getProducedType();
-        assertThat(producedType, instanceOf(InternalTypeInfo.class));
+        Assertions.assertThat(producedType).isExactlyInstanceOf(InternalTypeInfo.class);
         InternalTypeInfo<RowData> rowDataInternalTypeInfo =
                 (InternalTypeInfo<RowData>) producedType;
         DataType producedDataType = rowDataInternalTypeInfo.getDataType();
-        assertEquals(expectedProducedType.toString(), producedDataType.toString());
+        Assertions.assertThat(producedDataType).hasToString(expectedProducedType.toString());
     }
 }

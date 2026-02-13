@@ -19,14 +19,17 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple4;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
@@ -49,6 +52,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -100,6 +104,7 @@ class SchemaMergingUtilsTest {
     private static final DataType ROW = DataTypes.ROW(INT, STRING);
     private static final DataType ARRAY = DataTypes.ARRAY(STRING);
     private static final DataType MAP = DataTypes.MAP(INT, STRING);
+    private static final DataType VARIANT = DataTypes.VARIANT();
 
     private static final List<DataType> ALL_TYPES =
             Arrays.asList(
@@ -126,7 +131,8 @@ class SchemaMergingUtilsTest {
                     // Complex types
                     ROW,
                     ARRAY,
-                    MAP);
+                    MAP,
+                    VARIANT);
 
     private static final Map<DataType, Object> DUMMY_OBJECTS =
             ImmutableMap.of(
@@ -417,7 +423,28 @@ class SchemaMergingUtilsTest {
                                 TABLE_ID,
                                 Collections.singletonMap("name", STRING),
                                 Collections.singletonMap("name", VARCHAR(17))));
-
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "number", BIGINT),
+                                of("id", BIGINT)))
+                .as("test remove id while add gentle")
+                .containsExactly(new DropColumnEvent(TABLE_ID, Arrays.asList("number", "name")));
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "number", BIGINT),
+                                of("id", BIGINT, "name", STRING, "gentle", STRING)))
+                .as("test remove id while add gentle")
+                .containsExactly(
+                        new AddColumnEvent(
+                                TABLE_ID,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("gentle", STRING),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "name"))),
+                        new DropColumnEvent(TABLE_ID, Collections.singletonList("number")));
         Stream.of(TINYINT, SMALLINT, INT)
                 .forEach(
                         type ->
@@ -743,6 +770,10 @@ class SchemaMergingUtilsTest {
                                 DATE, dateOf(2020, 4, 4), TIMESTAMP_TZ, zTsOf("2020", "04", "04")),
                         Tuple4.of(DATE, dateOf(2021, 5, 5), STRING, binStrOf("2021-05-05")),
 
+                        // From TIME
+                        Tuple4.of(TIME, timeOf(21, 48, 25), TIME, timeOf(21, 48, 25)),
+                        Tuple4.of(TIME, timeOf(21, 48, 25), STRING, binStrOf("21:48:25")),
+
                         // From TIMESTAMP
                         Tuple4.of(
                                 TIMESTAMP,
@@ -937,35 +968,35 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 CHAR,
                 Arrays.asList(
                         STRING, CHAR, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 VARCHAR,
                 Arrays.asList(
                         STRING, STRING, VARCHAR, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 BINARY,
                 Arrays.asList(
                         STRING, STRING, STRING, BINARY, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 VARBINARY,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, VARBINARY, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         // 8-bit TINYINT could fit into FLOAT (24 sig bits) or DOUBLE (53 sig bits)
         assertTypeMergingVector(
@@ -973,7 +1004,7 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, TINYINT, SMALLINT, INT, BIGINT,
                         DECIMAL, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         // 16-bit SMALLINT could fit into FLOAT (24 sig bits) or DOUBLE (53 sig bits)
         assertTypeMergingVector(
@@ -981,42 +1012,43 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, SMALLINT, SMALLINT, INT, BIGINT,
                         DECIMAL, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         // 32-bit INT could fit into DOUBLE (53 sig bits)
         assertTypeMergingVector(
                 INT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, INT, INT, INT, BIGINT, DECIMAL,
-                        DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING, STRING));
+                        DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        STRING));
 
         assertTypeMergingVector(
                 BIGINT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, BIGINT, BIGINT,
                         DECIMAL, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 DECIMAL,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, DECIMAL, DECIMAL, DECIMAL, DECIMAL,
                         DECIMAL, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 FLOAT,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, FLOAT, FLOAT, DOUBLE, DOUBLE,
                         STRING, FLOAT, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 DOUBLE,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, DOUBLE, DOUBLE, DOUBLE, DOUBLE,
                         STRING, DOUBLE, DOUBLE, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 TIMESTAMP,
@@ -1036,6 +1068,7 @@ class SchemaMergingUtilsTest {
                         TIMESTAMP,
                         TIMESTAMP_LTZ,
                         TIMESTAMP_TZ,
+                        STRING,
                         STRING,
                         STRING,
                         STRING,
@@ -1062,6 +1095,7 @@ class SchemaMergingUtilsTest {
                         STRING,
                         STRING,
                         STRING,
+                        STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1085,6 +1119,7 @@ class SchemaMergingUtilsTest {
                         STRING,
                         STRING,
                         STRING,
+                        STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1092,13 +1127,13 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, TIME, STRING, STRING,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 ROW,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, ROW, STRING,
+                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, ROW, STRING, STRING,
                         STRING));
 
         assertTypeMergingVector(
@@ -1106,23 +1141,28 @@ class SchemaMergingUtilsTest {
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, ARRAY,
-                        STRING));
+                        STRING, STRING));
 
         assertTypeMergingVector(
                 MAP,
                 Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, MAP,
+                        STRING));
+
+        assertTypeMergingVector(
+                VARIANT,
+                Arrays.asList(
                         STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
-                        MAP));
+                        STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING, STRING,
+                        STRING, VARIANT));
     }
 
     private static void assertTypeMergingVector(DataType incomingType, List<DataType> resultTypes) {
         Assertions.assertThat(ALL_TYPES)
                 .map(type -> getLeastCommonType(type, incomingType))
-                .containsExactlyElementsOf(resultTypes);
-
-        // Flip LHS and RHS should emit same outputs
-        Assertions.assertThat(ALL_TYPES)
+                .containsExactlyElementsOf(resultTypes)
+                // Flip LHS and RHS should emit same outputs
                 .map(type -> getLeastCommonType(incomingType, type))
                 .containsExactlyElementsOf(resultTypes);
     }
@@ -1147,8 +1187,12 @@ class SchemaMergingUtilsTest {
         return builder.build();
     }
 
-    private static long dateOf(int year, int month, int dayOfMonth) {
-        return LocalDate.of(year, month, dayOfMonth).toEpochDay();
+    private static DateData dateOf(int year, int month, int dayOfMonth) {
+        return DateData.fromLocalDate(LocalDate.of(year, month, dayOfMonth));
+    }
+
+    private static TimeData timeOf(int hour, int minute, int second) {
+        return TimeData.fromLocalTime(LocalTime.of(hour, minute, second));
     }
 
     private static TimestampData tsOf(String year, String month, String dayOfMonth) {

@@ -19,16 +19,23 @@ package org.apache.flink.cdc.debezium.event;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.ChangeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.types.DataField;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
@@ -47,6 +54,7 @@ import io.debezium.time.MicroTimestamp;
 import io.debezium.time.NanoTime;
 import io.debezium.time.NanoTimestamp;
 import io.debezium.time.Timestamp;
+import io.debezium.time.ZonedTimestamp;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
@@ -59,6 +67,8 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,10 +92,13 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     /** Changelog Mode to use for encoding changes in Flink internal data structure. */
     protected final DebeziumChangelogMode changelogMode;
 
+    private final Map<io.debezium.relational.TableId, CreateTableEvent> createTableEventCache;
+
     public DebeziumEventDeserializationSchema(
             SchemaDataTypeInference schemaDataTypeInference, DebeziumChangelogMode changelogMode) {
         this.schemaDataTypeInference = schemaDataTypeInference;
         this.changelogMode = changelogMode;
+        this.createTableEventCache = new HashMap<>();
     }
 
     @Override
@@ -216,8 +229,26 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                         return convertToRecord((RowType) type, dbzObj, schema);
                     }
                 };
-            case ARRAY:
             case MAP:
+                return new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        return convertToMap(dbzObj, schema);
+                    }
+                };
+            case ARRAY:
+                return new DeserializationRuntimeConverter() {
+
+                    private static final long serialVersionUID = 1L;
+
+                    @Override
+                    public Object convert(Object dbzObj, Schema schema) throws Exception {
+                        return convertToArray(dbzObj, schema);
+                    }
+                };
             default:
                 throw new UnsupportedOperationException("Unsupported type: " + type);
         }
@@ -284,22 +315,29 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
     }
 
     protected Object convertToDate(Object dbzObj, Schema schema) {
-        return (int) TemporalConversions.toLocalDate(dbzObj).toEpochDay();
+        if (dbzObj instanceof Date) {
+            Instant instant = ((Date) dbzObj).toInstant();
+            return DateData.fromLocalDate(instant.atZone(java.time.ZoneOffset.UTC).toLocalDate());
+        }
+        return DateData.fromLocalDate(TemporalConversions.toLocalDate(dbzObj));
     }
 
     protected Object convertToTime(Object dbzObj, Schema schema) {
         if (dbzObj instanceof Long) {
             switch (schema.name()) {
                 case MicroTime.SCHEMA_NAME:
-                    return (int) ((long) dbzObj / 1000);
+                    return TimeData.fromMicroOfDay((long) dbzObj);
                 case NanoTime.SCHEMA_NAME:
-                    return (int) ((long) dbzObj / 1000_000);
+                    return TimeData.fromNanoOfDay((long) dbzObj);
             }
         } else if (dbzObj instanceof Integer) {
-            return dbzObj;
+            return TimeData.fromMillisOfDay((int) dbzObj);
+        } else if (dbzObj instanceof Date) {
+            long millisOfDay = ((Date) dbzObj).getTime() % (24 * 60 * 60 * 1000);
+            return TimeData.fromMillisOfDay((int) millisOfDay);
         }
         // get number of milliseconds of the day
-        return TemporalConversions.toLocalTime(dbzObj).toSecondOfDay() * 1000;
+        return TimeData.fromLocalTime(TemporalConversions.toLocalTime(dbzObj));
     }
 
     protected Object convertToTimestamp(Object dbzObj, Schema schema) {
@@ -309,10 +347,18 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                     return TimestampData.fromMillis((Long) dbzObj);
                 case MicroTimestamp.SCHEMA_NAME:
                     long micro = (long) dbzObj;
-                    return TimestampData.fromMillis(micro / 1000, (int) (micro % 1000 * 1000));
+                    return TimestampData.fromMillis(
+                            Math.floorDiv(micro, 1000), (int) (Math.floorMod(micro, 1000) * 1000));
                 case NanoTimestamp.SCHEMA_NAME:
                     long nano = (long) dbzObj;
-                    return TimestampData.fromMillis(nano / 1000_000, (int) (nano % 1000_000));
+                    return TimestampData.fromMillis(
+                            Math.floorDiv(nano, 1000_000), (int) (Math.floorMod(nano, 1000_000)));
+            }
+        }
+        if (dbzObj instanceof Date) {
+            if (schema.name().equals(org.apache.kafka.connect.data.Timestamp.LOGICAL_NAME)) {
+                Instant instant = ((Date) dbzObj).toInstant();
+                return TimestampData.fromMillis(instant.toEpochMilli());
             }
         }
         throw new IllegalArgumentException(
@@ -326,7 +372,7 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         if (dbzObj instanceof String) {
             String str = (String) dbzObj;
             // TIMESTAMP_LTZ type is encoded in string type
-            Instant instant = Instant.parse(str);
+            Instant instant = ZonedTimestamp.FORMATTER.parse(str, Instant::from);
             return LocalZonedTimestampData.fromInstant(instant);
         }
         throw new IllegalArgumentException(
@@ -418,6 +464,93 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
         }
     }
 
+    protected Object convertToMap(Object dbzObj, Schema schema) throws Exception {
+        if (dbzObj == null) {
+            return null;
+        }
+
+        // Obtain the schema for the keys and values of a Map"
+        Schema keySchema = schema.keySchema();
+        Schema valueSchema = schema.valueSchema();
+
+        // Infer the data types of keys and values
+        DataType keyType =
+                keySchema != null
+                        ? schemaDataTypeInference.infer(null, keySchema)
+                        : DataTypes.STRING();
+
+        DataType valueType =
+                valueSchema != null
+                        ? schemaDataTypeInference.infer(null, valueSchema)
+                        : DataTypes.STRING();
+
+        DeserializationRuntimeConverter keyConverter = createConverter(keyType);
+        DeserializationRuntimeConverter valueConverter = createConverter(valueType);
+
+        Map<?, ?> map = (Map<?, ?>) dbzObj;
+        Map<Object, Object> convertedMap = new java.util.HashMap<>(map.size());
+
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            Object convertedKey = convertField(keyConverter, entry.getKey(), keySchema);
+            Object convertedValue = convertField(valueConverter, entry.getValue(), valueSchema);
+            convertedMap.put(convertedKey, convertedValue);
+        }
+
+        return new GenericMapData(convertedMap);
+    }
+
+    protected Object convertToArray(Object dbzObj, Schema schema) throws Exception {
+        if (dbzObj == null) {
+            return null;
+        }
+
+        Schema elementSchema = schema.valueSchema();
+        // Multidimensional arrays are not supported
+        if (elementSchema.type() == Schema.Type.ARRAY) {
+            throw new IllegalArgumentException(
+                    "Unable to convert multidimensional array value '"
+                            + dbzObj
+                            + "' to a flat array.");
+        }
+        DataType elementType = schemaDataTypeInference.infer(null, elementSchema);
+        DeserializationRuntimeConverter elementConverter = getOrCreateConverter(elementType);
+
+        if (dbzObj instanceof java.util.List) {
+            java.util.List<?> list = (java.util.List<?>) dbzObj;
+            Object[] array = new Object[list.size()];
+
+            for (int i = 0; i < list.size(); i++) {
+                Object element = list.get(i);
+                if (element == null) {
+                    array[i] = null;
+                } else {
+                    array[i] = elementConverter.convert(element, elementSchema);
+                }
+            }
+
+            return new GenericArrayData(array);
+        } else if (dbzObj instanceof Object[]) {
+            Object[] inputArray = (Object[]) dbzObj;
+            Object[] convertedArray = new Object[inputArray.length];
+
+            for (int i = 0; i < inputArray.length; i++) {
+                if (inputArray[i] == null) {
+                    convertedArray[i] = null;
+                } else {
+                    convertedArray[i] = elementConverter.convert(inputArray[i], elementSchema);
+                }
+            }
+
+            return new GenericArrayData(convertedArray);
+        }
+
+        throw new IllegalArgumentException(
+                "Unable to convert to Array from unexpected value '"
+                        + dbzObj
+                        + "' of type "
+                        + dbzObj.getClass().getName());
+    }
+
     private static DeserializationRuntimeConverter wrapIntoNullableConverter(
             DeserializationRuntimeConverter converter) {
         return new DeserializationRuntimeConverter() {
@@ -432,5 +565,21 @@ public abstract class DebeziumEventDeserializationSchema extends SourceRecordEve
                 return converter.convert(dbzObj, schema);
             }
         };
+    }
+
+    public Map<io.debezium.relational.TableId, CreateTableEvent> getCreateTableEventCache() {
+        return createTableEventCache;
+    }
+
+    public void applyChangeEvent(ChangeEvent changeEvent) {
+        org.apache.flink.cdc.common.event.TableId flinkTableId = changeEvent.tableId();
+
+        io.debezium.relational.TableId debeziumTableId =
+                new io.debezium.relational.TableId(
+                        flinkTableId.getNamespace(),
+                        flinkTableId.getSchemaName(),
+                        flinkTableId.getTableName());
+
+        createTableEventCache.put(debeziumTableId, (CreateTableEvent) changeEvent);
     }
 }

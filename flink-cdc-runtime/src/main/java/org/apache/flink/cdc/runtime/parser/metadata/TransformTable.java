@@ -18,7 +18,7 @@
 package org.apache.flink.cdc.runtime.parser.metadata;
 
 import org.apache.flink.cdc.common.schema.Column;
-import org.apache.flink.cdc.runtime.typeutils.DataTypeConverter;
+import org.apache.flink.cdc.runtime.typeutils.CalciteDataTypeConverter;
 
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -44,6 +44,6 @@ public class TransformTable extends AbstractTable {
 
     @Override
     public RelDataType getRowType(RelDataTypeFactory relDataTypeFactory) {
-        return DataTypeConverter.convertCalciteRelDataType(relDataTypeFactory, columns);
+        return CalciteDataTypeConverter.convertCalciteRelDataType(relDataTypeFactory, columns);
     }
 }

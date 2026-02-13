@@ -183,6 +183,7 @@ public class DebeziumSourceFunction<T> extends RichSourceFunction<T>
 
     private transient ExecutorService executor;
     private transient DebeziumEngine<?> engine;
+
     /**
      * Unique name of this Debezium Engine instance across all the jobs. Currently we randomly
      * generate a UUID for it. This is used for {@link FlinkDatabaseHistory}.

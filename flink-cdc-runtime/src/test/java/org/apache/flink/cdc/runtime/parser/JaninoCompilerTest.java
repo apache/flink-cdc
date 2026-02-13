@@ -18,7 +18,11 @@
 package org.apache.flink.cdc.runtime.parser;
 
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.cdc.common.types.variant.BinaryVariantInternalBuilder;
+import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.types.variant.VariantTypeException;
 
+import org.assertj.core.api.Assertions;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.commons.compiler.Location;
 import org.codehaus.janino.ExpressionEvaluator;
@@ -26,35 +30,33 @@ import org.codehaus.janino.Java;
 import org.codehaus.janino.Parser;
 import org.codehaus.janino.Scanner;
 import org.codehaus.janino.Unparser;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /** Unit tests for the {@link JaninoCompiler}. */
-public class JaninoCompilerTest {
+class JaninoCompilerTest {
 
     @Test
-    public void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
+    void testJaninoParser() throws CompileException, IOException, InvocationTargetException {
         String expression = "1==2";
         Parser parser = new Parser(new Scanner(null, new StringReader(expression)));
         ExpressionEvaluator expressionEvaluator = new ExpressionEvaluator();
         expressionEvaluator.cook(parser);
         Object evaluate = expressionEvaluator.evaluate();
-        Assert.assertEquals(false, evaluate);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isFalse();
     }
 
     @Test
-    public void testJaninoUnParser() {
+    void testJaninoUnParser() {
         String expression = "1 <= 2";
         String[] values = new String[1];
         values[0] = "1";
@@ -68,50 +70,53 @@ public class JaninoCompilerTest {
         Unparser unparser = new Unparser(writer);
         unparser.unparseAtom(binaryOperation);
         unparser.close();
-        Assert.assertEquals(expression, writer.toString());
+        Assertions.assertThat(writer).hasToString(expression);
     }
 
     @Test
-    public void testJaninoNumericCompare() throws InvocationTargetException {
+    void testJaninoNumericCompare() throws InvocationTargetException {
         String expression = "col1==3.14";
-        List<String> columnNames = Arrays.asList("col1");
-        List<Class<?>> paramTypes = Arrays.asList(Double.class);
-        List<Object> params = Arrays.asList(3.14);
+        List<String> columnNames = Collections.singletonList("col1");
+        List<Class<?>> paramTypes = Collections.singletonList(Double.class);
+        List<Object> params = Collections.singletonList(3.14);
         ExpressionEvaluator expressionEvaluator =
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(true, evaluate);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isTrue();
     }
 
     @Test
-    public void testJaninoCharCompare() throws InvocationTargetException {
+    void testJaninoCharCompare() throws InvocationTargetException {
         String expression = "String.valueOf('2').equals(col1)";
-        List<String> columnNames = Arrays.asList("col1");
-        List<Class<?>> paramTypes = Arrays.asList(String.class);
-        List<Object> params = Arrays.asList("2");
+        List<String> columnNames = Collections.singletonList("col1");
+        List<Class<?>> paramTypes = Collections.singletonList(String.class);
+        List<Object> params = Collections.singletonList("2");
         ExpressionEvaluator expressionEvaluator =
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(true, evaluate);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isTrue();
     }
 
     @Test
-    public void testJaninoStringCompare() throws InvocationTargetException {
+    void testJaninoStringCompare() throws InvocationTargetException {
         String expression = "String.valueOf(\"metadata_table\").equals(__table_name__)";
-        List<String> columnNames = Arrays.asList("__table_name__");
-        List<Class<?>> paramTypes = Arrays.asList(String.class);
-        List<Object> params = Arrays.asList("metadata_table");
+        List<String> columnNames = Collections.singletonList("__table_name__");
+        List<Class<?>> paramTypes = Collections.singletonList(String.class);
+        List<Object> params = Collections.singletonList("metadata_table");
         ExpressionEvaluator expressionEvaluator =
                 JaninoCompiler.compileExpression(
                         expression, columnNames, paramTypes, Boolean.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(true, evaluate);
+        Assertions.assertThat(evaluate).isExactlyInstanceOf(Boolean.class);
+        Assertions.assertThat((Boolean) evaluate).isTrue();
     }
 
     @Test
-    public void testBuildInFunction() throws InvocationTargetException {
+    void testBuiltInFunction() throws InvocationTargetException, IOException {
         String expression = "ceil(2.4)";
         List<String> columnNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();
@@ -123,11 +128,94 @@ public class JaninoCompilerTest {
                         paramTypes,
                         Double.class);
         Object evaluate = expressionEvaluator.evaluate(params.toArray());
-        Assert.assertEquals(3.0, evaluate);
+        Assertions.assertThat(evaluate).isEqualTo(3.0);
+
+        // parseJson function.
+        String jsonStr =
+                "{\"name\":\"Bob\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}";
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("parseJson(testJsonStr)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {jsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(jsonStr, false));
+        final String duplicatedNameJsonStr =
+                "{\"name\":\"Bob\",\"name\":\"Mark\",\"age\":30,\"is_active\":true,\"email\":\"zhangsan@example.com\",\"hobbies\":[\"reading\",\"coding\",\"traveling\"],\"address\":{\"street\":\"MainSt\",\"city\":\"Beijing\",\"zip\":\"100000\"}}";
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("parseJson(testJsonStr, true)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {duplicatedNameJsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(duplicatedNameJsonStr, true));
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(
+                                                    "parseJson(testJsonStr)"),
+                                            List.of("testJsonStr"),
+                                            List.of(String.class),
+                                            Variant.class)
+                                    .evaluate(new Object[] {duplicatedNameJsonStr});
+                        })
+                .rootCause()
+                .isExactlyInstanceOf(VariantTypeException.class)
+                .hasMessageContaining("VARIANT_DUPLICATE_KEY");
+        evaluate = expressionEvaluator.evaluate(new Object[] {null});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {""});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        final String invalidJsonStr = "invalidJson";
+        Assertions.assertThatThrownBy(
+                        () -> {
+                            JaninoCompiler.compileExpression(
+                                            JaninoCompiler.loadSystemFunction(
+                                                    "parseJson(testJsonStr)"),
+                                            List.of("testJsonStr"),
+                                            List.of(String.class),
+                                            Variant.class)
+                                    .evaluate(new Object[] {invalidJsonStr});
+                        })
+                .cause()
+                .isExactlyInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Failed to parse json string");
+
+        // tryParseJson function.
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("tryParseJson(testJsonStr)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {null});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {""});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {jsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(jsonStr, false));
+        evaluate = expressionEvaluator.evaluate(new Object[] {duplicatedNameJsonStr});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        evaluate = expressionEvaluator.evaluate(new Object[] {invalidJsonStr});
+        Assertions.assertThat(evaluate).isEqualTo(null);
+        expressionEvaluator =
+                JaninoCompiler.compileExpression(
+                        JaninoCompiler.loadSystemFunction("tryParseJson(testJsonStr, true)"),
+                        List.of("testJsonStr"),
+                        List.of(String.class),
+                        Variant.class);
+        evaluate = expressionEvaluator.evaluate(new Object[] {duplicatedNameJsonStr});
+        Assertions.assertThat(evaluate)
+                .isEqualTo(BinaryVariantInternalBuilder.parseJson(duplicatedNameJsonStr, true));
     }
 
     @Test
-    public void testLargeNumericLiterals() {
+    void testLargeNumericLiterals() {
         // Test parsing integer literals
         Stream.of(
                         Tuple2.of("0", 0),
@@ -147,7 +235,8 @@ public class JaninoCompilerTest {
                                             paramTypes,
                                             Integer.class);
                             try {
-                                assertThat(expressionEvaluator.evaluate()).isEqualTo(t.f1);
+                                Assertions.assertThat(expressionEvaluator.evaluate())
+                                        .isEqualTo(t.f1);
                             } catch (InvocationTargetException e) {
                                 throw new RuntimeException(e);
                             }
@@ -172,7 +261,8 @@ public class JaninoCompilerTest {
                                             paramTypes,
                                             Double.class);
                             try {
-                                assertThat(expressionEvaluator.evaluate()).isEqualTo(t.f1);
+                                Assertions.assertThat(expressionEvaluator.evaluate())
+                                        .isEqualTo(t.f1);
                             } catch (InvocationTargetException e) {
                                 throw new RuntimeException(e);
                             }
@@ -196,7 +286,8 @@ public class JaninoCompilerTest {
                                             paramTypes,
                                             Long.class);
                             try {
-                                assertThat(expressionEvaluator.evaluate()).isEqualTo(t.f1);
+                                Assertions.assertThat(expressionEvaluator.evaluate())
+                                        .isEqualTo(t.f1);
                             } catch (InvocationTargetException e) {
                                 throw new RuntimeException(e);
                             }

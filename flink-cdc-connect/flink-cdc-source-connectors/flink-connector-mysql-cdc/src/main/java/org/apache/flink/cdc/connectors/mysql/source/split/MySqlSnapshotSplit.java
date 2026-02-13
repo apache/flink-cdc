@@ -40,6 +40,7 @@ public class MySqlSnapshotSplit extends MySqlSplit {
 
     @Nullable private final Object[] splitStart;
     @Nullable private final Object[] splitEnd;
+
     /** The high watermark is not null when the split read finished. */
     @Nullable private final BinlogOffset highWatermark;
 

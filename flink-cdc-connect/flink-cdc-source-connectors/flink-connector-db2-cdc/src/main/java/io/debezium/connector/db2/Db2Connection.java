@@ -134,7 +134,9 @@ public class Db2Connection extends JdbcConnection {
         realDatabaseName = retrieveRealDatabaseName();
     }
 
-    /** @return the current largest log sequence number */
+    /**
+     * @return the current largest log sequence number
+     */
     public Lsn getMaxLsn() throws SQLException {
         return queryAndMap(
                 GET_MAX_LSN,
@@ -399,7 +401,8 @@ public class Db2Connection extends JdbcConnection {
         // final List<Column> columns = columnEditors.subList(CHANGE_TABLE_DATA_COLUMN_OFFSET,
         // columnEditors.size() - 1).stream()
         final List<Column> columns =
-                columnEditors.subList(CHANGE_TABLE_DATA_COLUMN_OFFSET, columnEditors.size())
+                columnEditors
+                        .subList(CHANGE_TABLE_DATA_COLUMN_OFFSET, columnEditors.size())
                         .stream()
                         .map(
                                 c ->

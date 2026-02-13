@@ -26,11 +26,11 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.exceptions.SchemaEvolveException;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
-import org.apache.flink.cdc.runtime.operators.schema.common.TableIdRouter;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.distributed.event.SchemaChangeResponse;
@@ -205,17 +205,11 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         LOG.info("{}> Evolve request response: {}", subTaskId, response);
 
         // Update local evolved schema cache
-        response.getSchemaEvolveResult()
-                .forEach(
-                        schemaChangeEvent ->
-                                evolvedSchemaMap.compute(
-                                        schemaChangeEvent.tableId(),
-                                        (tableId, schema) ->
-                                                SchemaUtils.applySchemaChangeEvent(
-                                                        schema, schemaChangeEvent)));
+        evolvedSchemaMap.putAll(response.getEvolvedSchemas());
 
         // And emit schema change events to downstream
-        response.getSchemaEvolveResult().forEach(evt -> output.collect(new StreamRecord<>(evt)));
+        response.getEvolvedSchemaChangeEvents()
+                .forEach(evt -> output.collect(new StreamRecord<>(evt)));
         LOG.info(
                 "{}> Successfully updated evolved schema cache. Current state: {}",
                 subTaskId,

@@ -110,7 +110,7 @@ Pipeline Connector Options
       <td>Uri of metastore server.</td>
     </tr>
     <tr>
-      <td>commit.user</td>
+      <td>commit.user-prefix</td>
       <td>optional</td>
       <td style="word-wrap: break-word;"><code>"admin"</code></td>
       <td>String</td>
@@ -223,6 +223,11 @@ Data Type Mapping
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARIANT</td>
+      <td>VARIANT</td>
       <td></td>
     </tr>
     </tbody>

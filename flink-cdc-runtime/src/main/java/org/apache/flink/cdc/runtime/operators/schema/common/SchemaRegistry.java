@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.route.RouteRule;
+import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
@@ -123,7 +124,9 @@ public abstract class SchemaRegistry implements OperatorCoordinator, Coordinatio
         this.currentParallelism = context.currentParallelism();
         this.activeSinkWriters = ConcurrentHashMap.newKeySet();
         this.failedReasons = new ConcurrentHashMap<>();
-        this.schemaManager = new SchemaManager();
+        if (this.schemaManager == null) {
+            this.schemaManager = new SchemaManager();
+        }
         this.router = new TableIdRouter(routingRules);
     }
 

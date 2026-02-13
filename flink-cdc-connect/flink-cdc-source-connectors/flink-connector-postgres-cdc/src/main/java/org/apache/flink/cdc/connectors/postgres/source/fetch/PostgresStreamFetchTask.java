@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.fetch;
 
+import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.connectors.base.WatermarkDispatcher;
 import org.apache.flink.cdc.connectors.base.source.meta.offset.Offset;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
@@ -54,6 +55,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(PostgresStreamFetchTask.class);
 
     private final StreamSplit split;
+    private final StoppableChangeEventSourceContext changeEventSourceContext;
     private volatile boolean taskRunning = false;
     private volatile boolean stopped = false;
 
@@ -63,6 +65,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
 
     public PostgresStreamFetchTask(StreamSplit streamSplit) {
         this.split = streamSplit;
+        this.changeEventSourceContext = new StoppableChangeEventSourceContext();
     }
 
     @Override
@@ -92,8 +95,7 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                         sourceFetchContext.getTaskContext(),
                         sourceFetchContext.getReplicationConnection(),
                         split);
-        StoppableChangeEventSourceContext changeEventSourceContext =
-                new StoppableChangeEventSourceContext();
+
         streamSplitReadTask.execute(
                 changeEventSourceContext,
                 sourceFetchContext.getPartition(),
@@ -160,6 +162,11 @@ public class PostgresStreamFetchTask implements FetchTask<SourceSplitBase> {
                 streamSplitReadTask.commitOffset(offsets);
             }
         }
+    }
+
+    @VisibleForTesting
+    StoppableChangeEventSourceContext getChangeEventSourceContext() {
+        return changeEventSourceContext;
     }
 
     /** A {@link ChangeEventSource} implementation for Postgres to read streaming changes. */

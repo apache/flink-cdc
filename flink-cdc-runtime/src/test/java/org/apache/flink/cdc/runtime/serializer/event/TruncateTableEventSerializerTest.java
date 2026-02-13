@@ -23,7 +23,7 @@ import org.apache.flink.cdc.common.event.TruncateTableEvent;
 import org.apache.flink.cdc.runtime.serializer.SerializerTestBase;
 
 /** A test for the {@link RenameTableEventSerializer}. */
-public class TruncateTableEventSerializerTest extends SerializerTestBase<TruncateTableEvent> {
+class TruncateTableEventSerializerTest extends SerializerTestBase<TruncateTableEvent> {
     @Override
     protected TypeSerializer<TruncateTableEvent> createSerializer() {
 

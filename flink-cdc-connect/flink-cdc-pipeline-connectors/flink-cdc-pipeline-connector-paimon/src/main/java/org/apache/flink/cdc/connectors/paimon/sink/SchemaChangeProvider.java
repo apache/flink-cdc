@@ -20,10 +20,11 @@ package org.apache.flink.cdc.connectors.paimon.sink;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.types.DataType;
-import org.apache.flink.cdc.common.types.utils.DataTypeUtils;
+import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
+import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.connectors.paimon.sink.utils.TypeUtils;
 
-import org.apache.paimon.CoreOptions;
-import org.apache.paimon.flink.LogicalTypeConversion;
 import org.apache.paimon.schema.SchemaChange;
 
 import java.util.ArrayList;
@@ -37,6 +38,9 @@ import java.util.Optional;
  */
 public class SchemaChangeProvider {
 
+    public static final String DEFAULT_DATETIME = "1970-01-01 00:00:00";
+    public static final String INVALID_OR_MISSING_DATATIME = "0000-00-00 00:00:00";
+
     /**
      * Creates a SchemaChange object for adding a column without specifying its position.
      *
@@ -49,24 +53,19 @@ public class SchemaChangeProvider {
         result.add(
                 SchemaChange.addColumn(
                         columnWithPosition.getAddColumn().getName(),
-                        LogicalTypeConversion.toDataType(
-                                DataTypeUtils.toFlinkDataType(
-                                                columnWithPosition.getAddColumn().getType())
-                                        .getLogicalType()),
+                        TypeUtils.toPaimonDataType(columnWithPosition.getAddColumn().getType()),
                         columnWithPosition.getAddColumn().getComment()));
         // if default value express exists, we need to set the default value to the table
         // option
         Column column = columnWithPosition.getAddColumn();
-        Optional.ofNullable(column.getDefaultValueExpression())
+        Optional.ofNullable(
+                        convertInvalidTimestampDefaultValue(
+                                column.getDefaultValueExpression(), column.getType()))
                 .ifPresent(
                         value -> {
-                            String key =
-                                    String.format(
-                                            "%s.%s.%s",
-                                            CoreOptions.FIELDS_PREFIX,
-                                            column.getName(),
-                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
-                            result.add(SchemaChangeProvider.setOption(key, value));
+                            result.add(
+                                    SchemaChange.updateColumnDefaultValue(
+                                            new String[] {column.getName()}, value));
                         });
         return result;
     }
@@ -86,25 +85,20 @@ public class SchemaChangeProvider {
         result.add(
                 SchemaChange.addColumn(
                         columnWithPosition.getAddColumn().getName(),
-                        LogicalTypeConversion.toDataType(
-                                DataTypeUtils.toFlinkDataType(
-                                                columnWithPosition.getAddColumn().getType())
-                                        .getLogicalType()),
+                        TypeUtils.toPaimonDataType(columnWithPosition.getAddColumn().getType()),
                         columnWithPosition.getAddColumn().getComment(),
                         move));
         // if default value express exists, we need to set the default value to the table
         // option
         Column column = columnWithPosition.getAddColumn();
-        Optional.ofNullable(column.getDefaultValueExpression())
+        Optional.ofNullable(
+                        convertInvalidTimestampDefaultValue(
+                                column.getDefaultValueExpression(), column.getType()))
                 .ifPresent(
                         value -> {
-                            String key =
-                                    String.format(
-                                            "%s.%s.%s",
-                                            CoreOptions.FIELDS_PREFIX,
-                                            column.getName(),
-                                            CoreOptions.DEFAULT_VALUE_SUFFIX);
-                            result.add(SchemaChangeProvider.setOption(key, value));
+                            result.add(
+                                    SchemaChange.updateColumnDefaultValue(
+                                            new String[] {column.getName()}, value));
                         });
         return result;
     }
@@ -117,10 +111,7 @@ public class SchemaChangeProvider {
      * @return A SchemaChange object representing the update of the column's data type.
      */
     public static SchemaChange updateColumnType(String oldColumnName, DataType newType) {
-        return SchemaChange.updateColumnType(
-                oldColumnName,
-                LogicalTypeConversion.toDataType(
-                        DataTypeUtils.toFlinkDataType(newType).getLogicalType()));
+        return SchemaChange.updateColumnType(oldColumnName, TypeUtils.toPaimonDataType(newType));
     }
 
     /**
@@ -134,11 +125,6 @@ public class SchemaChangeProvider {
             String oldColumnName, String newColumnName, Map<String, String> options) {
         List<SchemaChange> result = new ArrayList<>();
         result.add(SchemaChange.renameColumn(oldColumnName, newColumnName));
-        String defaultValue = options.get(defaultValueOptionKey(oldColumnName));
-        if (defaultValue != null) {
-            result.add(SchemaChange.removeOption(defaultValueOptionKey(oldColumnName)));
-            result.add(SchemaChange.setOption(defaultValueOptionKey(newColumnName), defaultValue));
-        }
         return result;
     }
 
@@ -151,14 +137,7 @@ public class SchemaChangeProvider {
     public static List<SchemaChange> drop(String columnName) {
         List<SchemaChange> result = new ArrayList<>();
         result.add(SchemaChange.dropColumn(columnName));
-        result.add(SchemaChange.removeOption(defaultValueOptionKey(columnName)));
         return result;
-    }
-
-    public static String defaultValueOptionKey(String columnName) {
-        return String.format(
-                "%s.%s.%s",
-                CoreOptions.FIELDS_PREFIX, columnName, CoreOptions.DEFAULT_VALUE_SUFFIX);
     }
 
     /**
@@ -170,5 +149,23 @@ public class SchemaChangeProvider {
      */
     public static SchemaChange setOption(String key, String value) {
         return SchemaChange.setOption(key, value);
+    }
+
+    private static String convertInvalidTimestampDefaultValue(
+            String defaultValue, DataType dataType) {
+        if (defaultValue == null) {
+            return null;
+        }
+
+        if (dataType instanceof LocalZonedTimestampType
+                || dataType instanceof TimestampType
+                || dataType instanceof ZonedTimestampType) {
+
+            if (INVALID_OR_MISSING_DATATIME.equals(defaultValue)) {
+                return DEFAULT_DATETIME;
+            }
+        }
+
+        return defaultValue;
     }
 }

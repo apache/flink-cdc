@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mongodb.utils;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.assertj.core.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
@@ -35,8 +36,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
-import static org.junit.Assert.assertNotNull;
 
 /** Container for testing MongoDB >= 5.0.3. */
 public class MongoDBContainer extends org.testcontainers.containers.MongoDBContainer {
@@ -62,7 +61,9 @@ public class MongoDBContainer extends org.testcontainers.containers.MongoDBConta
         final String setupFilePath = "docker/mongodb/setup.js";
         final URL setupFile = MongoDBContainer.class.getClassLoader().getResource(setupFilePath);
 
-        assertNotNull("Cannot locate " + setupFilePath, setupFile);
+        Assertions.assertThat(setupFile)
+                .withFailMessage("Cannot locate " + setupFilePath)
+                .isNotNull();
         try {
             String createUserCommand =
                     Files.readAllLines(Paths.get(setupFile.toURI())).stream()
@@ -159,7 +160,7 @@ public class MongoDBContainer extends org.testcontainers.containers.MongoDBConta
         final String dbName = databaseName != null ? databaseName : fileNameIgnoreSuffix;
         final String ddlFile = String.format("ddl/%s.js", fileNameIgnoreSuffix);
         final URL ddlTestFile = MongoDBContainer.class.getClassLoader().getResource(ddlFile);
-        assertNotNull("Cannot locate " + ddlFile, ddlTestFile);
+        Assertions.assertThat(ddlTestFile).withFailMessage("Cannot locate " + ddlFile).isNotNull();
 
         try {
             // use database;

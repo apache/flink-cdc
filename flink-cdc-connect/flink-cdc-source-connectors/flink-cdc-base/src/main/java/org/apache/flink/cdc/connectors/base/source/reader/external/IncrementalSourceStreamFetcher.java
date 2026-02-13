@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.FinishedSnapshotSp
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
+import org.apache.flink.cdc.connectors.base.utils.SplitKeyUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import org.apache.flink.shaded.guava31.com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -47,6 +48,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.flink.cdc.connectors.base.source.meta.wartermark.WatermarkEvent.isEndWatermarkEvent;
+
 /** Fetcher to fetch data from table split, the split is the stream split {@link StreamSplit}. */
 public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, SourceSplitBase> {
     private static final Logger LOG = LoggerFactory.getLogger(IncrementalSourceStreamFetcher.class);
@@ -64,6 +67,8 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     private Map<TableId, List<FinishedSnapshotSplitInfo>> finishedSplitsInfo;
     // tableId -> the max splitHighWatermark
     private Map<TableId, Offset> maxSplitHighWatermarkMap;
+    private final boolean isBackfillSkipped;
+    private final boolean supportsSplitKeyOptimization;
 
     private static final long READER_CLOSE_TIMEOUT_SECONDS = 30L;
 
@@ -74,6 +79,8 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.currentTaskRunning = true;
         this.pureStreamPhaseTables = new HashSet<>();
+        this.isBackfillSkipped = taskContext.getSourceConfig().isSkipSnapshotBackfill();
+        this.supportsSplitKeyOptimization = taskContext.supportsSplitKeyOptimization();
     }
 
     @Override
@@ -94,12 +101,6 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                                         currentStreamSplit),
                                 e);
                         readException = e;
-                    } finally {
-                        try {
-                            stopReadTask();
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
                     }
                 });
     }
@@ -114,10 +115,19 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
     public Iterator<SourceRecords> pollSplitRecords() throws InterruptedException {
         checkReadException();
         final List<SourceRecord> sourceRecords = new ArrayList<>();
+        // what happens if currentTaskRunning
         if (currentTaskRunning) {
             List<DataChangeEvent> batch = queue.poll();
             for (DataChangeEvent event : batch) {
-                if (shouldEmit(event.getRecord())) {
+                if (isEndWatermarkEvent(event.getRecord())) {
+                    LOG.info("Read split {} end watermark event", currentStreamSplit);
+                    try {
+                        stopReadTask();
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    break;
+                } else if (shouldEmit(event.getRecord())) {
                     sourceRecords.add(event.getRecord());
                 } else {
                     LOG.debug("{} data change event should not emit", event);
@@ -184,13 +194,26 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
             }
             // only the table who captured snapshot splits need to filter
             if (finishedSplitsInfo.containsKey(tableId)) {
-                for (FinishedSnapshotSplitInfo splitInfo : finishedSplitsInfo.get(tableId)) {
-                    if (taskContext.isRecordBetween(
-                                    sourceRecord,
-                                    splitInfo.getSplitStart(),
-                                    splitInfo.getSplitEnd())
-                            && position.isAfter(splitInfo.getHighWatermark())) {
-                        return true;
+                // if backfill skipped, don't need to filter
+                if (isBackfillSkipped) {
+                    return true;
+                }
+                List<FinishedSnapshotSplitInfo> tableSplits = finishedSplitsInfo.get(tableId);
+                if (supportsSplitKeyOptimization) {
+                    Object[] splitKey = taskContext.getSplitKey(sourceRecord);
+                    FinishedSnapshotSplitInfo matchedSplit =
+                            SplitKeyUtils.findSplitByKeyBinary(tableSplits, splitKey);
+                    return matchedSplit != null
+                            && position.isAfter(matchedSplit.getHighWatermark());
+                } else {
+                    for (FinishedSnapshotSplitInfo splitInfo : tableSplits) {
+                        if (taskContext.isRecordBetween(
+                                        sourceRecord,
+                                        splitInfo.getSplitStart(),
+                                        splitInfo.getSplitEnd())
+                                && position.isAfter(splitInfo.getHighWatermark())) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -249,6 +272,9 @@ public class IncrementalSourceStreamFetcher implements Fetcher<SourceRecords, So
                 if (maxHighWatermark == null || highWatermark.isAfter(maxHighWatermark)) {
                     tableIdOffsetPositionMap.put(tableId, highWatermark);
                 }
+            }
+            if (supportsSplitKeyOptimization) {
+                splitsInfoMap.values().forEach(SplitKeyUtils::sortFinishedSplitInfos);
             }
         }
         this.finishedSplitsInfo = splitsInfoMap;

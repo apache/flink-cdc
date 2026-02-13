@@ -121,6 +121,7 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
                                     "Resume token has expired, fallback to timestamp restart mode");
                         }
                         changeStreamCursor = openChangeStreamCursor(descriptor, resumeTokenExpires);
+                        heartbeatManager = openHeartbeatManagerIfNeeded(changeStreamCursor);
                         next = Optional.ofNullable(changeStreamCursor.tryNext());
                     } else {
                         throw e;
@@ -220,6 +221,10 @@ public class MongoDBStreamFetchTask implements FetchTask<SourceSplitBase> {
         } catch (Exception e) {
             LOG.error("Poll change stream records failed ", e);
             throw e;
+        } catch (Throwable t) {
+            // Handle error
+            LOG.error("Fatal error when polling change stream records: ", t);
+            throw new RuntimeException("Fatal error when polling change stream records", t);
         } finally {
             taskRunning = false;
             if (changeStreamCursor != null) {

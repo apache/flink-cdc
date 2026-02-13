@@ -87,3 +87,24 @@ route:
 ```
 
 Then, all tables including `source_db.XXX` will be routed to `sink_db.XXX` without hassle.
+
+## Advanced: RegExp Capturing & Replacement Rules
+
+It is also possible to create capturing groups in `source-table` fields like this:
+
+```yaml
+route:
+  - source-table: db_(\.*).(\.*)_tbl
+    sink-table: sink_db_$1.sink_table_$2
+```
+
+Here we create two capturing groups matching database suffix and table prefix.
+
+For upstream table `db_foo.bar_tbl`, capturing group `(foo, bar)` will be extracted and bound to `$1` and `$2`.
+As a result, such table will be routed to downstream table `sink_db_foo.sink_table_bar`.
+
+{{< hint info >}}
+
+Standard RegExp capturing could not be used with `replace-symbol` options.
+
+{{< /hint >}}

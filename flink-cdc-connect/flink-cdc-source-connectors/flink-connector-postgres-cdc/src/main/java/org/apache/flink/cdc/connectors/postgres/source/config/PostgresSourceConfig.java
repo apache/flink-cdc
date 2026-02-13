@@ -38,6 +38,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
 
     private final int subtaskId;
     private final int lsnCommitCheckpointsDelay;
+    private final boolean includePartitionedTables;
+    private final boolean includeDatabaseInTableId;
 
     public PostgresSourceConfig(
             int subtaskId,
@@ -67,7 +69,9 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
             boolean skipSnapshotBackfill,
             boolean isScanNewlyAddedTableEnabled,
             int lsnCommitCheckpointsDelay,
-            boolean assignUnboundedChunkFirst) {
+            boolean assignUnboundedChunkFirst,
+            boolean includePartitionedTables,
+            boolean includeDatabaseInTableId) {
         super(
                 startupOptions,
                 databaseList,
@@ -97,6 +101,8 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
                 assignUnboundedChunkFirst);
         this.subtaskId = subtaskId;
         this.lsnCommitCheckpointsDelay = lsnCommitCheckpointsDelay;
+        this.includePartitionedTables = includePartitionedTables;
+        this.includeDatabaseInTableId = includeDatabaseInTableId;
     }
 
     /**
@@ -118,6 +124,15 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
     }
 
     /**
+     * Returns {@code includePartitionedTables} value.
+     *
+     * @return include partitioned table
+     */
+    public boolean includePartitionedTables() {
+        return includePartitionedTables;
+    }
+
+    /**
      * Returns the slot name for backfill task.
      *
      * @return backfill task slot name
@@ -126,8 +141,23 @@ public class PostgresSourceConfig extends JdbcSourceConfig {
         return getDbzProperties().getProperty(SLOT_NAME.name()) + "_" + getSubtaskId();
     }
 
+    /** Returns the JDBC URL for config unique key. */
+    public String getJdbcUrl() {
+        return String.format(
+                "jdbc:postgresql://%s:%d/%s", getHostname(), getPort(), getDatabaseList().get(0));
+    }
+
     @Override
     public PostgresConnectorConfig getDbzConnectorConfig() {
         return new PostgresConnectorConfig(getDbzConfiguration());
+    }
+
+    /**
+     * Returns whether to include database in the generated Table ID.
+     *
+     * @return whether to include database in the generated Table ID
+     */
+    public boolean isIncludeDatabaseInTableId() {
+        return includeDatabaseInTableId;
     }
 }

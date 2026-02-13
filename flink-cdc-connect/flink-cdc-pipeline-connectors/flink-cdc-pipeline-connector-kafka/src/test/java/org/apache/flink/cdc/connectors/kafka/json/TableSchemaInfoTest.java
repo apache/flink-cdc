@@ -17,19 +17,24 @@
 
 package org.apache.flink.cdc.connectors.kafka.json;
 
+import org.apache.flink.cdc.common.data.DateData;
 import org.apache.flink.cdc.common.data.DecimalData;
+import org.apache.flink.cdc.common.data.GenericArrayData;
 import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
+import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.types.RowKind;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -38,10 +43,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 
 /** Tests for {@link TableSchemaInfo}. */
-public class TableSchemaInfoTest {
+class TableSchemaInfoTest {
 
     @Test
-    public void testGetRowDataFromRecordData() {
+    void testGetRowDataFromRecordData() {
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn(
@@ -116,9 +121,9 @@ public class TableSchemaInfoTest {
                     BinaryStringData.fromString("test1"),
                     BinaryStringData.fromString("test2"),
                     BinaryStringData.fromString("test3"),
-                    100,
-                    200,
-                    300,
+                    DateData.fromEpochDay(100),
+                    TimeData.fromNanoOfDay(200_000_000L),
+                    TimeData.fromNanoOfDay(300_000_000L),
                     TimestampData.fromTimestamp(
                             java.sql.Timestamp.valueOf("2023-01-01 00:00:00.000")),
                     TimestampData.fromTimestamp(java.sql.Timestamp.valueOf("2023-01-01 00:00:00")),
@@ -130,37 +135,99 @@ public class TableSchemaInfoTest {
                 new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]))
                         .generate(testData);
 
-        Assertions.assertEquals(
-                GenericRowData.ofKind(
-                        RowKind.INSERT,
-                        org.apache.flink.table.data.binary.BinaryStringData.fromString("pk"),
-                        true,
-                        new byte[] {1, 2},
-                        new byte[] {3, 4},
-                        new byte[] {5, 6, 7},
-                        (byte) 1,
-                        (short) 2,
-                        3,
-                        4L,
-                        5.1f,
-                        6.2,
-                        org.apache.flink.table.data.DecimalData.fromBigDecimal(
-                                new BigDecimal("7.123"), 6, 3),
-                        org.apache.flink.table.data.binary.BinaryStringData.fromString("test1"),
-                        org.apache.flink.table.data.binary.BinaryStringData.fromString("test2"),
-                        org.apache.flink.table.data.binary.BinaryStringData.fromString("test3"),
-                        100,
-                        200,
-                        300,
-                        org.apache.flink.table.data.TimestampData.fromTimestamp(
-                                Timestamp.valueOf("2023-01-01 00:00:00.000")),
-                        org.apache.flink.table.data.TimestampData.fromTimestamp(
-                                Timestamp.valueOf("2023-01-01 00:00:00")),
-                        org.apache.flink.table.data.TimestampData.fromInstant(
-                                Instant.parse("2023-01-01T00:00:00.000Z")),
-                        org.apache.flink.table.data.TimestampData.fromInstant(
-                                Instant.parse("2023-01-01T00:00:00.000Z")),
-                        null),
-                tableSchemaInfo.getRowDataFromRecordData(recordData, false));
+        Assertions.assertThat(tableSchemaInfo.getRowDataFromRecordData(recordData, false))
+                .isEqualTo(
+                        GenericRowData.ofKind(
+                                RowKind.INSERT,
+                                org.apache.flink.table.data.binary.BinaryStringData.fromString(
+                                        "pk"),
+                                true,
+                                new byte[] {1, 2},
+                                new byte[] {3, 4},
+                                new byte[] {5, 6, 7},
+                                (byte) 1,
+                                (short) 2,
+                                3,
+                                4L,
+                                5.1f,
+                                6.2,
+                                org.apache.flink.table.data.DecimalData.fromBigDecimal(
+                                        new BigDecimal("7.123"), 6, 3),
+                                org.apache.flink.table.data.binary.BinaryStringData.fromString(
+                                        "test1"),
+                                org.apache.flink.table.data.binary.BinaryStringData.fromString(
+                                        "test2"),
+                                org.apache.flink.table.data.binary.BinaryStringData.fromString(
+                                        "test3"),
+                                100,
+                                200,
+                                300,
+                                org.apache.flink.table.data.TimestampData.fromTimestamp(
+                                        Timestamp.valueOf("2023-01-01 00:00:00.000")),
+                                org.apache.flink.table.data.TimestampData.fromTimestamp(
+                                        Timestamp.valueOf("2023-01-01 00:00:00")),
+                                org.apache.flink.table.data.TimestampData.fromInstant(
+                                        Instant.parse("2023-01-01T00:00:00.000Z")),
+                                org.apache.flink.table.data.TimestampData.fromInstant(
+                                        Instant.parse("2023-01-01T00:00:00.000Z")),
+                                null));
+    }
+
+    @Test
+    void testArrayWithNestedRowType() {
+        // Create a schema with ARRAY<ROW<name STRING, age INT>>
+        DataType personRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("age", DataTypes.INT()));
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("persons", DataTypes.ARRAY(personRowType))
+                        .primaryKey("id")
+                        .build();
+
+        TableSchemaInfo tableSchemaInfo =
+                new TableSchemaInfo(
+                        TableId.parse("testDatabase.testTable"), schema, null, ZoneId.of("UTC"));
+
+        // Create test data with nested ROW in ARRAY
+        BinaryRecordDataGenerator personGenerator =
+                new BinaryRecordDataGenerator(new DataType[] {DataTypes.STRING(), DataTypes.INT()});
+
+        RecordData person1 =
+                personGenerator.generate(new Object[] {BinaryStringData.fromString("Alice"), 30});
+        RecordData person2 =
+                personGenerator.generate(new Object[] {BinaryStringData.fromString("Bob"), 25});
+
+        GenericArrayData personsArray = new GenericArrayData(new RecordData[] {person1, person2});
+
+        Object[] testData = new Object[] {1, personsArray};
+
+        BinaryRecordData recordData =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]))
+                        .generate(testData);
+
+        // Convert and verify
+        org.apache.flink.table.data.RowData result =
+                tableSchemaInfo.getRowDataFromRecordData(recordData, false);
+
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getInt(0)).isEqualTo(1);
+
+        org.apache.flink.table.data.ArrayData resultArray = result.getArray(1);
+        Assertions.assertThat(resultArray).isNotNull();
+        Assertions.assertThat(resultArray.size()).isEqualTo(2);
+
+        // Verify first person
+        org.apache.flink.table.data.RowData resultPerson1 = resultArray.getRow(0, 2);
+        Assertions.assertThat(resultPerson1.getString(0).toString()).isEqualTo("Alice");
+        Assertions.assertThat(resultPerson1.getInt(1)).isEqualTo(30);
+
+        // Verify second person
+        org.apache.flink.table.data.RowData resultPerson2 = resultArray.getRow(1, 2);
+        Assertions.assertThat(resultPerson2.getString(0).toString()).isEqualTo("Bob");
+        Assertions.assertThat(resultPerson2.getInt(1)).isEqualTo(25);
     }
 }

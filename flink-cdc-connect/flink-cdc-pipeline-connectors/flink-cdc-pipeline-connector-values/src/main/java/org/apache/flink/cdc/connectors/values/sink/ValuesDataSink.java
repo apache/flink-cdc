@@ -80,7 +80,7 @@ public class ValuesDataSink implements DataSink, Serializable {
         if (errorOnSchemaChange) {
             return new ValuesDatabase.ErrorOnChangeMetadataApplier();
         } else {
-            return new ValuesDatabase.ValuesMetadataApplier();
+            return new ValuesDatabase.ValuesMetadataApplier(materializedInMemory);
         }
     }
 
@@ -161,13 +161,15 @@ public class ValuesDataSink implements DataSink, Serializable {
                 ValuesDatabase.applyDataChangeEvent((DataChangeEvent) event);
             }
             if (print) {
+                TableId tableId = ((ChangeEvent) event).tableId();
                 String prefix = numSubtasks > 1 ? subtaskIndex + "> " : "";
                 // print the detail message to console for verification.
                 System.out.println(
                         prefix
                                 + ValuesDataSinkHelper.convertEventToStr(
                                         event,
-                                        fieldGetterMaps.get(((ChangeEvent) event).tableId())));
+                                        schemaMaps.get(tableId).getColumnDataTypes(),
+                                        fieldGetterMaps.get(tableId)));
             }
         }
 

@@ -193,7 +193,11 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
                 if (gtidSet.equals(targetGtidSet)) {
                     long restartSkipEvents = this.getRestartSkipEvents();
                     long targetRestartSkipEvents = that.getRestartSkipEvents();
-                    return Long.compare(restartSkipEvents, targetRestartSkipEvents);
+                    if (restartSkipEvents != targetRestartSkipEvents) {
+                        return Long.compare(restartSkipEvents, targetRestartSkipEvents);
+                    }
+                    // The completed events are the same, so compare the row number ...
+                    return Long.compare(this.getRestartSkipRows(), that.getRestartSkipRows());
                 }
                 // The GTIDs are not an exact match, so figure out if this is a subset of the target
                 // offset
@@ -238,7 +242,9 @@ public class BinlogOffset implements Comparable<BinlogOffset>, Serializable {
         }
 
         // First compare the MySQL binlog filenames
-        if (this.getFilename().compareToIgnoreCase(that.getFilename()) != 0) {
+        if (this.getFilename() != null
+                && that.getFilename() != null
+                && this.getFilename().compareToIgnoreCase(that.getFilename()) != 0) {
             return this.getFilename().compareToIgnoreCase(that.getFilename());
         }
 

@@ -122,10 +122,15 @@ public class SchemaEvolutionUtils {
                 sqlBuilder
                         .append(addColumn.getAddColumn().getName())
                         .append(" ")
-                        .append(string(addColumn.getAddColumn().getType()))
-                        .append(" comment '")
-                        .append(addColumn.getAddColumn().getType().asSummaryString())
-                        .append("',");
+                        .append(string(addColumn.getAddColumn().getType()));
+                // Add comment if available
+                if (addColumn.getAddColumn().getComment() != null) {
+                    sqlBuilder
+                            .append(" comment '")
+                            .append(addColumn.getAddColumn().getComment())
+                            .append("'");
+                }
+                sqlBuilder.append(",");
             } else {
                 throw new UnsupportedOperationException(
                         "Not support position: "

@@ -35,7 +35,7 @@ jobs:
       isApprovedByAnyone: ${{ steps.label-when-approved-by-anyone.outputs.isApproved }}
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
           submodules: recursive

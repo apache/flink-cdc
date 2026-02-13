@@ -48,6 +48,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.debezium.connector.AbstractSourceInfo.DATABASE_NAME_KEY;
+import static io.debezium.connector.AbstractSourceInfo.TABLE_NAME_KEY;
 import static org.apache.flink.cdc.connectors.mysql.source.utils.RecordUtils.getHistoryRecord;
 
 /** Event deserializer for {@link MySqlDataSource}. */
@@ -69,17 +71,21 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
     private transient CustomMySqlAntlrDdlParser customParser;
 
     private final List<MySqlReadableMetadata> readableMetadataList;
+    private final boolean isTableIdCaseInsensitive;
 
     public MySqlEventDeserializer(
             DebeziumChangelogMode changelogMode,
             boolean includeSchemaChanges,
-            boolean tinyInt1isBit) {
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         this(
                 changelogMode,
                 includeSchemaChanges,
                 new ArrayList<>(),
                 includeSchemaChanges,
-                tinyInt1isBit);
+                tinyInt1isBit,
+                isTableIdCaseInsensitive);
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     public MySqlEventDeserializer(
@@ -87,19 +93,23 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
             boolean includeSchemaChanges,
             List<MySqlReadableMetadata> readableMetadataList,
             boolean includeComments,
-            boolean tinyInt1isBit) {
+            boolean tinyInt1isBit,
+            boolean isTableIdCaseInsensitive) {
         super(new MySqlSchemaDataTypeInference(), changelogMode);
         this.includeSchemaChanges = includeSchemaChanges;
         this.readableMetadataList = readableMetadataList;
         this.includeComments = includeComments;
         this.tinyInt1isBit = tinyInt1isBit;
+        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     @Override
     protected List<SchemaChangeEvent> deserializeSchemaChangeRecord(SourceRecord record) {
         if (includeSchemaChanges) {
             if (customParser == null) {
-                customParser = new CustomMySqlAntlrDdlParser(includeComments, tinyInt1isBit);
+                customParser =
+                        new CustomMySqlAntlrDdlParser(
+                                includeComments, tinyInt1isBit, isTableIdCaseInsensitive);
                 tables = new Tables();
             }
 
@@ -138,8 +148,11 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
 
     @Override
     protected TableId getTableId(SourceRecord record) {
-        String[] parts = record.topic().split("\\.");
-        return TableId.tableId(parts[1], parts[2]);
+        Struct value = (Struct) record.value();
+        Struct source = value.getStruct(Envelope.FieldName.SOURCE);
+        String dbName = source.getString(DATABASE_NAME_KEY);
+        String tableName = source.getString(TABLE_NAME_KEY);
+        return TableId.tableId(dbName, tableName);
     }
 
     @Override

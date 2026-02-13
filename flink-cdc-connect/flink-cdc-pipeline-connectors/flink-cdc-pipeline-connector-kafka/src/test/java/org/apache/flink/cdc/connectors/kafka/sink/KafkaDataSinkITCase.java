@@ -20,6 +20,10 @@ package org.apache.flink.cdc.connectors.kafka.sink;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.data.GenericArrayData;
+import org.apache.flink.cdc.common.data.GenericMapData;
+import org.apache.flink.cdc.common.data.StringData;
+import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
@@ -32,6 +36,7 @@ import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.connectors.kafka.json.JsonSerializationType;
@@ -44,6 +49,7 @@ import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.jackson.JacksonMapperFactory;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonGenerator;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.JsonNode;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -58,6 +64,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.KafkaContainer;
@@ -77,6 +85,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
+import static org.apache.flink.cdc.connectors.kafka.sink.KafkaDataSinkOptions.DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED;
 import static org.apache.flink.util.DockerImageVersions.KAFKA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -396,8 +405,7 @@ class KafkaDataSinkITCase extends TestLogger {
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic(topic, false);
-        final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords).hasSize(5);
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
             assertThat(
                             consumerRecord
@@ -492,8 +500,7 @@ class KafkaDataSinkITCase extends TestLogger {
 
         final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
                 drainAllRecordsFromTopic("test_topic", false, 0);
-        final long recordsCount = 5;
-        assertThat(recordsCount).isEqualTo(collectedRecords.size());
+        assertThat(collectedRecords).hasSize(5);
         for (ConsumerRecord<byte[], byte[]> consumerRecord : collectedRecords) {
             assertThat(
                             new String(
@@ -697,5 +704,474 @@ class KafkaDataSinkITCase extends TestLogger {
     private boolean findAliveKafkaThread(Map.Entry<Thread, StackTraceElement[]> threadStackTrace) {
         return threadStackTrace.getKey().getState() != Thread.State.TERMINATED
                 && threadStackTrace.getKey().getName().contains("kafka-producer-network-thread");
+    }
+
+    void runGenericComplexTypeSerializationTest(
+            JsonSerializationType serializationType,
+            List<Event> eventsToSerialize,
+            List<String> expectedJson)
+            throws Exception {
+        runGenericComplexTypeSerializationTest(
+                serializationType, eventsToSerialize, expectedJson, false);
+    }
+
+    void runGenericComplexTypeSerializationTest(
+            JsonSerializationType serializationType,
+            List<Event> eventsToSerialize,
+            List<String> expectedJson,
+            boolean includeSchema)
+            throws Exception {
+        try (StreamExecutionEnvironment env = new LocalStreamEnvironment()) {
+            env.enableCheckpointing(1000L);
+            env.setRestartStrategy(RestartStrategies.noRestart());
+            final DataStream<Event> source = env.fromData(eventsToSerialize, new EventTypeInfo());
+            Map<String, String> config = new HashMap<>();
+            Properties properties = getKafkaClientConfiguration();
+            properties.forEach(
+                    (key, value) ->
+                            config.put(
+                                    KafkaDataSinkOptions.PROPERTIES_PREFIX + key.toString(),
+                                    value.toString()));
+            if (serializationType == JsonSerializationType.CANAL_JSON) {
+                config.put(
+                        KafkaDataSinkOptions.VALUE_FORMAT.key(),
+                        JsonSerializationType.CANAL_JSON.toString());
+            }
+            if (includeSchema) {
+                config.put(DEBEZIUM_JSON_INCLUDE_SCHEMA_ENABLED.key(), "true");
+            }
+            source.sinkTo(
+                    ((FlinkSinkProvider)
+                                    (new KafkaDataSinkFactory()
+                                            .createDataSink(
+                                                    new FactoryHelper.DefaultContext(
+                                                            Configuration.fromMap(config),
+                                                            Configuration.fromMap(new HashMap<>()),
+                                                            this.getClass().getClassLoader()))
+                                            .getEventSinkProvider()))
+                            .getSink());
+            env.execute();
+        }
+
+        final List<ConsumerRecord<byte[], byte[]>> collectedRecords =
+                drainAllRecordsFromTopic(topic, false, 0);
+        assertThat(collectedRecords).hasSameSizeAs(expectedJson);
+        ObjectMapper mapper =
+                JacksonMapperFactory.createObjectMapper()
+                        .configure(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN, false);
+        List<JsonNode> expectedJsonNodes =
+                expectedJson.stream()
+                        .map(
+                                s -> {
+                                    try {
+                                        return mapper.readTree(
+                                                String.format(s, table1.getTableName()));
+                                    } catch (JsonProcessingException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                })
+                        .collect(Collectors.toList());
+        List<JsonNode> actualJsonNodes = deserializeValues(collectedRecords);
+
+        assertThat(actualJsonNodes).containsExactlyElementsOf(expectedJsonNodes);
+        checkProducerLeak();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource
+    void testComplexTypeSerialization(JsonSerializationType type) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("arr_col", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn(
+                                "map_col", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                        .physicalColumn(
+                                "row_col",
+                                DataTypes.ROW(
+                                        DataTypes.FIELD("name", DataTypes.STRING()),
+                                        DataTypes.FIELD("age", DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        BinaryRecordDataGenerator nestedRowGenerator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) (schema.getColumn("row_col").get().getType()))
+                                .getFieldTypes()
+                                .toArray(new DataType[0]));
+
+        BinaryRecordData recordData =
+                generator.generate(
+                        new Object[] {
+                            1,
+                            new GenericArrayData(
+                                    new Object[] {
+                                        BinaryStringData.fromString("Alfa"),
+                                        BinaryStringData.fromString("Bravo"),
+                                        BinaryStringData.fromString("Charlie")
+                                    }),
+                            new GenericMapData(
+                                    Map.of(
+                                            BinaryStringData.fromString("Delta"), 5,
+                                            BinaryStringData.fromString("Echo"), 4,
+                                            BinaryStringData.fromString("Foxtrot"), 7)),
+                            nestedRowGenerator.generate(
+                                    new Object[] {BinaryStringData.fromString("Golf"), 97})
+                        });
+        List<Event> eventsToSerialize =
+                List.of(
+                        new CreateTableEvent(table1, schema),
+                        DataChangeEvent.insertEvent(table1, recordData),
+                        DataChangeEvent.updateEvent(table1, recordData, recordData),
+                        DataChangeEvent.deleteEvent(table1, recordData));
+
+        List<String> expectedOutput = null;
+        switch (type) {
+            case DEBEZIUM_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"before\":null,\"after\":{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Foxtrot\":7,\"Delta\":5,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Foxtrot\":7,\"Delta\":5,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}},\"after\":{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Foxtrot\":7,\"Delta\":5,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Foxtrot\":7,\"Delta\":5,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}");
+                break;
+            case CANAL_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"old\":null,\"data\":[{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Delta\":5,\"Foxtrot\":7,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":[{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Delta\":5,\"Foxtrot\":7,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}}],\"data\":[{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Delta\":5,\"Foxtrot\":7,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":null,\"data\":[{\"id\":1,\"arr_col\":[\"Alfa\",\"Bravo\",\"Charlie\"],\"map_col\":{\"Delta\":5,\"Foxtrot\":7,\"Echo\":4},\"row_col\":{\"name\":\"Golf\",\"age\":97}}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}");
+                break;
+        }
+        runGenericComplexTypeSerializationTest(type, eventsToSerialize, expectedOutput);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource
+    void testNestedArraysSerialization(JsonSerializationType type) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn(
+                                "nested_arr", DataTypes.ARRAY(DataTypes.ARRAY(DataTypes.STRING())))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        BinaryRecordData recordData =
+                generator.generate(
+                        new Object[] {
+                            1,
+                            new GenericArrayData(
+                                    new Object[] {
+                                        new GenericArrayData(
+                                                new Object[] {new BinaryStringData("Alice")}),
+                                        new GenericArrayData(
+                                                new Object[] {new BinaryStringData("One")}),
+                                        new GenericArrayData(
+                                                new Object[] {new BinaryStringData("Alfa")})
+                                    })
+                        });
+        List<Event> eventsToSerialize =
+                List.of(
+                        new CreateTableEvent(table1, schema),
+                        DataChangeEvent.insertEvent(table1, recordData),
+                        DataChangeEvent.updateEvent(table1, recordData, recordData),
+                        DataChangeEvent.deleteEvent(table1, recordData));
+
+        List<String> expectedOutput = null;
+        switch (type) {
+            case DEBEZIUM_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"before\":null,\"after\":{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]},\"after\":{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}");
+                break;
+            case CANAL_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"old\":null,\"data\":[{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":[{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]}],\"data\":[{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":null,\"data\":[{\"id\":1,\"nested_arr\":[[\"Alice\"],[\"One\"],[\"Alfa\"]]}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}");
+                break;
+        }
+        runGenericComplexTypeSerializationTest(type, eventsToSerialize, expectedOutput);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource
+    void testMapWithArrayValueSerialization(JsonSerializationType type) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn(
+                                "map_arr",
+                                DataTypes.MAP(DataTypes.STRING(), DataTypes.ARRAY(DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        BinaryRecordData recordData =
+                generator.generate(
+                        new Object[] {
+                            1,
+                            new GenericMapData(
+                                    Map.of(
+                                            new BinaryStringData("Alice"),
+                                            new GenericArrayData(new int[] {1, 2, 3, 4, 5}),
+                                            new BinaryStringData("Bob"),
+                                            new GenericArrayData(new int[] {1, 2, 3}),
+                                            new BinaryStringData("Carol"),
+                                            new GenericArrayData(new int[] {6, 7, 8, 9, 10})))
+                        });
+        List<Event> eventsToSerialize =
+                List.of(
+                        new CreateTableEvent(table1, schema),
+                        DataChangeEvent.insertEvent(table1, recordData),
+                        DataChangeEvent.updateEvent(table1, recordData, recordData),
+                        DataChangeEvent.deleteEvent(table1, recordData));
+
+        List<String> expectedOutput = null;
+        switch (type) {
+            case DEBEZIUM_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"before\":null,\"after\":{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}},\"after\":{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}");
+                break;
+            case CANAL_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"old\":null,\"data\":[{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":[{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}}],\"data\":[{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":null,\"data\":[{\"id\":1,\"map_arr\":{\"Alice\":[1,2,3,4,5],\"Bob\":[1,2,3],\"Carol\":[6,7,8,9,10]}}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}");
+                break;
+        }
+        runGenericComplexTypeSerializationTest(type, eventsToSerialize, expectedOutput);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource
+    void testNullAndEmptyComplexTypesSerialization(JsonSerializationType type) throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("arr", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        BinaryRecordData recordData1 = generator.generate(new Object[] {1, null, null});
+        BinaryRecordData recordData2 =
+                generator.generate(
+                        new Object[] {
+                            1, new GenericArrayData(new Object[] {}), new GenericMapData(Map.of())
+                        });
+        Map<StringData, Integer> partialEmptyMap = new HashMap<>();
+        partialEmptyMap.put(BinaryStringData.fromString("Alice"), 1);
+        partialEmptyMap.put(BinaryStringData.fromString("Bob"), null);
+        BinaryRecordData recordData3 =
+                generator.generate(
+                        new Object[] {
+                            1,
+                            new GenericArrayData(
+                                    new Object[] {BinaryStringData.fromString("Foo"), null}),
+                            new GenericMapData(partialEmptyMap)
+                        });
+        List<Event> eventsToSerialize =
+                List.of(
+                        new CreateTableEvent(table1, schema),
+                        DataChangeEvent.insertEvent(table1, recordData1),
+                        DataChangeEvent.updateEvent(table1, recordData1, recordData2),
+                        DataChangeEvent.updateEvent(table1, recordData2, recordData3),
+                        DataChangeEvent.deleteEvent(table1, recordData3));
+
+        List<String> expectedOutput = null;
+        switch (type) {
+            case DEBEZIUM_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"before\":null,\"after\":{\"id\":1,\"arr\":null,\"map\":null},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"arr\":null,\"map\":null},\"after\":{\"id\":1,\"arr\":[],\"map\":{}},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"arr\":[],\"map\":{}},\"after\":{\"id\":1,\"arr\":[\"Foo\",null],\"map\":{\"Alice\":1,\"Bob\":null}},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"arr\":[\"Foo\",null],\"map\":{\"Alice\":1,\"Bob\":null}},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}");
+                break;
+            case CANAL_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"old\":null,\"data\":[{\"id\":1,\"arr\":null,\"map\":null}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":[{\"id\":1,\"arr\":null,\"map\":null}],\"data\":[{\"id\":1,\"arr\":[],\"map\":{}}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":[{\"id\":1,\"arr\":[],\"map\":{}}],\"data\":[{\"id\":1,\"arr\":[\"Foo\",null],\"map\":{\"Alice\":1,\"Bob\":null}}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":null,\"data\":[{\"id\":1,\"arr\":[\"Foo\",null],\"map\":{\"Alice\":1,\"Bob\":null}}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}");
+                break;
+        }
+        runGenericComplexTypeSerializationTest(type, eventsToSerialize, expectedOutput);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource
+    void testDeepNestedStructureSerialization(JsonSerializationType type) throws Exception {
+        RowType innerRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("x", DataTypes.INT()),
+                        DataTypes.FIELD("y", DataTypes.INT()));
+        RowType outerRowType =
+                DataTypes.ROW(
+                        DataTypes.FIELD("name", DataTypes.STRING()),
+                        DataTypes.FIELD("nested", innerRowType));
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT().notNull())
+                        .physicalColumn("deep", DataTypes.ARRAY(outerRowType))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator outerRowGenerator =
+                new BinaryRecordDataGenerator(
+                        outerRowType.getFieldTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator innerRowGenerator =
+                new BinaryRecordDataGenerator(
+                        innerRowType.getFieldTypes().toArray(new DataType[0]));
+
+        BinaryRecordData recordData =
+                generator.generate(
+                        new Object[] {
+                            1,
+                            new GenericArrayData(
+                                    new Object[] {
+                                        outerRowGenerator.generate(
+                                                new Object[] {
+                                                    BinaryStringData.fromString("323"),
+                                                    innerRowGenerator.generate(
+                                                            new Object[] {17, 19})
+                                                }),
+                                        outerRowGenerator.generate(
+                                                new Object[] {
+                                                    BinaryStringData.fromString("143"),
+                                                    innerRowGenerator.generate(
+                                                            new Object[] {11, 13})
+                                                })
+                                    })
+                        });
+        List<Event> eventsToSerialize =
+                List.of(
+                        new CreateTableEvent(table1, schema),
+                        DataChangeEvent.insertEvent(table1, recordData),
+                        DataChangeEvent.updateEvent(table1, recordData, recordData),
+                        DataChangeEvent.deleteEvent(table1, recordData));
+
+        List<String> expectedOutput = null;
+        switch (type) {
+            case DEBEZIUM_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"before\":null,\"after\":{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]},\"after\":{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}",
+                                "{\"before\":{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}");
+                break;
+            case CANAL_JSON:
+                expectedOutput =
+                        List.of(
+                                "{\"old\":null,\"data\":[{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]}],\"type\":\"INSERT\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":[{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]}],\"data\":[{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]}],\"type\":\"UPDATE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}",
+                                "{\"old\":null,\"data\":[{\"id\":1,\"deep\":[{\"name\":\"323\",\"nested\":{\"x\":17,\"y\":19}},{\"name\":\"143\",\"nested\":{\"x\":11,\"y\":13}}]}],\"type\":\"DELETE\",\"database\":\"default_schema\",\"table\":\"%s\",\"pkNames\":[\"id\"]}");
+                break;
+        }
+        runGenericComplexTypeSerializationTest(type, eventsToSerialize, expectedOutput);
+    }
+
+    @Test
+    void testDebeziumJsonWithSchemaComplexTypes() throws Exception {
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("arr", DataTypes.ARRAY(DataTypes.STRING()))
+                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
+                        .physicalColumn(
+                                "row",
+                                DataTypes.ROW(
+                                        DataTypes.FIELD("f1", DataTypes.STRING()),
+                                        DataTypes.FIELD("f2", DataTypes.INT())))
+                        .primaryKey("id")
+                        .build();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+        BinaryRecordDataGenerator nestedRowGenerator =
+                new BinaryRecordDataGenerator(
+                        ((RowType) (schema.getColumn("row").get().getType()))
+                                .getFieldTypes()
+                                .toArray(new DataType[0]));
+
+        BinaryRecordData recordData =
+                generator.generate(
+                        new Object[] {
+                            1,
+                            new GenericArrayData(
+                                    new Object[] {
+                                        BinaryStringData.fromString("item1"),
+                                        BinaryStringData.fromString("item2")
+                                    }),
+                            new GenericMapData(
+                                    Map.of(
+                                            BinaryStringData.fromString("key1"), 100,
+                                            BinaryStringData.fromString("key2"), 200)),
+                            nestedRowGenerator.generate(
+                                    new Object[] {BinaryStringData.fromString("nested"), 42})
+                        });
+
+        List<Event> eventsToSerialize =
+                List.of(
+                        new CreateTableEvent(table1, schema),
+                        DataChangeEvent.insertEvent(table1, recordData),
+                        DataChangeEvent.updateEvent(table1, recordData, recordData),
+                        DataChangeEvent.deleteEvent(table1, recordData));
+
+        String schemaJson =
+                "{\"type\":\"struct\",\"fields\":["
+                        + "{\"type\":\"struct\",\"fields\":["
+                        + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                        + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                        + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                        + "{\"type\":\"struct\",\"fields\":["
+                        + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                        + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                        + "],\"optional\":true,\"field\":\"row\"}"
+                        + "],\"optional\":true,\"field\":\"before\"},"
+                        + "{\"type\":\"struct\",\"fields\":["
+                        + "{\"type\":\"int32\",\"optional\":true,\"field\":\"id\"},"
+                        + "{\"type\":\"array\",\"items\":{\"type\":\"string\",\"optional\":false},\"optional\":true,\"field\":\"arr\"},"
+                        + "{\"type\":\"map\",\"keys\":{\"type\":\"string\",\"optional\":false},\"values\":{\"type\":\"int32\",\"optional\":false},\"optional\":true,\"field\":\"map\"},"
+                        + "{\"type\":\"struct\",\"fields\":["
+                        + "{\"type\":\"string\",\"optional\":false,\"field\":\"f1\"},"
+                        + "{\"type\":\"int32\",\"optional\":false,\"field\":\"f2\"}"
+                        + "],\"optional\":true,\"field\":\"row\"}"
+                        + "],\"optional\":true,\"field\":\"after\"}"
+                        + "],\"optional\":false}";
+
+        List<String> expectedJsonWithSchema =
+                List.of(
+                        "{\"schema\":"
+                                + schemaJson
+                                + ",\"payload\":{\"before\":null,\"after\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"op\":\"c\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}}",
+                        "{\"schema\":"
+                                + schemaJson
+                                + ",\"payload\":{\"before\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"after\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"op\":\"u\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}}",
+                        "{\"schema\":"
+                                + schemaJson
+                                + ",\"payload\":{\"before\":{\"id\":1,\"arr\":[\"item1\",\"item2\"],\"map\":{\"key1\":100,\"key2\":200},\"row\":{\"f1\":\"nested\",\"f2\":42}},\"after\":null,\"op\":\"d\",\"source\":{\"db\":\"default_schema\",\"table\":\"%s\"}}}");
+
+        runGenericComplexTypeSerializationTest(
+                JsonSerializationType.DEBEZIUM_JSON,
+                eventsToSerialize,
+                expectedJsonWithSchema,
+                true);
     }
 }

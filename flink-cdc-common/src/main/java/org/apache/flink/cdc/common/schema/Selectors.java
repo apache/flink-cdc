@@ -20,6 +20,10 @@ package org.apache.flink.cdc.common.schema;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.utils.Predicates;
 
+import org.apache.flink.shaded.guava31.com.google.common.cache.Cache;
+import org.apache.flink.shaded.guava31.com.google.common.cache.CacheBuilder;
+
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -29,7 +33,15 @@ import java.util.function.Predicate;
 /** Selectors for filtering tables. */
 public class Selectors {
 
+    private static final Duration CACHE_EXPIRE_DURATION = Duration.ofHours(1);
+
     private List<Selector> selectors;
+
+    private final Cache<TableId, Boolean> cache =
+            CacheBuilder.newBuilder()
+                    .expireAfterAccess(CACHE_EXPIRE_DURATION)
+                    .maximumSize(1024)
+                    .build();
 
     private Selectors() {}
 
@@ -71,8 +83,20 @@ public class Selectors {
         }
     }
 
-    /** Match the {@link TableId} against the {@link Selector}s. * */
+    /** Match the {@link TableId} against the {@link Selector}s. */
     public boolean isMatch(TableId tableId) {
+        Boolean cachedResult = cache.getIfPresent(tableId);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+
+        boolean match = computeIsMatch(tableId);
+        cache.put(tableId, match);
+        return match;
+    }
+
+    /** Computes the match result if not present in the cache. */
+    private boolean computeIsMatch(TableId tableId) {
         for (Selector selector : selectors) {
             if (selector.isMatch(tableId)) {
                 return true;
