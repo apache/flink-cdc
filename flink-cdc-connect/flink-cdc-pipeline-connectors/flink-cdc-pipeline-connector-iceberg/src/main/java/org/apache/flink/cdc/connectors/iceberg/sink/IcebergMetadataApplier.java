@@ -46,6 +46,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.flink.FlinkSchemaUtil;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -178,7 +179,12 @@ public class IcebergMetadataApplier implements MetadataApplier {
             }
             PartitionSpec partitionSpec = generatePartitionSpec(icebergSchema, partitionColumns);
             if (!catalog.tableExists(tableIdentifier)) {
-                catalog.createTable(tableIdentifier, icebergSchema, partitionSpec, tableOptions);
+                Table table =
+                        catalog.createTable(
+                                tableIdentifier, icebergSchema, partitionSpec, tableOptions);
+
+                applyDefaultValues(table, cdcSchema);
+
                 LOG.info(
                         "Spend {} ms to create iceberg table {}",
                         System.currentTimeMillis() - startTimestamp,
@@ -186,6 +192,25 @@ public class IcebergMetadataApplier implements MetadataApplier {
             }
         } catch (Exception e) {
             throw new SchemaEvolveException(event, e.getMessage(), e);
+        }
+    }
+
+    private void applyDefaultValues(
+            Table table, org.apache.flink.cdc.common.schema.Schema cdcSchema) {
+        UpdateSchema updateSchema = null;
+        for (Column column : cdcSchema.getColumns()) {
+            Literal<?> defaultValue =
+                    IcebergTypeUtils.parseDefaultValue(
+                            column.getDefaultValueExpression(), column.getType());
+            if (defaultValue != null) {
+                if (updateSchema == null) {
+                    updateSchema = table.updateSchema();
+                }
+                updateSchema.updateColumnDefault(column.getName(), defaultValue);
+            }
+        }
+        if (updateSchema != null) {
+            updateSchema.commit();
         }
     }
 
@@ -212,16 +237,21 @@ public class IcebergMetadataApplier implements MetadataApplier {
                         FlinkSchemaUtil.convert(
                                 DataTypeUtils.toFlinkDataType(addColumn.getType())
                                         .getLogicalType());
+                Literal<?> defaultValue =
+                        IcebergTypeUtils.parseDefaultValue(
+                                addColumn.getDefaultValueExpression(), addColumn.getType());
+                if (defaultValue != null) {
+                    updateSchema.addColumn(columnName, icebergType, columnComment, defaultValue);
+                } else {
+                    updateSchema.addColumn(columnName, icebergType, columnComment);
+                }
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
-                        table.updateSchema().moveFirst(columnName);
+                        updateSchema.moveFirst(columnName);
                         break;
                     case LAST:
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         break;
                     case BEFORE:
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         updateSchema.moveBefore(
                                 columnName, columnWithPosition.getExistedColumnName());
                         break;
@@ -229,7 +259,6 @@ public class IcebergMetadataApplier implements MetadataApplier {
                         checkNotNull(
                                 columnWithPosition.getExistedColumnName(),
                                 "Existing column name must be provided for AFTER position");
-                        updateSchema.addColumn(columnName, icebergType, columnComment);
                         updateSchema.moveAfter(
                                 columnName, columnWithPosition.getExistedColumnName());
                         break;
