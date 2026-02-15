@@ -224,8 +224,7 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
     private void captureNewlyAddedTables() {
         // Don't scan newly added table in snapshot mode.
         if (sourceConfig.isScanNewlyAddedTableEnabled()
-                && !sourceConfig.getStartupOptions().isSnapshotOnly()
-                && AssignerStatus.isAssigningFinished(assignerStatus)) {
+                && !sourceConfig.getStartupOptions().isSnapshotOnly()) {
             // check whether we got newly added tables
             try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
                 final List<TableId> currentCapturedTables =
@@ -248,6 +247,10 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 List<TableId> newlyAddedTables = currentCapturedTables;
 
                 // case 1: there are old tables to remove from state
+                // Table removal must happen regardless of assigner status. When a table
+                // is excluded after splits have been assigned but before they are finished,
+                // we must remove those splits to prevent the assigner from waiting indefinitely
+                // for splits that will never be reported as finished.
                 if (!tablesToRemove.isEmpty()) {
 
                     // remove unassigned tables/splits if it does not satisfy new table filter
@@ -267,6 +270,11 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                     LOG.info("Enumerator remove tables after restart: {}", tablesToRemove);
                     remainingTables.removeAll(tablesToRemove);
                     alreadyProcessedTables.removeIf(tableId -> tablesToRemove.contains(tableId));
+                }
+
+                // Adding new tables should only happen when assigning is finished.
+                if (!AssignerStatus.isAssigningFinished(assignerStatus)) {
+                    return;
                 }
 
                 // case 2: there are new tables to add
