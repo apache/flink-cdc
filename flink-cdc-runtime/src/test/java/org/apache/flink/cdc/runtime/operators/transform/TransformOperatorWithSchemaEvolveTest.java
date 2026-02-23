@@ -840,6 +840,245 @@ class TransformOperatorWithSchemaEvolveTest {
                 .runTests("inserting columns at last");
     }
 
+    /**
+     * This case tests that duplicate AddColumnEvents are handled gracefully by both
+     * PreTransformOperator and PostTransformOperator. When the same column is added twice (e.g.,
+     * from gh-ost online schema migrations), the second event should be filtered out.
+     */
+    @Test
+    void testDuplicateAddColumnEventPreTransform() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
+        TransformWithSchemaEvolveTestCase.of(
+                        tableId,
+                        "*, id + age as computed",
+                        "name <> 'Alice'",
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .runTests("initializing table")
+                // First AddColumnEvent: add "extras" column
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null))))
+                .expectInPreTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))))
+                .expectInPostTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))))
+                .runTests("adding extras column first time")
+                // Duplicate AddColumnEvent: add "extras" column again (should be filtered)
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null))))
+                .expectNothingInPreTransformed()
+                .expectNothingInPostTransformed()
+                .runTests("duplicate add extras column should be filtered")
+                .destroyHarness();
+    }
+
+    /**
+     * This case tests that duplicate AddColumnEvents are handled gracefully by
+     * PostTransformOperator. When the same column is added twice, the second event should be
+     * filtered out even when sent directly to the post-transform operator.
+     */
+    @Test
+    void testDuplicateAddColumnEventPostTransform() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
+        TransformWithSchemaEvolveTestCase.of(
+                        tableId,
+                        "*, id + age as computed",
+                        "name <> 'Alice'",
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .runTests("initializing table")
+                // First AddColumnEvent: add "extras" column
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null))))
+                .expectInPreTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))))
+                .expectInPostTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))))
+                .runTests("adding extras column first time")
+                // Second AddColumnEvent: add "extras" again (duplicate, should be filtered)
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("extras", DataTypes.FLOAT()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null))))
+                .expectNothingInPreTransformed()
+                .expectNothingInPostTransformed()
+                .runTests("duplicate add extras column should be filtered by both operators")
+                .destroyHarness();
+    }
+
+    /**
+     * This case tests partial duplicate AddColumnEvents. When an event adds multiple columns and
+     * some already exist, only the non-duplicate columns should be forwarded.
+     */
+    @Test
+    void testPartialDuplicateAddColumnEvent() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "data_changes");
+        TransformWithSchemaEvolveTestCase.of(
+                        tableId,
+                        "*, id + age as computed",
+                        "name <> 'Alice'",
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .primaryKey("id")
+                                .build(),
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT().notNull())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .physicalColumn("computed", DataTypes.INT())
+                                .primaryKey("id")
+                                .build())
+                .initializeHarness()
+                .runTests("initializing table")
+                // First AddColumnEvent: add "email" column
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("email", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null))))
+                .expectInPreTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("email", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))))
+                .expectInPostTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("email", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "age"))))
+                .runTests("adding email column")
+                // Second AddColumnEvent: add "email" (duplicate) and "phone" (new)
+                .evolveFromSource(
+                        new AddColumnEvent(
+                                tableId,
+                                Arrays.asList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("email", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null),
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("phone", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.LAST,
+                                                null))))
+                .expectInPreTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("phone", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "email"))))
+                .expectInPostTransformed(
+                        new AddColumnEvent(
+                                tableId,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("phone", DataTypes.STRING()),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "email"))))
+                .runTests("partial duplicate: email filtered, phone added")
+                .destroyHarness();
+    }
+
     /** This case tests column name map when schema evolution happens. */
     @Test
     public void testSchemaChangeWithColumnNameMap() throws Exception {

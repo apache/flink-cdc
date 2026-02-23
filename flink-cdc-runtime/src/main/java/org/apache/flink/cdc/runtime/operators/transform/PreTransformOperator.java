@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -45,6 +46,9 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -64,6 +68,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(PreTransformOperator.class);
 
     private final List<TransformRule> transformRules;
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
@@ -215,6 +220,24 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
+
+        // Filter out redundant AddColumnEvent columns that already exist in the schema
+        // to handle duplicate events from tools like gh-ost online schema migrations
+        if (event instanceof AddColumnEvent) {
+            AddColumnEvent addColumnEvent = (AddColumnEvent) event;
+            Schema currentSchema = tableChangeInfo.getSourceSchema();
+            Optional<AddColumnEvent> filtered =
+                    SchemaUtils.filterRedundantAddColumns(currentSchema, addColumnEvent);
+            if (!filtered.isPresent()) {
+                LOG.debug(
+                        "Skipping fully redundant AddColumnEvent for table {} "
+                                + "- all columns already exist",
+                        tableId);
+                return Optional.empty();
+            }
+            event = filtered.get();
+        }
+
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();
