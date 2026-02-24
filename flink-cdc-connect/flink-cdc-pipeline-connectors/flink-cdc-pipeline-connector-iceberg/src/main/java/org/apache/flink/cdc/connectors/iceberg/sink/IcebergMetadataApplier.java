@@ -252,6 +252,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
                     case LAST:
                         break;
                     case BEFORE:
+                        checkNotNull(
+                                columnWithPosition.getExistedColumnName(),
+                                "Existing column name must be provided for BEFORE position");
                         updateSchema.moveBefore(
                                 columnName, columnWithPosition.getExistedColumnName());
                         break;
