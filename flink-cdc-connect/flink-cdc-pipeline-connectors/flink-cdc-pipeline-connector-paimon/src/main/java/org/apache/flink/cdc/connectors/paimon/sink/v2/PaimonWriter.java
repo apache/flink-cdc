@@ -224,6 +224,9 @@ public class PaimonWriter<InputT>
         if (compactExecutor != null) {
             compactExecutor.shutdownNow();
         }
+        if (ioManager != null) {
+            ioManager.close();
+        }
     }
 
     @Override
