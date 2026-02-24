@@ -17,18 +17,24 @@
 
 package org.apache.flink.cdc.runtime.operators.transform;
 
+import org.apache.flink.api.common.state.ListState;
+import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeutils.base.array.BytePrimitiveArraySerializer;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.converter.JavaObjectConverter;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
+import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.udf.UserDefinedFunctionContext;
@@ -39,6 +45,8 @@ import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformExce
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.cdc.runtime.typeutils.BinaryInternalObjectConverter;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.runtime.state.StateInitializationContext;
+import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -46,14 +54,20 @@ import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.shaded.guava31.com.google.common.collect.HashBasedTable;
 import org.apache.flink.shaded.guava31.com.google.common.collect.Table;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -68,6 +82,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(PostTransformOperator.class);
 
     private final String timezone;
     private final List<TransformRule> transformRules;
@@ -88,6 +103,9 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
             projectionProcessors;
     private transient Table<TableId, PostTransformer, TransformFilterProcessor> filterProcessors;
 
+    private transient ListState<byte[]> state;
+    private transient Map<TableId, List<SchemaChangeEvent>> pendingSchemaChanges;
+
     public static PostTransformOperatorBuilder newBuilder() {
         return new PostTransformOperatorBuilder();
     }
@@ -105,6 +123,106 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     }
 
     @Override
+    public void initializeState(StateInitializationContext context) throws Exception {
+        super.initializeState(context);
+        pendingSchemaChanges = new HashMap<>();
+
+        // Initialize transformers early — needed for schema recalculation
+        initializeUdf();
+        this.transformers = createTransformers();
+
+        ListStateDescriptor<byte[]> descriptor =
+                new ListStateDescriptor<>(
+                        "postTransformSchemaState", BytePrimitiveArraySerializer.INSTANCE);
+        state = context.getOperatorStateStore().getUnionListState(descriptor);
+
+        if (context.isRestored()) {
+            for (byte[] serialized : state.get()) {
+                try {
+                    PostTransformChangeInfo restored =
+                            PostTransformChangeInfo.SERIALIZER.deserialize(
+                                    PostTransformChangeInfo.SERIALIZER.getVersion(), serialized);
+                    TableId tableId = restored.getTableId();
+                    Schema preSchema = restored.getPreTransformedSchema();
+                    Schema oldPostSchema = restored.getPostTransformedSchema();
+
+                    // Recalculate post-transform schema using current projection rules
+                    List<PostTransformer> effectiveTransformers = getEffectiveTransformers(tableId);
+                    Schema recalculatedPostSchema = preSchema;
+                    boolean hasAsterisk = true;
+                    List<String> projectedColumns = new ArrayList<>();
+
+                    if (!effectiveTransformers.isEmpty()) {
+                        List<Schema> schemas =
+                                effectiveTransformers.stream()
+                                        .map(trans -> transformSchema(preSchema, trans))
+                                        .collect(Collectors.toList());
+                        recalculatedPostSchema =
+                                SchemaUtils.ensurePkNonNull(
+                                        SchemaMergingUtils.strictlyMergeSchemas(schemas));
+                        hasAsterisk =
+                                effectiveTransformers.stream()
+                                        .map(PostTransformer::getProjection)
+                                        .flatMap(this::optionalToStream)
+                                        .map(TransformProjection::getProjection)
+                                        .anyMatch(TransformParser::hasAsterisk);
+                        projectedColumns =
+                                preSchema.getColumnNames().stream()
+                                        .filter(recalculatedPostSchema.getColumnNames()::contains)
+                                        .collect(Collectors.toList());
+                    }
+
+                    // Detect schema changes
+                    if (!oldPostSchema.equals(recalculatedPostSchema)) {
+                        List<SchemaChangeEvent> events =
+                                generateSchemaChangeEvents(
+                                        tableId, oldPostSchema, recalculatedPostSchema);
+                        if (!events.isEmpty()) {
+                            pendingSchemaChanges.put(tableId, events);
+                            LOG.info(
+                                    "Detected projection change for table {}: "
+                                            + "{} schema change events pending",
+                                    tableId,
+                                    events.size());
+                        }
+                    }
+
+                    // Update operator state with recalculated schema
+                    postTransformInfoMap.put(
+                            tableId,
+                            PostTransformChangeInfo.of(tableId, preSchema, recalculatedPostSchema));
+                    hasAsteriskMap.put(tableId, hasAsterisk);
+                    projectedColumnsMap.put(tableId, projectedColumns);
+
+                } catch (Exception e) {
+                    LOG.warn(
+                            "Failed to deserialize PostTransformChangeInfo from state, "
+                                    + "skipping entry (may be upgrading from version "
+                                    + "without state)",
+                            e);
+                }
+            }
+        }
+    }
+
+    @Override
+    public void snapshotState(StateSnapshotContext context) throws Exception {
+        super.snapshotState(context);
+        List<byte[]> serialized = new ArrayList<>();
+        for (Map.Entry<TableId, PostTransformChangeInfo> entry : postTransformInfoMap.entrySet()) {
+            try {
+                serialized.add(PostTransformChangeInfo.SERIALIZER.serialize(entry.getValue()));
+            } catch (IOException e) {
+                LOG.warn(
+                        "Failed to serialize PostTransformChangeInfo for table {}, skipping",
+                        entry.getKey(),
+                        e);
+            }
+        }
+        state.update(serialized);
+    }
+
+    @Override
     public void open() throws Exception {
         super.open();
 
@@ -112,10 +230,18 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         this.projectionProcessors = HashBasedTable.create();
         this.filterProcessors = HashBasedTable.create();
 
-        // Be sure to initialize UDF related fields before creating transformers
-        initializeUdf();
-
-        this.transformers = createTransformers();
+        if (pendingSchemaChanges == null) {
+            pendingSchemaChanges = new HashMap<>();
+        }
+        if (this.transformers == null) {
+            initializeUdf();
+            this.transformers = createTransformers();
+        }
+        if (!pendingSchemaChanges.isEmpty()) {
+            LOG.info(
+                    "PostTransformOperator restored with {} tables having pending schema changes",
+                    pendingSchemaChanges.size());
+        }
     }
 
     @Override
@@ -171,16 +297,24 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         }
 
         if (event instanceof CreateTableEvent) {
+            pendingSchemaChanges.remove(tableId);
+            invalidateCache(tableId);
             processCreateTableEvent((CreateTableEvent) event, transformers)
                     .map(StreamRecord::new)
                     .ifPresent(output::collect);
-            invalidateCache(tableId);
         } else if (event instanceof SchemaChangeEvent) {
+            invalidateCache(tableId);
             processSchemaChangeEvent((SchemaChangeEvent) event, transformers)
                     .map(StreamRecord::new)
                     .ifPresent(output::collect);
-            invalidateCache(tableId);
         } else if (event instanceof DataChangeEvent) {
+            // Emit pending schema changes before first data event for this table
+            List<SchemaChangeEvent> pending = pendingSchemaChanges.remove(tableId);
+            if (pending != null) {
+                for (SchemaChangeEvent pendingEvent : pending) {
+                    output.collect(new StreamRecord<>(pendingEvent));
+                }
+            }
             processDataChangeEvent((DataChangeEvent) event, transformers)
                     .map(StreamRecord::new)
                     .ifPresent(output::collect);
@@ -551,5 +685,52 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     private <T> Stream<T> optionalToStream(Optional<T> optional) {
         return optional.map(Stream::of).orElseGet(Stream::empty);
+    }
+
+    /**
+     * Generates {@link SchemaChangeEvent}s to evolve from {@code oldSchema} to {@code newSchema}.
+     */
+    private List<SchemaChangeEvent> generateSchemaChangeEvents(
+            TableId tableId, Schema oldSchema, Schema newSchema) {
+        List<SchemaChangeEvent> events = new ArrayList<>();
+
+        // Detect added columns
+        Set<String> oldColumnNames = new HashSet<>(oldSchema.getColumnNames());
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        List<Column> newColumns = newSchema.getColumns();
+        for (int i = 0; i < newColumns.size(); i++) {
+            Column col = newColumns.get(i);
+            if (!oldColumnNames.contains(col.getName())) {
+                if (i == 0) {
+                    addedColumns.add(AddColumnEvent.first(col));
+                } else if (i == newColumns.size() - 1) {
+                    addedColumns.add(AddColumnEvent.last(col));
+                } else {
+                    String prevColName = newColumns.get(i - 1).getName();
+                    if (oldColumnNames.contains(prevColName)) {
+                        addedColumns.add(AddColumnEvent.after(col, prevColName));
+                    } else {
+                        addedColumns.add(AddColumnEvent.last(col));
+                    }
+                }
+            }
+        }
+        if (!addedColumns.isEmpty()) {
+            events.add(new AddColumnEvent(tableId, addedColumns));
+        }
+
+        // Detect dropped columns
+        Set<String> newColumnNames = new HashSet<>(newSchema.getColumnNames());
+        List<String> droppedColumns = new ArrayList<>();
+        for (String oldColName : oldSchema.getColumnNames()) {
+            if (!newColumnNames.contains(oldColName)) {
+                droppedColumns.add(oldColName);
+            }
+        }
+        if (!droppedColumns.isEmpty()) {
+            events.add(new DropColumnEvent(tableId, droppedColumns));
+        }
+
+        return events;
     }
 }

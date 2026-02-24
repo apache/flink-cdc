@@ -22,10 +22,20 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.RowType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.serializer.TableIdSerializer;
+import org.apache.flink.cdc.runtime.serializer.schema.SchemaSerializer;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
+import org.apache.flink.core.io.SimpleVersionedSerializer;
+import org.apache.flink.core.memory.DataInputViewStreamWrapper;
+import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 
 import javax.annotation.Nullable;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +45,8 @@ import java.util.Map;
  * and binary record data generator for post-transform schema.
  */
 public class PostTransformChangeInfo {
+
+    public static final Serializer SERIALIZER = new Serializer();
 
     private final TableId tableId;
 
@@ -139,5 +151,58 @@ public class PostTransformChangeInfo {
 
     public BinaryRecordDataGenerator getPostTransformedRecordDataGenerator() {
         return postTransformedRecordDataGenerator;
+    }
+
+    /** Serializer for {@link PostTransformChangeInfo} with backward-compatible deserialization. */
+    public static class Serializer implements SimpleVersionedSerializer<PostTransformChangeInfo> {
+
+        private static final int CURRENT_VERSION = 2;
+        private static final TableId MAGIC_TABLE_ID = TableId.tableId("__magic_post_transform__");
+
+        @Override
+        public int getVersion() {
+            return CURRENT_VERSION;
+        }
+
+        @Override
+        public byte[] serialize(PostTransformChangeInfo changeInfo) throws IOException {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputViewStreamWrapper out =
+                    new DataOutputViewStreamWrapper(new DataOutputStream(baos));
+            // Write magic marker for format detection
+            TableIdSerializer.INSTANCE.serialize(MAGIC_TABLE_ID, out);
+            out.writeInt(CURRENT_VERSION);
+            // Write actual data
+            TableIdSerializer.INSTANCE.serialize(changeInfo.getTableId(), out);
+            SchemaSerializer.INSTANCE.serialize(changeInfo.getPreTransformedSchema(), out);
+            SchemaSerializer.INSTANCE.serialize(changeInfo.getPostTransformedSchema(), out);
+            return baos.toByteArray();
+        }
+
+        @Override
+        public PostTransformChangeInfo deserialize(int version, byte[] serialized)
+                throws IOException {
+            DataInputViewStreamWrapper in =
+                    new DataInputViewStreamWrapper(
+                            new DataInputStream(new ByteArrayInputStream(serialized)));
+            // Read first TableId to detect format
+            TableId firstTableId = TableIdSerializer.INSTANCE.deserialize(in);
+            TableId tableId;
+            Schema preSchema;
+            Schema postSchema;
+            if (MAGIC_TABLE_ID.equals(firstTableId)) {
+                // New format: magic marker present
+                int dataVersion = in.readInt();
+                tableId = TableIdSerializer.INSTANCE.deserialize(in);
+                preSchema = SchemaSerializer.INSTANCE.deserialize(in);
+                postSchema = SchemaSerializer.INSTANCE.deserialize(in);
+            } else {
+                // Old format: first TableId is the actual tableId
+                tableId = firstTableId;
+                preSchema = SchemaSerializer.INSTANCE.deserialize(in);
+                postSchema = SchemaSerializer.INSTANCE.deserialize(in);
+            }
+            return PostTransformChangeInfo.of(tableId, preSchema, postSchema);
+        }
     }
 }

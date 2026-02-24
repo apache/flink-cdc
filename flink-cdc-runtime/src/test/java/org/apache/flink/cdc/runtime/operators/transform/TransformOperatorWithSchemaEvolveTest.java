@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -921,5 +922,452 @@ class TransformOperatorWithSchemaEvolveTest {
                 .expectInPreTransformed(40, 3, 6, 9, "class0")
                 .expectNothingInPostTransformed()
                 .runTests("schema evolution with mapped column names");
+    }
+
+    // ========================================================================================
+    // Tests for generateSchemaChangeEvents and pending schema changes (FLINK-38828)
+    // ========================================================================================
+
+    /** Helper to invoke the private {@code generateSchemaChangeEvents} method via reflection. */
+    @SuppressWarnings("unchecked")
+    private static List<SchemaChangeEvent> invokeGenerateSchemaChangeEvents(
+            PostTransformOperator operator, TableId tableId, Schema oldSchema, Schema newSchema)
+            throws Exception {
+        Method method =
+                PostTransformOperator.class.getDeclaredMethod(
+                        "generateSchemaChangeEvents", TableId.class, Schema.class, Schema.class);
+        method.setAccessible(true);
+        return (List<SchemaChangeEvent>) method.invoke(operator, tableId, oldSchema, newSchema);
+    }
+
+    /** Tests that generateSchemaChangeEvents produces correct AddColumnEvent. */
+    @Test
+    void testGenerateSchemaChangeEventsAddColumn() throws Exception {
+        TableId tableId = TableId.tableId("ns", "sch", "tbl");
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        Schema oldSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        Schema newSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+
+        List<SchemaChangeEvent> events =
+                invokeGenerateSchemaChangeEvents(operator, tableId, oldSchema, newSchema);
+
+        Assertions.assertThat(events).hasSize(1);
+        Assertions.assertThat(events.get(0)).isInstanceOf(AddColumnEvent.class);
+
+        AddColumnEvent addEvent = (AddColumnEvent) events.get(0);
+        Assertions.assertThat(addEvent.tableId()).isEqualTo(tableId);
+        Assertions.assertThat(addEvent.getAddedColumns()).hasSize(1);
+
+        AddColumnEvent.ColumnWithPosition colWithPos = addEvent.getAddedColumns().get(0);
+        Assertions.assertThat(colWithPos.getAddColumn().getName()).isEqualTo("age");
+        Assertions.assertThat(colWithPos.getAddColumn().getType()).isEqualTo(DataTypes.INT());
+        // "age" is the last column, so it should be positioned LAST
+        Assertions.assertThat(colWithPos.getPosition())
+                .isEqualTo(AddColumnEvent.ColumnPosition.LAST);
+    }
+
+    /**
+     * Tests that generateSchemaChangeEvents produces correct AddColumnEvent with AFTER position.
+     */
+    @Test
+    void testGenerateSchemaChangeEventsAddColumnAfter() throws Exception {
+        TableId tableId = TableId.tableId("ns", "sch", "tbl");
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        Schema oldSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("extra", DataTypes.DOUBLE())
+                        .primaryKey("id")
+                        .build();
+        // Insert "age" between "name" and "extra"
+        Schema newSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .physicalColumn("extra", DataTypes.DOUBLE())
+                        .primaryKey("id")
+                        .build();
+
+        List<SchemaChangeEvent> events =
+                invokeGenerateSchemaChangeEvents(operator, tableId, oldSchema, newSchema);
+
+        Assertions.assertThat(events).hasSize(1);
+        Assertions.assertThat(events.get(0)).isInstanceOf(AddColumnEvent.class);
+
+        AddColumnEvent addEvent = (AddColumnEvent) events.get(0);
+        AddColumnEvent.ColumnWithPosition colWithPos = addEvent.getAddedColumns().get(0);
+        Assertions.assertThat(colWithPos.getAddColumn().getName()).isEqualTo("age");
+        Assertions.assertThat(colWithPos.getPosition())
+                .isEqualTo(AddColumnEvent.ColumnPosition.AFTER);
+        Assertions.assertThat(colWithPos.getExistedColumnName()).isEqualTo("name");
+    }
+
+    /** Tests that generateSchemaChangeEvents produces correct DropColumnEvent. */
+    @Test
+    void testGenerateSchemaChangeEventsDropColumn() throws Exception {
+        TableId tableId = TableId.tableId("ns", "sch", "tbl");
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        Schema oldSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        Schema newSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        List<SchemaChangeEvent> events =
+                invokeGenerateSchemaChangeEvents(operator, tableId, oldSchema, newSchema);
+
+        Assertions.assertThat(events).hasSize(1);
+        Assertions.assertThat(events.get(0)).isInstanceOf(DropColumnEvent.class);
+
+        DropColumnEvent dropEvent = (DropColumnEvent) events.get(0);
+        Assertions.assertThat(dropEvent.tableId()).isEqualTo(tableId);
+        Assertions.assertThat(dropEvent.getDroppedColumnNames()).containsExactly("age");
+    }
+
+    /** Tests that generateSchemaChangeEvents handles mixed add and drop changes. */
+    @Test
+    void testGenerateSchemaChangeEventsMixedChanges() throws Exception {
+        TableId tableId = TableId.tableId("ns", "sch", "tbl");
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        Schema oldSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("old_col", DataTypes.FLOAT())
+                        .primaryKey("id")
+                        .build();
+        Schema newSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("new_col", DataTypes.DOUBLE())
+                        .primaryKey("id")
+                        .build();
+
+        List<SchemaChangeEvent> events =
+                invokeGenerateSchemaChangeEvents(operator, tableId, oldSchema, newSchema);
+
+        // Should produce both AddColumnEvent and DropColumnEvent
+        Assertions.assertThat(events).hasSize(2);
+
+        // First event should be AddColumnEvent (added columns are processed first)
+        Assertions.assertThat(events.get(0)).isInstanceOf(AddColumnEvent.class);
+        AddColumnEvent addEvent = (AddColumnEvent) events.get(0);
+        Assertions.assertThat(addEvent.getAddedColumns()).hasSize(1);
+        Assertions.assertThat(addEvent.getAddedColumns().get(0).getAddColumn().getName())
+                .isEqualTo("new_col");
+
+        // Second event should be DropColumnEvent
+        Assertions.assertThat(events.get(1)).isInstanceOf(DropColumnEvent.class);
+        DropColumnEvent dropEvent = (DropColumnEvent) events.get(1);
+        Assertions.assertThat(dropEvent.getDroppedColumnNames()).containsExactly("old_col");
+    }
+
+    /** Tests that generateSchemaChangeEvents returns empty list when schemas are identical. */
+    @Test
+    void testGenerateSchemaChangeEventsNoChanges() throws Exception {
+        TableId tableId = TableId.tableId("ns", "sch", "tbl");
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        List<SchemaChangeEvent> events =
+                invokeGenerateSchemaChangeEvents(operator, tableId, schema, schema);
+
+        Assertions.assertThat(events).isEmpty();
+    }
+
+    /** Tests that generateSchemaChangeEvents positions first column correctly. */
+    @Test
+    void testGenerateSchemaChangeEventsAddColumnFirst() throws Exception {
+        TableId tableId = TableId.tableId("ns", "sch", "tbl");
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        Schema oldSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        // Add "new_first" at position 0
+        Schema newSchema =
+                Schema.newBuilder()
+                        .physicalColumn("new_first", DataTypes.BIGINT())
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        List<SchemaChangeEvent> events =
+                invokeGenerateSchemaChangeEvents(operator, tableId, oldSchema, newSchema);
+
+        Assertions.assertThat(events).hasSize(1);
+        AddColumnEvent addEvent = (AddColumnEvent) events.get(0);
+        AddColumnEvent.ColumnWithPosition colWithPos = addEvent.getAddedColumns().get(0);
+        Assertions.assertThat(colWithPos.getAddColumn().getName()).isEqualTo("new_first");
+        Assertions.assertThat(colWithPos.getPosition())
+                .isEqualTo(AddColumnEvent.ColumnPosition.FIRST);
+    }
+
+    /**
+     * Tests that pending schema changes are emitted before the first DataChangeEvent for a table.
+     */
+    @Test
+    void testPendingSchemaChangesEmittedBeforeDataEvent() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "pending_test");
+
+        // Build operator with projection "id, name, age"
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name, age", null)
+                        .build();
+
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(operator, 1);
+        harness.open();
+
+        // First, send a CreateTableEvent to establish the schema
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        operator.processElement(new StreamRecord<>(new CreateTableEvent(tableId, initialSchema)));
+
+        // Consume the CreateTableEvent output
+        Event createOutput = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(createOutput).isInstanceOf(CreateTableEvent.class);
+
+        // Now manually inject pending schema changes via reflection
+        java.lang.reflect.Field pendingField =
+                PostTransformOperator.class.getDeclaredField("pendingSchemaChanges");
+        pendingField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Map<TableId, List<SchemaChangeEvent>> pendingMap =
+                (java.util.Map<TableId, List<SchemaChangeEvent>>) pendingField.get(operator);
+
+        List<SchemaChangeEvent> pendingEvents = new ArrayList<>();
+        pendingEvents.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("extra", DataTypes.DOUBLE()),
+                                        AddColumnEvent.ColumnPosition.LAST,
+                                        null))));
+        pendingMap.put(tableId, pendingEvents);
+
+        // Send a DataChangeEvent — pending changes should be emitted first
+        Schema postSchema = ((CreateTableEvent) createOutput).getSchema();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator((RowType) postSchema.toRowDataType());
+        DataChangeEvent dataEvent =
+                DataChangeEvent.insertEvent(
+                        tableId,
+                        generator.generate(new Object[] {1, new BinaryStringData("Alice"), 30}));
+        operator.processElement(new StreamRecord<>(dataEvent));
+
+        // The first output should be the pending AddColumnEvent
+        Event firstOutput = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(firstOutput).isInstanceOf(AddColumnEvent.class);
+        AddColumnEvent emittedAdd = (AddColumnEvent) firstOutput;
+        Assertions.assertThat(emittedAdd.getAddedColumns().get(0).getAddColumn().getName())
+                .isEqualTo("extra");
+
+        // The second output should be the DataChangeEvent
+        Event secondOutput = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(secondOutput).isInstanceOf(DataChangeEvent.class);
+
+        // Pending map should be cleared for this table
+        Assertions.assertThat(pendingMap).doesNotContainKey(tableId);
+
+        harness.close();
+    }
+
+    /** Tests that CreateTableEvent clears pending schema changes for a table. */
+    @Test
+    void testCreateTableEventClearsPendingChanges() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "clear_test");
+
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(operator, 1);
+        harness.open();
+
+        // First, send a CreateTableEvent to establish the schema
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        operator.processElement(new StreamRecord<>(new CreateTableEvent(tableId, initialSchema)));
+        harness.getOutputRecords().poll(); // consume CreateTableEvent output
+
+        // Inject pending schema changes via reflection
+        java.lang.reflect.Field pendingField =
+                PostTransformOperator.class.getDeclaredField("pendingSchemaChanges");
+        pendingField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Map<TableId, List<SchemaChangeEvent>> pendingMap =
+                (java.util.Map<TableId, List<SchemaChangeEvent>>) pendingField.get(operator);
+
+        List<SchemaChangeEvent> pendingEvents = new ArrayList<>();
+        pendingEvents.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("stale_col", DataTypes.STRING()),
+                                        AddColumnEvent.ColumnPosition.LAST,
+                                        null))));
+        pendingMap.put(tableId, pendingEvents);
+
+        // Verify pending changes exist
+        Assertions.assertThat(pendingMap).containsKey(tableId);
+
+        // Send a new CreateTableEvent — this should clear pending changes
+        Schema newSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("email", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        operator.processElement(new StreamRecord<>(new CreateTableEvent(tableId, newSchema)));
+
+        // Pending changes should be cleared
+        Assertions.assertThat(pendingMap).doesNotContainKey(tableId);
+
+        // The output should be the new CreateTableEvent (not the stale pending AddColumnEvent)
+        Event output = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(output).isInstanceOf(CreateTableEvent.class);
+
+        // No more pending events should be in the output
+        Assertions.assertThat(harness.getOutputRecords()).isEmpty();
+
+        harness.close();
+    }
+
+    /** Tests that multiple pending schema changes are emitted in order. */
+    @Test
+    void testMultiplePendingSchemaChangesEmittedInOrder() throws Exception {
+        TableId tableId = TableId.tableId("my_company", "my_branch", "multi_pending");
+
+        PostTransformOperator operator =
+                PostTransformOperator.newBuilder()
+                        .addTransform(tableId.identifier(), "id, name", null)
+                        .build();
+
+        RegularEventOperatorTestHarness<PostTransformOperator, Event> harness =
+                RegularEventOperatorTestHarness.with(operator, 1);
+        harness.open();
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+        operator.processElement(new StreamRecord<>(new CreateTableEvent(tableId, initialSchema)));
+        harness.getOutputRecords().poll(); // consume CreateTableEvent
+
+        // Inject multiple pending schema changes
+        java.lang.reflect.Field pendingField =
+                PostTransformOperator.class.getDeclaredField("pendingSchemaChanges");
+        pendingField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        java.util.Map<TableId, List<SchemaChangeEvent>> pendingMap =
+                (java.util.Map<TableId, List<SchemaChangeEvent>>) pendingField.get(operator);
+
+        List<SchemaChangeEvent> pendingEvents = new ArrayList<>();
+        pendingEvents.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("col_a", DataTypes.INT()),
+                                        AddColumnEvent.ColumnPosition.LAST,
+                                        null))));
+        pendingEvents.add(new DropColumnEvent(tableId, Collections.singletonList("old_col")));
+        pendingMap.put(tableId, pendingEvents);
+
+        // Send a DataChangeEvent to trigger emission
+        Schema postSchema =
+                ((CreateTableEvent) new CreateTableEvent(tableId, initialSchema)).getSchema();
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator((RowType) postSchema.toRowDataType());
+        DataChangeEvent dataEvent =
+                DataChangeEvent.insertEvent(
+                        tableId, generator.generate(new Object[] {1, new BinaryStringData("Bob")}));
+        operator.processElement(new StreamRecord<>(dataEvent));
+
+        // First output: AddColumnEvent
+        Event first = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(first).isInstanceOf(AddColumnEvent.class);
+
+        // Second output: DropColumnEvent
+        Event second = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(second).isInstanceOf(DropColumnEvent.class);
+
+        // Third output: DataChangeEvent
+        Event third = harness.getOutputRecords().poll().getValue();
+        Assertions.assertThat(third).isInstanceOf(DataChangeEvent.class);
+
+        harness.close();
     }
 }
