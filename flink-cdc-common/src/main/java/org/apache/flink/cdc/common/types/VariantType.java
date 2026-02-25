@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.common.types;
 
-import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.cdc.common.annotation.PublicEvolving;
 
 import java.util.Collections;
 import java.util.List;
