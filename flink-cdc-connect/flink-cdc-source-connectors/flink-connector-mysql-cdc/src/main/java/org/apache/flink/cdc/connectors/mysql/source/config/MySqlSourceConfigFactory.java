@@ -504,7 +504,7 @@ public class MySqlSourceConfigFactory implements Serializable {
         LOG.debug("After replacing comma with pipe separator: {}", tables);
 
         // Step 2: Replace escaped dot \. with placeholder
-        // In Flink CDC, \. means any character in regex, in Debezium it should be .
+        // In Flink CDC, \. means a literal dot in regex, in Debezium it should be . (any character).
         String unescapedTables = tables.replace("\\.", "$");
         LOG.debug("After unescaping dots as RegEx meta-character: {}", unescapedTables);
 

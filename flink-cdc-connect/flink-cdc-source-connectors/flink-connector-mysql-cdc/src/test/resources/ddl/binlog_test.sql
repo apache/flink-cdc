@@ -25,8 +25,8 @@
 -- 4. Non-matching tables are not captured
 --
 -- IMPORTANT: This SQL file defines the initial schema for reference and documentation.
--- The actual test creates tables dynamically during execution to validate binlog-only capture.
--- The initial_table is crea1ted in @BeforeEach to ensure binlog is active before CDC source starts.
+-- The actual test created tables dynamically during execution to validate binlog-only capture.
+-- The initial_table is created in @BeforeEach to ensure binlog is active before CDC source starts.
 
 -- Initial table to activate binlog
 -- This table is actually created in test code, but defined here for reference
