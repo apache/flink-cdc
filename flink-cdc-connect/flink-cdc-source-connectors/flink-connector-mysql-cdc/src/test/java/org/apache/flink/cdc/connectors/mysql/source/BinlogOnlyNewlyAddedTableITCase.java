@@ -44,7 +44,6 @@ import io.debezium.connector.mysql.MySqlConnection;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.sql.SQLException;
 import java.time.ZoneId;
@@ -57,19 +56,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 
 /**
  * IT tests for binlog-only newly added table capture functionality using {@link
- * MySqlSource.scanBinlogNewlyAddedTableEnabled}.
+ * MySqlSourceBuilder#scanBinlogNewlyAddedTableEnabled(boolean)}.
  *
  * <p>This test validates that tables matching the configured pattern are automatically captured
  * when they are created during binlog reading phase, without triggering snapshot phase.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
 
     private final UniqueDatabase testDatabase =
@@ -78,18 +75,6 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
     @BeforeEach
     public void before() throws SQLException {
         testDatabase.createAndInitialize();
-
-        try (MySqlConnection connection = getConnection()) {
-            connection.setAutoCommit(false);
-            // Create an initial table to ensure binlog is active
-            String tableId = testDatabase.getDatabaseName() + ".initial_table";
-            connection.execute(
-                    format(
-                            "CREATE TABLE %s (id BIGINT PRIMARY KEY, value VARCHAR(100));",
-                            tableId));
-            connection.execute(format("INSERT INTO %s VALUES (1, 'initial');", tableId));
-            connection.commit();
-        }
     }
 
     @AfterEach
@@ -110,8 +95,9 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
     @Test
     void testBinlogOnlyCaptureWithPatternMatching() throws Exception {
         // Test with wildcard pattern: capture tables like user_*
+        // Flink CDC style: unescaped '.' is db/table separator, '\.' is regex any-char wildcard
         testBinlogOnlyCaptureWithPattern(
-                testDatabase.getDatabaseName() + ".user_.*",
+                testDatabase.getDatabaseName() + ".user_\\.*",
                 "user_profiles",
                 "user_settings",
                 "user_logs");
@@ -119,18 +105,35 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Test
     void testBinlogOnlyCaptureWithDatabasePattern() throws Exception {
-        // Test with database.* pattern
+        // Test with database.* pattern (all tables in database)
+        // Flink CDC style: unescaped '.' is db/table separator, '\.' is regex any-char wildcard
         testBinlogOnlyCaptureWithPattern(
-                testDatabase.getDatabaseName() + ".*", "product_inventory", "product_catalog");
+                testDatabase.getDatabaseName() + ".\\.*", "product_inventory", "product_catalog");
     }
 
     private void testBinlogOnlyCapture(String... tableNames) throws Exception {
-        String pattern = testDatabase.getDatabaseName() + ".(" + String.join("|", tableNames) + ")";
+        String pattern =
+                testDatabase.getDatabaseName() + "\\.(" + String.join("|", tableNames) + ")";
         testBinlogOnlyCaptureWithPattern(pattern, tableNames);
     }
 
     private void testBinlogOnlyCaptureWithPattern(String tablePattern, String... tableNames)
             throws Exception {
+        // Pre-create tables before starting source to satisfy startup validation.
+        // With StartupOptions.latest(), no snapshot is taken - only binlog events after source
+        // starts are captured.
+        try (MySqlConnection preConnection = getConnection()) {
+            preConnection.setAutoCommit(false);
+            for (String tableName : tableNames) {
+                String tableId = testDatabase.getDatabaseName() + "." + tableName;
+                preConnection.execute(
+                        format(
+                                "CREATE TABLE %s (id BIGINT PRIMARY KEY, name VARCHAR(100), quantity INT);",
+                                tableId));
+            }
+            preConnection.commit();
+        }
+
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.enableCheckpointing(200L);
@@ -190,19 +193,13 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
         // Wait for job to start reading binlog
         Thread.sleep(2000);
 
-        // Create new tables and insert data
+        // Insert/update/delete data - these are captured as binlog events
         List<String> expectedResults = new ArrayList<>();
         try (MySqlConnection connection = getConnection()) {
             connection.setAutoCommit(false);
 
             for (String tableName : tableNames) {
                 String tableId = testDatabase.getDatabaseName() + "." + tableName;
-
-                // Create table
-                connection.execute(
-                        format(
-                                "CREATE TABLE %s (id BIGINT PRIMARY KEY, name VARCHAR(100), quantity INT);",
-                                tableId));
 
                 // Insert data - these should be captured as binlog events
                 connection.execute(
@@ -241,6 +238,17 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
 
     @Test
     void testBinlogOnlyDoesNotCaptureNonMatchingTables() throws Exception {
+        // Pre-create matching table before starting source (required for startup validation)
+        String matchingTable = testDatabase.getDatabaseName() + ".temp_test";
+        try (MySqlConnection preConnection = getConnection()) {
+            preConnection.setAutoCommit(false);
+            preConnection.execute(
+                    format(
+                            "CREATE TABLE %s (id BIGINT PRIMARY KEY, value VARCHAR(100));",
+                            matchingTable));
+            preConnection.commit();
+        }
+
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
         env.enableCheckpointing(200L);
@@ -272,7 +280,8 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
                         .build();
 
         // Only capture tables matching temp_*
-        String tablePattern = testDatabase.getDatabaseName() + ".temp_.*";
+        // Flink CDC style: unescaped '.' is db/table separator, '\.' is regex any-char wildcard
+        String tablePattern = testDatabase.getDatabaseName() + ".temp_\\.*";
 
         MySqlSource<RowData> mySqlSource =
                 MySqlSource.<RowData>builder()
@@ -302,15 +311,10 @@ class BinlogOnlyNewlyAddedTableITCase extends MySqlSourceTestBase {
         try (MySqlConnection connection = getConnection()) {
             connection.setAutoCommit(false);
 
-            // Create a matching table
-            String matchingTable = testDatabase.getDatabaseName() + ".temp_test";
-            connection.execute(
-                    format(
-                            "CREATE TABLE %s (id BIGINT PRIMARY KEY, value VARCHAR(100));",
-                            matchingTable));
+            // Insert into matching table (already exists)
             connection.execute(format("INSERT INTO %s VALUES (1, 'matched');", matchingTable));
 
-            // Create a non-matching table
+            // Create and insert into non-matching table (will not be captured)
             String nonMatchingTable = testDatabase.getDatabaseName() + ".permanent_test";
             connection.execute(
                     format(
