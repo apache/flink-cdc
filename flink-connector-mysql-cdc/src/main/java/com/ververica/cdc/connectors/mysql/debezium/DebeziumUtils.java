@@ -112,10 +112,10 @@ public class DebeziumUtils {
 
     /** Fetch current binlog offsets in MySql Server. */
     public static BinlogOffset currentBinlogOffset(JdbcConnection jdbc) {
-        final String showMasterStmt = "SHOW MASTER STATUS";
+        final String query = getBinlogStatusQuery(jdbc);
         try {
             return jdbc.queryAndMap(
-                    showMasterStmt,
+                    query,
                     rs -> {
                         if (rs.next()) {
                             final String binlogFilename = rs.getString(1);
@@ -129,17 +129,44 @@ public class DebeziumUtils {
                         } else {
                             throw new FlinkRuntimeException(
                                     "Cannot read the binlog filename and position via '"
-                                            + showMasterStmt
+                                            + query
                                             + "'. Make sure your server is correctly configured");
                         }
                     });
         } catch (SQLException e) {
             throw new FlinkRuntimeException(
                     "Cannot read the binlog filename and position via '"
-                            + showMasterStmt
+                            + query
                             + "'. Make sure your server is correctly configured",
                     e);
         }
+    }
+
+    /**
+     * Returns the appropriate binlog status query based on MySQL version. MySQL 8.4+ uses SHOW
+     * BINARY LOG STATUS; MySQL 8.0 and below use SHOW MASTER STATUS.
+     */
+    private static String getBinlogStatusQuery(JdbcConnection jdbc) {
+        try {
+            String version =
+                    jdbc.queryAndMap(
+                            "SELECT VERSION()",
+                            rs -> {
+                                if (rs.next()) {
+                                    return rs.getString(1);
+                                }
+                                return "";
+                            });
+            if (version != null
+                    && (version.startsWith("8.4")
+                            || version.startsWith("8.5")
+                            || version.startsWith("9."))) {
+                return "SHOW BINARY LOG STATUS";
+            }
+        } catch (Exception e) {
+            // Ignore exception, use default command
+        }
+        return "SHOW MASTER STATUS";
     }
 
     /** Create a TableFilter by database name and table name. */

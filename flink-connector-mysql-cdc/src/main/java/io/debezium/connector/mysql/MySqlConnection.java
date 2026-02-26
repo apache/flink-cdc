@@ -273,8 +273,9 @@ public class MySqlConnection extends JdbcConnection {
      */
     public String knownGtidSet() {
         try {
+            String query = getBinlogStatusQuery();
             return queryAndMap(
-                    "SHOW MASTER STATUS",
+                    query,
                     rs -> {
                         if (rs.next() && rs.getMetaData().getColumnCount() > 4) {
                             return rs.getString(
@@ -286,6 +287,33 @@ public class MySqlConnection extends JdbcConnection {
             throw new DebeziumException(
                     "Unexpected error while connecting to MySQL and looking at GTID mode: ", e);
         }
+    }
+
+    /**
+     * Returns the appropriate binlog status query based on MySQL version. MySQL 8.4+ uses SHOW
+     * BINARY LOG STATUS; MySQL 8.0 and below use SHOW MASTER STATUS.
+     */
+    private String getBinlogStatusQuery() {
+        try {
+            String version =
+                    queryAndMap(
+                            "SELECT VERSION()",
+                            rs -> {
+                                if (rs.next()) {
+                                    return rs.getString(1);
+                                }
+                                return "";
+                            });
+            if (version != null
+                    && (version.startsWith("8.4")
+                            || version.startsWith("8.5")
+                            || version.startsWith("9."))) {
+                return "SHOW BINARY LOG STATUS";
+            }
+        } catch (Exception e) {
+            // Ignore exception, use default command
+        }
+        return "SHOW MASTER STATUS";
     }
 
     /**
