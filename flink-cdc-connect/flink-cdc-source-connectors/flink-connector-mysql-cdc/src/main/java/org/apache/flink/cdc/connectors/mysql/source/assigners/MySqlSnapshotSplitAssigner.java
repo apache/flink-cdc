@@ -390,11 +390,12 @@ public class MySqlSnapshotSplitAssigner implements MySqlSplitAssigner {
                 new ArrayList<>(assignedSplits.values());
         List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos = new ArrayList<>();
         for (MySqlSchemalessSnapshotSplit split : assignedSnapshotSplit) {
-            BinlogOffset binlogOffset = splitFinishedOffsets.get(split.splitId());
+            String splitId = split.splitId();
+            BinlogOffset binlogOffset = splitFinishedOffsets.get(splitId);
             finishedSnapshotSplitInfos.add(
                     new FinishedSnapshotSplitInfo(
                             split.getTableId(),
-                            split.splitId(),
+                            splitId,
                             split.getSplitStart(),
                             split.getSplitEnd(),
                             binlogOffset));
