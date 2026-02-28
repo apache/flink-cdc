@@ -981,10 +981,10 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                 new CreateTableEvent(
                         TableId.tableId("DEBEZIUM", "MYLAKE"),
                         Schema.newBuilder()
-                                .physicalColumn("feature_id", DataTypes.BIGINT().notNull())
-                                .physicalColumn("name", DataTypes.VARCHAR(32))
-                                .physicalColumn("shape", DataTypes.STRING())
-                                .primaryKey(Arrays.asList("feature_id"))
+                                .physicalColumn("FEATURE_ID", DataTypes.BIGINT().notNull())
+                                .physicalColumn("NAME", DataTypes.VARCHAR(32))
+                                .physicalColumn("SHAPE", DataTypes.STRING())
+                                .primaryKey(Arrays.asList("FEATURE_ID"))
                                 .build());
 
         RowType rowType =
@@ -1568,11 +1568,11 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
         return new CreateTableEvent(
                 tableId,
                 Schema.newBuilder()
-                        .physicalColumn("id", DataTypes.BIGINT().notNull())
-                        .physicalColumn("name", DataTypes.VARCHAR(255).notNull())
-                        .physicalColumn("description", DataTypes.VARCHAR(512))
-                        .physicalColumn("weight", DataTypes.FLOAT())
-                        .primaryKey(Collections.singletonList("id"))
+                        .physicalColumn("ID", DataTypes.BIGINT().notNull())
+                        .physicalColumn("NAME", DataTypes.VARCHAR(255).notNull())
+                        .physicalColumn("DESCRIPTION", DataTypes.VARCHAR(512))
+                        .physicalColumn("WEIGHT", DataTypes.FLOAT())
+                        .primaryKey(Collections.singletonList("ID"))
                         .build());
     }
 

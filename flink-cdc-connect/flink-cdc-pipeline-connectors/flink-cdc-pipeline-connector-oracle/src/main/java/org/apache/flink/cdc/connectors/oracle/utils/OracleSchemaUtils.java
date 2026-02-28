@@ -158,7 +158,7 @@ public class OracleSchemaUtils {
             DataType dataType = OracleTypeUtils.fromDbzColumn(column);
             org.apache.flink.cdc.common.schema.Column cdcColumn =
                     org.apache.flink.cdc.common.schema.Column.physicalColumn(
-                            column.name().toLowerCase(Locale.ROOT), dataType);
+                            column.name(), dataType);
             list.add(cdcColumn);
         }
         return Schema.newBuilder().setColumns(list).primaryKey(pks).build();
@@ -181,7 +181,7 @@ public class OracleSchemaUtils {
                         while (rs.next()) {
                             String columnName;
                             columnName = rs.getString(1);
-                            list.add(columnName.toLowerCase(Locale.ROOT));
+                            list.add(columnName);
                         }
                         return list;
                     });
