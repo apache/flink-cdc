@@ -577,4 +577,105 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
 
         assertEqualsInOrder(expected, actual);
     }
+
+    /** Microsecond variant: '0000-00-00 00:00:00.000000'. */
+    private static final String INVALID_DATETIME_WITH_MICROS = "0000-00-00 00:00:00.000000";
+
+    @Test
+    void testMysqlDefaultTimestampValueWithMicrosInCreateTable() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .column(
+                                new PhysicalColumn(
+                                        "created_time",
+                                        DataTypes.TIMESTAMP(6),
+                                        null,
+                                        INVALID_DATETIME_WITH_MICROS))
+                        .column(
+                                new PhysicalColumn(
+                                        "updated_time",
+                                        DataTypes.TIMESTAMP_LTZ(6),
+                                        null,
+                                        INVALID_DATETIME_WITH_MICROS))
+                        .primaryKey("id")
+                        .build();
+
+        runJobWithEvents(Collections.singletonList(new CreateTableEvent(tableId, schema)));
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "name | varchar(150) | YES | false | null",
+                        "created_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME,
+                        "updated_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
+    }
+
+    @Test
+    void testMysqlDefaultTimestampValueWithMicrosInAddColumn() throws Exception {
+        TableId tableId =
+                TableId.tableId(
+                        StarRocksContainer.STARROCKS_DATABASE_NAME,
+                        StarRocksContainer.STARROCKS_TABLE_NAME);
+
+        Schema initialSchema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(50), null))
+                        .primaryKey("id")
+                        .build();
+
+        List<Event> events = new ArrayList<>();
+        events.add(new CreateTableEvent(tableId, initialSchema));
+
+        PhysicalColumn createdTimeCol =
+                new PhysicalColumn(
+                        "created_time", DataTypes.TIMESTAMP(6), null, INVALID_DATETIME_WITH_MICROS);
+
+        PhysicalColumn updatedTimeCol =
+                new PhysicalColumn(
+                        "updated_time",
+                        DataTypes.TIMESTAMP_LTZ(6),
+                        null,
+                        INVALID_DATETIME_WITH_MICROS);
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(createdTimeCol))));
+
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(updatedTimeCol))));
+
+        runJobWithEvents(events);
+
+        List<String> actual = inspectTableSchema(tableId);
+
+        List<String> expected =
+                Arrays.asList(
+                        "id | int | NO | true | null",
+                        "name | varchar(150) | YES | false | null",
+                        "created_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME,
+                        "updated_time | datetime | YES | false | "
+                                + StarRocksUtils.DEFAULT_DATETIME);
+
+        assertEqualsInOrder(expected, actual);
+    }
 }
