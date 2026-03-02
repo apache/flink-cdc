@@ -207,7 +207,7 @@ Pipeline 连接器配置项
     </tr>
     <tr>
       <td>TIMESTAMP</td>
-      <td>DATETIME</td>
+      <td>TIMESTAMP</td>
       <td></td>
     </tr>
     <tr>
@@ -223,6 +223,11 @@ Pipeline 连接器配置项
     <tr>
       <td>VARCHAR(n)</td>
       <td>VARCHAR(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARIANT</td>
+      <td>VARIANT</td>
       <td></td>
     </tr>
     </tbody>

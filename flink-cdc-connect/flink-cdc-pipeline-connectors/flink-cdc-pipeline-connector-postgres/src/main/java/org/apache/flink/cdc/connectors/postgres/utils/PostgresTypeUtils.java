@@ -159,6 +159,7 @@ public class PostgresTypeUtils {
             case PgOid.DATERANGE_OID:
                 return DataTypes.STRING();
             case PgOid.TEXT_ARRAY:
+            case PgOid.UUID_ARRAY:
                 return DataTypes.ARRAY(DataTypes.STRING());
             case PgOid.TIMESTAMP:
                 return handleTimestampWithTemporalMode(temporalPrecisionMode, scale);

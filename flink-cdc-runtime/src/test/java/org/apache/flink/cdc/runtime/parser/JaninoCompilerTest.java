@@ -116,7 +116,7 @@ class JaninoCompilerTest {
     }
 
     @Test
-    void testBuildInFunction() throws InvocationTargetException, IOException {
+    void testBuiltInFunction() throws InvocationTargetException, IOException {
         String expression = "ceil(2.4)";
         List<String> columnNames = new ArrayList<>();
         List<Class<?>> paramTypes = new ArrayList<>();

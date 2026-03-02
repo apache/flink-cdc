@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
  * {@link JdbcConnection} connection extension used for connecting to Postgres instances.
  *
  * @author Horia Chiorean
- *     <p>Copied from Debezium 1.9.8-Final with three additional methods:
+ *     <p>Copied from Debezium 1.9.8-Final with the following modifications:
  *     <ul>
  *       <li>Constructor PostgresConnection( Configuration config, PostgresValueConverterBuilder
  *           valueConverterBuilder, ConnectionFactory factory) to allow passing a custom
@@ -66,6 +66,13 @@ import java.util.regex.Pattern;
  *       <li>override isTableUniqueIndexIncluded: Copied DBZ-5398 from Debezium 2.0.0.Final to fix
  *           https://github.com/ververica/flink-cdc-connectors/issues/2710. Remove this comment
  *           after bumping debezium version to 2.0.0.Final.
+ *       <li>FLINK-38965: Modified doReadTableColumn to filter out columns from other tables that
+ *           might be returned due to PostgreSQL LIKE wildcard matching. The underscore '_' matches
+ *           any single character, and '%' matches any sequence of characters. For example, when
+ *           querying table 'user_sink', the LIKE pattern may also match 'userbsink' (due to '_');
+ *           when querying table 'user%data' (where % is a literal character in the table name), the
+ *           LIKE pattern may also match 'user_test_data' (due to '%'). See also:
+ *           https://github.com/debezium/debezium/blob/main/debezium-core/src/main/java/io/debezium/jdbc/JdbcConnection.java#L1327
  *     </ul>
  */
 public class PostgresConnection extends JdbcConnection {
@@ -696,6 +703,17 @@ public class PostgresConnection extends JdbcConnection {
     private Optional<ColumnEditor> doReadTableColumn(
             ResultSet columnMetadata, TableId tableId, Tables.ColumnNameFilter columnFilter)
             throws SQLException {
+        // FLINK-38965: Filter out columns from other tables that might be returned due to
+        // PostgreSQL LIKE wildcard matching. The underscore '_' matches any single character,
+        // and '%' matches any sequence of characters. For example:
+        // - When querying 'user_sink', the pattern may also match 'userbsink' (due to '_')
+        // - When querying 'user%data' (where % is literal), it may match 'user_test_data' (due to
+        // '%')
+        final String resultTableName = columnMetadata.getString(3);
+        if (!tableId.table().equals(resultTableName)) {
+            return Optional.empty();
+        }
+
         final String columnName = columnMetadata.getString(4);
         if (columnFilter == null
                 || columnFilter.matches(

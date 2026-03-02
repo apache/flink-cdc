@@ -40,7 +40,7 @@ limitations under the License.
         <flink.release.name>flink-${flink.version}-bin-scala_${scala.binary.version}.tgz</flink.release.name>
         <flink.release.mirror>https://dlcdn.apache.org/flink/flink-${flink.version}</flink.release.mirror>
         <maven.plugin.download.version>1.6.8</maven.plugin.download.version>
-        <iceberg.version>1.6.1</iceberg.version>
+        <iceberg.version>1.10.1</iceberg.version>
         <hive.version>2.3.9</hive.version>
         <fluss.version>0.7.0</fluss.version>
         <jmh.version>1.37</jmh.version>
@@ -102,6 +102,22 @@ limitations under the License.
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
             <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-cdc-pipeline-connector-oracle</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-oracle-cdc</artifactId>
+            <version>${parent.version}</version>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
@@ -200,7 +216,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.iceberg</groupId>
-            <artifactId>iceberg-flink-runtime-${flink-major-1.19}</artifactId>
+            <artifactId>iceberg-flink-runtime-${flink-major-1.20}</artifactId>
             <version>${iceberg.version}</version>
             <scope>test</scope>
         </dependency>
@@ -545,6 +561,26 @@ limitations under the License.
                             <artifactId>flink-cdc-pipeline-connector-postgres</artifactId>
                             <version>${project.version}</version>
                             <destFileName>postgres-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>org.apache.flink</groupId>
+                            <artifactId>flink-cdc-pipeline-connector-oracle</artifactId>
+                            <version>${project.version}</version>
+                            <destFileName>oracle-cdc-pipeline-connector.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+
+                        <artifactItem>
+                            <groupId>com.oracle.ojdbc</groupId>
+                            <artifactId>ojdbc8</artifactId>
+                            <version>19.3.0.0</version>
+                            <destFileName>oracle-ojdbc.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>

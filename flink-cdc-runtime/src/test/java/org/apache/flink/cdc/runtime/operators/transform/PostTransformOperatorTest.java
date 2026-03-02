@@ -36,14 +36,14 @@ import org.apache.flink.cdc.runtime.testutils.operators.RegularEventOperatorTest
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
+import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
+
 import org.apache.calcite.runtime.CalciteContextException;
 import org.apache.calcite.sql.validate.SqlValidatorException;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 import java.math.BigDecimal;
-import java.time.format.DateTimeParseException;
 
 /** Unit tests for the {@link PostTransformOperator}. */
 class PostTransformOperatorTest {
@@ -2086,6 +2086,7 @@ class PostTransformOperatorTest {
                                         + ",cast(colString as DECIMAL(4,2)) as nullDecimal"
                                         + ",cast(colString as TIMESTAMP(3)) as nullTimestamp",
                                 null)
+                        .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -2281,6 +2282,7 @@ class PostTransformOperatorTest {
                                         + ",castDecimal"
                                         + ",cast('1970-01-01T00:00:01.234' as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '10'")
+                        .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -2718,6 +2720,7 @@ class PostTransformOperatorTest {
                                         + ",cast(castFloat as DECIMAL(4,2)) as castDecimal"
                                         + ",cast(castFloat as TIMESTAMP(3)) as castTimestamp",
                                 "col1 = '1'")
+                        .addTimezone("UTC")
                         .build();
         RegularEventOperatorTestHarness<PostTransformOperator, Event>
                 transformFunctionEventEventOperatorTestHarness =
@@ -2764,8 +2767,13 @@ class PostTransformOperatorTest {
                                 + "to schema\n"
                                 + "\tcolumns={`col1` STRING NOT NULL,`castInt` INT,`castBoolean` BOOLEAN,`castTinyint` TINYINT,`castSmallint` SMALLINT,`castBigint` BIGINT,`castFloat` FLOAT,`castDouble` DOUBLE,`castChar` STRING,`castVarchar` STRING,`castDecimal` DECIMAL(4, 2),`castTimestamp` TIMESTAMP(3)}, primaryKeys=col1, options=().")
                 .cause()
-                .hasRootCauseInstanceOf(DateTimeParseException.class)
-                .hasRootCauseMessage("Text '1.0' could not be parsed at index 0");
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "Failed to evaluate projection expression `CAST(`TB`.`castFloat` AS TIMESTAMP(3))` for column `castTimestamp` in table `my_company.my_branch.data_cast`.\n"
+                                + "\tCompiled expression: castToTimestamp($0, __time_zone__)\n"
+                                + "\tColumn name map: {$0 -> castFloat}")
+                .hasRootCauseMessage("Unable to parse given string as timestamp: 1.0");
+
         transformFunctionEventEventOperatorTestHarness.close();
     }
 

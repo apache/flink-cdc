@@ -78,4 +78,12 @@ public class IcebergDataSinkOptions {
                     .defaultValue(-1)
                     .withDescription(
                             "The parallelism for file compaction, default value is -1, which means that compaction parallelism is equal to sink writer parallelism.");
+
+    @Experimental
+    public static final ConfigOption<String> JOB_ID_PREFIX =
+            key("job.id.prefix")
+                    .stringType()
+                    .defaultValue("cdc")
+                    .withDescription(
+                            "The prefix of job id, which is used to distinguish different jobs.");
 }

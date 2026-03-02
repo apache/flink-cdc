@@ -17,10 +17,11 @@
 
 package org.apache.flink.cdc.connectors.oracle.source.utils;
 
+import org.apache.flink.cdc.connectors.oracle.connection.OracleSourceConnection;
+import org.apache.flink.cdc.connectors.oracle.source.OracleSourceValueConverters;
 import org.apache.flink.cdc.connectors.oracle.source.meta.offset.RedoLogOffset;
 import org.apache.flink.table.types.logical.RowType;
 
-import io.debezium.connector.oracle.OracleConnection;
 import io.debezium.connector.oracle.OracleConnectorConfig;
 import io.debezium.connector.oracle.OracleDatabaseSchema;
 import io.debezium.connector.oracle.OracleDefaultValueConverter;
@@ -199,11 +200,11 @@ public class OracleUtils {
 
     /** Creates a new {@link OracleDatabaseSchema} to monitor the latest oracle database schemas. */
     public static OracleDatabaseSchema createOracleDatabaseSchema(
-            OracleConnectorConfig dbzOracleConfig, OracleConnection oracleConnection) {
+            OracleConnectorConfig dbzOracleConfig, OracleSourceConnection oracleConnection) {
         TopicSelector<TableId> topicSelector = OracleTopicSelector.defaultSelector(dbzOracleConfig);
         SchemaNameAdjuster schemaNameAdjuster = SchemaNameAdjuster.create();
         OracleValueConverters oracleValueConverters =
-                new OracleValueConverters(dbzOracleConfig, oracleConnection);
+                new OracleSourceValueConverters(dbzOracleConfig, oracleConnection);
         OracleDefaultValueConverter defaultValueConverter =
                 new OracleDefaultValueConverter(oracleValueConverters, oracleConnection);
         StreamingAdapter.TableNameCaseSensitivity tableNameCaseSensitivity =

@@ -123,11 +123,21 @@ public class Elasticsearch8AsyncWriter<InputT> extends AsyncSinkWriter<InputT, O
         LOG.debug("submitRequestEntries with {} items", requestEntries.size());
 
         BulkRequest.Builder br = new BulkRequest.Builder();
+        boolean hasOperations = false;
         for (Operation operation : requestEntries) {
             if (operation.getBulkOperationVariant() == null) {
                 continue;
             }
             br.operations(new BulkOperation(operation.getBulkOperationVariant()));
+            hasOperations = true;
+        }
+
+        if (!hasOperations) {
+            LOG.debug(
+                    "Skipping empty BulkRequest, all {} operation(s) have null BulkOperationVariant",
+                    requestEntries.size());
+            requestResult.accept(Collections.emptyList());
+            return;
         }
 
         esClient.bulk(br.build())

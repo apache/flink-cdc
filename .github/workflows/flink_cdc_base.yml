@@ -44,9 +44,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     strategy:
+      max-parallel: 20
       fail-fast: false
       matrix:
         java-version: ${{ fromJSON(inputs.java-versions) }}

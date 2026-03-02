@@ -24,11 +24,11 @@ import org.apache.flink.metrics.Counter;
  * additional information regarding copyright ownership. */
 
 /** An implementation of Flink's {@link Counter} which wraps Fluss's Counter. */
-public class WarppedFlussCounter implements Counter {
+public class WrappedFlussCounter implements Counter {
 
     private final com.alibaba.fluss.metrics.Counter flussCounter;
 
-    public WarppedFlussCounter(com.alibaba.fluss.metrics.Counter flussCounter) {
+    public WrappedFlussCounter(com.alibaba.fluss.metrics.Counter flussCounter) {
         this.flussCounter = flussCounter;
     }
 

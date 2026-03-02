@@ -36,6 +36,8 @@ import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.variant.Variant;
+import org.apache.flink.cdc.common.types.variant.VariantBuilder;
 import org.apache.flink.cdc.composer.PipelineExecution;
 import org.apache.flink.cdc.composer.definition.PipelineDef;
 import org.apache.flink.cdc.composer.definition.SinkDef;
@@ -106,6 +108,7 @@ import static org.apache.flink.cdc.common.types.DataTypes.TIMESTAMP_TZ;
 import static org.apache.flink.cdc.common.types.DataTypes.TINYINT;
 import static org.apache.flink.cdc.common.types.DataTypes.VARBINARY;
 import static org.apache.flink.cdc.common.types.DataTypes.VARCHAR;
+import static org.apache.flink.cdc.common.types.DataTypes.VARIANT;
 import static org.apache.flink.cdc.connectors.values.factory.ValuesDataFactory.IDENTIFIER;
 import static org.apache.flink.cdc.connectors.values.sink.ValuesDataSinkOptions.PRINT_ENABLED;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS;
@@ -154,6 +157,7 @@ class TransformSpecsITCase {
                     .physicalColumn("map_string_array_string_", MAP(STRING(), ARRAY(STRING())))
                     .physicalColumn(
                             "complex_row_", ROW(FIELD("name", STRING()), FIELD("length", INT())))
+                    .physicalColumn("variant_", VARIANT())
                     .build();
 
     private static final BinaryRecordDataGenerator generator =
@@ -165,6 +169,26 @@ class TransformSpecsITCase {
     static {
         BinaryRecordDataGenerator nestedGenerator =
                 new BinaryRecordDataGenerator(new DataType[] {STRING(), INT()});
+        VariantBuilder builder = Variant.newBuilder();
+
+        Variant objectVariant =
+                builder.object()
+                        .add("k", builder.of(1))
+                        .add("object", builder.object().add("k", builder.of("hello")).build())
+                        .add(
+                                "array",
+                                builder.array()
+                                        .add(builder.of(1))
+                                        .add(builder.of(2))
+                                        .add(builder.object().add("kk", builder.of(1.123f)).build())
+                                        .build())
+                        .build();
+        Variant arrayVariant =
+                builder.array()
+                        .add(builder.object().add("k", builder.of(1)).build())
+                        .add(builder.of("hello"))
+                        .add(builder.object().add("k", builder.of(2)).build())
+                        .build();
 
         BinaryRecordData record1 =
                 generator.generate(
@@ -213,7 +237,8 @@ class TransformSpecsITCase {
                                     s("three"),
                                     new GenericArrayData(
                                             new Object[] {s("T"), s("H"), s("R"), s("E"), s("E")})),
-                            nestedGenerator.generate(new Object[] {s("Alice"), 5})
+                            nestedGenerator.generate(new Object[] {s("Alice"), 5}),
+                            objectVariant,
                         });
 
         BinaryRecordData record2 =
@@ -260,7 +285,8 @@ class TransformSpecsITCase {
                                     new GenericArrayData(new Object[] {s("E"), s("R")}),
                                     s("三"),
                                     new GenericArrayData(new Object[] {s("S"), s("A"), s("N")})),
-                            nestedGenerator.generate(new Object[] {s("Derrida"), 7})
+                            nestedGenerator.generate(new Object[] {s("Derrida"), 7}),
+                            arrayVariant
                         });
 
         BinaryRecordData record3 =
@@ -268,7 +294,7 @@ class TransformSpecsITCase {
                         new Object[] {
                             0L, null, null, null, null, null, null, null, null, null, null, null,
                             null, null, null, null, null, null, null, null, null, null, null, null,
-                            null, null, null, null, null, null, null, null, null, null
+                            null, null, null, null, null, null, null, null, null, null, null
                         });
 
         testInputSuites.add(new CreateTableEvent(testTableId, testInputSchema));

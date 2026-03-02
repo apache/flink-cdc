@@ -186,4 +186,24 @@ public class ElasticsearchTestUtils {
                                     3, 3.0, BinaryStringData.fromString("value3"), true
                                 })));
     }
+
+    /**
+     * Creates a list of test events that only contain SchemaChangeEvents (CreateTableEvent) without
+     * any DataChangeEvents. This simulates the scenario where a batch only has schema change
+     * events, which previously caused "Missing required property 'BulkRequest.operations'" error.
+     *
+     * @param tableId the identifier of the table.
+     * @return a list of events containing only CreateTableEvent.
+     */
+    public static List<Event> createTestEventsWithOnlySchemaChange(TableId tableId) {
+        Schema schema =
+                Schema.newBuilder()
+                        .column(new PhysicalColumn("id", DataTypes.INT().notNull(), null))
+                        .column(new PhysicalColumn("number", DataTypes.DOUBLE(), null))
+                        .column(new PhysicalColumn("name", DataTypes.VARCHAR(17), null))
+                        .primaryKey("id")
+                        .build();
+
+        return Collections.singletonList(new CreateTableEvent(tableId, schema));
+    }
 }
