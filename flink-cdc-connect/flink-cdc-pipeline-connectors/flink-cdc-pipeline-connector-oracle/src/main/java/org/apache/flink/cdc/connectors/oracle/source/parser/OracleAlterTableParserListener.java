@@ -28,7 +28,6 @@ import io.debezium.connector.oracle.antlr.OracleDdlParser;
 import io.debezium.ddl.parser.oracle.generated.PlSqlParser;
 import io.debezium.relational.Column;
 import io.debezium.relational.ColumnEditor;
-import io.debezium.relational.Table;
 import io.debezium.relational.TableEditor;
 import io.debezium.relational.TableId;
 import io.debezium.text.ParsingException;
@@ -88,7 +87,7 @@ public class OracleAlterTableParserListener extends BaseParserListener {
     @Override
     public void enterAlter_table(PlSqlParser.Alter_tableContext ctx) {
         TableId tableId = new TableId(catalogName, schemaName, getTableName(ctx.tableview_name()));
-        tableEditor = Table.editor().tableId(tableId);
+        tableEditor = parser.databaseTables().editTable(tableId);
         if (tableEditor == null) {
             throw new ParsingException(
                     null,
@@ -174,7 +173,7 @@ public class OracleAlterTableParserListener extends BaseParserListener {
                     columnEditors = new ArrayList<>(columns.size());
                     for (PlSqlParser.Modify_col_propertiesContext column : columns) {
                         String columnName = getColumnName(column.column_name());
-                        Column existingColumn = Column.editor().name(columnName).create();
+                        Column existingColumn = tableEditor.create().columnWithName(columnName);
                         if (existingColumn != null) {
                             ColumnEditor columnEditor = existingColumn.edit();
                             columnDefinitionParserListener =
