@@ -1727,7 +1727,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE %s.products ADD DESC1 VARCHAR(45) DEFAULT '' NOT NULL",
+                        "ALTER TABLE %s.products ADD DESC1 VARCHAR(45) DEFAULT 'N/A' NOT NULL",
                         "debezium"));
         expected.add(
                 new AddColumnEvent(
