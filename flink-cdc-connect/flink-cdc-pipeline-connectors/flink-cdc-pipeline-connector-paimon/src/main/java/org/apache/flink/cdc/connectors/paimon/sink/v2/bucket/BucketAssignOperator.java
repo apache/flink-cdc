@@ -157,6 +157,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                     bucketAssignerMap.computeIfAbsent(
                             dataChangeEvent.tableId(), this::getTableInfo);
             int bucket;
+            int partition;
             GenericRow genericRow =
                     PaimonWriterHelper.convertEventToGenericRow(
                             dataChangeEvent,
@@ -171,17 +172,20 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                                 tuple4.f2.assign(
                                         tuple4.f3.partition(genericRow),
                                         tuple4.f3.trimmedPrimaryKey(genericRow).hashCode());
+                        partition = tuple4.f3.partition(genericRow).hashCode();
                         break;
                     }
                 case HASH_FIXED:
                     {
                         tuple4.f1.setRecord(genericRow);
                         bucket = tuple4.f1.bucket();
+                        partition = tuple4.f1.partition().hashCode();
                         break;
                     }
                 case BUCKET_UNAWARE:
                     {
                         bucket = 0;
+                        partition = 0;
                         break;
                     }
                 case KEY_DYNAMIC:
@@ -191,7 +195,8 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                     }
             }
             output.collect(
-                    new StreamRecord<>(new BucketWrapperChangeEvent(bucket, dataChangeEvent)));
+                    new StreamRecord<>(
+                            new BucketWrapperChangeEvent(bucket, partition, dataChangeEvent)));
         } else {
             // Broadcast SchemachangeEvent.
             for (int index = 0; index < totalTasksNumber; index++) {
@@ -199,6 +204,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                         new StreamRecord<>(
                                 new BucketWrapperChangeEvent(
                                         index,
+                                        0,
                                         convertSchemaChangeEvent((SchemaChangeEvent) event))));
             }
         }
@@ -279,6 +285,7 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
                             new StreamRecord<>(
                                     new BucketWrapperChangeEvent(
                                             index,
+                                            0,
                                             new CreateTableEvent(
                                                     tableId,
                                                     mixedSchemaInfo.paimonSchemaInfo
