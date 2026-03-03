@@ -518,6 +518,9 @@ public abstract class JdbcSourceChunkSplitter implements ChunkSplitter {
         // chunk end might be null when max values are removed
         Object chunkEnd =
                 queryNextChunkMax(jdbc, tableId, splitColumn, chunkSize, previousChunkEnd);
+        if (chunkEnd == null) {
+            return null;
+        }
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
