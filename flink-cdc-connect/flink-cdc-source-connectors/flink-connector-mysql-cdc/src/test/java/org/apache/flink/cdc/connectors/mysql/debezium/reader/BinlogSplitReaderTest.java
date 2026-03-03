@@ -1131,15 +1131,16 @@ class BinlogSplitReaderTest extends MySqlSourceTestBase {
         // Restore binlog reader from checkpoint
         binlogReader.submitSplit(checkpointSplit);
 
-        // We mock a WRITE_ROWS event with timestamp = 1, which should be dropped by filter
+        // Restored checkpoint offsets are concrete positions, so we should not drop this event
+        // based on the original TIMESTAMP startup setting.
         EventHeaderV4 header = new EventHeaderV4();
         header.setEventType(EventType.WRITE_ROWS);
         header.setTimestamp(1L);
         Event event = new Event(header, new WriteRowsEventData());
 
-        // Check if the filter works
+        // Check that the restored reader keeps the event.
         Predicate<Event> eventFilter = binlogReader.getBinlogSplitReadTask().getEventFilter();
-        assertThat(eventFilter.test(event)).isFalse();
+        assertThat(eventFilter.test(event)).isTrue();
     }
 
     @Test

@@ -22,6 +22,7 @@ import org.apache.flink.cdc.connectors.mysql.debezium.task.MySqlBinlogSplitReadT
 import org.apache.flink.cdc.connectors.mysql.debezium.task.context.StatefulTaskContext;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffset;
+import org.apache.flink.cdc.connectors.mysql.source.offset.BinlogOffsetKind;
 import org.apache.flink.cdc.connectors.mysql.source.split.FinishedSnapshotSplitInfo;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlBinlogSplit;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -391,21 +392,26 @@ public class BinlogSplitReader implements DebeziumReader<SourceRecords, MySqlSpl
     private Predicate<Event> createEventFilter() {
         // If the startup mode is set as TIMESTAMP, we need to apply a filter on event to drop
         // events earlier than the specified timestamp.
-
-        // NOTE: Here we take user's configuration (statefulTaskContext.getSourceConfig())
-        // as the ground truth. This might be fragile if user changes the config and recover
-        // the job from savepoint / checkpoint, as there might be conflict between user's config
-        // and the state in savepoint / checkpoint. But as we don't promise compatibility of
-        // checkpoint after changing the config, this is acceptable for now.
         StartupOptions startupOptions = statefulTaskContext.getSourceConfig().getStartupOptions();
         if (startupOptions.startupMode.equals(StartupMode.TIMESTAMP)) {
-            if (startupOptions.binlogOffset == null) {
+            // A TIMESTAMP-startup job keeps StartupMode.TIMESTAMP in the source config even after
+            // restoring from a checkpoint / savepoint. However, the restored split's starting
+            // offset already points to a concrete resume position (SPECIFIC / GTID) rather than the
+            // original submission-time timestamp. So we take the split's starting offset as the
+            // ground truth: only apply the timestamp filter when the offset kind is still
+            // TIMESTAMP, otherwise valid row events after recovery would be incorrectly dropped.
+            BinlogOffset startingOffset = currentBinlogSplit.getStartingOffset();
+            if (startingOffset == null) {
                 throw new NullPointerException(
                         "The startup option was set to TIMESTAMP "
                                 + "but unable to find starting binlog offset. Please check if the timestamp is specified in "
                                 + "configuration. ");
             }
-            long startTimestampSec = startupOptions.binlogOffset.getTimestampSec();
+            if (startingOffset.getOffsetKind() != BinlogOffsetKind.TIMESTAMP) {
+                return event -> true;
+            }
+
+            long startTimestampSec = startingOffset.getTimestampSec();
             // We only skip data change event, as other kinds of events are necessary for updating
             // some internal state inside MySqlStreamingChangeEventSource
             LOG.info(
