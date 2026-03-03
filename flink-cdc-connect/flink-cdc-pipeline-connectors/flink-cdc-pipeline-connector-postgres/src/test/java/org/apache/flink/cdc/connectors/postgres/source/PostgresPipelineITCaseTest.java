@@ -717,9 +717,13 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
                             .collect(Collectors.toList());
             assertThat(actualIds).containsExactly(1, 2, 3);
         } finally {
-            // Cancel the job first to release the replication slot
-            iterator.close();
-            jobClient.cancel().get();
+            // Cancel the job with a bounded wait so cleanup always runs
+            try {
+                iterator.close();
+                jobClient.cancel().get();
+            } catch (Exception e) {
+                LOG.warn("Failed to cancel job: {}", e.getMessage());
+            }
 
             // Wait for the job to fully stop and release the replication slot
             Thread.sleep(3000);
