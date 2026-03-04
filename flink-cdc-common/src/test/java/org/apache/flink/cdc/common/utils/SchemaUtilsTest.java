@@ -19,6 +19,7 @@ package org.apache.flink.cdc.common.utils;
 
 import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.AlterColumnTypeEvent;
+import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.RenameColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
@@ -483,5 +484,67 @@ class SchemaUtilsTest {
                                                 .option("Key2", "Value2")
                                                 .build()))
                 .isExactlyInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void testIsSchemaChangeEventRedundantForCreateTableEvent() {
+        TableId tableId = TableId.tableId("test_db", "test_table");
+
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        // CreateTableEvent is NOT redundant when table doesn't exist (null schema)
+        CreateTableEvent createEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(SchemaUtils.isSchemaChangeEventRedundant(null, createEvent))
+                .as("CreateTableEvent should not be redundant when table does not exist")
+                .isFalse();
+
+        // CreateTableEvent IS redundant when table exists with the same schema
+        Assertions.assertThat(SchemaUtils.isSchemaChangeEventRedundant(schema, createEvent))
+                .as("CreateTableEvent should be redundant when table exists with same schema")
+                .isTrue();
+
+        // CreateTableEvent is NOT redundant when table exists with different schema (extra column)
+        Schema schemaWithExtraColumn =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createEventWithExtraColumn =
+                new CreateTableEvent(tableId, schemaWithExtraColumn);
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schema, createEventWithExtraColumn))
+                .as("CreateTableEvent should not be redundant when new schema has extra columns")
+                .isFalse();
+
+        // CreateTableEvent is NOT redundant when column types differ
+        Schema schemaWithDifferentType =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.VARCHAR(255))
+                        .primaryKey("id")
+                        .build();
+        CreateTableEvent createEventWithDifferentType =
+                new CreateTableEvent(tableId, schemaWithDifferentType);
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schema, createEventWithDifferentType))
+                .as("CreateTableEvent should not be redundant when column types differ")
+                .isFalse();
+
+        // CreateTableEvent is NOT redundant when existing schema has more columns than new schema
+        Assertions.assertThat(
+                        SchemaUtils.isSchemaChangeEventRedundant(
+                                schemaWithExtraColumn, createEvent))
+                .as(
+                        "CreateTableEvent should not be redundant when existing schema has more columns")
+                .isFalse();
     }
 }

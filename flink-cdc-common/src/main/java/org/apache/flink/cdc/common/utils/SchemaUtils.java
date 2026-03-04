@@ -348,8 +348,9 @@ public class SchemaUtils {
                             return true;
                         },
                         createTableEvent -> {
-                            // It has been applied if such table already exists
-                            return latestSchema.isPresent();
+                            // Redundant only if the table exists AND the schema is identical
+                            return latestSchema.isPresent()
+                                    && latestSchema.get().equals(createTableEvent.getSchema());
                         },
                         dropColumnEvent -> {
                             // It has not been applied if schema does not even exist
