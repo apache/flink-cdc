@@ -547,6 +547,79 @@ class FlinkPipelineUdfITCase {
                 .contains("[ LifecycleFunction ] closed. Called 6 times.");
     }
 
+    @ParameterizedTest
+    @MethodSource("testParams")
+    void testConfigurableUdf(ValuesDataSink.SinkApi sinkApi, String language) throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.TRANSFORM_TABLE);
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        sinkConfig.set(ValuesDataSinkOptions.MATERIALIZED_IN_MEMORY, true);
+        sinkConfig.set(ValuesDataSinkOptions.SINK_API, sinkApi);
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup transform
+        TransformDef transformDef =
+                new TransformDef(
+                        "default_namespace.default_schema.table1",
+                        "*, greet(col1) as greeting",
+                        null,
+                        "col1",
+                        null,
+                        "key1=value1",
+                        "",
+                        null);
+
+        // Setup UDF with options
+        UdfDef udfDef =
+                new UdfDef(
+                        "greet",
+                        String.format(
+                                "org.apache.flink.cdc.udf.examples.%s.ConfigurableFunctionClass",
+                                language),
+                        ImmutableMap.of("greeting", "Hi", "suffix", "~"));
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(transformDef),
+                        Collections.singletonList(udfDef),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+        assertThat(outputEvents)
+                .containsExactly(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING NOT NULL,`col2` STRING,`greeting` STRING}, primaryKeys=col1, options=({key1=value1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[1, 1, Hi 1~], op=INSERT, meta=({op_ts=1})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[2, 2, Hi 2~], op=INSERT, meta=({op_ts=2})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[], after=[3, 3, Hi 3~], op=INSERT, meta=({op_ts=3})}",
+                        "AddColumnEvent{tableId=default_namespace.default_schema.table1, addedColumns=[ColumnWithPosition{column=`col3` STRING, position=AFTER, existedColumnName=col2}]}",
+                        "RenameColumnEvent{tableId=default_namespace.default_schema.table1, nameMapping={col2=newCol2, col3=newCol3}}",
+                        "DropColumnEvent{tableId=default_namespace.default_schema.table1, droppedColumnNames=[newCol2]}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[1, 1, Hi 1~], after=[], op=DELETE, meta=({op_ts=4})}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.table1, before=[2, , Hi 2~], after=[2, x, Hi 2~], op=UPDATE, meta=({op_ts=5})}");
+    }
+
     // --------------------------
     // Flink-compatible UDF tests
     // --------------------------

@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.composer.definition;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
@@ -38,13 +38,13 @@ public class UdfDef {
     private final Map<String, String> options;
 
     public UdfDef(String name, String classpath) {
-        this(name, classpath, new HashMap<>());
+        this(name, classpath, Collections.emptyMap());
     }
 
     public UdfDef(String name, String classpath, Map<String, String> options) {
         this.name = name;
         this.classpath = classpath;
-        this.options = options != null ? options : new HashMap<>();
+        this.options = options != null ? options : Collections.emptyMap();
     }
 
     public String getName() {
