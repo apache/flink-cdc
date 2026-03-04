@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink;
+package org.apache.flink.cdc.connectors.fluss.sink.row;
 
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
@@ -26,6 +26,8 @@ import org.apache.flink.cdc.common.data.TimestampData;
 
 import org.apache.fluss.row.BinaryString;
 import org.apache.fluss.row.Decimal;
+import org.apache.fluss.row.InternalArray;
+import org.apache.fluss.row.InternalMap;
 import org.apache.fluss.row.InternalRow;
 import org.apache.fluss.row.TimestampLtz;
 import org.apache.fluss.row.TimestampNtz;
@@ -165,6 +167,22 @@ public class CdcAsFlussRow implements InternalRow {
     @Override
     public byte[] getBytes(int pos) {
         return cdcRecord.getBinary(indexMapping.get(pos));
+    }
+
+    @Override
+    public InternalArray getArray(int i) {
+        return new CdcAsFlussArray(cdcRecord.getArray(indexMapping.get(i)));
+    }
+
+    @Override
+    public InternalMap getMap(int i) {
+        return new CdcAsFlussMap(cdcRecord.getMap(indexMapping.get(i)));
+    }
+
+    @Override
+    public InternalRow getRow(int i, int numFields) {
+        return new CdcAsFlussRow(
+                cdcRecord.getRow(indexMapping.get(i), numFields), numFields, indexMapping);
     }
 
     @VisibleForTesting

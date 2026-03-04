@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.types.BigIntType;
 import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DateType;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.DoubleType;
@@ -37,6 +38,7 @@ import org.apache.flink.cdc.common.types.TinyIntType;
 import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
+import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.util.CollectionUtil;
 
 import org.apache.fluss.annotation.VisibleForTesting;
@@ -235,20 +237,30 @@ public class FlussConversions {
 
         @Override
         public org.apache.fluss.types.DataType visit(ArrayType arrayType) {
-            throw new UnsupportedOperationException(
-                    "Unsupported data type in fluss version under 0.7: " + arrayType);
+            List<DataType> children = arrayType.getChildren();
+            Preconditions.checkState(!children.isEmpty());
+            org.apache.fluss.types.DataType flussChildType = toFlussType(children.get(0));
+            return new org.apache.fluss.types.ArrayType(arrayType.isNullable(), flussChildType);
         }
 
         @Override
         public org.apache.fluss.types.DataType visit(MapType mapType) {
-            throw new UnsupportedOperationException(
-                    "Unsupported data type in fluss version under 0.7: " + mapType);
+            org.apache.fluss.types.DataType flussKeyType = toFlussType(mapType.getKeyType());
+            org.apache.fluss.types.DataType flussValueType = toFlussType(mapType.getValueType());
+            return new org.apache.fluss.types.MapType(
+                    mapType.isNullable(), flussKeyType, flussValueType);
         }
 
         @Override
         public org.apache.fluss.types.DataType visit(RowType rowType) {
-            throw new UnsupportedOperationException(
-                    "Unsupported data type in fluss version under 0.7: " + rowType);
+            return new org.apache.fluss.types.RowType(
+                    rowType.isNullable(),
+                    rowType.getFields().stream()
+                            .map(
+                                    field ->
+                                            new org.apache.fluss.types.DataField(
+                                                    field.getName(), field.getType().accept(this)))
+                            .collect(Collectors.toList()));
         }
     }
 }

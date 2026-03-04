@@ -88,12 +88,14 @@ class FlussConversionsTest {
                         .physicalColumn("time_col", DataTypes.TIME())
                         .physicalColumn("timestamp_col", DataTypes.TIMESTAMP(3))
                         .physicalColumn("ltz_col", DataTypes.TIMESTAMP_LTZ(6))
+                        .physicalColumn("arr", DataTypes.ARRAY(DataTypes.INT()))
+                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
                         .build();
 
         org.apache.fluss.metadata.Schema flussSchema = FlussConversions.toFlussSchema(cdcSchema);
 
         RowType rowType = flussSchema.getRowType();
-        assertThat(rowType.getFieldCount()).isEqualTo(16);
+        assertThat(rowType.getFieldCount()).isEqualTo(18);
 
         assertThat(rowType.getTypeAt(0)).isEqualTo(org.apache.fluss.types.DataTypes.BOOLEAN());
         assertThat(rowType.getTypeAt(1)).isEqualTo(org.apache.fluss.types.DataTypes.TINYINT());
@@ -114,6 +116,15 @@ class FlussConversionsTest {
         assertThat(rowType.getTypeAt(14)).isEqualTo(org.apache.fluss.types.DataTypes.TIMESTAMP(3));
         assertThat(rowType.getTypeAt(15))
                 .isEqualTo(org.apache.fluss.types.DataTypes.TIMESTAMP_LTZ(6));
+        assertThat(rowType.getTypeAt(16))
+                .isEqualTo(
+                        org.apache.fluss.types.DataTypes.ARRAY(
+                                org.apache.fluss.types.DataTypes.INT()));
+        assertThat(rowType.getTypeAt(17))
+                .isEqualTo(
+                        org.apache.fluss.types.DataTypes.MAP(
+                                org.apache.fluss.types.DataTypes.STRING(),
+                                org.apache.fluss.types.DataTypes.INT()));
     }
 
     @Test
@@ -138,28 +149,6 @@ class FlussConversionsTest {
                 Schema.newBuilder()
                         .physicalColumn(
                                 "ts", new org.apache.flink.cdc.common.types.ZonedTimestampType())
-                        .build();
-
-        assertThatThrownBy(() -> FlussConversions.toFlussSchema(cdcSchema))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Unsupported data type in fluss");
-    }
-
-    @Test
-    void testToFlussSchemaUnsupportedArrayType() {
-        Schema cdcSchema =
-                Schema.newBuilder().physicalColumn("arr", DataTypes.ARRAY(DataTypes.INT())).build();
-
-        assertThatThrownBy(() -> FlussConversions.toFlussSchema(cdcSchema))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("Unsupported data type in fluss");
-    }
-
-    @Test
-    void testToFlussSchemaUnsupportedMapType() {
-        Schema cdcSchema =
-                Schema.newBuilder()
-                        .physicalColumn("map", DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()))
                         .build();
 
         assertThatThrownBy(() -> FlussConversions.toFlussSchema(cdcSchema))
