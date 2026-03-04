@@ -61,7 +61,17 @@ public class Predicates {
     }
 
     public static Set<Pattern> setOfRegex(String input, int regexFlags) {
-        return setOf(input, RegExSplitterByComma::split, (str) -> Pattern.compile(str, regexFlags));
+        return setOf(
+                input,
+                RegExSplitterByComma::split,
+                (str) -> {
+                    // Use PatternCache to avoid recompiling patterns.
+                    if (regexFlags == 0) {
+                        return PatternCache.getPattern(str);
+                    }
+                    // Patterns with flags are not cached yet.
+                    return Pattern.compile(str, regexFlags);
+                });
     }
 
     public static <T> Set<T> setOf(
