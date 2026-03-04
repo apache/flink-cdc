@@ -410,19 +410,26 @@ pipeline:
         cache.enabled: "true"
 ```
 
-在你的 UDF 实现中，可以这样访问这些配置选项：
+在你的 UDF 实现中，可以通过定义 `ConfigOption` 实例来访问这些配置选项：
 
 ```java
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
+
 public class RedisQueryFunction implements UserDefinedFunction {
+    private static final ConfigOption<String> HOSTNAME =
+        ConfigOptions.key("hostname").stringType().noDefaultValue();
+    private static final ConfigOption<Integer> PORT =
+        ConfigOptions.key("port").intType().defaultValue(6379);
+
     private String hostname;
     private int port;
     
     @Override
     public void open(UserDefinedFunctionContext context) throws Exception {
-        hostname = context.configuration().get("hostname");
-        port = Integer.parseInt(context.configuration().get("port"));
+        hostname = context.configuration().get(HOSTNAME);
+        port = context.configuration().get(PORT);
         // 在这里初始化你的连接...
-
     }
     
     public Object eval(String key) {
