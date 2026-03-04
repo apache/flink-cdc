@@ -20,7 +20,6 @@ package org.apache.flink.cdc.runtime.operators.transform;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
-import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -222,20 +221,16 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
 
         // Filter out redundant AddColumnEvent columns that already exist in the schema
         // to handle duplicate events from tools like gh-ost online schema migrations
-        if (event instanceof AddColumnEvent) {
-            AddColumnEvent addColumnEvent = (AddColumnEvent) event;
-            Schema currentSchema = tableChangeInfo.getSourceSchema();
-            Optional<AddColumnEvent> filtered =
-                    SchemaUtils.filterRedundantAddColumns(currentSchema, addColumnEvent);
-            if (!filtered.isPresent()) {
-                LOG.debug(
-                        "Skipping fully redundant AddColumnEvent for table {} "
-                                + "- all columns already exist",
-                        tableId);
-                return Optional.empty();
-            }
-            event = filtered.get();
+        Optional<SchemaChangeEvent> filteredEvent =
+                TransformSchemaChangeUtils.filterDuplicateAddColumns(
+                        tableChangeInfo.getSourceSchema(), event, LOG);
+        if (!filteredEvent.isPresent()) {
+            return Optional.empty();
         }
+        event = filteredEvent.get();
+
+        // Schema actually changed, invalidate the processor cache so it gets rebuilt
+        preTransformProcessorMap.remove(tableId);
 
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);

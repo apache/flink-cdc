@@ -841,9 +841,12 @@ class TransformOperatorWithSchemaEvolveTest {
     }
 
     /**
-     * This case tests that duplicate AddColumnEvents are handled gracefully by both
-     * PreTransformOperator and PostTransformOperator. When the same column is added twice (e.g.,
-     * from gh-ost online schema migrations), the second event should be filtered out.
+     * Tests duplicate AddColumnEvent handling with a wildcard projection ({@code *, id + age as
+     * computed}) and a filter ({@code name <> 'Alice'}). This exercises the full pre+post pipeline
+     * with a wildcard rule: the first AddColumnEvent for "extras" passes through both operators,
+     * while the duplicate is filtered by PreTransformOperator (which also prevents it from reaching
+     * PostTransformOperator). A subsequent DataChangeEvent verifies the pipeline remains functional
+     * after duplicate filtering, with the computed column correctly evaluated.
      */
     @Test
     void testDuplicateAddColumnEventPreTransform() throws Exception {
@@ -920,9 +923,13 @@ class TransformOperatorWithSchemaEvolveTest {
     }
 
     /**
-     * This case tests that duplicate AddColumnEvents are handled gracefully by
-     * PostTransformOperator. When the same column is added twice, the second event should be
-     * filtered out even when sent directly to the post-transform operator.
+     * Tests duplicate AddColumnEvent handling with the same wildcard projection and filter as
+     * {@link #testDuplicateAddColumnEventPreTransform()}, but verifies that PostTransformOperator
+     * independently filters duplicates. Both operators see the duplicate event and each filters it
+     * independently. The subsequent DataChangeEvent uses different record values ({@code id=2,
+     * name="Charlie", age=30}) to verify the computed column ({@code id + age = 32}) is correctly
+     * evaluated after duplicate filtering, confirming both operators maintain consistent schema
+     * state.
      */
     @Test
     void testDuplicateAddColumnEventPostTransform() throws Exception {

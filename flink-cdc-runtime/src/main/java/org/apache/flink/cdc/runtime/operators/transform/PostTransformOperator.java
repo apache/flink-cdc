@@ -23,7 +23,6 @@ import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.converter.JavaObjectConverter;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.binary.BinaryRecordData;
-import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.ChangeEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
@@ -247,20 +246,13 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
 
         // Filter out redundant AddColumnEvent columns that already exist in the schema
         // to handle duplicate events from tools like gh-ost online schema migrations
-        if (event instanceof AddColumnEvent) {
-            AddColumnEvent addColumnEvent = (AddColumnEvent) event;
-            Schema currentSchema = info.getPreTransformedSchema();
-            Optional<AddColumnEvent> filtered =
-                    SchemaUtils.filterRedundantAddColumns(currentSchema, addColumnEvent);
-            if (!filtered.isPresent()) {
-                LOG.debug(
-                        "Skipping fully redundant AddColumnEvent for table {} "
-                                + "- all columns already exist",
-                        tableId);
-                return Optional.empty();
-            }
-            event = filtered.get();
+        Optional<SchemaChangeEvent> filteredEvent =
+                TransformSchemaChangeUtils.filterDuplicateAddColumns(
+                        info.getPreTransformedSchema(), event, LOG);
+        if (!filteredEvent.isPresent()) {
+            return Optional.empty();
         }
+        event = filteredEvent.get();
 
         // Apply schema change event to the pre-transformed schema
         Schema prevPreSchema = info.getPreTransformedSchema();

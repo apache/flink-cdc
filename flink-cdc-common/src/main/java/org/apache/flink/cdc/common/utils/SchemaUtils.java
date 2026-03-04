@@ -44,6 +44,7 @@ import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -212,22 +213,46 @@ public class SchemaUtils {
      * may be emitted for the same column.
      *
      * <p><b>Note:</b> Duplicate detection is based on column name only. If a duplicate
-     * AddColumnEvent arrives with a different type for an existing column name, it will be silently
-     * skipped. This is the expected behavior for online schema migration tools (gh-ost, pt-osc)
-     * where duplicate events are always exact copies.
+     * AddColumnEvent arrives with a different type for an existing column name, a warning will be
+     * logged but the column will still be skipped. This is the expected behavior for online schema
+     * migration tools (gh-ost, pt-osc) where duplicate events are always exact copies.
      */
     public static Optional<AddColumnEvent> filterRedundantAddColumns(
             Schema currentSchema, AddColumnEvent event) {
-        Set<String> seenColumns = new HashSet<>(currentSchema.getColumnNames());
+        Map<String, Column> existingColumns = new HashMap<>();
+        for (Column col : currentSchema.getColumns()) {
+            existingColumns.put(col.getName(), col);
+        }
+        Set<String> seenColumns = new HashSet<>(existingColumns.keySet());
         List<AddColumnEvent.ColumnWithPosition> nonRedundant = new ArrayList<>();
+        List<String> filteredColumnNames = new ArrayList<>();
         for (AddColumnEvent.ColumnWithPosition cwp : event.getAddedColumns()) {
             String colName = cwp.getAddColumn().getName();
             if (seenColumns.add(colName)) {
                 nonRedundant.add(cwp);
+            } else {
+                filteredColumnNames.add(colName);
+                Column existingCol = existingColumns.get(colName);
+                if (existingCol != null
+                        && !existingCol.getType().equals(cwp.getAddColumn().getType())) {
+                    LOG.warn(
+                            "Skipping duplicate column '{}' for table {} but types differ: "
+                                    + "existing={}, incoming={}",
+                            colName,
+                            event.tableId(),
+                            existingCol.getType(),
+                            cwp.getAddColumn().getType());
+                }
             }
         }
         if (nonRedundant.isEmpty()) {
             return Optional.empty();
+        }
+        if (!filteredColumnNames.isEmpty()) {
+            LOG.debug(
+                    "Filtered redundant columns {} from AddColumnEvent for table {}",
+                    filteredColumnNames,
+                    event.tableId());
         }
         if (nonRedundant.size() == event.getAddedColumns().size()) {
             return Optional.of(event);
