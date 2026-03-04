@@ -69,6 +69,7 @@ public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTo
                             if (event instanceof BucketWrapperChangeEvent) {
                                 // Add hash of tableId to avoid data skew.
                                 return ((BucketWrapperChangeEvent) event).getBucket()
+                                        + ((BucketWrapperChangeEvent) event).getPartition()
                                         + ((BucketWrapperChangeEvent) event).tableId().hashCode();
                             } else {
                                 return ((BucketWrapper) event).getBucket();
