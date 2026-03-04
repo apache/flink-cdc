@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.common.route;
 
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.pipeline.RouteMode;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaTestBase;
 
 import org.junit.jupiter.api.Test;
@@ -166,7 +167,9 @@ public class TableIdRouterTest extends SchemaTestBase {
     private static List<String> testStdRegExpRoute(
             String sourceRouteRule, String sinkRouteRule, List<String> sourceTables) {
         TableIdRouter router =
-                new TableIdRouter(List.of(new RouteRule(sourceRouteRule, sinkRouteRule)));
+                new TableIdRouter(
+                        List.of(new RouteRule(sourceRouteRule, sinkRouteRule)),
+                        RouteMode.ALL_MATCH);
         return sourceTables.stream()
                 .map(TableId::parse)
                 .map(router::route)
