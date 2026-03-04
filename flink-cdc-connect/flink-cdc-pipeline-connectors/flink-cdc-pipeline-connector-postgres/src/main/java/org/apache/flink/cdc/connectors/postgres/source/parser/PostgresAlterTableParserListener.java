@@ -120,12 +120,7 @@ public class PostgresAlterTableParserListener extends PostgreSQLParserBaseListen
             typeMapping.put(columnName, toCdcColumn(columnEditor.create()).getType());
             changes.add(new AlterColumnTypeEvent(toCdcTableId(tableEditor.tableId()), typeMapping));
         } else if (isChangeOptional(ctx)) {
-            // Unable to retrieve raw data type, drop column event simply makes the column nullable.
-            String columnName = parser.removeQuotes(ctx.colid(0));
-            changes.add(
-                    new DropColumnEvent(
-                            toCdcTableId(tableEditor.tableId()),
-                            Collections.singletonList(columnName)));
+            // TODO: get the column type and add an AlterColumnTypeEvent.
         }
         super.exitAlter_table_cmd(ctx);
     }

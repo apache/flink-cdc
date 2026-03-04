@@ -343,8 +343,6 @@ public class PostgresPipelineITCaseTest extends PostgresTestBase {
             expected.add(
                     new AlterColumnTypeEvent(
                             tableId, Collections.singletonMap("weight", DataTypes.VARCHAR(50))));
-            stmt.execute("ALTER TABLE inventory.products ALTER COLUMN name DROP NOT NULL");
-            expected.add(new DropColumnEvent(tableId, Collections.singletonList("name")));
             stmt.execute("ALTER TABLE inventory.products DROP COLUMN description");
             expected.add(new DropColumnEvent(tableId, Collections.singletonList("description")));
             stmt.execute("ALTER TABLE inventory.products ADD COLUMN age varchar(100)");
