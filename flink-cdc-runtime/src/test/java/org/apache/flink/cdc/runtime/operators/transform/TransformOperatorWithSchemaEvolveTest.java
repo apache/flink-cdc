@@ -911,6 +911,11 @@ class TransformOperatorWithSchemaEvolveTest {
                 .expectNothingInPreTransformed()
                 .expectNothingInPostTransformed()
                 .runTests("duplicate add extras column should be filtered")
+                // Send a DataChangeEvent after the duplicate filtering to verify pipeline works
+                .insertSource(1, "Bob", 20, 1.5f)
+                .expectInPreTransformed(1, "Bob", 20, 1.5f)
+                .expectInPostTransformed(1, "Bob", 20, 1.5f, 21)
+                .runTests("data change after duplicate filtering should succeed")
                 .destroyHarness();
     }
 
@@ -985,6 +990,11 @@ class TransformOperatorWithSchemaEvolveTest {
                 .expectNothingInPreTransformed()
                 .expectNothingInPostTransformed()
                 .runTests("duplicate add extras column should be filtered by both operators")
+                // Send a DataChangeEvent after the duplicate filtering to verify pipeline works
+                .insertSource(2, "Charlie", 30, 2.5f)
+                .expectInPreTransformed(2, "Charlie", 30, 2.5f)
+                .expectInPostTransformed(2, "Charlie", 30, 2.5f, 32)
+                .runTests("data change after duplicate filtering should succeed")
                 .destroyHarness();
     }
 

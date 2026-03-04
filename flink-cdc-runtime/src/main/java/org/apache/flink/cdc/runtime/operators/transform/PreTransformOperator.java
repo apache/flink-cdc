@@ -199,7 +199,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            preTransformProcessorMap.remove(schemaChangeEvent.tableId());
             cacheChangeSchema(schemaChangeEvent)
                     .ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {

@@ -37,6 +37,9 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
@@ -54,6 +57,8 @@ import java.util.stream.IntStream;
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
 public class SchemaUtils {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaUtils.class);
 
     /**
      * create a list of {@link RecordData.FieldGetter} from given {@link Schema} to get Object from
@@ -128,6 +133,25 @@ public class SchemaUtils {
             // Skip columns that already exist in the schema to handle duplicate AddColumnEvents
             // (e.g., from gh-ost online schema migrations)
             if (existingColumnNames.contains(columnWithPosition.getAddColumn().getName())) {
+                Column incomingColumn = columnWithPosition.getAddColumn();
+                columns.stream()
+                        .filter(c -> c.getName().equals(incomingColumn.getName()))
+                        .findFirst()
+                        .ifPresent(
+                                existingColumn -> {
+                                    if (!existingColumn
+                                            .getType()
+                                            .equals(incomingColumn.getType())) {
+                                        LOG.warn(
+                                                "Skipping duplicate AddColumn for column '{}' in table {}, "
+                                                        + "but definitions differ: existing type = {}, incoming type = {}. "
+                                                        + "The existing column definition will be kept.",
+                                                incomingColumn.getName(),
+                                                event.tableId(),
+                                                existingColumn.getType(),
+                                                incomingColumn.getType());
+                                    }
+                                });
                 continue;
             }
             switch (columnWithPosition.getPosition()) {
