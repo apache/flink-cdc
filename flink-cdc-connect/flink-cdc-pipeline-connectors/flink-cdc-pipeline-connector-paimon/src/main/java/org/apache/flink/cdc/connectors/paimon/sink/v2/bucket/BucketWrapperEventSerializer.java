@@ -82,6 +82,7 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
             BucketWrapperChangeEvent bucketWrapperChangeEvent = (BucketWrapperChangeEvent) event;
             enumSerializer.serialize(EventClass.BUCKET_WRAPPER_CHANGE_EVENT, dataOutputView);
             dataOutputView.writeInt(bucketWrapperChangeEvent.getBucket());
+            dataOutputView.writeInt(bucketWrapperChangeEvent.getPartition());
             eventSerializer.serialize(bucketWrapperChangeEvent.getInnerEvent(), dataOutputView);
         } else if (event instanceof BucketWrapperFlushEvent) {
             enumSerializer.serialize(EventClass.BUCKET_WRAPPER_FLUSH_EVENT, dataOutputView);
@@ -107,7 +108,9 @@ public class BucketWrapperEventSerializer extends TypeSerializerSingleton<Event>
                     schemaChangeEventTypeEnumSerializer.deserialize(source));
         } else {
             return new BucketWrapperChangeEvent(
-                    source.readInt(), (ChangeEvent) eventSerializer.deserialize(source));
+                    source.readInt(),
+                    source.readInt(),
+                    (ChangeEvent) eventSerializer.deserialize(source));
         }
     }
 
