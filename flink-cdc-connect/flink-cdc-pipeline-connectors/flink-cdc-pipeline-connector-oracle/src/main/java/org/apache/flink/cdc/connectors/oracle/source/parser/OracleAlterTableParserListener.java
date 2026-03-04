@@ -87,15 +87,7 @@ public class OracleAlterTableParserListener extends BaseParserListener {
     @Override
     public void enterAlter_table(PlSqlParser.Alter_tableContext ctx) {
         TableId tableId = new TableId(catalogName, schemaName, getTableName(ctx.tableview_name()));
-        tableEditor = parser.databaseTables().editTable(tableId);
-        if (tableEditor == null) {
-            throw new ParsingException(
-                    null,
-                    "Trying to alter table "
-                            + tableId
-                            + ", which does not exist. Query: "
-                            + getText(ctx));
-        }
+        tableEditor = parser.databaseTables().editOrCreateTable(tableId);
         super.enterAlter_table(ctx);
     }
 
@@ -174,23 +166,27 @@ public class OracleAlterTableParserListener extends BaseParserListener {
                     for (PlSqlParser.Modify_col_propertiesContext column : columns) {
                         String columnName = getColumnName(column.column_name());
                         Column existingColumn = tableEditor.create().columnWithName(columnName);
-                        if (existingColumn != null) {
-                            ColumnEditor columnEditor = existingColumn.edit();
-                            columnDefinitionParserListener =
-                                    new ColumnDefinitionParserListener(tableEditor, columnEditor);
-                            listeners.add(columnDefinitionParserListener);
-
-                            columnEditors.add(columnEditor);
+                        ColumnEditor columnEditor;
+                        if (existingColumn == null) {
+                            if (column.datatype() == null) {
+                                throw new ParsingException(
+                                        null,
+                                        "Trying to change column "
+                                                + columnName
+                                                + " in "
+                                                + tableEditor.tableId()
+                                                + " table, but column schema is missing and "
+                                                + "MODIFY statement doesn't provide datatype. Query: "
+                                                + getText(ctx));
+                            }
+                            columnEditor = Column.editor().name(columnName);
                         } else {
-                            throw new ParsingException(
-                                    null,
-                                    "trying to change column "
-                                            + columnName
-                                            + " in "
-                                            + tableEditor.tableId().toString()
-                                            + " table, which does not exist.  Query: "
-                                            + getText(ctx));
+                            columnEditor = existingColumn.edit();
                         }
+                        columnDefinitionParserListener =
+                                new ColumnDefinitionParserListener(tableEditor, columnEditor);
+                        listeners.add(columnDefinitionParserListener);
+                        columnEditors.add(columnEditor);
                     }
                 },
                 tableEditor);
