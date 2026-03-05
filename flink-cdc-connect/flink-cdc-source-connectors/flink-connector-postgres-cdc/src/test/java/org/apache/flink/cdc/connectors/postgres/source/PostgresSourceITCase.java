@@ -185,6 +185,23 @@ class PostgresSourceITCase extends PostgresTestBase {
                 scanStartupMode);
     }
 
+    @Test
+    void testFilteredPublication() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put("debezium.publication.autocreate.mode", "filtered");
+        options.put("scan.incremental.snapshot.chunk.size", "10");
+        testPostgresParallelSource(
+                1,
+                DEFAULT_SCAN_STARTUP_MODE,
+                PostgresTestUtils.FailoverType.NONE,
+                PostgresTestUtils.FailoverPhase.NEVER,
+                new String[] {"Customers", "customers_1", "customers_2"},
+                RestartStrategies.fixedDelayRestart(1, 0),
+                options,
+                this::checkStreamDataForFilteredPublication,
+                false);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"initial", "latest-offset"})
     void testReadMultipleTableWithMultipleParallelism(String scanStartupMode) throws Exception {
@@ -833,6 +850,29 @@ class PostgresSourceITCase extends PostgresTestBase {
             Map<String, String> otherOptions,
             StreamDataChecker streamDataChecker)
             throws Exception {
+        testPostgresParallelSource(
+                parallelism,
+                scanStartupMode,
+                failoverType,
+                failoverPhase,
+                captureCustomerTables,
+                restartStrategyConfiguration,
+                otherOptions,
+                streamDataChecker,
+                true);
+    }
+
+    private void testPostgresParallelSource(
+            int parallelism,
+            String scanStartupMode,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables,
+            RestartStrategies.RestartStrategyConfiguration restartStrategyConfiguration,
+            Map<String, String> otherOptions,
+            StreamDataChecker streamDataChecker,
+            boolean checkSnapshot)
+            throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
 
@@ -844,7 +884,7 @@ class PostgresSourceITCase extends PostgresTestBase {
         TableResult tableResult = tEnv.executeSql("select * from customers");
 
         // first step: check the snapshot data
-        if (DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
+        if (checkSnapshot && DEFAULT_SCAN_STARTUP_MODE.equals(scanStartupMode)) {
             checkSnapshotData(tableResult, failoverType, failoverPhase, captureCustomerTables);
         }
 
@@ -961,6 +1001,103 @@ class PostgresSourceITCase extends PostgresTestBase {
 
         assertEqualsInAnyOrder(
                 expectedSnapshotData, fetchRows(iterator, expectedSnapshotData.size()));
+    }
+
+    private void checkStreamDataForFilteredPublication(
+            TableResult tableResult,
+            PostgresTestUtils.FailoverType failoverType,
+            PostgresTestUtils.FailoverPhase failoverPhase,
+            String[] captureCustomerTables)
+            throws Exception {
+        waitUntilJobRunning(tableResult);
+        CloseableIterator<Row> iterator = tableResult.collect();
+        Optional<JobClient> optionalJobClient = tableResult.getJobClient();
+        assertThat(optionalJobClient).isPresent();
+
+        String[] snapshotForSingleTable =
+                new String[] {
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Shanghai, 123567891234]",
+                    "+I[109, user_4, Shanghai, 123567891234]",
+                    "+I[110, user_5, Shanghai, 123567891234]",
+                    "+I[111, user_6, Shanghai, 123567891234]",
+                    "+I[118, user_7, Shanghai, 123567891234]",
+                    "+I[121, user_8, Shanghai, 123567891234]",
+                    "+I[123, user_9, Shanghai, 123567891234]",
+                    "+I[1009, user_10, Shanghai, 123567891234]",
+                    "+I[1010, user_11, Shanghai, 123567891234]",
+                    "+I[1011, user_12, Shanghai, 123567891234]",
+                    "+I[1012, user_13, Shanghai, 123567891234]",
+                    "+I[1013, user_14, Shanghai, 123567891234]",
+                    "+I[1014, user_15, Shanghai, 123567891234]",
+                    "+I[1015, user_16, Shanghai, 123567891234]",
+                    "+I[1016, user_17, Shanghai, 123567891234]",
+                    "+I[1017, user_18, Shanghai, 123567891234]",
+                    "+I[1018, user_19, Shanghai, 123567891234]",
+                    "+I[1019, user_20, Shanghai, 123567891234]",
+                    "+I[2000, user_21, Shanghai, 123567891234]"
+                };
+
+        int recordsPerTable = snapshotForSingleTable.length;
+        int totalSnapshotRecords = recordsPerTable * captureCustomerTables.length;
+        int recordsFromFirstTwoTables = recordsPerTable * 2;
+        int recordsWhenTable3Starts = recordsFromFirstTwoTables + 1;
+
+        List<String> collectedSnapshotData = new ArrayList<>();
+        boolean insertedDuringSnapshot = false;
+
+        while (iterator.hasNext() && collectedSnapshotData.size() < totalSnapshotRecords) {
+            Row row = iterator.next();
+            String rowStr = row.toString();
+            collectedSnapshotData.add(rowStr);
+
+            // Insert test record right after Table 3 starts its snapshot phase
+            // This ensures the insert happens while Table 3's backfill slot may have altered the
+            // publication
+            if (collectedSnapshotData.size() == recordsWhenTable3Starts
+                    && !insertedDuringSnapshot) {
+                Thread.sleep(1000L); // Give Table 3's backfill slot time to alter the publication
+                try (PostgresConnection connection = getConnection()) {
+                    connection.setAutoCommit(false);
+                    connection.execute(
+                            "INSERT INTO customer.Customers VALUES(9999, 'test_user', 'TestCity', '123456789')");
+                    connection.commit();
+                }
+                insertedDuringSnapshot = true;
+            }
+        }
+
+        List<String> expectedSnapshotData = new ArrayList<>();
+        for (int i = 0; i < captureCustomerTables.length; i++) {
+            expectedSnapshotData.addAll(Arrays.asList(snapshotForSingleTable));
+        }
+
+        assertEqualsInAnyOrder(expectedSnapshotData, collectedSnapshotData);
+
+        Thread.sleep(15000L);
+
+        List<String> collectedStreamData = new ArrayList<>();
+        long startTime = System.currentTimeMillis();
+        long timeout = 30000L;
+        int maxRecords = 100;
+
+        while (collectedStreamData.size() < maxRecords
+                && (System.currentTimeMillis() - startTime) < timeout) {
+            if (hasNextData(iterator)) {
+                String record = iterator.next().toString();
+                collectedStreamData.add(record);
+            } else {
+                Thread.sleep(1000L);
+            }
+        }
+
+        boolean insertFound =
+                collectedStreamData.contains("+I[9999, test_user, TestCity, 123456789]");
+        assertThat(insertFound)
+                .as(
+                        "The insert into Customers table during Table 3 snapshot phase should be captured.")
+                .isTrue();
     }
 
     private void checkStreamData(
