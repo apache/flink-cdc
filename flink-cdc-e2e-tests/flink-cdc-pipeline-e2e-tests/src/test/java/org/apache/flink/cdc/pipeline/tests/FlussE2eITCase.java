@@ -129,7 +129,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
         // Due to a bug described in https://github.com/apache/fluss/pull/1267, it's not viable to
         // pass Fluss dependency with `--jar` CLI option. We may remove this workaround and use
         // `submitPipelineJob` to carry extra jar later.
-        return Collections.singletonList("fluss-sql-connector.jar");
+        return Collections.singletonList(String.format("fluss-flink-%s.jar", flinkVersion));
     }
 
     @BeforeEach

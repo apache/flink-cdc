@@ -674,9 +674,18 @@ limitations under the License.
                         </artifactItem>
                         <artifactItem>
                             <groupId>org.apache.fluss</groupId>
-                            <artifactId>fluss-flink-${flink.major.version}</artifactId>
+                            <artifactId>fluss-flink-${flink-major-1.20}</artifactId>
                             <version>${fluss.version}</version>
-                            <destFileName>fluss-sql-connector.jar</destFileName>
+                            <destFileName>fluss-flink-${flink-1.20}.jar</destFileName>
+                            <type>jar</type>
+                            <outputDirectory>${project.build.directory}/dependencies
+                            </outputDirectory>
+                        </artifactItem>
+                        <artifactItem>
+                            <groupId>org.apache.fluss</groupId>
+                            <artifactId>fluss-flink-${flink-major-1.19}</artifactId>
+                            <version>${fluss.version}</version>
+                            <destFileName>fluss-flink-${flink-1.19}.jar</destFileName>
                             <type>jar</type>
                             <outputDirectory>${project.build.directory}/dependencies
                             </outputDirectory>
