@@ -37,10 +37,14 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.ZonedTimestampType;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.CheckReturnValue;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -54,6 +58,8 @@ import java.util.stream.IntStream;
 /** Utils for {@link Schema} to perform the ability of evolution. */
 @PublicEvolving
 public class SchemaUtils {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SchemaUtils.class);
 
     /**
      * create a list of {@link RecordData.FieldGetter} from given {@link Schema} to get Object from
@@ -120,7 +126,35 @@ public class SchemaUtils {
 
     private static Schema applyAddColumnEvent(AddColumnEvent event, Schema oldSchema) {
         LinkedList<Column> columns = new LinkedList<>(oldSchema.getColumns());
+        Set<String> existingColumnNames =
+                columns.stream()
+                        .map(Column::getName)
+                        .collect(Collectors.toCollection(HashSet::new));
         for (AddColumnEvent.ColumnWithPosition columnWithPosition : event.getAddedColumns()) {
+            // Skip columns that already exist in the schema to handle duplicate AddColumnEvents
+            // (e.g., from gh-ost online schema migrations)
+            if (existingColumnNames.contains(columnWithPosition.getAddColumn().getName())) {
+                Column incomingColumn = columnWithPosition.getAddColumn();
+                columns.stream()
+                        .filter(c -> c.getName().equals(incomingColumn.getName()))
+                        .findFirst()
+                        .ifPresent(
+                                existingColumn -> {
+                                    if (!existingColumn
+                                            .getType()
+                                            .equals(incomingColumn.getType())) {
+                                        LOG.warn(
+                                                "Skipping duplicate AddColumn for column '{}' in table {}, "
+                                                        + "but definitions differ: existing type = {}, incoming type = {}. "
+                                                        + "The existing column definition will be kept.",
+                                                incomingColumn.getName(),
+                                                event.tableId(),
+                                                existingColumn.getType(),
+                                                incomingColumn.getType());
+                                    }
+                                });
+                continue;
+            }
             switch (columnWithPosition.getPosition()) {
                 case FIRST:
                     {
@@ -165,8 +199,65 @@ public class SchemaUtils {
                         break;
                     }
             }
+            existingColumnNames.add(columnWithPosition.getAddColumn().getName());
         }
         return oldSchema.copy(columns);
+    }
+
+    /**
+     * Filters out redundant columns from an {@link AddColumnEvent} that already exist in the
+     * current schema, and deduplicates columns within the same event. Returns {@link
+     * Optional#empty()} if all columns are redundant.
+     *
+     * <p>This handles cases like gh-ost online schema migrations where duplicate ADD COLUMN events
+     * may be emitted for the same column.
+     *
+     * <p><b>Note:</b> Duplicate detection is based on column name only. If a duplicate
+     * AddColumnEvent arrives with a different type for an existing column name, a warning will be
+     * logged but the column will still be skipped. This is the expected behavior for online schema
+     * migration tools (gh-ost, pt-osc) where duplicate events are always exact copies.
+     */
+    public static Optional<AddColumnEvent> filterRedundantAddColumns(
+            Schema currentSchema, AddColumnEvent event) {
+        Map<String, Column> existingColumns = new HashMap<>();
+        for (Column col : currentSchema.getColumns()) {
+            existingColumns.put(col.getName(), col);
+        }
+        Set<String> seenColumns = new HashSet<>(existingColumns.keySet());
+        List<AddColumnEvent.ColumnWithPosition> nonRedundant = new ArrayList<>();
+        List<String> filteredColumnNames = new ArrayList<>();
+        for (AddColumnEvent.ColumnWithPosition cwp : event.getAddedColumns()) {
+            String colName = cwp.getAddColumn().getName();
+            if (seenColumns.add(colName)) {
+                nonRedundant.add(cwp);
+            } else {
+                filteredColumnNames.add(colName);
+                Column existingCol = existingColumns.get(colName);
+                if (existingCol != null
+                        && !existingCol.getType().equals(cwp.getAddColumn().getType())) {
+                    LOG.warn(
+                            "Skipping duplicate column '{}' for table {} but types differ: "
+                                    + "existing={}, incoming={}",
+                            colName,
+                            event.tableId(),
+                            existingCol.getType(),
+                            cwp.getAddColumn().getType());
+                }
+            }
+        }
+        if (nonRedundant.isEmpty()) {
+            return Optional.empty();
+        }
+        if (!filteredColumnNames.isEmpty()) {
+            LOG.debug(
+                    "Filtered redundant columns {} from AddColumnEvent for table {}",
+                    filteredColumnNames,
+                    event.tableId());
+        }
+        if (nonRedundant.size() == event.getAddedColumns().size()) {
+            return Optional.of(event);
+        }
+        return Optional.of(new AddColumnEvent(event.tableId(), nonRedundant));
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {

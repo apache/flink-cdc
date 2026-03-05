@@ -32,9 +32,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** A test for the {@link org.apache.flink.cdc.common.utils.SchemaUtils}. */
 class SchemaUtilsTest {
@@ -483,5 +485,232 @@ class SchemaUtilsTest {
                                                 .option("Key2", "Value2")
                                                 .build()))
                 .isExactlyInstanceOf(IllegalStateException.class);
+    }
+
+    // ========================== Tests for duplicate AddColumnEvent handling
+    // ==========================
+
+    @Test
+    void testFilterRedundantAddColumns_allDuplicates() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING())));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("age", DataTypes.INT())));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Optional<AddColumnEvent> result =
+                SchemaUtils.filterRedundantAddColumns(schema, addColumnEvent);
+        Assertions.assertThat(result).isEmpty();
+    }
+
+    @Test
+    void testFilterRedundantAddColumns_noDuplicates() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("age", DataTypes.INT())));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("email", DataTypes.STRING())));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Optional<AddColumnEvent> result =
+                SchemaUtils.filterRedundantAddColumns(schema, addColumnEvent);
+        Assertions.assertThat(result).isPresent();
+        Assertions.assertThat(result.get().getAddedColumns()).hasSize(2);
+        Assertions.assertThat(result.get()).isEqualTo(addColumnEvent);
+    }
+
+    @Test
+    void testFilterRedundantAddColumns_partialDuplicates() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING())));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("age", DataTypes.INT())));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Optional<AddColumnEvent> result =
+                SchemaUtils.filterRedundantAddColumns(schema, addColumnEvent);
+        Assertions.assertThat(result).isPresent();
+        Assertions.assertThat(result.get().getAddedColumns()).hasSize(1);
+        Assertions.assertThat(result.get().getAddedColumns().get(0).getAddColumn().getName())
+                .isEqualTo("age");
+    }
+
+    @Test
+    void testFilterRedundantAddColumns_emptyAddedColumns() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, Collections.emptyList());
+
+        Optional<AddColumnEvent> result =
+                SchemaUtils.filterRedundantAddColumns(schema, addColumnEvent);
+        Assertions.assertThat(result).isEmpty();
+    }
+
+    @Test
+    void testApplyAddColumnEvent_idempotent() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING())));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("age", DataTypes.INT())));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Schema result = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .build());
+    }
+
+    @Test
+    void testApplyAddColumnEvent_allDuplicates() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING())));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("age", DataTypes.INT())));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Schema result = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .physicalColumn("age", DataTypes.INT())
+                                .build());
+    }
+
+    @Test
+    void testFilterRedundantAddColumns_withPositions() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING()),
+                        AddColumnEvent.ColumnPosition.AFTER,
+                        "id"));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("age", DataTypes.INT()),
+                        AddColumnEvent.ColumnPosition.AFTER,
+                        "name"));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Optional<AddColumnEvent> result =
+                SchemaUtils.filterRedundantAddColumns(schema, addColumnEvent);
+        Assertions.assertThat(result).isPresent();
+        Assertions.assertThat(result.get().getAddedColumns()).hasSize(1);
+
+        AddColumnEvent.ColumnWithPosition remaining = result.get().getAddedColumns().get(0);
+        Assertions.assertThat(remaining.getAddColumn().getName()).isEqualTo("age");
+        Assertions.assertThat(remaining.getPosition())
+                .isEqualTo(AddColumnEvent.ColumnPosition.AFTER);
+        Assertions.assertThat(remaining.getExistedColumnName()).isEqualTo("name");
+    }
+
+    @Test
+    void testFilterRedundantAddColumns_intraEventDuplicates() {
+        Schema schema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+        TableId tableId = TableId.tableId("default", "schema", "table");
+        AddColumnEvent event =
+                new AddColumnEvent(
+                        tableId,
+                        Arrays.asList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("name", DataTypes.STRING())),
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("name", DataTypes.STRING()))));
+        Optional<AddColumnEvent> result = SchemaUtils.filterRedundantAddColumns(schema, event);
+        Assertions.assertThat(result).isPresent();
+        Assertions.assertThat(result.get().getAddedColumns()).hasSize(1);
+        Assertions.assertThat(result.get().getAddedColumns().get(0).getAddColumn().getName())
+                .isEqualTo("name");
+    }
+
+    @Test
+    void testApplyAddColumnEvent_duplicateWithinSameEvent() {
+        TableId tableId = TableId.parse("default.default.table1");
+        Schema schema = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
+
+        List<AddColumnEvent.ColumnWithPosition> addedColumns = new ArrayList<>();
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING())));
+        addedColumns.add(
+                new AddColumnEvent.ColumnWithPosition(
+                        Column.physicalColumn("name", DataTypes.STRING())));
+        AddColumnEvent addColumnEvent = new AddColumnEvent(tableId, addedColumns);
+
+        Schema result = SchemaUtils.applySchemaChangeEvent(schema, addColumnEvent);
+        Assertions.assertThat(result)
+                .isEqualTo(
+                        Schema.newBuilder()
+                                .physicalColumn("id", DataTypes.INT())
+                                .physicalColumn("name", DataTypes.STRING())
+                                .build());
     }
 }
