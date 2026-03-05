@@ -417,6 +417,51 @@ pipeline:
 
 Notice that given classpath must be fully-qualified, and corresponding `jar` files must be included in Flink `/lib` folder, or be passed with `flink-cdc.sh --jar` option.
 
+### UDF Options
+
+You can pass extra options to UDFs by adding an `options` block. These options will be available in the `open` method through `UserDefinedFunctionContext.configuration()`:
+
+```yaml
+pipeline:
+  user-defined-function:
+    - name: query_redis
+      classpath: com.example.flink.cdc.udf.RedisQueryFunction
+      options:
+        hostname: localhost
+        port: "6379"
+        cache.enabled: "true"
+```
+
+And in your UDF implementation, you can access these options by defining `ConfigOption` instances:
+
+```java
+import org.apache.flink.cdc.common.configuration.ConfigOption;
+import org.apache.flink.cdc.common.configuration.ConfigOptions;
+
+public class RedisQueryFunction implements UserDefinedFunction {
+    private static final ConfigOption<String> HOSTNAME =
+        ConfigOptions.key("hostname").stringType().noDefaultValue();
+    private static final ConfigOption<Integer> PORT =
+        ConfigOptions.key("port").intType().defaultValue(6379);
+
+    private String hostname;
+    private int port;
+    
+    @Override
+    public void open(UserDefinedFunctionContext context) throws Exception {
+        hostname = context.configuration().get(HOSTNAME);
+        port = context.configuration().get(PORT);
+        // Initialize your connection here...
+    }
+    
+    public Object eval(String key) {
+        // Query Redis using hostname and port...
+    }
+}
+```
+
+The `options` field is optional. If not specified, an empty configuration will be passed to the UDF.
+
 After being correctly registered, UDFs could be used in both `projection` and `filter` expressions, just like built-in functions:
 
 ```yaml
