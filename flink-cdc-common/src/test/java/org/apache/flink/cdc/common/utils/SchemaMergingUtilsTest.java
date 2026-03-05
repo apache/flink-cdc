@@ -496,6 +496,74 @@ class SchemaMergingUtilsTest {
     }
 
     @Test
+    void testGetSchemaDifferenceForProjectionChanges() {
+        // Simulate projection change: new schema has an added column
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING),
+                                of("id", BIGINT, "name", STRING, "age", INT)))
+                .as("projection change adding a column should produce AddColumnEvent")
+                .containsExactly(
+                        new AddColumnEvent(
+                                TABLE_ID,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("age", INT),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "name"))));
+
+        // Simulate projection change: new schema has a removed column
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING, "age", INT),
+                                of("id", BIGINT, "name", STRING)))
+                .as("projection change removing a column should produce DropColumnEvent")
+                .containsExactly(new DropColumnEvent(TABLE_ID, Collections.singletonList("age")));
+
+        // Simulate projection change: column type changed (e.g. STRING -> VARCHAR(255))
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING),
+                                of("id", BIGINT, "name", DataTypes.VARCHAR(255))))
+                .as(
+                        "projection change with different column type should produce AlterColumnTypeEvent")
+                .containsExactly(
+                        new AlterColumnTypeEvent(
+                                TABLE_ID,
+                                Collections.singletonMap("name", DataTypes.VARCHAR(255)),
+                                Collections.singletonMap("name", STRING)));
+
+        // Simulate projection change: both added and removed columns (column swap)
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING),
+                                of("id", BIGINT, "email", STRING)))
+                .as("projection change swapping columns should produce Add + Drop events")
+                .containsExactly(
+                        new AddColumnEvent(
+                                TABLE_ID,
+                                Collections.singletonList(
+                                        new AddColumnEvent.ColumnWithPosition(
+                                                Column.physicalColumn("email", STRING),
+                                                AddColumnEvent.ColumnPosition.AFTER,
+                                                "id"))),
+                        new DropColumnEvent(TABLE_ID, Collections.singletonList("name")));
+
+        // Simulate projection change: identical schemas should produce no diff
+        Assertions.assertThat(
+                        getSchemaDifference(
+                                TABLE_ID,
+                                of("id", BIGINT, "name", STRING),
+                                of("id", BIGINT, "name", STRING)))
+                .as("identical schemas should produce no schema change events")
+                .isEmpty();
+    }
+
+    @Test
     void testMergeAndDiff() {
         Assertions.assertThat(mergeAndDiff(null, of("id", BIGINT, "name", VARCHAR(17))))
                 .as("test merging into an empty schema")

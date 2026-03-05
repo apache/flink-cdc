@@ -288,12 +288,29 @@ public class SchemaCoordinator extends SchemaRegistry {
 
             List<SchemaChangeEvent> rawSchemaChangeEvents = new ArrayList<>();
             if (upstreamDependencies.size() == 1) {
-                // If it's a one-by-one routing rule, we can simply forward it to downstream sink.
-                SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
-                rawSchemaChangeEvents.add(rawEvent);
-                LOG.info(
-                        "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
-                        rawEvent);
+                // If it's a one-by-one routing rule, we can simply forward it to downstream
+                // sink. However, if the incoming event is a CreateTableEvent for an
+                // already-known evolved table (e.g. after restart with changed projections),
+                // we must compute the schema diff instead of forwarding the raw
+                // CreateTableEvent, which would fail at the sink.
+                if (event instanceof CreateTableEvent && currentEvolvedSchema != null) {
+                    CreateTableEvent createTableEvent = (CreateTableEvent) event;
+                    List<SchemaChangeEvent> diffEvents =
+                            SchemaMergingUtils.getSchemaDifference(
+                                    evolvedTableId,
+                                    currentEvolvedSchema,
+                                    createTableEvent.getSchema());
+                    rawSchemaChangeEvents.addAll(diffEvents);
+                    LOG.info(
+                            "Step 3.3 - It's a one-by-one routing but CreateTableEvent for existing table. Computed diff events: {}.",
+                            diffEvents);
+                } else {
+                    SchemaChangeEvent rawEvent = event.copy(evolvedTableId);
+                    rawSchemaChangeEvents.add(rawEvent);
+                    LOG.info(
+                            "Step 3.3 - It's an one-by-one routing and could be forwarded as {}.",
+                            rawEvent);
+                }
             } else {
                 Set<Schema> toBeMergedSchemas =
                         SchemaDerivator.reverseLookupDependingUpstreamSchemas(
