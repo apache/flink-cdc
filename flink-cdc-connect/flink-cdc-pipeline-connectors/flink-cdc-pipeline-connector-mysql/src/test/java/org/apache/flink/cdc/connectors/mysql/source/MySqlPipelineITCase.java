@@ -540,8 +540,8 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                         .tableList(databaseName + ".*")
                         .excludeTableList(
                                 String.format(
-                                        "%s.customers, %s.orders, %s.multi_max_table",
-                                        databaseName, databaseName, databaseName))
+                                        "%s.customers, %s.orders, %s.multi_max_table, %s.uppercase_products",
+                                        databaseName, databaseName, databaseName, databaseName))
                         .startupOptions(StartupOptions.initial())
                         .serverId(getServerId(env.getParallelism()))
                         .serverTimeZone("UTC")
