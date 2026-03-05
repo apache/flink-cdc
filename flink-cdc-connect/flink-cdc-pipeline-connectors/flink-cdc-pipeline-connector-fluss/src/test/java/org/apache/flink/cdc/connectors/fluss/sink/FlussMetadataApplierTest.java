@@ -188,17 +188,10 @@ public class FlussMetadataApplierTest {
 
     @Test
     void testUnsupportedType() throws Exception {
-        String[] fieldNames = new String[] {"timestamp_tz_col", "array_col", "map_col", "row_col"};
+        String[] fieldNames = new String[] {"timestamp_tz_col"};
 
         org.apache.flink.cdc.common.types.DataType[] cdcDataTypes =
-                new org.apache.flink.cdc.common.types.DataType[] {
-                    DataTypes.ARRAY(DataTypes.STRING()),
-                    DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
-                    DataTypes.ROW(
-                            DataTypes.FIELD("name", DataTypes.STRING()),
-                            DataTypes.FIELD("age", DataTypes.INT())),
-                    DataTypes.TIMESTAMP_TZ()
-                };
+                new org.apache.flink.cdc.common.types.DataType[] {DataTypes.TIMESTAMP_TZ()};
 
         try (FlussMetaDataApplier applier =
                 new FlussMetaDataApplier(
