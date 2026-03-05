@@ -337,6 +337,21 @@ pipeline:
       <td>CDC 中长度表示字符数，而 StarRocks 中长度表示字节数。根据 UTF-8 编码，一个中文字符占用三个字节，因此 CDC 中的长度对应到 StarRocks
           中为 n * 3。</td>
     </tr>
+    <tr>
+      <td>BINARY(n)</td>
+      <td>VARBINARY(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>VARBINARY(n)</td>
+      <td>VARBINARY(n)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>BYTES</td>
+      <td>VARBINARY(1048576)</td>
+      <td>BYTES 映射为最大长度为 1048576 的 VARBINARY。</td>
+    </tr>
     </tbody>
 </table>
 </div>

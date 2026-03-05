@@ -38,6 +38,7 @@ import org.apache.flink.cdc.common.event.DropColumnEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DataType;
 import org.apache.flink.cdc.common.types.DateType;
@@ -48,6 +49,7 @@ import org.apache.flink.cdc.common.types.LocalZonedTimestampType;
 import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.runtime.typeutils.BinaryRecordDataGenerator;
@@ -77,6 +79,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -482,6 +485,77 @@ class EventRecordSerializationSchemaTest {
 
         verifySerializeResult(
                 tableId, "{\"id\":1,\"not_null_time\":\"12:00:00\",\"__op\":0}", result);
+    }
+
+    @Test
+    void testBinaryTypeSerialization() throws Exception {
+        TableId tableId = TableId.parse("test.binary_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("bin_col", new BinaryType(10))
+                        .physicalColumn("varbin_col", new VarBinaryType(255))
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        byte[] binData = new byte[] {1, 2, 3, 4, 5};
+        byte[] varBinData = new byte[] {0x0A, 0x0B, 0x0C};
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(
+                        tableId, generator.generate(new Object[] {1, binData, varBinData}));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+        Assertions.assertThat(result.getDatabase()).isEqualTo(tableId.getSchemaName());
+        Assertions.assertThat(result.getTable()).isEqualTo(tableId.getTableName());
+
+        // Binary data is serialized as Base64-encoded strings in JSON by Jackson
+        String expectedBin = Base64.getEncoder().encodeToString(binData);
+        String expectedVarBin = Base64.getEncoder().encodeToString(varBinData);
+        String expectedJson =
+                String.format(
+                        "{\"id\":1,\"bin_col\":\"%s\",\"varbin_col\":\"%s\",\"__op\":0}",
+                        expectedBin, expectedVarBin);
+
+        SortedMap<String, Object> expectMap =
+                objectMapper.readValue(
+                        expectedJson, new TypeReference<TreeMap<String, Object>>() {});
+        SortedMap<String, Object> actualMap =
+                objectMapper.readValue(
+                        result.getRow(), new TypeReference<TreeMap<String, Object>>() {});
+        Assertions.assertThat(actualMap).isEqualTo(expectMap);
+    }
+
+    @Test
+    void testBinaryTypeWithNullValues() throws Exception {
+        TableId tableId = TableId.parse("test.binary_null_table");
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("id", new IntType())
+                        .physicalColumn("nullable_bin", new VarBinaryType(100))
+                        .primaryKey("id")
+                        .build();
+
+        CreateTableEvent createTableEvent = new CreateTableEvent(tableId, schema);
+        Assertions.assertThat(serializer.serialize(createTableEvent)).isNull();
+
+        BinaryRecordDataGenerator generator =
+                new BinaryRecordDataGenerator(schema.getColumnDataTypes().toArray(new DataType[0]));
+
+        DataChangeEvent insertEvent =
+                DataChangeEvent.insertEvent(tableId, generator.generate(new Object[] {1, null}));
+
+        StarRocksRowData result = serializer.serialize(insertEvent);
+        Assertions.assertThat(result).isNotNull();
+
+        verifySerializeResult(tableId, "{\"id\":1,\"__op\":0}", result);
     }
 
     private void verifySerializeResult(

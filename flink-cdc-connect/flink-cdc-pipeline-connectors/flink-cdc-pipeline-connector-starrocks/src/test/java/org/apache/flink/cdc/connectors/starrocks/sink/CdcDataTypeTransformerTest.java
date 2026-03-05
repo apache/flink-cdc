@@ -17,8 +17,11 @@
 
 package org.apache.flink.cdc.connectors.starrocks.sink;
 
+import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.CharType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DecimalType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
@@ -145,5 +148,39 @@ class CdcDataTypeTransformerTest {
         Assertions.assertThat(largeLengthColumn.getColumnSize())
                 .hasValue(StarRocksUtils.MAX_VARCHAR_SIZE);
         Assertions.assertThat(largeLengthColumn.isNullable()).isTrue();
+    }
+
+    @Test
+    void testBinaryType() {
+        StarRocksColumn.Builder builder =
+                new StarRocksColumn.Builder().setColumnName("binary_col").setOrdinalPosition(0);
+        new BinaryType(17).accept(new StarRocksUtils.CdcDataTypeTransformer(false, builder));
+        StarRocksColumn column = builder.build();
+        Assertions.assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY_TYPE);
+        Assertions.assertThat(column.getColumnSize()).hasValue(17);
+        Assertions.assertThat(column.isNullable()).isTrue();
+    }
+
+    @Test
+    void testVarBinaryType() {
+        StarRocksColumn.Builder builder =
+                new StarRocksColumn.Builder().setColumnName("varbinary_col").setOrdinalPosition(0);
+        new VarBinaryType(255).accept(new StarRocksUtils.CdcDataTypeTransformer(false, builder));
+        StarRocksColumn column = builder.build();
+        Assertions.assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY_TYPE);
+        Assertions.assertThat(column.getColumnSize()).hasValue(255);
+        Assertions.assertThat(column.isNullable()).isTrue();
+    }
+
+    @Test
+    void testBytesType() {
+        // BYTES is VarBinaryType with MAX_LENGTH, should be capped to MAX_VARBINARY_SIZE
+        StarRocksColumn.Builder builder =
+                new StarRocksColumn.Builder().setColumnName("bytes_col").setOrdinalPosition(0);
+        DataTypes.BYTES().accept(new StarRocksUtils.CdcDataTypeTransformer(false, builder));
+        StarRocksColumn column = builder.build();
+        Assertions.assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY_TYPE);
+        Assertions.assertThat(column.getColumnSize()).hasValue(StarRocksUtils.MAX_VARBINARY_SIZE);
+        Assertions.assertThat(column.isNullable()).isTrue();
     }
 }
