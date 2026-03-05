@@ -334,6 +334,9 @@ public class MySqlChunkSplitter implements ChunkSplitter {
         Object chunkEnd =
                 StatementUtils.queryNextChunkMax(
                         jdbc, tableId, splitColumnName, chunkSize, previousChunkEnd);
+        if (chunkEnd == null) {
+            return null;
+        }
         if (Objects.equals(previousChunkEnd, chunkEnd)) {
             // we don't allow equal chunk start and end,
             // should query the next one larger than chunkEnd
