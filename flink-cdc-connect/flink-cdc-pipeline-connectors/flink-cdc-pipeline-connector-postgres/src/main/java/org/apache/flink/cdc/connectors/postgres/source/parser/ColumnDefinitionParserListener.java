@@ -68,6 +68,6 @@ public class ColumnDefinitionParserListener extends PostgreSQLParserBaseListener
         if (ctx.NOT() != null) {
             columnEditor.optional(false);
         }
-        super.enterColconstraintelem(ctx);
+        super.exitColconstraintelem(ctx);
     }
 }
