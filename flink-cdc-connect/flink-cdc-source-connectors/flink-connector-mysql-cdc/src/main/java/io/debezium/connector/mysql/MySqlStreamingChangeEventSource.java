@@ -24,6 +24,7 @@ import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDataDeserializationException;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 import com.github.shyiko.mysql.binlog.event.deserialization.GtidEventDataDeserializer;
+import com.github.shyiko.mysql.binlog.event.deserialization.TableIdFilter;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import com.github.shyiko.mysql.binlog.network.AuthenticationException;
 import com.github.shyiko.mysql.binlog.network.DefaultSSLSocketFactory;
@@ -99,6 +100,9 @@ import static io.debezium.util.Strings.isNullOrEmpty;
  *
  * <p>Line 951-963 : Use iterator instead of index-based loop to avoid O(n²) complexity when
  * processing LinkedList rows in handleChange method. See FLINK-38846.
+ *
+ * <p>Line 317, 1358-1366 : Use a {@link TableIdFilter} to skip binlog deserialization of unmatched
+ * tables.
  */
 public class MySqlStreamingChangeEventSource
         implements StreamingChangeEventSource<MySqlPartition, MySqlOffsetContext> {
@@ -316,30 +320,38 @@ public class MySqlStreamingChangeEventSource
                     }
                 };
 
+        final TableIdFilter tableIdFilter = getTableIdDeserializationFilter();
+
         // Add our custom deserializers ...
         eventDeserializer.setEventDataDeserializer(EventType.STOP, new StopEventDataDeserializer());
         eventDeserializer.setEventDataDeserializer(EventType.GTID, new GtidEventDataDeserializer());
         eventDeserializer.setEventDataDeserializer(
                 EventType.WRITE_ROWS,
-                new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId));
+                new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId)
+                        .setTableIdFilter(tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.UPDATE_ROWS,
-                new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId));
+                new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId)
+                        .setTableIdFilter(tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.DELETE_ROWS,
-                new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId));
+                new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId)
+                        .setTableIdFilter(tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.EXT_WRITE_ROWS,
                 new RowDeserializers.WriteRowsDeserializer(tableMapEventByTableId)
-                        .setMayContainExtraInformation(true));
+                        .setMayContainExtraInformation(true)
+                        .setTableIdFilter(tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.EXT_UPDATE_ROWS,
                 new RowDeserializers.UpdateRowsDeserializer(tableMapEventByTableId)
-                        .setMayContainExtraInformation(true));
+                        .setMayContainExtraInformation(true)
+                        .setTableIdFilter(tableIdFilter));
         eventDeserializer.setEventDataDeserializer(
                 EventType.EXT_DELETE_ROWS,
                 new RowDeserializers.DeleteRowsDeserializer(tableMapEventByTableId)
-                        .setMayContainExtraInformation(true));
+                        .setMayContainExtraInformation(true)
+                        .setTableIdFilter(tableIdFilter));
         client.setEventDeserializer(eventDeserializer);
     }
 
@@ -1348,6 +1360,15 @@ public class MySqlStreamingChangeEventSource
         }
 
         return null;
+    }
+
+    private TableIdFilter getTableIdDeserializationFilter() {
+        return tableId -> {
+            // since only subscribed table is recording schema, the result could be null
+            TableId table = taskContext.getSchema().getTableId(tableId);
+            return table != null
+                    && connectorConfig.getTableFilters().dataCollectionFilter().isIncluded(table);
+        };
     }
 
     private void logStreamingSourceState() {
