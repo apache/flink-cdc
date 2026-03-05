@@ -35,12 +35,14 @@ import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.expressions.Literal;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -148,54 +150,137 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        4,
-                                        true,
-                                        "description",
-                                        Types.StringType.get(),
-                                        "column for descriptions"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal")),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .withWriteDefault(Literal.of("John Smith"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .withWriteDefault(Literal.of(1))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(4)
+                                        .asOptional()
+                                        .withName("description")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for descriptions")
+                                        .withWriteDefault(Literal.of("not important"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .withWriteDefault(Literal.of(false))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .withWriteDefault(Literal.of(1.0f))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .withWriteDefault(Literal.of(1.0d))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
+                                        .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
-        // Add column.
+        // Verify that schema without default values is NOT the same.
+        org.apache.iceberg.Schema schemaWithoutDefaults =
+                new org.apache.iceberg.Schema(
+                        0,
+                        Arrays.asList(
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(4)
+                                        .asOptional()
+                                        .withName("description")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for descriptions")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .build()),
+                        new HashSet<>(Collections.singletonList(1)));
+        assertThat(table.schema().sameSchema(schemaWithoutDefaults)).isFalse();
+
+        // Add column with default value.
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(
                         tableId,
@@ -205,63 +290,84 @@ public class IcebergMetadataApplierTest {
                                                 "newIntColumn",
                                                 DataTypes.INT(),
                                                 "comment for newIntColumn",
-                                                "not important"))));
+                                                "42"))));
         icebergMetadataApplier.applySchemaChange(addColumnEvent);
         table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
         schema =
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        4,
-                                        true,
-                                        "description",
-                                        Types.StringType.get(),
-                                        "column for descriptions"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "newIntColumn",
-                                        Types.IntegerType.get(),
-                                        "comment for newIntColumn")),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .withWriteDefault(Literal.of("John Smith"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .withWriteDefault(Literal.of(1))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(4)
+                                        .asOptional()
+                                        .withName("description")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for descriptions")
+                                        .withWriteDefault(Literal.of("not important"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .withWriteDefault(Literal.of(false))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .withWriteDefault(Literal.of(1.0f))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .withWriteDefault(Literal.of(1.0d))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(9)
+                                        .asOptional()
+                                        .withName("newIntColumn")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("comment for newIntColumn")
+                                        .withWriteDefault(Literal.of(42))
+                                        .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
@@ -274,50 +380,69 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "newIntColumn",
-                                        Types.IntegerType.get(),
-                                        "comment for newIntColumn")),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .withWriteDefault(Literal.of("John Smith"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .withWriteDefault(Literal.of(1))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .withWriteDefault(Literal.of(false))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .withWriteDefault(Literal.of(1.0f))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .withWriteDefault(Literal.of(1.0d))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(9)
+                                        .asOptional()
+                                        .withName("newIntColumn")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("comment for newIntColumn")
+                                        .withWriteDefault(Literal.of(42))
+                                        .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
@@ -330,50 +455,69 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "renamedIntColumn",
-                                        Types.IntegerType.get(),
-                                        "comment for newIntColumn")),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .withWriteDefault(Literal.of("John Smith"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .withWriteDefault(Literal.of(1))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .withWriteDefault(Literal.of(false))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .withWriteDefault(Literal.of(1.0f))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .withWriteDefault(Literal.of(1.0d))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(9)
+                                        .asOptional()
+                                        .withName("renamedIntColumn")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("comment for newIntColumn")
+                                        .withWriteDefault(Literal.of(42))
+                                        .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
 
@@ -387,50 +531,69 @@ public class IcebergMetadataApplierTest {
                 new org.apache.iceberg.Schema(
                         0,
                         Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "renamedIntColumn",
-                                        Types.LongType.get(),
-                                        "comment for newIntColumn")),
+                                Types.NestedField.builder()
+                                        .withId(1)
+                                        .asRequired()
+                                        .withName("id")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("column for id")
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(2)
+                                        .asRequired()
+                                        .withName("name")
+                                        .ofType(Types.StringType.get())
+                                        .withDoc("column for name")
+                                        .withWriteDefault(Literal.of("John Smith"))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(3)
+                                        .asOptional()
+                                        .withName("tinyIntCol")
+                                        .ofType(Types.IntegerType.get())
+                                        .withDoc("column for tinyIntCol")
+                                        .withWriteDefault(Literal.of(1))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(5)
+                                        .asOptional()
+                                        .withName("bool_column")
+                                        .ofType(Types.BooleanType.get())
+                                        .withDoc("column for bool")
+                                        .withWriteDefault(Literal.of(false))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(6)
+                                        .asOptional()
+                                        .withName("float_column")
+                                        .ofType(Types.FloatType.get())
+                                        .withDoc("column for float")
+                                        .withWriteDefault(Literal.of(1.0f))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(7)
+                                        .asOptional()
+                                        .withName("double_column")
+                                        .ofType(Types.DoubleType.get())
+                                        .withDoc("column for double")
+                                        .withWriteDefault(Literal.of(1.0d))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(8)
+                                        .asOptional()
+                                        .withName("decimal_column")
+                                        .ofType(Types.DecimalType.of(10, 2))
+                                        .withDoc("column for decimal")
+                                        .withWriteDefault(Literal.of(new BigDecimal("1.00")))
+                                        .build(),
+                                Types.NestedField.builder()
+                                        .withId(9)
+                                        .asOptional()
+                                        .withName("renamedIntColumn")
+                                        .ofType(Types.LongType.get())
+                                        .withDoc("comment for newIntColumn")
+                                        .withWriteDefault(Literal.of(42L))
+                                        .build()),
                         new HashSet<>(Collections.singletonList(1)));
         assertThat(table.schema().sameSchema(schema)).isTrue();
     }
