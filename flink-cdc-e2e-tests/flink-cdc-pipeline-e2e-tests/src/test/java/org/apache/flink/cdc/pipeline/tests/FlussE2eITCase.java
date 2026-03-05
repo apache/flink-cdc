@@ -53,7 +53,7 @@ public class FlussE2eITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlussE2eITCase.class);
     private static final Duration FLUSS_TESTCASE_TIMEOUT = Duration.ofMinutes(3);
-    private static final String flussImageTag = "apache/fluss:0.8.0-incubating";
+    private static final String flussImageTag = "apache/fluss:0.9.0-incubating";
     private static final String zooKeeperImageTag = "zookeeper:3.9.2";
 
     private static final List<String> flussCoordinatorProperties =
