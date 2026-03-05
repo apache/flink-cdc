@@ -1737,7 +1737,7 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
                                         Column.physicalColumn(
                                                 "DESC1", DataTypes.VARCHAR(45).notNull())))));
 
-        statement.execute(String.format("ALTER TABLE %s.products MODIFY DESC1 NULL", "DEBEZIUM"));
+        statement.execute(String.format("ALTER TABLE %s.products MODIFY DESC1 NULL", "debezium"));
         expected.add(
                 new AlterColumnTypeEvent(
                         tableId, Collections.singletonMap("DESC1", DataTypes.VARCHAR(45))));
