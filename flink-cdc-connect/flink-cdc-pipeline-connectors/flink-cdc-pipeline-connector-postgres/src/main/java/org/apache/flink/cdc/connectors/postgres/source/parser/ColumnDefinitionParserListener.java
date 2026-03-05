@@ -46,7 +46,7 @@ public class ColumnDefinitionParserListener extends PostgreSQLParserBaseListener
         } else {
             columnEditor = Column.editor().name(ctx.getText());
         }
-        super.exitColumnDef(ctx);
+        super.enterColumnDef(ctx);
     }
 
     @Override
