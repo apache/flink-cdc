@@ -150,6 +150,43 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
         assertThat(actual).isEqualTo(expected);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"products", "uppercase_products"})
+    public void testSnapshotModeWhenTableNameAndColumnIsUpper(String tableName)
+            throws Exception {
+        env.setParallelism(1);
+        inventoryDatabase.createAndInitialize();
+        MySqlSourceConfigFactory configFactory =
+                new MySqlSourceConfigFactory()
+                        .hostname(MYSQL8_CONTAINER.getHost())
+                        .port(MYSQL8_CONTAINER.getDatabasePort())
+                        .username(TEST_USER)
+                        .password(TEST_PASSWORD)
+                        .databaseList(inventoryDatabase.getDatabaseName())
+                        .tableList(inventoryDatabase.getDatabaseName() + "\\." + tableName)
+                        .startupOptions(StartupOptions.snapshot())
+                        .serverId(getServerId(env.getParallelism()))
+                        .serverTimeZone("UTC")
+                        .includeSchemaChanges(SCHEMA_CHANGE_ENABLED.defaultValue());
+
+        FlinkSourceProvider sourceProvider =
+                (FlinkSourceProvider) new MySqlDataSource(configFactory).getEventSourceProvider();
+        CloseableIterator<Event> events =
+                env.fromSource(
+                                sourceProvider.getSource(),
+                                WatermarkStrategy.noWatermarks(),
+                                MySqlDataSourceFactory.IDENTIFIER,
+                                new EventTypeInfo())
+                        .executeAndCollect();
+        Thread.sleep(5_000);
+
+        TableId tableId = TableId.tableId(inventoryDatabase.getDatabaseName(), tableName);
+        List<Event> expected = new ArrayList<>();
+        expected.add(getProductsCreateTableEvent(tableId));
+        List<Event> actual = fetchResults(events, expected.size());
+        assertThat(actual).isEqualTo(expected);
+    }
+
     private CreateTableEvent getProductsCreateTableEvent(TableId tableId) {
         return new CreateTableEvent(
                 tableId,
