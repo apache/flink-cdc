@@ -39,6 +39,7 @@ import org.apache.flink.cdc.connectors.doris.utils.DorisSchemaUtils;
 
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.apache.doris.flink.sink.writer.serializer.DorisRecord;
 import org.apache.doris.flink.sink.writer.serializer.DorisRecordSerializer;
@@ -143,7 +144,7 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
                                 });
             }
         }
-
+        objectMapper.registerModule(new JavaTimeModule());
         return DorisRecord.of(
                 tableId.getSchemaName(),
                 tableId.getTableName(),
