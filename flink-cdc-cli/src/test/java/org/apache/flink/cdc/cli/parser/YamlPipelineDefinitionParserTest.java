@@ -198,6 +198,15 @@ class YamlPipelineDefinitionParserTest {
     }
 
     @Test
+    void testUdfDefinitionWithOptions() throws Exception {
+        URL resource =
+                Resources.getResource("definitions/pipeline-definition-with-udf-options.yaml");
+        YamlPipelineDefinitionParser parser = new YamlPipelineDefinitionParser();
+        PipelineDef pipelineDef = parser.parse(new Path(resource.toURI()), new Configuration());
+        assertThat(pipelineDef).isEqualTo(pipelineDefWithUdfOptions);
+    }
+
+    @Test
     void testSchemaEvolutionTypesConfiguration() throws Exception {
         testSchemaEvolutionTypesParsing(
                 "evolve",
@@ -665,6 +674,44 @@ class YamlPipelineDefinitionParserTest {
                             new UdfDef(
                                     "format",
                                     "org.apache.flink.cdc.udf.examples.java.FormatFunctionClass")),
+                    Configuration.fromMap(
+                            ImmutableMap.<String, String>builder()
+                                    .put("parallelism", "1")
+                                    .build()));
+
+    private final PipelineDef pipelineDefWithUdfOptions =
+            new PipelineDef(
+                    new SourceDef("values", null, new Configuration()),
+                    new SinkDef(
+                            "values",
+                            null,
+                            new Configuration(),
+                            ImmutableSet.of(
+                                    DROP_COLUMN,
+                                    ALTER_COLUMN_TYPE,
+                                    ADD_COLUMN,
+                                    CREATE_TABLE,
+                                    RENAME_COLUMN)),
+                    Collections.emptyList(),
+                    Collections.singletonList(
+                            new TransformDef(
+                                    "mydb.web_order",
+                                    "*, query_redis(id) as redis_value",
+                                    "id > 0",
+                                    null,
+                                    null,
+                                    null,
+                                    null,
+                                    null)),
+                    Collections.singletonList(
+                            new UdfDef(
+                                    "query_redis",
+                                    "org.apache.flink.cdc.udf.examples.java.RedisQueryFunction",
+                                    ImmutableMap.<String, String>builder()
+                                            .put("hostname", "localhost")
+                                            .put("port", "6379")
+                                            .put("cache.enabled", "true")
+                                            .build())),
                     Configuration.fromMap(
                             ImmutableMap.<String, String>builder()
                                     .put("parallelism", "1")
