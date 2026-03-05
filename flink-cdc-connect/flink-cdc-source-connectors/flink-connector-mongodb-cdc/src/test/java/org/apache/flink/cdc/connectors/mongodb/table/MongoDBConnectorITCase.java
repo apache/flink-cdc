@@ -471,6 +471,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                                 + " weight DECIMAL(10,3),"
                                 + " db_name STRING METADATA FROM 'database_name' VIRTUAL,"
                                 + " collection_name STRING METADATA VIRTUAL,"
+                                + " full_document STRING METADATA FROM 'full_document' VIRTUAL,"
                                 + " PRIMARY KEY (_id) NOT ENFORCED"
                                 + ") WITH ("
                                 + " 'connector' = 'mongodb-cdc',"
@@ -497,6 +498,7 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                         + " weight DECIMAL(10,3),"
                         + " database_name STRING,"
                         + " collection_name STRING,"
+                        + " full_document STRING,"
                         + " PRIMARY KEY (_id) NOT ENFORCED"
                         + ") WITH ("
                         + " 'connector' = 'values',"
@@ -549,6 +551,30 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
 
         waitForSinkSize("meta_sink", 16);
 
+        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("meta_sink");
+
+        // Verify original metadata columns (database_name, collection_name) by stripping
+        // the full_document column (last column) from each row for precise matching
+        List<String> actualWithoutFullDoc =
+                actual.stream()
+                        .map(
+                                row -> {
+                                    // Row format: +I(col1,col2,...,colN,full_document_json)
+                                    // full_document is the last column, strip it
+                                    int lastCommaBeforeJson = row.lastIndexOf(",{\"_id\"");
+                                    if (lastCommaBeforeJson > 0) {
+                                        return row.substring(0, lastCommaBeforeJson) + ")";
+                                    }
+                                    // For -D events, full_document is null
+                                    int lastCommaBeforeNull = row.lastIndexOf(",null)");
+                                    if (lastCommaBeforeNull > 0) {
+                                        return row.substring(0, lastCommaBeforeNull) + ")";
+                                    }
+                                    return row;
+                                })
+                        .sorted()
+                        .collect(Collectors.toList());
+
         List<String> expected =
                 Stream.of(
                                 "+I(100000000000000000000101,scooter,Small 2-wheel scooter,3.140,%s,products)",
@@ -571,8 +597,21 @@ class MongoDBConnectorITCase extends MongoDBSourceTestBase {
                         .sorted()
                         .collect(Collectors.toList());
 
-        List<String> actual = TestValuesTableFactory.getRawResultsAsStrings("meta_sink");
-        Assertions.assertThat(actual).containsExactlyInAnyOrderElementsOf(expected);
+        Assertions.assertThat(actualWithoutFullDoc).containsExactlyInAnyOrderElementsOf(expected);
+
+        // Verify full_document metadata: non-null for all events, contains expected fields
+        for (String row : actual) {
+            Assertions.assertThat(row)
+                    .as("full_document should contain 'name' field")
+                    .contains("\"name\"");
+            Assertions.assertThat(row)
+                    .as("full_document should contain 'description' field")
+                    .contains("\"description\"");
+            Assertions.assertThat(row)
+                    .as("full_document should contain 'weight' field")
+                    .contains("\"weight\"");
+        }
+
         result.getJobClient().get().cancel().get();
     }
 
