@@ -212,7 +212,7 @@ public class FlussMetaDataApplier implements MetadataApplier {
         List<String> currentPartitionKeys = currentTableInfo.getPartitionKeys();
         if (!inferredPartitionKeys.equals(currentPartitionKeys)) {
             throw new ValidationException(
-                    "The table schema inffered by Flink CDC is not matched with current Fluss table schema. "
+                    "The table schema inferred by Flink CDC is not matched with current Fluss table schema. "
                             + "\n New Fluss table's partition keys : "
                             + inferredPartitionKeys
                             + "\n Current Fluss's partition keys: "

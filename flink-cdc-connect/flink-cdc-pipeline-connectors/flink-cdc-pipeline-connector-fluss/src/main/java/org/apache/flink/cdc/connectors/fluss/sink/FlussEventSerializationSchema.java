@@ -113,7 +113,7 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
         } else {
             throw new UnsupportedOperationException(
                     String.format(
-                            "Schema change type %s not supported. Only CreateTableEvent and AddColumnEvent is allowed at the moment.",
+                            "Schema change type %s not supported. Only CreateTableEvent and AddColumnEvent are allowed at the moment.",
                             event.getClass()));
         }
     }
