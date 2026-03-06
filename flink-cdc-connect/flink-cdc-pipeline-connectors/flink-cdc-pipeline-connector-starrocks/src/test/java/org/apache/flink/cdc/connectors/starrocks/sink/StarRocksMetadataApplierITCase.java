@@ -197,11 +197,11 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         Schema schema =
                 Schema.newBuilder()
                         .column(new PhysicalColumn("id", DataTypes.INT().notNull(), "ID"))
-                        // StarRocks sink doesn't support BINARY and BYTES type yet.
-                        // .column(new PhysicalColumn("binary", DataTypes.BINARY(17), "Binary"))
-                        // .column(new PhysicalColumn("varbinary", DataTypes.VARBINARY(17), "Var
-                        // Binary"))
-                        // .column(new PhysicalColumn("bytes", DataTypes.BYTES(), "Bytes"))
+                        .column(new PhysicalColumn("binary", DataTypes.BINARY(17), "Binary"))
+                        .column(
+                                new PhysicalColumn(
+                                        "varbinary", DataTypes.VARBINARY(17), "Var Binary"))
+                        .column(new PhysicalColumn("bytes", DataTypes.BYTES(), "Bytes"))
                         .column(new PhysicalColumn("boolean", DataTypes.BOOLEAN(), "Boolean"))
                         .column(new PhysicalColumn("int", DataTypes.INT(), "Int"))
                         .column(new PhysicalColumn("tinyint", DataTypes.TINYINT(), "Tiny Int"))
@@ -245,6 +245,9 @@ class StarRocksMetadataApplierITCase extends StarRocksSinkTestBase {
         List<String> expected =
                 Arrays.asList(
                         "id | int | NO | true | null",
+                        "binary | varbinary | YES | false | null",
+                        "varbinary | varbinary | YES | false | null",
+                        "bytes | varbinary | YES | false | null",
                         "boolean | boolean | YES | false | null",
                         "int | int | YES | false | null",
                         "tinyint | tinyint | YES | false | null",
