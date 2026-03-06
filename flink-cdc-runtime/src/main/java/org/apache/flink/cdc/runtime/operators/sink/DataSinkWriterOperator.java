@@ -124,6 +124,54 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
     public void open() throws Exception {
         invokeFlinkWriterOperatorMethod("open", new Class<?>[0]);
         copySinkWriter = getFieldValue("sinkWriter");
+        ensureEmitDownstream();
+    }
+
+    /**
+     * Flink 2.2 {@code SinkWriterOperator} sets {@code emitDownstream = sink instanceof
+     * SupportsCommitter}. Sinks like Paimon implement the older {@code TwoPhaseCommittingSink}
+     * rather than Flink 2.x {@code SupportsCommitter}, so committables are silently discarded. This
+     * method forces the flag to {@code true} and fills in the committable serializer so that the
+     * wrapped operator properly emits committables to the downstream committer.
+     */
+    private void ensureEmitDownstream() {
+        try {
+            Field emitField = findField(flinkWriterOperator.getClass(), "emitDownstream");
+            if (emitField == null) {
+                return;
+            }
+            emitField.setAccessible(true);
+            if (!emitField.getBoolean(flinkWriterOperator)) {
+                emitField.setBoolean(flinkWriterOperator, true);
+
+                Field serField = findField(flinkWriterOperator.getClass(), "committableSerializer");
+                if (serField != null) {
+                    serField.setAccessible(true);
+                    if (serField.get(flinkWriterOperator) == null) {
+                        try {
+                            Method getSerializer =
+                                    sink.getClass().getMethod("getCommittableSerializer");
+                            getSerializer.setAccessible(true);
+                            serField.set(flinkWriterOperator, getSerializer.invoke(sink));
+                        } catch (NoSuchMethodException ignored) {
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn("Could not force emitDownstream on wrapped SinkWriterOperator", e);
+        }
+    }
+
+    private static Field findField(Class<?> clazz, String name) {
+        while (clazz != null) {
+            try {
+                return clazz.getDeclaredField(name);
+            } catch (NoSuchFieldException e) {
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return null;
     }
 
     @Override
