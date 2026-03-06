@@ -17,12 +17,12 @@
 
 package org.apache.flink.cdc.connectors.mysql;
 
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.connectors.mysql.debezium.DebeziumUtils;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceConfig;
 import org.apache.flink.cdc.connectors.mysql.source.config.MySqlSourceOptions;
 import org.apache.flink.cdc.debezium.Validator;
 import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.api.ValidationException;
 
 import io.debezium.jdbc.JdbcConnection;
 import org.slf4j.Logger;

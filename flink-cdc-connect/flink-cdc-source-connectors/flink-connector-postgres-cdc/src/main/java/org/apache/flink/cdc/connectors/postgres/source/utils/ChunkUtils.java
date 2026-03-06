@@ -17,8 +17,8 @@
 
 package org.apache.flink.cdc.connectors.postgres.source.utils;
 
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.types.logical.RowType;
 
 import io.debezium.relational.Column;

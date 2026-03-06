@@ -28,7 +28,6 @@ import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
-import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import org.apache.paimon.flink.sink.FlinkStreamPartitioner;
@@ -43,9 +42,11 @@ import java.util.UUID;
 /**
  * A {@link Sink} for Paimon. Maintain this package until Paimon has it own sinkV2 implementation.
  */
+/**
+ * Sink with createCommitter/getCommittableSerializer (detected via reflection for Flink 1.x/2.x).
+ */
 public class PaimonSink<InputT>
-        implements WithPreCommitTopology<InputT, MultiTableCommittable>,
-                SupportsWriterState<InputT, PaimonWriterState> {
+        implements Sink<InputT>, SupportsWriterState<InputT, PaimonWriterState> {
 
     // provided a default commit user.
     public static final String DEFAULT_COMMIT_USER = "admin";
@@ -70,7 +71,16 @@ public class PaimonSink<InputT>
     }
 
     @Override
-    public PaimonWriter<InputT> createWriter(InitContext context) {
+    public PaimonWriter<InputT> createWriter(Sink.InitContext context) {
+        long lastCheckpointId =
+                context.getRestoredCheckpointId()
+                        .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
+        return new PaimonWriter<>(
+                catalogOptions, context.metricGroup(), commitUser, serializer, lastCheckpointId);
+    }
+
+    @Override
+    public PaimonWriter<InputT> createWriter(WriterInitContext context) {
         long lastCheckpointId =
                 context.getRestoredCheckpointId()
                         .orElse(CheckpointIDCounter.INITIAL_CHECKPOINT_ID - 1);
@@ -94,18 +104,18 @@ public class PaimonSink<InputT>
                 lastCheckpointId);
     }
 
-    @Override
+    /** Used for two-phase commit (detected via reflection by DataSinkTranslator). */
     public Committer<MultiTableCommittable> createCommitter() {
         return new PaimonCommitter(catalogOptions, commitUser);
     }
 
-    @Override
+    /** Used for two-phase commit (detected via reflection by DataSinkTranslator). */
     public SimpleVersionedSerializer<MultiTableCommittable> getCommittableSerializer() {
         CommitMessageSerializer fileSerializer = new CommitMessageSerializer();
         return new MultiTableCommittableSerializer(fileSerializer);
     }
 
-    @Override
+    /** Discovered via reflection by DataSinkTranslator. */
     public DataStream<CommittableMessage<MultiTableCommittable>> addPreCommitTopology(
             DataStream<CommittableMessage<MultiTableCommittable>> committables) {
         TypeInformation<CommittableMessage<MultiTableCommittable>> typeInformation =

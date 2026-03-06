@@ -35,6 +35,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.history.TableChanges.TableChange;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -145,7 +146,7 @@ public abstract class SourceSplitSerializer
             }
             TableId tableId = TableId.parse(in.readUTF(), useCatalogBeforeSchema);
             String splitId = in.readUTF();
-            RowType splitKeyType = (RowType) LogicalTypeParser.parse(in.readUTF());
+            RowType splitKeyType = parseRowTypeCompat(in.readUTF());
             Object[] splitBoundaryStart = SerializerUtils.serializedStringToRow(in.readUTF());
             Object[] splitBoundaryEnd = SerializerUtils.serializedStringToRow(in.readUTF());
             Offset highWatermark = readOffsetPosition(version, in);
@@ -195,6 +196,31 @@ public abstract class SourceSplitSerializer
                     isSnapshotCompleted);
         } else {
             throw new IOException("Unknown split kind: " + splitKind);
+        }
+    }
+
+    /**
+     * Parses a serialized {@link RowType} in a way that is compatible with both Flink 1.20 and
+     * Flink 2.2+. Flink 1.20 exposes LogicalTypeParser.parse(String) while Flink 2.2 moved to
+     * LogicalTypeParser.parse(String, ClassLoader). We use reflection to avoid a static dependency
+     * on either specific signature.
+     */
+    private static RowType parseRowTypeCompat(String serialized) throws IOException {
+        try {
+            try {
+                // Flink ≤ 1.20: LogicalTypeParser.parse(String)
+                Method m = LogicalTypeParser.class.getMethod("parse", String.class);
+                return (RowType) m.invoke(null, serialized);
+            } catch (NoSuchMethodException ignore) {
+                // Flink ≥ 2.2: LogicalTypeParser.parse(String, ClassLoader)
+                Method m =
+                        LogicalTypeParser.class.getMethod("parse", String.class, ClassLoader.class);
+                return (RowType)
+                        m.invoke(null, serialized, Thread.currentThread().getContextClassLoader());
+            }
+        } catch (Exception e) {
+            throw new IOException(
+                    "Failed to parse RowType from serialized string: " + serialized, e);
         }
     }
 

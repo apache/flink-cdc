@@ -79,4 +79,10 @@ public class PreTransformOperatorBuilder {
     public PreTransformOperator build() {
         return new PreTransformOperator(transformRules, udfFunctions);
     }
+
+    /** Builds a factory with chaining strategy set (for Flink 2.x compatibility). */
+    public PreTransformOperatorFactory buildFactory() {
+        return new PreTransformOperatorFactory(
+                new PreTransformOperator(transformRules, udfFunctions));
+    }
 }

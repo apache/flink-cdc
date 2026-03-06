@@ -177,7 +177,8 @@ public class LocalZonedTimestampDataSerializer extends TypeSerializer<LocalZoned
             return new LocalZonedTimestampDataSerializer(previousPrecision);
         }
 
-        @Override
+        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
+        // compatibility
         public TypeSerializerSchemaCompatibility<LocalZonedTimestampData>
                 resolveSchemaCompatibility(TypeSerializer<LocalZonedTimestampData> newSerializer) {
             if (!(newSerializer instanceof LocalZonedTimestampDataSerializer)) {
@@ -191,6 +192,23 @@ public class LocalZonedTimestampDataSerializer extends TypeSerializer<LocalZoned
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+        }
+
+        // Flink 2.x changed the abstract method to
+        // resolveSchemaCompatibility(TypeSerializerSnapshot).
+        // No @Override so this also compiles against Flink 1.x where the method does not exist.
+        public TypeSerializerSchemaCompatibility<LocalZonedTimestampData>
+                resolveSchemaCompatibility(
+                        TypeSerializerSnapshot<LocalZonedTimestampData> oldSerializerSnapshot) {
+            if (!(oldSerializerSnapshot instanceof LocalZonedTimestampDataSerializerSnapshot)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            LocalZonedTimestampDataSerializerSnapshot snapshot =
+                    (LocalZonedTimestampDataSerializerSnapshot) oldSerializerSnapshot;
+            if (previousPrecision != snapshot.previousPrecision) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

@@ -48,7 +48,6 @@ import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -102,7 +101,6 @@ public class SessionManageOperator extends AbstractStreamOperator<Event>
     private transient boolean endOfInput;
 
     public SessionManageOperator(MaxComputeOptions options, OperatorID schemaOperatorUid) {
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.options = options;
         this.schemaOperatorUid = schemaOperatorUid;
     }

@@ -15,24 +15,14 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.source;
-
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
-import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
+package org.apache.flink.table.factories;
 
 /**
- * {@code FlinkSourceFunctionProvider} is used to provide a Flink {@link SourceFunction} for reading
- * events from external systems.
+ * Minimal compatibility stub for Flink's CatalogFactory which existed in older Flink table APIs and
+ * is still referenced by some connector artifacts (for example Paimon compiled against Flink 1.x).
+ * This interface is intentionally empty and only restores the missing type so that such connectors
+ * can be loaded on Flink 2.2 runtimes.
  */
-@PublicEvolving
-public interface FlinkSourceFunctionProvider extends EventSourceProvider {
-
-    /** Get the {@link SourceFunction} for reading events from external systems. */
-    SourceFunction<Event> getSourceFunction();
-
-    /** Create a {@link FlinkSourceFunctionProvider} from a {@link SourceFunction}. */
-    static FlinkSourceFunctionProvider of(SourceFunction<Event> sourceFunction) {
-        return () -> sourceFunction;
-    }
-}
+// CHECKSTYLE.OFF: TypeName
+public interface CatalogFactory {}
+// CHECKSTYLE.ON: TypeName

@@ -32,7 +32,6 @@ import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -70,7 +69,6 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
 
     public BatchSchemaOperator(
             List<RouteRule> routingRules, MetadataApplier metadataApplier, String timezone) {
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
         this.routingRules = routingRules;
         this.metadataApplier = metadataApplier;

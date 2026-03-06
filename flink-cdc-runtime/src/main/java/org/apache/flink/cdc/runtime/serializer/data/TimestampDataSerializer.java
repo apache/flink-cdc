@@ -171,7 +171,8 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
             return new TimestampDataSerializer(previousPrecision);
         }
 
-        @Override
+        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
+        // compatibility
         public TypeSerializerSchemaCompatibility<TimestampData> resolveSchemaCompatibility(
                 TypeSerializer<TimestampData> newSerializer) {
             if (!(newSerializer instanceof TimestampDataSerializer)) {
@@ -185,6 +186,22 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+        }
+
+        // Flink 2.x changed the abstract method to
+        // resolveSchemaCompatibility(TypeSerializerSnapshot).
+        // No @Override so this also compiles against Flink 1.x where the method does not exist.
+        public TypeSerializerSchemaCompatibility<TimestampData> resolveSchemaCompatibility(
+                TypeSerializerSnapshot<TimestampData> oldSerializerSnapshot) {
+            if (!(oldSerializerSnapshot instanceof TimestampDataSerializerSnapshot)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            TimestampDataSerializerSnapshot snapshot =
+                    (TimestampDataSerializerSnapshot) oldSerializerSnapshot;
+            if (previousPrecision != snapshot.previousPrecision) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

@@ -39,6 +39,7 @@ limitations under the License.
         <module>flink-cdc-dist</module>
         <module>flink-cdc-connect</module>
         <module>flink-cdc-runtime</module>
+        <module>flink-cdc-flink-compat</module>
         <module>flink-cdc-e2e-tests</module>
         <module>flink-cdc-pipeline-udf-examples</module>
         <module>flink-cdc-pipeline-model</module>
@@ -106,6 +107,8 @@ limitations under the License.
              and thus is changing back to java 1.6 on each maven re-import -->
         <maven.compiler.source>${source.java.version}</maven.compiler.source>
         <maven.compiler.target>${target.java.version}</maven.compiler.target>
+        <!-- Which compat JAR to bundle in dist: flink-cdc-flink-compat-flink1 (1.x) or flink-cdc-flink-compat-flink2 (2.x). Overridden by profile flink-2.2. -->
+        <flink.cdc.compat.artifact>flink-cdc-flink-compat-flink1</flink.cdc.compat.artifact>
     </properties>
 
     <dependencyManagement>
@@ -732,6 +735,18 @@ limitations under the License.
     </build>
 
     <profiles>
+        <!-- Build for Flink 2.2: use Flink 2.2.0, Java 17, and bundle compat-flink2 in dist. Produces flink-cdc-dist-<revision>-2.2.jar -->
+        <profile>
+            <id>flink-2.2</id>
+            <properties>
+                <flink.version>2.2.0</flink.version>
+                <flink.major.version>2.2</flink.major.version>
+                <flink.cdc.compat.artifact>flink-cdc-flink-compat-flink2</flink.cdc.compat.artifact>
+                <java.version>17</java.version>
+                <source.java.version>17</source.java.version>
+                <target.java.version>17</target.java.version>
+            </properties>
+        </profile>
         <profile>
             <id>fast</id>
             <activation>

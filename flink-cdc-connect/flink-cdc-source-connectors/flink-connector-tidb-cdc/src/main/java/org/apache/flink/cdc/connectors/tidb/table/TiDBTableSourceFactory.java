@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.connectors.tidb.table;
 
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.connectors.tidb.table.utils.OptionUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableSourceFactory;

@@ -24,7 +24,6 @@ import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.connector.sink2.StatefulSinkWriter;
 import org.apache.flink.api.connector.sink2.SupportsWriterState;
-import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
@@ -36,9 +35,6 @@ import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
 import org.apache.flink.streaming.api.connector.sink2.CommittableWithLineage;
-import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
-import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import java.time.ZoneId;
@@ -48,13 +44,11 @@ import java.util.Objects;
 import java.util.UUID;
 
 /** A {@link Sink} implementation for Apache Iceberg. */
-public class IcebergSink
-        implements Sink<Event>,
-                WithPreWriteTopology<Event>,
-                WithPreCommitTopology<Event, WriteResultWrapper>,
-                TwoPhaseCommittingSink<Event, WriteResultWrapper>,
-                WithPostCommitTopology<Event, WriteResultWrapper>,
-                SupportsWriterState<Event, IcebergWriterState> {
+/**
+ * Sink with addPreCommitTopology/addPostCommitTopology (discovered via reflection for Flink
+ * 1.x/2.x).
+ */
+public class IcebergSink implements Sink<Event>, SupportsWriterState<Event, IcebergWriterState> {
 
     protected final Map<String, String> catalogOptions;
     protected final Map<String, String> tableOptions;
@@ -81,24 +75,24 @@ public class IcebergSink
         this.operatorId = UUID.randomUUID().toString();
     }
 
-    @Override
+    /** Adds compaction operator (discovered via reflection by DataSinkTranslator). */
     public DataStream<Event> addPreWriteTopology(DataStream<Event> dataStream) {
         return dataStream;
     }
 
-    @Override
+    /** Used for two-phase commit (detected via reflection by DataSinkTranslator). */
     public Committer<WriteResultWrapper> createCommitter() {
         return new IcebergCommitter(catalogOptions);
     }
 
-    @Override
+    /** Overload with metrics (optional; used when available). */
     public Committer<WriteResultWrapper> createCommitter(
             CommitterInitContext committerInitContext) {
         SinkCommitterMetricGroup metricGroup = committerInitContext.metricGroup();
         return new IcebergCommitter(catalogOptions, metricGroup);
     }
 
-    @Override
+    /** Used for two-phase commit (detected via reflection by DataSinkTranslator). */
     public SimpleVersionedSerializer<WriteResultWrapper> getCommittableSerializer() {
         return new WriteResultWrapperSerializer();
     }
@@ -161,7 +155,7 @@ public class IcebergSink
         return new IcebergWriterStateSerializer();
     }
 
-    @Override
+    /** Discovered via reflection by DataSinkTranslator. */
     public DataStream<CommittableMessage<WriteResultWrapper>> addPreCommitTopology(
             DataStream<CommittableMessage<WriteResultWrapper>> committables) {
         // Refer to
@@ -169,12 +163,12 @@ public class IcebergSink
         return committables.global();
     }
 
-    @Override
+    /** Used by pre-commit topology (from removed WithPreCommitTopology interface). */
     public SimpleVersionedSerializer<WriteResultWrapper> getWriteResultSerializer() {
         return new WriteResultWrapperSerializer();
     }
 
-    @Override
+    /** Discovered via reflection by DataSinkTranslator. */
     public void addPostCommitTopology(
             DataStream<CommittableMessage<WriteResultWrapper>> committableMessageDataStream) {
         if (compactionOptions.isEnabled()) {

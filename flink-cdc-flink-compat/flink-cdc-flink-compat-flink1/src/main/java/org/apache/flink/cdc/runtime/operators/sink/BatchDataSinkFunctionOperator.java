@@ -21,23 +21,18 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
 /**
- * An operator that processes records to be written into a {@link SinkFunction} in batch mode.
- *
- * <p>The operator is a proxy of {@link StreamSink} in Flink.
- *
- * <p>The operator is always part of a sink pipeline and is the first operator.
+ * Batch-mode operator that writes into a {@link SinkFunction}. Lives in the Flink 1.x compat module
+ * because SinkFunction was removed in Flink 2.x.
  */
 @Internal
 public class BatchDataSinkFunctionOperator extends StreamSink<Event> {
 
     public BatchDataSinkFunctionOperator(SinkFunction<Event> userFunction) {
         super(userFunction);
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override

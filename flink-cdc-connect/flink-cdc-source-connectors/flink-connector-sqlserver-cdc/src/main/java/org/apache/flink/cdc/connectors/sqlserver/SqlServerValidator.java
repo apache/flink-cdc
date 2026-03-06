@@ -17,9 +17,9 @@
 
 package org.apache.flink.cdc.connectors.sqlserver;
 
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.debezium.Validator;
 import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.api.ValidationException;
 
 import com.microsoft.sqlserver.jdbc.SQLServerDriver;
 

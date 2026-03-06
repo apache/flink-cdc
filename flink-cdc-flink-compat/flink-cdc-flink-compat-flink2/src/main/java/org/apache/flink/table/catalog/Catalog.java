@@ -15,24 +15,13 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.sink;
-
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
-import org.apache.flink.cdc.common.event.Event;
-import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+package org.apache.flink.table.catalog;
 
 /**
- * {@code FlinkSinkFunctionProvider} is used to provide a Flink {@link SinkFunction} for writing
- * events to external systems.
+ * Minimal compatibility stub for Flink's Catalog from older table APIs. It exists so that
+ * connectors compiled against Flink 1.x table modules (for example certain Paimon artifacts) can
+ * still be loaded on Flink 2.2 runtimes where this type was removed or relocated.
  */
-@PublicEvolving
-public interface FlinkSinkFunctionProvider extends EventSinkProvider {
-
-    /** Get the {@link SinkFunction} for writing events to external systems. */
-    SinkFunction<Event> getSinkFunction();
-
-    /** Create a {@link FlinkSinkFunctionProvider} from a {@link SinkFunction}. */
-    static FlinkSinkFunctionProvider of(SinkFunction<Event> sinkFunction) {
-        return () -> sinkFunction;
-    }
-}
+// CHECKSTYLE.OFF: TypeName
+public interface Catalog {}
+// CHECKSTYLE.ON: TypeName

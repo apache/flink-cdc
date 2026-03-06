@@ -46,6 +46,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.apache.flink.cdc.cli.CliFrontendOptions.FLINK_CONFIG;
@@ -132,8 +133,33 @@ public class CliFrontend {
                 flinkHome);
     }
 
+    /**
+     * Config key for Pekko/Akka RPC ask timeout. Flink 2.x uses Pekko; Flink 1.x uses Akka.
+     * SchemaOperator's RPC to SchemaCoordinator can take several minutes for wide tables; default
+     * 120s is too short and causes TimeoutException.
+     */
+    private static final String PEKKO_ASK_TIMEOUT_KEY = "pekko.ask.timeout";
+
+    private static final String AKKA_ASK_TIMEOUT_KEY = "akka.ask.timeout";
+    private static final String SCHEMA_RPC_SAFE_TIMEOUT = "5 min";
+
     private static void overrideFlinkConfiguration(
             Configuration flinkConfig, CommandLine commandLine) {
+
+        // Ensure RPC timeout is sufficient for SchemaOperator (waits for SchemaCoordinator
+        // which may apply schema to Paimon/S3). Default 120s causes failures for wide tables.
+        Set<String> keys = flinkConfig.keySet();
+        if (!keys.contains(PEKKO_ASK_TIMEOUT_KEY) && !keys.contains(AKKA_ASK_TIMEOUT_KEY)) {
+            flinkConfig.set(
+                    ConfigOptions.key(PEKKO_ASK_TIMEOUT_KEY)
+                            .stringType()
+                            .defaultValue(SCHEMA_RPC_SAFE_TIMEOUT),
+                    SCHEMA_RPC_SAFE_TIMEOUT);
+            LOG.info(
+                    "Set {} to {} for SchemaOperator RPC compatibility (wide tables).",
+                    PEKKO_ASK_TIMEOUT_KEY,
+                    SCHEMA_RPC_SAFE_TIMEOUT);
+        }
 
         String target =
                 commandLine.hasOption(USE_MINI_CLUSTER)

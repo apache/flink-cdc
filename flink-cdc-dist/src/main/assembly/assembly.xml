@@ -25,11 +25,11 @@ limitations under the License.
     <baseDirectory>flink-cdc-${revision}</baseDirectory>
 
     <files>
-        <!-- copy flink-cdc-dist uber jar -->
+        <!-- copy flink-cdc-dist uber jar (connector-style: flink-cdc-dist-<revision>-<flink.major.version>.jar) -->
         <file>
-            <source>target/flink-cdc-dist-${revision}.jar</source>
+            <source>target/${project.build.finalName}.jar</source>
             <outputDirectory>lib</outputDirectory>
-            <destName>flink-cdc-dist-${revision}.jar</destName>
+            <destName>${project.build.finalName}.jar</destName>
             <fileMode>0644</fileMode>
         </file>
 
@@ -47,6 +47,17 @@ limitations under the License.
             <fileMode>0644</fileMode>
         </file>
     </files>
+
+    <dependencySets>
+        <!-- Copy flink-cdc-flink-compat-flink2 jar separately for auto-deploy to $FLINK_HOME/lib -->
+        <dependencySet>
+            <outputDirectory>lib</outputDirectory>
+            <includes>
+                <include>org.apache.flink:flink-cdc-flink-compat-flink2</include>
+            </includes>
+            <useProjectArtifact>false</useProjectArtifact>
+        </dependencySet>
+    </dependencySets>
 
     <fileSets>
         <!-- copy start scripts -->

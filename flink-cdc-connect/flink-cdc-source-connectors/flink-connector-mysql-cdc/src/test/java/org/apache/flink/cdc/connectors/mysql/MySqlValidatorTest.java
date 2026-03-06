@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.mysql;
 
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.mocks.MockSplitEnumeratorContext;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.connectors.mysql.source.MySqlSource;
 import org.apache.flink.cdc.connectors.mysql.source.assigners.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.mysql.source.split.MySqlSplit;
@@ -26,7 +27,6 @@ import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.debezium.DebeziumSourceFunction;
-import org.apache.flink.table.api.ValidationException;
 
 import org.apache.kafka.connect.source.SourceRecord;
 import org.assertj.core.api.Assertions;

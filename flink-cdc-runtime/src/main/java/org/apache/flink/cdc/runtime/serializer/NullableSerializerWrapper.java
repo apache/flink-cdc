@@ -172,7 +172,8 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
             return new NullableSerializerWrapper<>(innerSerializer);
         }
 
-        @Override
+        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
+        // compatibility
         public TypeSerializerSchemaCompatibility<T> resolveSchemaCompatibility(
                 TypeSerializer<T> newSerializer) {
             if (!(newSerializer instanceof NullableSerializerWrapper)) {
@@ -186,6 +187,21 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+        }
+
+        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
+        @SuppressWarnings("unchecked")
+        public TypeSerializerSchemaCompatibility<T> resolveSchemaCompatibility(
+                TypeSerializerSnapshot<T> oldSerializerSnapshot) {
+            if (!(oldSerializerSnapshot instanceof NullableSerializerWrapperSnapshot)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            NullableSerializerWrapperSnapshot<T> snapshot =
+                    (NullableSerializerWrapperSnapshot<T>) oldSerializerSnapshot;
+            if (!innerSerializer.equals(snapshot.innerSerializer)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

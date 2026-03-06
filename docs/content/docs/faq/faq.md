@@ -334,3 +334,20 @@ Add configuration item  'database.connection.adapter' = 'xstream', please use th
 ### Q4: What are the database name and schema name of Oracle CDC?
 
 Database name is the name of the database example, that is, the SID of Oracle. Schema name is the schema corresponding to the table. Generally speaking, a user corresponds to a schema. The schema name of the user is equal to the user name and is used as the default schema of the user. Therefore, schema name is generally the user name for creating the table, but if a schema is specified when creating the table, the specified schema is schema name. For example, use create table AAAA If TestTable (XXXX) is successfully created, AAAA is schema name.
+
+## Pipeline / Schema Operator FAQ
+
+### Q1: Flink 2.x job fails with "Failed to send request to coordinator: SchemaChangeRequest" and TimeoutException after ~2 minutes. What should I do?
+
+This occurs because SchemaOperator sends schema change requests (e.g. CreateTableEvent for wide tables) to SchemaCoordinator on the JobManager via RPC. Flink 2.x uses Pekko with a default `pekko.ask.timeout` of 120 seconds. For wide tables (many columns) or when Paimon/other sinks apply schema to remote storage (e.g. S3), the operation can exceed 2 minutes.
+
+**Fix:**
+
+1. **Flink CDC CLI** (recommended): The CLI now auto-sets `pekko.ask.timeout: 5 min` when your Flink config does not have it. Restart the cluster or use application mode so the config takes effect.
+
+2. **Existing session cluster**: Add to `$FLINK_HOME/conf/flink-conf.yaml` on the JobManager and TaskManager nodes, then restart the cluster:
+   ```yaml
+   pekko.ask.timeout: 5 min
+   ```
+
+3. **Command-line override**: `flink-cdc.sh cdc/your-pipeline.yaml -D pekko.ask.timeout=5 min` (for application-mode deployments)

@@ -306,7 +306,8 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
             return new MapDataSerializer(keyType, valueType, keySerializer, valueSerializer);
         }
 
-        @Override
+        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
+        // compatibility
         public TypeSerializerSchemaCompatibility<MapData> resolveSchemaCompatibility(
                 TypeSerializer<MapData> newSerializer) {
             if (!(newSerializer instanceof MapDataSerializer)) {
@@ -322,6 +323,22 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+        }
+
+        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
+        public TypeSerializerSchemaCompatibility<MapData> resolveSchemaCompatibility(
+                TypeSerializerSnapshot<MapData> oldSerializerSnapshot) {
+            if (!(oldSerializerSnapshot instanceof MapDataSerializerSnapshot)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            MapDataSerializerSnapshot snapshot = (MapDataSerializerSnapshot) oldSerializerSnapshot;
+            if (!keyType.equals(snapshot.keyType)
+                    || !valueType.equals(snapshot.valueType)
+                    || !keySerializer.equals(snapshot.keySerializer)
+                    || !valueSerializer.equals(snapshot.valueSerializer)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

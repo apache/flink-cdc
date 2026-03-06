@@ -44,10 +44,7 @@ import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplit;
 import org.apache.flink.cdc.connectors.base.source.meta.split.StreamSplitState;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
 import org.apache.flink.connector.base.source.reader.SingleThreadMultiplexSourceReaderBase;
-import org.apache.flink.connector.base.source.reader.fetcher.SingleThreadFetcherManager;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.Preconditions;
 
@@ -110,7 +107,6 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
     private final IncrementalSourceReaderContext incrementalSourceReaderContext;
 
     public IncrementalSourceReader(
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementQueue,
             Supplier<IncrementalSourceSplitReader<C>> splitReaderSupplier,
             RecordEmitter<SourceRecords, T, SourceSplitState> recordEmitter,
             Configuration config,
@@ -119,8 +115,7 @@ public class IncrementalSourceReader<T, C extends SourceConfig>
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect<C> dialect) {
         super(
-                elementQueue,
-                new SingleThreadFetcherManager<>(elementQueue, splitReaderSupplier::get),
+                splitReaderSupplier::get,
                 recordEmitter,
                 config,
                 incrementalSourceReaderContext.getSourceReaderContext());

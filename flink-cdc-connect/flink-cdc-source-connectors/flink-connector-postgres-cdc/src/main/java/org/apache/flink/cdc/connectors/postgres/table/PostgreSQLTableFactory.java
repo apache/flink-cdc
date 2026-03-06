@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.connectors.postgres.table;
 
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.connectors.base.options.JdbcSourceOptions;
 import org.apache.flink.cdc.connectors.base.options.StartupMode;
 import org.apache.flink.cdc.connectors.base.options.StartupOptions;
@@ -24,7 +25,6 @@ import org.apache.flink.cdc.connectors.postgres.utils.OptionUtils;
 import org.apache.flink.cdc.debezium.table.DebeziumChangelogMode;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.source.DynamicTableSource;
 import org.apache.flink.table.factories.DynamicTableFactory;

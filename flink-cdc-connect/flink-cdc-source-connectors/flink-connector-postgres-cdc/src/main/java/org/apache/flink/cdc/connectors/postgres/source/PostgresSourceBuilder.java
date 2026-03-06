@@ -29,7 +29,6 @@ import org.apache.flink.cdc.connectors.base.source.assigner.state.HybridPendingS
 import org.apache.flink.cdc.connectors.base.source.assigner.state.PendingSplitsState;
 import org.apache.flink.cdc.connectors.base.source.assigner.state.StreamPendingSplitsState;
 import org.apache.flink.cdc.connectors.base.source.jdbc.JdbcIncrementalSource;
-import org.apache.flink.cdc.connectors.base.source.meta.split.SourceRecords;
 import org.apache.flink.cdc.connectors.base.source.meta.split.SourceSplitBase;
 import org.apache.flink.cdc.connectors.base.source.metrics.SourceReaderMetrics;
 import org.apache.flink.cdc.connectors.base.source.reader.IncrementalSourceReaderContext;
@@ -40,8 +39,6 @@ import org.apache.flink.cdc.connectors.postgres.source.enumerator.PostgresSource
 import org.apache.flink.cdc.connectors.postgres.source.offset.PostgresOffsetFactory;
 import org.apache.flink.cdc.connectors.postgres.source.reader.PostgresSourceReader;
 import org.apache.flink.cdc.debezium.DebeziumDeserializationSchema;
-import org.apache.flink.connector.base.source.reader.RecordsWithSplitIds;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 import org.apache.flink.util.FlinkRuntimeException;
 
 import io.debezium.relational.TableId;
@@ -418,8 +415,6 @@ public class PostgresSourceBuilder<T> {
             // create source config for the given subtask (e.g. unique server id)
             PostgresSourceConfig sourceConfig =
                     (PostgresSourceConfig) configFactory.create(readerContext.getIndexOfSubtask());
-            FutureCompletingBlockingQueue<RecordsWithSplitIds<SourceRecords>> elementsQueue =
-                    new FutureCompletingBlockingQueue<>();
 
             final SourceReaderMetrics sourceReaderMetrics =
                     new SourceReaderMetrics(readerContext.metricGroup());
@@ -435,7 +430,6 @@ public class PostgresSourceBuilder<T> {
                                     incrementalSourceReaderContext,
                                     snapshotHooks);
             return new PostgresSourceReader(
-                    elementsQueue,
                     splitReaderSupplier,
                     createRecordEmitter(sourceConfig, sourceReaderMetrics),
                     readerContext.getConfiguration(),

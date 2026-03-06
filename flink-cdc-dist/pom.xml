@@ -29,6 +29,8 @@ limitations under the License.
 
     <properties>
         <japicmp.skip>true</japicmp.skip>
+        <!-- Connector-style JAR name: flink-cdc-dist-<revision>-<flink.major.version>.jar (e.g. 3.6-SNAPSHOT-1.20 or 3.6-SNAPSHOT-2.2) -->
+        <dist.jar.basename>flink-cdc-dist-${revision}-${flink.major.version}</dist.jar.basename>
     </properties>
 
     <dependencies>
@@ -52,9 +54,15 @@ limitations under the License.
             <artifactId>flink-cdc-composer</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>${flink.cdc.compat.artifact}</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
+        <finalName>${dist.jar.basename}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -81,7 +89,7 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <shadedArtifactAttached>false</shadedArtifactAttached>
-                            <finalName>${project.artifactId}-${revision}</finalName>
+                            <finalName>${dist.jar.basename}</finalName>
                             <artifactSet>
                                 <includes>
                                     <include>*</include>
@@ -111,7 +119,7 @@ limitations under the License.
                             <tarLongFileMode>gnu</tarLongFileMode>
                             <appendAssemblyId>false</appendAssemblyId>
                             <attach>false</attach>
-                            <finalName>flink-cdc-${project.version}-bin</finalName>
+                            <finalName>flink-cdc-${project.version}-${flink.major.version}-bin</finalName>
                             <descriptors>
                                 <descriptor>${basedir}/src/main/assembly/assembly.xml</descriptor>
                             </descriptors>

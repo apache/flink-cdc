@@ -26,14 +26,13 @@ import org.apache.flink.cdc.connectors.maxcompute.coordinator.SessionManageCoord
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeOptions;
 import org.apache.flink.cdc.connectors.maxcompute.options.MaxComputeWriteOptions;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 
 import java.io.IOException;
 
 /** A {@link Sink} of {@link Event} to MaxCompute. */
-public class MaxComputeEventSink implements Sink<Event>, WithPreWriteTopology<Event> {
+public class MaxComputeEventSink implements Sink<Event> {
     private static final long serialVersionUID = 1L;
     private final MaxComputeOptions options;
     private final MaxComputeWriteOptions writeOptions;
@@ -43,7 +42,7 @@ public class MaxComputeEventSink implements Sink<Event>, WithPreWriteTopology<Ev
         this.writeOptions = writeOptions;
     }
 
-    @Override
+    /** Adds session-manage operator (discovered via reflection by DataSinkTranslator). */
     public DataStream<Event> addPreWriteTopology(DataStream<Event> inputDataStream) {
         SingleOutputStreamOperator<Event> stream =
                 inputDataStream.transform(

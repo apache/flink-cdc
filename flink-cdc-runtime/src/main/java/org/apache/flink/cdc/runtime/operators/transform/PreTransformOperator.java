@@ -39,7 +39,6 @@ import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -85,7 +84,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         this.preTransformChangeInfoMap = new HashMap<>();
         this.preTransformProcessorMap = new HashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
 
         this.transformRules = transformRules;
         this.udfFunctions = udfFunctions;
