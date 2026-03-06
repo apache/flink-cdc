@@ -1727,13 +1727,20 @@ public class OraclePipelineITCase extends OracleSourceTestBase {
 
         statement.execute(
                 String.format(
-                        "ALTER TABLE %s.products ADD DESC1 VARCHAR(45) DEFAULT NULL", "debezium"));
+                        "ALTER TABLE %s.products ADD DESC1 VARCHAR(45) DEFAULT 'N/A' NOT NULL",
+                        "debezium"));
         expected.add(
                 new AddColumnEvent(
                         tableId,
                         Collections.singletonList(
                                 new AddColumnEvent.ColumnWithPosition(
-                                        Column.physicalColumn("DESC1", DataTypes.VARCHAR(45))))));
+                                        Column.physicalColumn(
+                                                "DESC1", DataTypes.VARCHAR(45).notNull())))));
+
+        statement.execute(String.format("ALTER TABLE %s.products MODIFY DESC1 NULL", "debezium"));
+        expected.add(
+                new AlterColumnTypeEvent(
+                        tableId, Collections.singletonMap("DESC1", DataTypes.VARCHAR(45))));
 
         statement.execute(
                 String.format(
