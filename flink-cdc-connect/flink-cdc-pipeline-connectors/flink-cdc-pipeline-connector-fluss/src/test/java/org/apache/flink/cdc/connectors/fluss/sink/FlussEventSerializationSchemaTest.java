@@ -23,12 +23,15 @@ import org.apache.flink.cdc.common.data.LocalZonedTimestampData;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.DataType;
+import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.DateType;
 import org.apache.flink.cdc.common.types.DecimalType;
 import org.apache.flink.cdc.common.types.FloatType;
@@ -97,7 +100,7 @@ public class FlussEventSerializationSchemaTest {
     }
 
     @Test
-    void testMixedSchemaAndDataChanges() throws Exception {
+    void testSchemaAndDataChangesInMultiTables() throws Exception {
         // 1. create table1, and insert/delete/update data
         TableId table1 = TableId.parse("test.tbl1");
         Schema schema1 =
@@ -221,6 +224,77 @@ public class FlussEventSerializationSchemaTest {
                 table2,
                 new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.DELETE),
                 Objects.requireNonNull(serializer.serialize(deleteEvent2)));
+    }
+
+    @Test
+    void testAddColumn() throws Exception {
+        // 1. create table1, and insert/delete/update data
+        TableId table1 = TableId.parse("test.tbl1");
+        Schema schemaBefore =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .physicalColumn("col2", new BooleanType())
+                        .physicalColumn("col3", new TimestampType())
+                        .primaryKey("col1")
+                        .build();
+        AddColumnEvent addColumnEvent =
+                new AddColumnEvent(
+                        table1,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("newColumn", DataTypes.STRING()))));
+        Schema schemaAfter =
+                Schema.newBuilder()
+                        .physicalColumn("col1", new IntType())
+                        .physicalColumn("col2", new BooleanType())
+                        .physicalColumn("col3", new TimestampType())
+                        .physicalColumn("newColumn", new VarCharType())
+                        .primaryKey("col1")
+                        .build();
+        CreateTableEvent createTableEvent1 = new CreateTableEvent(table1, schemaBefore);
+        flussMetaDataApplier.applySchemaChange(createTableEvent1);
+        verifySchemaChangeEvent(table1, serializer.serialize(createTableEvent1));
+
+        BinaryRecordDataGenerator generator1 =
+                new BinaryRecordDataGenerator(
+                        schemaBefore.getColumnDataTypes().toArray(new DataType[0]));
+
+        RecordData record =
+                generator1.generate(
+                        new Object[] {
+                            1,
+                            true,
+                            TimestampData.fromMillis(
+                                    Timestamp.valueOf("2023-11-27 18:00:00").getTime())
+                        });
+        DataChangeEvent insertEvent1 = DataChangeEvent.insertEvent(table1, record);
+
+        verifyDataChangeEvent(
+                table1,
+                new FlussRowWithOp(CdcAsFlussRow.replace(record), FlussOperationType.UPSERT),
+                serializer.serialize(insertEvent1));
+
+        // 2. add column at last.
+        flussMetaDataApplier.applySchemaChange(addColumnEvent);
+        verifySchemaChangeEvent(table1, serializer.serialize(addColumnEvent));
+        BinaryRecordDataGenerator generator2 =
+                new BinaryRecordDataGenerator(
+                        schemaAfter.getColumnDataTypes().toArray(new DataType[0]));
+        RecordData newRecord =
+                generator2.generate(
+                        new Object[] {
+                            3,
+                            false,
+                            TimestampData.fromMillis(
+                                    Timestamp.valueOf("2023-11-27 20:00:00").getTime()),
+                            new BinaryStringData("insert new column")
+                        });
+        DataChangeEvent updateEvent1 = DataChangeEvent.updateEvent(table1, record, newRecord);
+
+        verifyDataChangeEvent(
+                table1,
+                new FlussRowWithOp(CdcAsFlussRow.replace(newRecord), FlussOperationType.UPSERT),
+                serializer.serialize(updateEvent1));
     }
 
     private void verifySchemaChangeEvent(TableId tableId, FlussEvent flussEvent) throws Exception {

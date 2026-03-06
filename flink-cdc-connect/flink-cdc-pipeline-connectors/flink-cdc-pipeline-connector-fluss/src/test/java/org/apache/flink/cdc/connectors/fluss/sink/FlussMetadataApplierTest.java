@@ -17,9 +17,11 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.IntType;
@@ -48,6 +50,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.fluss.config.ConfigOptions.TABLE_REPLICATION_FACTOR;
+import static org.apache.fluss.types.DataTypeChecks.equalsWithFieldId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -105,6 +108,9 @@ public class FlussMetadataApplierTest {
                     "time_col",
                     "timestamp_col",
                     "timestamp_ltz_col",
+                    "array_col",
+                    "map_col",
+                    "row_col"
                 };
 
         org.apache.flink.cdc.common.types.DataType[] cdcDataTypes =
@@ -126,7 +132,12 @@ public class FlussMetadataApplierTest {
                     DataTypes.DATE(),
                     DataTypes.TIME(),
                     DataTypes.TIMESTAMP(3),
-                    DataTypes.TIMESTAMP_LTZ(6)
+                    DataTypes.TIMESTAMP_LTZ(6),
+                    DataTypes.ARRAY(DataTypes.INT()),
+                    DataTypes.MAP(DataTypes.STRING(), DataTypes.INT()),
+                    DataTypes.ROW(
+                            DataTypes.FIELD("name", DataTypes.STRING()),
+                            DataTypes.FIELD("age", DataTypes.INT()))
                 };
 
         org.apache.fluss.types.DataType[] flussDataTypes =
@@ -150,7 +161,16 @@ public class FlussMetadataApplierTest {
                     org.apache.fluss.types.DataTypes.DATE(),
                     org.apache.fluss.types.DataTypes.TIME(),
                     org.apache.fluss.types.DataTypes.TIMESTAMP(3),
-                    org.apache.fluss.types.DataTypes.TIMESTAMP_LTZ(6)
+                    org.apache.fluss.types.DataTypes.TIMESTAMP_LTZ(6),
+                    org.apache.fluss.types.DataTypes.ARRAY(org.apache.fluss.types.DataTypes.INT()),
+                    org.apache.fluss.types.DataTypes.MAP(
+                            org.apache.fluss.types.DataTypes.STRING(),
+                            org.apache.fluss.types.DataTypes.INT()),
+                    org.apache.fluss.types.DataTypes.ROW(
+                            org.apache.fluss.types.DataTypes.FIELD(
+                                    "name", org.apache.fluss.types.DataTypes.STRING()),
+                            org.apache.fluss.types.DataTypes.FIELD(
+                                    "age", org.apache.fluss.types.DataTypes.INT()))
                 };
 
         try (FlussMetaDataApplier applier =
@@ -183,6 +203,21 @@ public class FlussMetadataApplierTest {
             if (primaryKeyTable) {
                 assertThat(tableInfo.getPrimaryKeys()).containsExactly("int_col");
             }
+
+            // check field of nested row.
+            assertThat(
+                            equalsWithFieldId(
+                                    flussRowType.getTypeAt(flussRowType.getFieldCount() - 1),
+                                    org.apache.fluss.types.DataTypes.ROW(
+                                            org.apache.fluss.types.DataTypes.FIELD(
+                                                    "name",
+                                                    org.apache.fluss.types.DataTypes.STRING(),
+                                                    flussRowType.getFieldCount()),
+                                            org.apache.fluss.types.DataTypes.FIELD(
+                                                    "age",
+                                                    org.apache.fluss.types.DataTypes.INT(),
+                                                    flussRowType.getFieldCount() + 1))))
+                    .isTrue();
         }
     }
 
@@ -454,6 +489,58 @@ public class FlussMetadataApplierTest {
                                         .getBucketKeys())
                         .containsExactlyInAnyOrder("name", "id");
             }
+        }
+    }
+
+    @Test
+    void testAddColumnAtLast() throws Exception {
+        TablePath tablePath = new TablePath("fluss", "add_column_table");
+        TableId tableId = TableId.tableId("default_namespace", "fluss", "add_column_table");
+        admin.createTable(
+                        tablePath,
+                        TableDescriptor.builder()
+                                .schema(
+                                        org.apache.fluss.metadata.Schema.newBuilder()
+                                                .column(
+                                                        "id",
+                                                        org.apache.fluss.types.DataTypes.INT())
+                                                .column(
+                                                        "name",
+                                                        org.apache.fluss.types.DataTypes.INT())
+                                                .build())
+                                .build(),
+                        true)
+                .get();
+
+        Column oldColumn = Column.physicalColumn("name", DataTypes.STRING());
+        Column newColumn = Column.physicalColumn("newColumn", DataTypes.STRING());
+
+        try (FlussMetaDataApplier applier =
+                new FlussMetaDataApplier(
+                        FLUSS_CLUSTER_EXTENSION.getClientConfig(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap(),
+                        Collections.emptyMap())) {
+            assertThatThrownBy(
+                            () ->
+                                    applier.applySchemaChange(
+                                            new AddColumnEvent(
+                                                    tableId,
+                                                    Collections.singletonList(
+                                                            AddColumnEvent.last(oldColumn)))))
+                    .rootCause()
+                    .hasMessageContaining("Column name already exists.");
+            applier.applySchemaChange(
+                    new AddColumnEvent(
+                            tableId, Collections.singletonList(AddColumnEvent.last(newColumn))));
+            TableInfo tableInfo = admin.getTableInfo(tablePath).get();
+            assertThat(tableInfo.getSchema())
+                    .isEqualTo(
+                            org.apache.fluss.metadata.Schema.newBuilder()
+                                    .column("id", org.apache.fluss.types.DataTypes.INT())
+                                    .column("name", org.apache.fluss.types.DataTypes.INT())
+                                    .column("newColumn", org.apache.fluss.types.DataTypes.STRING())
+                                    .build());
         }
     }
 

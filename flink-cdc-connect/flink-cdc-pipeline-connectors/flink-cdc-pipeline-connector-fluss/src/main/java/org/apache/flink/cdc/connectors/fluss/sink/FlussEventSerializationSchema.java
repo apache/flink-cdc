@@ -17,13 +17,16 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.OperationType;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.Preconditions;
+import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.fluss.sink.row.CdcAsFlussRow;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEvent;
 import org.apache.flink.cdc.connectors.fluss.sink.v2.FlussEventSerializer;
@@ -43,19 +46,19 @@ import java.util.Map;
 import static org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType.APPEND;
 import static org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType.DELETE;
 import static org.apache.flink.cdc.connectors.fluss.sink.v2.FlussOperationType.UPSERT;
-import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.sameSchemaIgnoreCommentAndDefaultValue;
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussSchema;
 
 /** Serialization schema that converts a CDC data record to a Fluss event. */
 public class FlussEventSerializationSchema implements FlussEventSerializer<Event> {
     private static final long serialVersionUID = 1L;
 
-    private transient Map<TableId, TableSchemaInfo> tableInfoMap;
+    private transient Map<TableId, TableSchemaInfo> schemaMaps;
     private transient Connection connection;
 
     @Override
     public void open(Connection connection) {
-        this.tableInfoMap = new HashMap<>();
+        this.schemaMaps = new HashMap<>();
         this.connection = connection;
     }
 
@@ -82,29 +85,45 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
             org.apache.flink.cdc.common.schema.Schema newSchema =
                     ((CreateTableEvent) event).getSchema();
             // if the table is not exist or the schema is changed, update the table info.
-            if (!tableInfoMap.containsKey(tableId)
-                    || !sameCdcColumnsIgnoreCommentAndDefaultValue(
-                            tableInfoMap.get(tableId).upstreamCdcSchema, newSchema)) {
+            if (!schemaMaps.containsKey(tableId)
+                    || !sameSchemaIgnoreCommentAndDefaultValue(
+                            schemaMaps.get(tableId).upstreamCdcSchema, newSchema)) {
                 Table table = connection.getTable(getTablePath(tableId));
                 TableSchemaInfo newSchemaInfo =
                         new TableSchemaInfo(newSchema, table.getTableInfo().getSchema());
-                tableInfoMap.put(tableId, newSchemaInfo);
+                schemaMaps.put(tableId, newSchemaInfo);
+            }
+        } else if (event instanceof AddColumnEvent) {
+            TableSchemaInfo schemaInfo = schemaMaps.get(event.tableId());
+            if (schemaInfo == null) {
+                throw new IllegalStateException(
+                        "Cannot apply AddColumnEvent for table "
+                                + event.tableId()
+                                + ": table schema not found. Ensure CreateTableEvent is processed before AddColumnEvent.");
+            }
+            Schema schema = schemaInfo.upstreamCdcSchema;
+            if (!SchemaUtils.isSchemaChangeEventRedundant(schema, event)) {
+                Table table = connection.getTable(getTablePath(tableId));
+                TableSchemaInfo newSchemaInfo =
+                        new TableSchemaInfo(
+                                SchemaUtils.applySchemaChangeEvent(schema, event),
+                                table.getTableInfo().getSchema());
+                schemaMaps.put(tableId, newSchemaInfo);
             }
         } else {
-            // TODO: Logics for altering tables are not supported yet.
-            // This is anticipated to be supported in Fluss version 0.8.0.
-            throw new RuntimeException(
-                    "Schema change type not supported. Only CreateTableEvent is allowed at the moment.");
+            throw new UnsupportedOperationException(
+                    String.format(
+                            "Schema change type %s not supported. Only CreateTableEvent and AddColumnEvent are allowed at the moment.",
+                            event.getClass()));
         }
     }
 
     private FlussRowWithOp applyDataChangeEvent(DataChangeEvent record) {
         OperationType op = record.op();
-        TableSchemaInfo tableSchemaInfo = tableInfoMap.get(record.tableId());
+        TableSchemaInfo tableSchemaInfo = schemaMaps.get(record.tableId());
         Preconditions.checkNotNull(
                 tableSchemaInfo, "Table schema not found for table " + record.tableId());
-        int flussFieldCount =
-                tableSchemaInfo.downStreamFlusstreamSchema.getRowType().getFieldCount();
+        int flussFieldCount = tableSchemaInfo.downstreamFlussSchema.getRowType().getFieldCount();
         boolean hasPrimaryKey = !tableSchemaInfo.upstreamCdcSchema.primaryKeys().isEmpty();
         switch (op) {
             case INSERT:
@@ -130,17 +149,17 @@ public class FlussEventSerializationSchema implements FlussEventSerializer<Event
 
     private static class TableSchemaInfo {
         org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema;
-        org.apache.fluss.metadata.Schema downStreamFlusstreamSchema;
+        org.apache.fluss.metadata.Schema downstreamFlussSchema;
         Map<Integer, Integer> indexMapping;
 
         private TableSchemaInfo(
                 org.apache.flink.cdc.common.schema.Schema upstreamCdcSchema,
-                org.apache.fluss.metadata.Schema downStreamFlusstreamSchema) {
+                org.apache.fluss.metadata.Schema downstreamFlussSchema) {
             this.upstreamCdcSchema = upstreamCdcSchema;
-            this.downStreamFlusstreamSchema = downStreamFlusstreamSchema;
+            this.downstreamFlussSchema = downstreamFlussSchema;
             this.indexMapping =
                     sanityCheckAndGenerateIndexMapping(
-                            toFlussSchema(upstreamCdcSchema), downStreamFlusstreamSchema);
+                            toFlussSchema(upstreamCdcSchema), downstreamFlussSchema);
         }
     }
 
