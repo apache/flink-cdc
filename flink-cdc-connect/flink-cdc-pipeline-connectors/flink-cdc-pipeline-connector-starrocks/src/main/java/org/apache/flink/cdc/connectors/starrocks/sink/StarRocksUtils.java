@@ -279,7 +279,7 @@ public class StarRocksUtils {
     public static final String STRING = "STRING";
     public static final String DATE = "DATE";
     public static final String DATETIME = "DATETIME";
-    public static final String VARBINARY_TYPE = "VARBINARY";
+    public static final String VARBINARY = "VARBINARY";
     public static final String JSON = "JSON";
 
     /** Max size of char type of StarRocks. */
@@ -418,7 +418,7 @@ public class StarRocksUtils {
 
         @Override
         public StarRocksColumn.Builder visit(BinaryType binaryType) {
-            builder.setDataType(VARBINARY_TYPE);
+            builder.setDataType(VARBINARY);
             builder.setNullable(binaryType.isNullable());
             builder.setColumnSize(Math.min(binaryType.getLength(), MAX_VARBINARY_SIZE));
             return builder;
@@ -426,7 +426,7 @@ public class StarRocksUtils {
 
         @Override
         public StarRocksColumn.Builder visit(VarBinaryType varBinaryType) {
-            builder.setDataType(VARBINARY_TYPE);
+            builder.setDataType(VARBINARY);
             builder.setNullable(varBinaryType.isNullable());
             builder.setColumnSize(Math.min(varBinaryType.getLength(), MAX_VARBINARY_SIZE));
             return builder;

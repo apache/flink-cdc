@@ -350,13 +350,13 @@ pipeline:
     </tr>
     <tr>
       <td>BINARY(n)</td>
-      <td>VARBINARY(n)</td>
-      <td></td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>The length is capped to 1048576.</td>
     </tr>
     <tr>
       <td>VARBINARY(n)</td>
-      <td>VARBINARY(n)</td>
-      <td></td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>The length is capped to 1048576.</td>
     </tr>
     <tr>
       <td>BYTES</td>

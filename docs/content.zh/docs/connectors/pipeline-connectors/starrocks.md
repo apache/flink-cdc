@@ -339,13 +339,13 @@ pipeline:
     </tr>
     <tr>
       <td>BINARY(n)</td>
-      <td>VARBINARY(n)</td>
-      <td></td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>长度上限为 1048576。</td>
     </tr>
     <tr>
       <td>VARBINARY(n)</td>
-      <td>VARBINARY(n)</td>
-      <td></td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>长度上限为 1048576。</td>
     </tr>
     <tr>
       <td>BYTES</td>

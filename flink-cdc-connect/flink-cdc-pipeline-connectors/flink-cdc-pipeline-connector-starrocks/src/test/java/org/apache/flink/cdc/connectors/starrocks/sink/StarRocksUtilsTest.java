@@ -307,7 +307,7 @@ class StarRocksUtilsTest {
                 new StarRocksColumn.Builder().setColumnName("col").setOrdinalPosition(0);
         StarRocksUtils.toStarRocksDataType(new BinaryType(17), false, builder);
         StarRocksColumn column = builder.build();
-        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY_TYPE);
+        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY);
         assertThat(column.getColumnSize()).hasValue(17);
         assertThat(column.isNullable()).isTrue();
     }
@@ -318,7 +318,7 @@ class StarRocksUtilsTest {
                 new StarRocksColumn.Builder().setColumnName("col").setOrdinalPosition(0);
         StarRocksUtils.toStarRocksDataType(new VarBinaryType(255), false, builder);
         StarRocksColumn column = builder.build();
-        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY_TYPE);
+        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY);
         assertThat(column.getColumnSize()).hasValue(255);
         assertThat(column.isNullable()).isTrue();
     }
@@ -329,7 +329,7 @@ class StarRocksUtilsTest {
                 new StarRocksColumn.Builder().setColumnName("col").setOrdinalPosition(0);
         StarRocksUtils.toStarRocksDataType(DataTypes.BYTES(), false, builder);
         StarRocksColumn column = builder.build();
-        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY_TYPE);
+        assertThat(column.getDataType()).isEqualTo(StarRocksUtils.VARBINARY);
         assertThat(column.getColumnSize()).hasValue(StarRocksUtils.MAX_VARBINARY_SIZE);
         assertThat(column.isNullable()).isTrue();
     }
