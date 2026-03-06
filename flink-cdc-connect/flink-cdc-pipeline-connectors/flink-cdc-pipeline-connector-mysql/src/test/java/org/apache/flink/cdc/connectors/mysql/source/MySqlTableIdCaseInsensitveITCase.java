@@ -152,8 +152,7 @@ class MySqlTableIdCaseInsensitveITCase extends MySqlSourceTestBase {
 
     @ParameterizedTest
     @ValueSource(strings = {"products", "uppercase_products"})
-    public void testSnapshotModeWhenTableNameAndColumnIsUpper(String tableName)
-            throws Exception {
+    public void testSnapshotModeWhenTableNameAndColumnIsUpper(String tableName) throws Exception {
         env.setParallelism(1);
         inventoryDatabase.createAndInitialize();
         MySqlSourceConfigFactory configFactory =
