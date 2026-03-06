@@ -19,14 +19,14 @@ package org.apache.flink.cdc.connectors.fluss.sink.v2.metrics;
 
 import org.apache.flink.metrics.MetricGroup;
 
-import com.alibaba.fluss.metrics.CharacterFilter;
-import com.alibaba.fluss.metrics.Counter;
-import com.alibaba.fluss.metrics.Gauge;
-import com.alibaba.fluss.metrics.Histogram;
-import com.alibaba.fluss.metrics.Meter;
-import com.alibaba.fluss.metrics.Metric;
-import com.alibaba.fluss.metrics.groups.AbstractMetricGroup;
-import com.alibaba.fluss.metrics.registry.MetricRegistry;
+import org.apache.fluss.metrics.CharacterFilter;
+import org.apache.fluss.metrics.Counter;
+import org.apache.fluss.metrics.Gauge;
+import org.apache.fluss.metrics.Histogram;
+import org.apache.fluss.metrics.Meter;
+import org.apache.fluss.metrics.Metric;
+import org.apache.fluss.metrics.groups.AbstractMetricGroup;
+import org.apache.fluss.metrics.registry.MetricRegistry;
 
 import java.util.Collections;
 import java.util.HashMap;
