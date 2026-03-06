@@ -294,7 +294,7 @@ class FlussConversionsTest {
                         .physicalColumn("name", DataTypes.STRING())
                         .build();
 
-        assertThat(FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue(schema1, schema2))
+        assertThat(FlussConversions.sameSchemaIgnoreCommentAndDefaultValue(schema1, schema2))
                 .isTrue();
     }
 
@@ -312,7 +312,7 @@ class FlussConversionsTest {
                         .physicalColumn("age", DataTypes.INT())
                         .build();
 
-        assertThat(FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue(schema1, schema2))
+        assertThat(FlussConversions.sameSchemaIgnoreCommentAndDefaultValue(schema1, schema2))
                 .isFalse();
     }
 
@@ -330,7 +330,7 @@ class FlussConversionsTest {
                         .physicalColumn("name", DataTypes.STRING())
                         .build();
 
-        assertThat(FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue(schema1, schema2))
+        assertThat(FlussConversions.sameSchemaIgnoreCommentAndDefaultValue(schema1, schema2))
                 .isFalse();
     }
 
@@ -344,7 +344,7 @@ class FlussConversionsTest {
 
         Schema schema2 = Schema.newBuilder().physicalColumn("id", DataTypes.INT()).build();
 
-        assertThat(FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue(schema1, schema2))
+        assertThat(FlussConversions.sameSchemaIgnoreCommentAndDefaultValue(schema1, schema2))
                 .isFalse();
     }
 
@@ -363,7 +363,7 @@ class FlussConversionsTest {
                         .build();
 
         // Should be true because comments are ignored
-        assertThat(FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue(schema1, schema2))
+        assertThat(FlussConversions.sameSchemaIgnoreCommentAndDefaultValue(schema1, schema2))
                 .isTrue();
     }
 
@@ -382,7 +382,7 @@ class FlussConversionsTest {
                         .physicalColumn("name", DataTypes.STRING())
                         .build();
 
-        assertThat(FlussConversions.sameCdcColumnsIgnoreCommentAndDefaultValue(schema1, schema2))
+        assertThat(FlussConversions.sameSchemaIgnoreCommentAndDefaultValue(schema1, schema2))
                 .isTrue();
     }
 }

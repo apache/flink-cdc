@@ -19,12 +19,13 @@ package org.apache.flink.cdc.connectors.fluss;
 
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.binary.BinaryStringData;
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
-import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
 import org.apache.flink.cdc.common.types.RowType;
@@ -64,6 +65,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR;
+import static org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior.EVOLVE;
+import static org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior.IGNORE;
+import static org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior.LENIENT;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_1;
 import static org.apache.flink.cdc.connectors.values.source.ValuesDataSourceHelper.TABLE_2;
 import static org.apache.flink.configuration.CoreOptions.ALWAYS_PARENT_FIRST_LOADER_PATTERNS_ADDITIONAL;
@@ -233,7 +238,7 @@ public class FlussPipelineITCase {
         eventOfSplits.add(Collections.singletonList(updateEvent));
         eventOfSplits.add(Collections.singletonList(deleteEvent));
 
-        composeAndExecute(eventOfSplits);
+        composeAndExecuteInEvolveMode(eventOfSplits);
         checkResult(TABLE_1, Arrays.asList("+I[2, b2]", "+I[3, c]"));
     }
 
@@ -279,16 +284,114 @@ public class FlussPipelineITCase {
         split1.add(insertEvent3);
         eventOfSplits.add(split1);
 
-        composeAndExecute(eventOfSplits);
+        composeAndExecuteInEvolveMode(eventOfSplits);
         checkResult(TABLE_1, Arrays.asList("+I[1, a]", "+I[2, b]", "+I[3, c]"));
     }
 
     @Test
-    void testSingleLogTableWithSchemaChange() {
-        assertThatThrownBy(() -> composeAndExecute(ValuesDataSourceHelper.singleSplitSingleTable()))
+    void testSingleLogTableWithNotSupportedSchemaChange() throws Exception {
+        assertThatThrownBy(
+                        () ->
+                                composeAndExecuteInEvolveMode(
+                                        ValuesDataSourceHelper.singleSplitSingleTable()))
                 .rootCause()
                 .hasMessageContaining(
-                        "fluss metadata applier only support CreateTableEvent now but receives AddColumnEvent");
+                        "fluss metadata applier only supports CreateTableEvent and AddColumnEvent now but receives RenameColumnEvent");
+    }
+
+    @Test
+    void testSingleLogTableInLenientMode() throws Exception {
+        // test add/drop/rename column in lenient mode
+        composeAndExecute(
+                ValuesDataSourceHelper.singleSplitSingleTable(),
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, LENIENT));
+        checkResult(
+                TABLE_1, Arrays.asList("+I[2, null, null, null, x]", "+I[3, 3, null, null, null]"));
+    }
+
+    @Test
+    void testSingleLogTableInIgnoreMode() throws Exception {
+        // test add/drop/rename column in ignore mode
+        composeAndExecute(
+                ValuesDataSourceHelper.singleSplitSingleTable(),
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, IGNORE));
+        checkResult(TABLE_1, Arrays.asList("+I[2, null]", "+I[3, 3]"));
+    }
+
+    @Test
+    void testSingleLogTableWithAddColumn() throws Exception {
+        List<List<Event>> eventOfSplits = new ArrayList<>();
+        List<Event> split1 = new ArrayList<>();
+        Schema schema =
+                Schema.newBuilder()
+                        .physicalColumn("col1", DataTypes.STRING())
+                        .physicalColumn("col2", DataTypes.STRING())
+                        .build();
+        CreateTableEvent createTableEvent = new CreateTableEvent(TABLE_1, schema);
+        split1.add(createTableEvent);
+        DataChangeEvent insertEvent1 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        new BinaryRecordDataGenerator(
+                                        RowType.of(DataTypes.STRING(), DataTypes.STRING()))
+                                .generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("1"),
+                                            BinaryStringData.fromString("a")
+                                        }));
+        split1.add(insertEvent1);
+
+        // add column at last.
+        split1.add(
+                new AddColumnEvent(
+                        TABLE_1,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("newColumn", DataTypes.STRING())))));
+        DataChangeEvent insertEvent2 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        new BinaryRecordDataGenerator(
+                                        RowType.of(
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING()))
+                                .generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("2"),
+                                            BinaryStringData.fromString("b"),
+                                            BinaryStringData.fromString("bb")
+                                        }));
+        split1.add(insertEvent2);
+        split1.add(
+                new AddColumnEvent(
+                        TABLE_1,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("newColumn2", DataTypes.STRING())))));
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        new BinaryRecordDataGenerator(
+                                        RowType.of(
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING()))
+                                .generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("3"),
+                                            BinaryStringData.fromString("c"),
+                                            BinaryStringData.fromString("cc"),
+                                            BinaryStringData.fromString("ccc")
+                                        }));
+        split1.add(insertEvent3);
+        eventOfSplits.add(split1);
+
+        composeAndExecuteInEvolveMode(eventOfSplits);
+        checkResult(
+                TABLE_1,
+                Arrays.asList("+I[1, a, null, null]", "+I[2, b, bb, null]", "+I[3, c, cc, ccc]"));
     }
 
     @Test
@@ -298,7 +401,8 @@ public class FlussPipelineITCase {
                                 composeAndExecute(
                                         ValuesDataSourceHelper.singleSplitSingleTable(),
                                         Collections.singletonMap(
-                                                BOOTSTRAP_SERVERS.key(), getBootstrapServers())))
+                                                BOOTSTRAP_SERVERS.key(), getBootstrapServers()),
+                                        new Configuration()))
                 .rootCause()
                 .hasMessageContaining(
                         "The connection has not completed authentication yet. This may be caused by a missing or incorrect configuration of 'client.security.protocol' on the client side.");
@@ -318,7 +422,8 @@ public class FlussPipelineITCase {
                         () ->
                                 composeAndExecute(
                                         ValuesDataSourceHelper.singleSplitSingleTable(),
-                                        sinkOption))
+                                        sinkOption,
+                                        new Configuration()))
                 .rootCause()
                 .hasMessageContaining("'table.non-key' is not a recognized Fluss table property");
     }
@@ -398,7 +503,7 @@ public class FlussPipelineITCase {
         split1.add(insertTabl2Event3);
         eventOfSplits.add(split1);
 
-        composeAndExecute(eventOfSplits);
+        composeAndExecuteInEvolveMode(eventOfSplits);
         checkResult(TABLE_1, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
         checkResult(TABLE_2, Arrays.asList("+I[1, 1]", "+I[2, 2]", "+I[3, 3]"));
     }
@@ -438,7 +543,7 @@ public class FlussPipelineITCase {
                                 new Object[] {
                                     BinaryStringData.fromString("1"),
                                     BinaryStringData.fromString("a"),
-                                    BinaryStringData.fromString("1")
+                                    BinaryStringData.fromString("aa")
                                 }));
         split1.add(insertEvent1);
         DataChangeEvent insertEvent2 =
@@ -447,14 +552,39 @@ public class FlussPipelineITCase {
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2")
+                                    BinaryStringData.fromString("b"),
+                                    BinaryStringData.fromString("bb")
                                 }));
         split1.add(insertEvent2);
         eventOfSplits.add(split1);
 
-        composeAndExecute(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[a, 1]", "+I[2, 2]"));
+        // add column at last
+        split1.add(
+                new AddColumnEvent(
+                        TABLE_1,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("newColumn", DataTypes.STRING())))));
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        new BinaryRecordDataGenerator(
+                                        RowType.of(
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING()))
+                                .generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("3"),
+                                            BinaryStringData.fromString("c"),
+                                            BinaryStringData.fromString("cc"),
+                                            BinaryStringData.fromString("ccc")
+                                        }));
+        split1.add(insertEvent3);
+
+        composeAndExecuteInEvolveMode(eventOfSplits);
+        checkResult(TABLE_1, Arrays.asList("+I[a, 1, null]", "+I[b, 2, null]", "+I[c, 3, ccc]"));
     }
 
     @Test
@@ -499,27 +629,64 @@ public class FlussPipelineITCase {
                         generator.generate(
                                 new Object[] {
                                     BinaryStringData.fromString("2"),
-                                    BinaryStringData.fromString("2")
+                                    BinaryStringData.fromString("b")
                                 }));
         split1.add(insertEvent2);
         eventOfSplits.add(split1);
 
-        composeAndExecute(eventOfSplits);
-        checkResult(TABLE_1, Arrays.asList("+I[1, a, null]", "+I[2, 2, null]"));
+        // add column at last
+        split1.add(
+                new AddColumnEvent(
+                        TABLE_1,
+                        Collections.singletonList(
+                                AddColumnEvent.last(
+                                        Column.physicalColumn("newColumn", DataTypes.STRING())))));
+        DataChangeEvent insertEvent3 =
+                DataChangeEvent.insertEvent(
+                        TABLE_1,
+                        new BinaryRecordDataGenerator(
+                                        RowType.of(
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING(),
+                                                DataTypes.STRING()))
+                                .generate(
+                                        new Object[] {
+                                            BinaryStringData.fromString("3"),
+                                            BinaryStringData.fromString("c"),
+                                            BinaryStringData.fromString("cc")
+                                        }));
+        split1.add(insertEvent3);
+
+        composeAndExecuteInEvolveMode(eventOfSplits);
+        checkResult(
+                TABLE_1,
+                Arrays.asList(
+                        "+I[1, a, null, null]", "+I[2, b, null, null]", "+I[3, c, null, cc]"));
     }
 
-    private void composeAndExecute(List<List<Event>> customSourceEvents) throws Exception {
+    private void composeAndExecuteInEvolveMode(List<List<Event>> customSourceEvents)
+            throws Exception {
+        composeAndExecute(
+                customSourceEvents,
+                new Configuration().set(PIPELINE_SCHEMA_CHANGE_BEHAVIOR, EVOLVE));
+    }
+
+    private void composeAndExecute(
+            List<List<Event>> customSourceEvents, Configuration pipelineConfig) throws Exception {
         Map<String, String> sinkOption = new HashMap<>();
         sinkOption.put(BOOTSTRAP_SERVERS.key(), getBootstrapServers());
         sinkOption.put("properties.client.security.protocol", "sasl");
         sinkOption.put("properties.client.security.sasl.mechanism", "PLAIN");
         sinkOption.put("properties.client.security.sasl.username", "guest");
         sinkOption.put("properties.client.security.sasl.password", "password2");
-        composeAndExecute(customSourceEvents, sinkOption);
+        composeAndExecute(customSourceEvents, sinkOption, pipelineConfig);
     }
 
     private void composeAndExecute(
-            List<List<Event>> customSourceEvents, Map<String, String> sinkOption) throws Exception {
+            List<List<Event>> customSourceEvents,
+            Map<String, String> sinkOption,
+            Configuration pipelineConfig)
+            throws Exception {
         FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
 
         // Setup value source
@@ -535,10 +702,8 @@ public class FlussPipelineITCase {
         SinkDef sinkDef = new SinkDef("fluss", "Fluss Sink", Configuration.fromMap(sinkOption));
 
         // Setup pipeline
-        Configuration pipelineConfig = new Configuration();
         pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 4);
-        pipelineConfig.set(
-                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        pipelineConfig.addAll(pipelineConfig);
         PipelineDef pipelineDef =
                 new PipelineDef(
                         sourceDef,

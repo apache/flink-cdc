@@ -17,12 +17,14 @@
 
 package org.apache.flink.cdc.connectors.fluss.sink;
 
+import org.apache.flink.cdc.common.event.AddColumnEvent;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DropTableEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.SchemaChangeEventTypeFamily;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.table.api.ValidationException;
 
@@ -31,12 +33,14 @@ import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.config.Configuration;
 import org.apache.fluss.metadata.DatabaseDescriptor;
+import org.apache.fluss.metadata.TableChange;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -47,6 +51,7 @@ import java.util.stream.Collectors;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_TABLE;
 import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussTable;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConversions.toFlussType;
 
 /** {@link MetadataApplier} for fluss. */
 public class FlussMetaDataApplier implements MetadataApplier {
@@ -57,9 +62,6 @@ public class FlussMetaDataApplier implements MetadataApplier {
     private final Map<String, Integer> bucketNumMap;
     private Set<SchemaChangeEventType> enabledEventTypes =
             new HashSet<>(Arrays.asList(CREATE_TABLE, DROP_TABLE));
-
-    private transient Connection connection;
-    private transient Admin admin;
 
     public FlussMetaDataApplier(
             Configuration flussClientConfig,
@@ -92,22 +94,25 @@ public class FlussMetaDataApplier implements MetadataApplier {
     @Override
     public void applySchemaChange(SchemaChangeEvent schemaChangeEvent) {
         LOG.info("fluss metadata applier receive schemaChangeEvent {}", schemaChangeEvent);
-        Admin admin = getAdmin();
         if (schemaChangeEvent instanceof CreateTableEvent) {
             CreateTableEvent createTableEvent = (CreateTableEvent) schemaChangeEvent;
-            applyCreateTable(admin, createTableEvent);
+            applyCreateTable(createTableEvent);
         } else if (schemaChangeEvent instanceof DropTableEvent) {
             DropTableEvent dropTableEvent = (DropTableEvent) schemaChangeEvent;
-            applyDropTable(admin, dropTableEvent);
+            applyDropTable(dropTableEvent);
+        } else if (schemaChangeEvent instanceof AddColumnEvent) {
+            AddColumnEvent addColumnEvent = (AddColumnEvent) schemaChangeEvent;
+            applyAddColumnTable(addColumnEvent);
         } else {
             throw new IllegalArgumentException(
-                    "fluss metadata applier only support CreateTableEvent now but receives "
+                    "fluss metadata applier only supports CreateTableEvent and AddColumnEvent now but receives "
                             + schemaChangeEvent);
         }
     }
 
-    private void applyCreateTable(Admin admin, CreateTableEvent event) {
-        try {
+    private void applyCreateTable(CreateTableEvent event) {
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
+                Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             String tableIdentifier = tablePath.getDatabaseName() + "." + tablePath.getTableName();
@@ -129,8 +134,9 @@ public class FlussMetaDataApplier implements MetadataApplier {
         }
     }
 
-    private void applyDropTable(Admin admin, DropTableEvent event) {
-        try {
+    private void applyDropTable(DropTableEvent event) {
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
+                Admin admin = connection.getAdmin()) {
             TableId tableId = event.tableId();
             TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
             admin.dropTable(tablePath, true).get();
@@ -140,21 +146,36 @@ public class FlussMetaDataApplier implements MetadataApplier {
         }
     }
 
-    private Admin getAdmin() {
-        if (connection == null) {
-            connection = ConnectionFactory.createConnection(flussClientConfig);
-            admin = connection.getAdmin();
-        }
-        return admin;
-    }
+    private void applyAddColumnTable(AddColumnEvent event) {
+        List<TableChange> tableChanges = new ArrayList<>();
+        event.getAddedColumns()
+                .forEach(
+                        columnWithPosition -> {
+                            if (columnWithPosition.getPosition()
+                                    != AddColumnEvent.ColumnPosition.LAST) {
+                                throw new IllegalArgumentException(
+                                        "Fluss metadata applier only supports LAST position for adding columns now but receives "
+                                                + columnWithPosition.getPosition()
+                                                + ". Consider using 'schema.change.behavior' configuration with 'LENIENT' mode to handle schema changes more flexibly.");
+                            }
 
-    @Override
-    public void close() throws Exception {
-        if (admin != null) {
-            admin.close();
-        }
-        if (connection != null) {
-            connection.close();
+                            Column column = columnWithPosition.getAddColumn();
+                            tableChanges.add(
+                                    TableChange.addColumn(
+                                            column.getName(),
+                                            toFlussType(column.getType()),
+                                            column.getComment(),
+                                            TableChange.ColumnPosition.last()));
+                        });
+
+        try (Connection connection = ConnectionFactory.createConnection(flussClientConfig);
+                Admin admin = connection.getAdmin()) {
+            TableId tableId = event.tableId();
+            TablePath tablePath = new TablePath(tableId.getSchemaName(), tableId.getTableName());
+            admin.alterTable(tablePath, tableChanges, true).get();
+        } catch (Exception e) {
+            LOG.error("Failed to apply schema change {}", event, e);
+            throw new RuntimeException(e);
         }
     }
 
@@ -191,7 +212,7 @@ public class FlussMetaDataApplier implements MetadataApplier {
         List<String> currentPartitionKeys = currentTableInfo.getPartitionKeys();
         if (!inferredPartitionKeys.equals(currentPartitionKeys)) {
             throw new ValidationException(
-                    "The table schema inferred by Flink CDC is not matched with current Fluss table schema. "
+                    "The table schema inffered by Flink CDC is not matched with current Fluss table schema. "
                             + "\n New Fluss table's partition keys : "
                             + inferredPartitionKeys
                             + "\n Current Fluss's partition keys: "

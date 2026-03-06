@@ -41,7 +41,6 @@ import org.apache.flink.cdc.common.types.ZonedTimestampType;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.util.CollectionUtil;
 
-import org.apache.fluss.annotation.VisibleForTesting;
 import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableDescriptor;
 
@@ -94,28 +93,25 @@ public class FlussConversions {
             schemBuilder.primaryKey(cdcSchema.primaryKeys());
         }
 
-        Schema schema =
-                schemBuilder
-                        .fromColumns(
-                                cdcSchema.getColumns().stream()
-                                        .map(
-                                                column ->
-                                                        new Schema.Column(
-                                                                column.getName(),
-                                                                toFlussType(column.getType()),
-                                                                column.getComment()))
-                                        .collect(Collectors.toList()))
-                        .build();
-        return schema;
+        // use schemBuilder.column rather than schemBuilder.fromColumns to reassign nested row id.
+        cdcSchema
+                .getColumns()
+                .forEach(
+                        column ->
+                                schemBuilder
+                                        .column(
+                                                column.getName(),
+                                                column.getType().accept(TO_FLUSS_TYPE_INSTANCE))
+                                        .withComment(column.getComment()));
+        return schemBuilder.build();
     }
 
-    @VisibleForTesting
-    private static org.apache.fluss.types.DataType toFlussType(
+    public static org.apache.fluss.types.DataType toFlussType(
             org.apache.flink.cdc.common.types.DataType flinkDataType) {
         return flinkDataType.accept(TO_FLUSS_TYPE_INSTANCE);
     }
 
-    public static Boolean sameCdcColumnsIgnoreCommentAndDefaultValue(
+    public static Boolean sameSchemaIgnoreCommentAndDefaultValue(
             org.apache.flink.cdc.common.schema.Schema oldSchema,
             org.apache.flink.cdc.common.schema.Schema newSchema) {
         List<org.apache.flink.cdc.common.schema.Column> upstreamColumns = oldSchema.getColumns();
