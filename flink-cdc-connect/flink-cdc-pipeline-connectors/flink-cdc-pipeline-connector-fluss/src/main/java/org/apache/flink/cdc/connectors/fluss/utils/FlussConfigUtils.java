@@ -78,4 +78,6 @@ public class FlussConfigUtils {
         }
         return result;
     }
+
+    private FlussConfigUtils() {}
 }
