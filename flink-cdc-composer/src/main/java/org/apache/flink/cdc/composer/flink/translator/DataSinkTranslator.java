@@ -19,7 +19,6 @@ package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.connector.sink2.Sink;
-import org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.cdc.common.configuration.Configuration;
@@ -28,30 +27,24 @@ import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
-import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.definition.SinkDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
+import org.apache.flink.cdc.composer.flink.compat.FlinkPipelineBridges;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
-import org.apache.flink.cdc.runtime.operators.sink.BatchDataSinkFunctionOperator;
-import org.apache.flink.cdc.runtime.operators.sink.DataSinkFunctionOperator;
+import org.apache.flink.cdc.flink.compat.FlinkPipelineBridge;
 import org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperatorFactory;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessageTypeInfo;
-import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
-import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
-import org.apache.flink.streaming.api.operators.StreamSink;
-import org.apache.flink.streaming.api.transformations.LegacySinkTransformation;
-import org.apache.flink.streaming.api.transformations.PhysicalTransformation;
 
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 /** Translator used to build {@link DataSink} for given {@link DataStream}. */
 @Internal
@@ -96,26 +89,25 @@ public class DataSinkTranslator {
             boolean isBatchMode,
             OperatorID schemaOperatorID,
             OperatorUidGenerator operatorUidGenerator) {
-        // Get sink provider
         EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
+        if (eventSinkProvider == null) {
+            return;
+        }
         String sinkName = generateSinkName(sinkDef);
         if (eventSinkProvider instanceof FlinkSinkProvider) {
-            // Sink V2
             FlinkSinkProvider sinkProvider = (FlinkSinkProvider) eventSinkProvider;
             Sink<Event> sink = sinkProvider.getSink();
             sinkTo(input, sink, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
-        } else if (eventSinkProvider instanceof FlinkSinkFunctionProvider) {
-            // SinkFunction
-            FlinkSinkFunctionProvider sinkFunctionProvider =
-                    (FlinkSinkFunctionProvider) eventSinkProvider;
-            SinkFunction<Event> sinkFunction = sinkFunctionProvider.getSinkFunction();
-            sinkTo(
+        } else {
+            // SinkFunction path (Flink 1.x compat)
+            FlinkPipelineBridge bridge = FlinkPipelineBridges.getDefault();
+            bridge.sinkTo(
                     input,
-                    sinkFunction,
+                    eventSinkProvider,
                     sinkName,
                     isBatchMode,
                     schemaOperatorID,
-                    operatorUidGenerator);
+                    operatorUidGenerator::generateUid);
         }
     }
 
@@ -128,12 +120,11 @@ public class DataSinkTranslator {
             OperatorID schemaOperatorID,
             OperatorUidGenerator operatorUidGenerator) {
         DataStream<Event> stream = input;
-        // Pre-write topology
-        if (sink instanceof WithPreWriteTopology) {
-            stream = ((WithPreWriteTopology<Event>) sink).addPreWriteTopology(stream);
-        }
+        // Pre-write topology (reflection for Flink 1.x WithPreWriteTopology vs 2.x
+        // SupportsPreWriteTopology)
+        stream = addPreWriteTopologyIfSupported(sink, stream);
 
-        if (sink instanceof TwoPhaseCommittingSink) {
+        if (supportsTwoPhaseCommit(sink)) {
             addCommittingTopology(
                     sink, stream, sinkName, isBatchMode, schemaOperatorID, operatorUidGenerator);
         } else {
@@ -146,29 +137,51 @@ public class DataSinkTranslator {
         }
     }
 
-    private void sinkTo(
-            DataStream<Event> input,
-            SinkFunction<Event> sinkFunction,
-            String sinkName,
-            boolean isBatchMode,
-            OperatorID schemaOperatorID,
-            OperatorUidGenerator operatorUidGenerator) {
-        StreamSink<Event> sinkOperator;
-        if (isBatchMode) {
-            sinkOperator = new BatchDataSinkFunctionOperator(sinkFunction);
-        } else {
-            sinkOperator = new DataSinkFunctionOperator(sinkFunction, schemaOperatorID);
+    /**
+     * True if sink has createCommitter and getCommittableSerializer (Flink 1.x
+     * TwoPhaseCommittingSink vs 2.x SupportsCommitter).
+     *
+     * <p>We must also consider methods declared on superclasses (for example {@code
+     * PaimonEventSink} extends {@code PaimonSink} which declares {@code createCommitter}). Using
+     * {@code getDeclaredMethods()} only on the concrete class would miss those and incorrectly
+     * disable the committer stage.
+     */
+    private static boolean supportsTwoPhaseCommit(Sink<Event> sink) {
+        try {
+            boolean hasCreateCommitter = false;
+            boolean hasGetCommittableSerializer = false;
+
+            // getMethods() returns all public methods, including those from superclasses and
+            // interfaces, without forcing us to load 1.x-only types such as Sink.InitContext.
+            for (Method m : sink.getClass().getMethods()) {
+                if ("createCommitter".equals(m.getName()) && m.getParameterCount() == 0) {
+                    hasCreateCommitter = true;
+                }
+                if ("getCommittableSerializer".equals(m.getName()) && m.getParameterCount() == 0) {
+                    hasGetCommittableSerializer = true;
+                }
+            }
+            return hasCreateCommitter && hasGetCommittableSerializer;
+        } catch (NoClassDefFoundError e) {
+            // Sink class references 1.x-only types (e.g. Sink.InitContext); assume two-phase
+            return true;
         }
-        final StreamExecutionEnvironment executionEnvironment = input.getExecutionEnvironment();
-        PhysicalTransformation<Event> transformation =
-                new LegacySinkTransformation<>(
-                        input.getTransformation(),
-                        SINK_WRITER_PREFIX + sinkName,
-                        sinkOperator,
-                        executionEnvironment.getParallelism(),
-                        false);
-        transformation.setUid(operatorUidGenerator.generateUid("sink-writer"));
-        executionEnvironment.addOperator(transformation);
+    }
+
+    /**
+     * Calls addPreWriteTopology via reflection to support both Flink 1.x (WithPreWriteTopology) and
+     * 2.x (SupportsPreWriteTopology).
+     */
+    private static DataStream<Event> addPreWriteTopologyIfSupported(
+            Sink<Event> sink, DataStream<Event> stream) {
+        try {
+            Method m = sink.getClass().getMethod("addPreWriteTopology", DataStream.class);
+            @SuppressWarnings("unchecked")
+            DataStream<Event> result = (DataStream<Event>) m.invoke(sink, stream);
+            return result != null ? result : stream;
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            return stream;
+        }
     }
 
     private <CommT> void addCommittingTopology(
@@ -189,11 +202,8 @@ public class DataSinkTranslator {
                                         sink, isBatchMode, schemaOperatorID))
                         .uid(operatorUidGenerator.generateUid("sink-writer"));
 
-        DataStream<CommittableMessage<CommT>> preCommitted = written;
-        if (sink instanceof WithPreCommitTopology) {
-            preCommitted =
-                    ((WithPreCommitTopology<Event, CommT>) sink).addPreCommitTopology(written);
-        }
+        DataStream<CommittableMessage<CommT>> preCommitted =
+                addPreCommitTopologyIfSupported(sink, written);
 
         // TODO: Hard coding checkpoint
         boolean isCheckpointingEnabled = true;
@@ -206,8 +216,36 @@ public class DataSinkTranslator {
                                         sink, isBatchMode, isCheckpointingEnabled))
                         .uid(operatorUidGenerator.generateUid("sink-committer"));
 
-        if (sink instanceof WithPostCommitTopology) {
-            ((WithPostCommitTopology<Event, CommT>) sink).addPostCommitTopology(committed);
+        addPostCommitTopologyIfSupported(sink, committed);
+    }
+
+    /**
+     * Calls addPreCommitTopology via reflection (Flink 1.x WithPreCommitTopology vs 2.x
+     * SupportsPreCommitTopology).
+     */
+    @SuppressWarnings("unchecked")
+    private static <CommT> DataStream<CommittableMessage<CommT>> addPreCommitTopologyIfSupported(
+            Sink<Event> sink, DataStream<CommittableMessage<CommT>> written) {
+        try {
+            Method m = sink.getClass().getMethod("addPreCommitTopology", DataStream.class);
+            Object result = m.invoke(sink, written);
+            return result != null ? (DataStream<CommittableMessage<CommT>>) result : written;
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            return written;
+        }
+    }
+
+    /**
+     * Calls addPostCommitTopology via reflection (Flink 1.x WithPostCommitTopology vs 2.x
+     * SupportsPostCommitTopology).
+     */
+    private static <CommT> void addPostCommitTopologyIfSupported(
+            Sink<Event> sink, DataStream<CommittableMessage<CommT>> committed) {
+        try {
+            Method m = sink.getClass().getMethod("addPostCommitTopology", DataStream.class);
+            m.invoke(sink, committed);
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            // Sink does not support post-commit topology
         }
     }
 
@@ -217,8 +255,9 @@ public class DataSinkTranslator {
     }
 
     private static <CommT> SimpleVersionedSerializer<CommT> getCommittableSerializer(Object sink) {
-        // FIX ME: TwoPhaseCommittingSink has been deprecated, and its signature has changed
-        // during Flink 1.18 to 1.19. Remove this when Flink 1.18 is no longer supported.
+        // Uses reflection-friendly method name (works with TwoPhaseCommittingSink and
+        // SupportsCommitter) during Flink 1.18 to 1.19. Remove this when Flink 1.18 is no longer
+        // supported.
         try {
             return (SimpleVersionedSerializer<CommT>)
                     sink.getClass().getDeclaredMethod("getCommittableSerializer").invoke(sink);
@@ -227,25 +266,94 @@ public class DataSinkTranslator {
         }
     }
 
+    /**
+     * Creates a {@code CommitterOperatorFactory} via reflection.
+     *
+     * <p>Flink 1.19+ / 2.x requires the first constructor parameter to be {@code
+     * SupportsCommitter<CommT>}. Sinks like PaimonSink declare {@code createCommitter()} (no-arg)
+     * and {@code getCommittableSerializer()} without implementing the {@code SupportsCommitter}
+     * interface. In that case we create a dynamic proxy that adapts the sink.
+     */
+    @SuppressWarnings("unchecked")
     private static <CommT>
             OneInputStreamOperatorFactory<CommittableMessage<CommT>, CommittableMessage<CommT>>
                     getCommitterOperatorFactory(
                             Sink<Event> sink, boolean isBatchMode, boolean isCheckpointingEnabled) {
-        // FIX ME: OneInputStreamOperatorFactory is an @Internal class, and its signature has
-        // changed during Flink 1.18 to 1.19. Remove this when Flink 1.18 is no longer supported.
         try {
+            Class<?> factoryClass =
+                    Class.forName(
+                            "org.apache.flink.streaming.runtime.operators.sink.CommitterOperatorFactory");
+            java.lang.reflect.Constructor<?> ctor = factoryClass.getDeclaredConstructors()[0];
+            Class<?> firstParamType = ctor.getParameterTypes()[0];
+
+            Object firstArg;
+            if (firstParamType.isInstance(sink)) {
+                firstArg = sink;
+            } else {
+                firstArg = adaptToSupportsCommitter(sink, firstParamType);
+            }
+
+            ctor.setAccessible(true);
             return (OneInputStreamOperatorFactory<
                             CommittableMessage<CommT>, CommittableMessage<CommT>>)
-                    Class.forName(
-                                    "org.apache.flink.streaming.runtime.operators.sink.CommitterOperatorFactory")
-                            .getDeclaredConstructors()[0]
-                            .newInstance(sink, isBatchMode, isCheckpointingEnabled);
+                    ctor.newInstance(firstArg, isBatchMode, isCheckpointingEnabled);
 
         } catch (ClassNotFoundException
                 | InstantiationException
                 | IllegalAccessException
                 | InvocationTargetException e) {
             throw new RuntimeException("Failed to create CommitterOperatorFactory", e);
+        }
+    }
+
+    /**
+     * Creates a dynamic proxy implementing {@code SupportsCommitter} (or whatever the target
+     * interface is) by delegating to the sink's existing {@code createCommitter()} and {@code
+     * getCommittableSerializer()} methods.
+     */
+    private static Object adaptToSupportsCommitter(Sink<Event> sink, Class<?> targetInterface) {
+        return java.lang.reflect.Proxy.newProxyInstance(
+                targetInterface.getClassLoader(),
+                new Class<?>[] {targetInterface},
+                new SupportsCommitterInvocationHandler(sink));
+    }
+
+    /** Serializable invocation handler used to adapt sinks to SupportsCommitter. */
+    private static final class SupportsCommitterInvocationHandler
+            implements InvocationHandler, java.io.Serializable {
+
+        private static final long serialVersionUID = 1L;
+
+        private final Sink<Event> sink;
+
+        private SupportsCommitterInvocationHandler(Sink<Event> sink) {
+            this.sink = sink;
+        }
+
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            String name = method.getName();
+            if ("createCommitter".equals(name)) {
+                // SupportsCommitter.createCommitter(CommitterInitContext) ->
+                // delegate to sink.createCommitter() (no-arg)
+                Method noArgMethod = sink.getClass().getMethod("createCommitter");
+                noArgMethod.setAccessible(true);
+                return noArgMethod.invoke(sink);
+            }
+            if ("getCommittableSerializer".equals(name)) {
+                Method serMethod = sink.getClass().getMethod("getCommittableSerializer");
+                serMethod.setAccessible(true);
+                return serMethod.invoke(sink);
+            }
+            // Delegate any other method (toString, equals, hashCode) to sink when present
+            try {
+                Method sinkMethod = sink.getClass().getMethod(name, method.getParameterTypes());
+                sinkMethod.setAccessible(true);
+                return sinkMethod.invoke(sink, args);
+            } catch (NoSuchMethodException ignore) {
+                // Fall back to default behaviour for Object methods on proxy
+                return method.invoke(this, args);
+            }
         }
     }
 }

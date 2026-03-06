@@ -33,7 +33,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -67,7 +66,6 @@ public class RegularPrePartitionOperator extends AbstractStreamOperator<Partitio
             OperatorID schemaOperatorId,
             int downstreamParallelism,
             HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorId = schemaOperatorId;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;

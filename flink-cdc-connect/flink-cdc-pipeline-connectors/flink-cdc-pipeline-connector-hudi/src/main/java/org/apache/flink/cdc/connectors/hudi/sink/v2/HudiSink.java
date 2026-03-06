@@ -28,7 +28,6 @@ import org.apache.flink.cdc.connectors.hudi.sink.bucket.BucketWrapper;
 import org.apache.flink.cdc.connectors.hudi.sink.bucket.FlushEventAlignmentOperator;
 import org.apache.flink.cdc.connectors.hudi.sink.operator.MultiTableWriteOperator;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.util.Collector;
@@ -40,7 +39,7 @@ import java.io.IOException;
 import java.time.ZoneId;
 
 /** A {@link Sink} implementation for Apache Hudi. */
-public class HudiSink implements Sink<Event>, WithPreWriteTopology<Event> {
+public class HudiSink implements Sink<Event> {
 
     private static final Logger LOG = LoggerFactory.getLogger(HudiSink.class);
 
@@ -64,7 +63,10 @@ public class HudiSink implements Sink<Event>, WithPreWriteTopology<Event> {
         return DummySinkWriter.INSTANCE;
     }
 
-    @Override
+    /**
+     * Adds bucket-assign and flush-alignment operators (discovered via reflection by
+     * DataSinkTranslator).
+     */
     public DataStream<Event> addPreWriteTopology(DataStream<Event> dataStream) {
         LOG.info("Building Hudi pre-write topology with bucket assignment and partitioning");
 

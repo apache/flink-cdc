@@ -17,10 +17,10 @@
 
 package org.apache.flink.cdc.connectors.oracle;
 
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.connectors.oracle.util.OracleJdbcUrlUtils;
 import org.apache.flink.cdc.debezium.Validator;
 import org.apache.flink.table.api.TableException;
-import org.apache.flink.table.api.ValidationException;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;

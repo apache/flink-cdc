@@ -39,7 +39,6 @@ import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -97,7 +96,6 @@ public class BucketAssignOperator extends AbstractStreamOperator<Event>
     public BucketAssignOperator(
             Options catalogOptions, String schemaOperatorUid, ZoneId zoneId, String commitUser) {
         this.catalogOptions = catalogOptions;
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.schemaOperatorUid = schemaOperatorUid;
         this.commitUser = commitUser;
         this.zoneId = zoneId;

@@ -38,7 +38,6 @@ import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitAckEve
 import org.apache.flink.cdc.connectors.postgres.source.events.OffsetCommitEvent;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.base.source.reader.RecordEmitter;
-import org.apache.flink.connector.base.source.reader.synchronization.FutureCompletingBlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +65,6 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
     private final int lsnCommitCheckpointsDelay;
 
     public PostgresSourceReader(
-            FutureCompletingBlockingQueue elementQueue,
             Supplier supplier,
             RecordEmitter recordEmitter,
             Configuration config,
@@ -75,7 +73,6 @@ public class PostgresSourceReader extends IncrementalSourceReaderWithCommit {
             SourceSplitSerializer sourceSplitSerializer,
             DataSourceDialect dialect) {
         super(
-                elementQueue,
                 supplier,
                 recordEmitter,
                 config,

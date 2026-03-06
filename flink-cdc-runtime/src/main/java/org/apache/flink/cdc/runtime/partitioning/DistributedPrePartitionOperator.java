@@ -30,7 +30,6 @@ import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -55,7 +54,6 @@ public class DistributedPrePartitionOperator extends AbstractStreamOperator<Part
 
     public DistributedPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
     }
@@ -63,7 +61,7 @@ public class DistributedPrePartitionOperator extends AbstractStreamOperator<Part
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         schemaMap = new HashMap<>();
         hashFunctionMap = new HashMap<>();
     }

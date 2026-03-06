@@ -21,13 +21,13 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
-import org.apache.flink.cdc.runtime.partitioning.BatchRegularPrePartitionOperator;
-import org.apache.flink.cdc.runtime.partitioning.DistributedPrePartitionOperator;
+import org.apache.flink.cdc.runtime.partitioning.BatchRegularPrePartitionOperatorFactory;
+import org.apache.flink.cdc.runtime.partitioning.DistributedPrePartitionOperatorFactory;
 import org.apache.flink.cdc.runtime.partitioning.EventPartitioner;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEventKeySelector;
 import org.apache.flink.cdc.runtime.partitioning.PostPartitionProcessor;
-import org.apache.flink.cdc.runtime.partitioning.RegularPrePartitionOperator;
+import org.apache.flink.cdc.runtime.partitioning.RegularPrePartitionOperatorFactory;
 import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
 import org.apache.flink.cdc.runtime.typeutils.PartitioningEventTypeInfo;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -72,9 +72,9 @@ public class PartitioningTranslator {
                                 isBatchMode ? "BatchPrePartition" : "PrePartition",
                                 new PartitioningEventTypeInfo(),
                                 isBatchMode
-                                        ? new BatchRegularPrePartitionOperator(
+                                        ? new BatchRegularPrePartitionOperatorFactory(
                                                 downstreamParallelism, hashFunctionProvider)
-                                        : new RegularPrePartitionOperator(
+                                        : new RegularPrePartitionOperatorFactory(
                                                 schemaOperatorID,
                                                 downstreamParallelism,
                                                 hashFunctionProvider))
@@ -97,7 +97,7 @@ public class PartitioningTranslator {
         return input.transform(
                         "Partitioning",
                         new PartitioningEventTypeInfo(),
-                        new DistributedPrePartitionOperator(
+                        new DistributedPrePartitionOperatorFactory(
                                 downstreamParallelism, hashFunctionProvider))
                 .setParallelism(upstreamParallelism)
                 .partitionCustom(new EventPartitioner(), new PartitioningEventKeySelector());

@@ -24,7 +24,7 @@ import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.composer.definition.RouteDef;
-import org.apache.flink.cdc.runtime.operators.schema.regular.BatchSchemaOperator;
+import org.apache.flink.cdc.runtime.operators.schema.regular.BatchSchemaOperatorFactory;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperatorFactory;
 import org.apache.flink.cdc.runtime.partitioning.PartitioningEvent;
@@ -143,7 +143,7 @@ public class SchemaOperatorTranslator {
                 input.transform(
                         "SchemaBatchOperator",
                         new EventTypeInfo(),
-                        new BatchSchemaOperator(routingRules, metadataApplier, timezone));
+                        new BatchSchemaOperatorFactory(routingRules, metadataApplier, timezone));
         stream.uid(schemaOperatorUid).setParallelism(parallelism);
         return stream;
     }

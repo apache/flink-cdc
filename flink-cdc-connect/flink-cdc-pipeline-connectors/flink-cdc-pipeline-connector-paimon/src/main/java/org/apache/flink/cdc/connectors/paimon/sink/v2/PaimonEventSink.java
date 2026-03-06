@@ -24,7 +24,6 @@ import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperChange
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.BucketWrapperEventTypeInfo;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.bucket.FlushEventAlignmentOperator;
 import org.apache.flink.core.io.SimpleVersionedSerializer;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 
 import org.apache.paimon.flink.sink.MultiTableCommittable;
@@ -35,7 +34,8 @@ import org.apache.paimon.table.sink.CommitMessageSerializer;
 import java.time.ZoneId;
 
 /** A {@link PaimonSink} to process {@link Event}. */
-public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTopology<Event> {
+/** Sink with addPreWriteTopology for schema/bucket operators (Flink 1.x/2.x compatible). */
+public class PaimonEventSink extends PaimonSink<Event> {
 
     public final String schemaOperatorUid;
 
@@ -52,7 +52,10 @@ public class PaimonEventSink extends PaimonSink<Event> implements WithPreWriteTo
         this.zoneId = zoneId;
     }
 
-    @Override
+    /**
+     * Adds bucket-assign and flush-alignment operators (discovered via reflection by
+     * DataSinkTranslator).
+     */
     public DataStream<Event> addPreWriteTopology(DataStream<Event> dataStream) {
         // Shuffle by key hash => Assign bucket => Shuffle by bucket.
         return dataStream

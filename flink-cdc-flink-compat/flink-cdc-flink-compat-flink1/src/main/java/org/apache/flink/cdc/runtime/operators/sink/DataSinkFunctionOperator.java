@@ -30,7 +30,6 @@ import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.StreamSink;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -41,13 +40,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An operator that processes records to be written into a {@link
- * org.apache.flink.streaming.api.functions.sink.SinkFunction}.
- *
- * <p>The operator is a proxy of {@link org.apache.flink.streaming.api.operators.StreamSink} in
- * Flink.
- *
- * <p>The operator is always part of a sink pipeline and is the first operator.
+ * An operator that processes records to be written into a {@link SinkFunction}. Lives in the Flink
+ * 1.x compat module because SinkFunction was removed in Flink 2.x.
  */
 @Internal
 public class DataSinkFunctionOperator extends StreamSink<Event> {
@@ -55,14 +49,12 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     private SchemaEvolutionClient schemaEvolutionClient;
     private final OperatorID schemaOperatorID;
 
-    /** A set of {@link TableId} that already processed {@link CreateTableEvent}. */
     private final Set<TableId> processedTableIds;
 
     public DataSinkFunctionOperator(SinkFunction<Event> userFunction, OperatorID schemaOperatorID) {
         super(userFunction);
         this.schemaOperatorID = schemaOperatorID;
         processedTableIds = new HashSet<>();
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override
@@ -88,23 +80,17 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
         Event event = element.getValue();
 
         try {
-            // FlushEvent triggers flush
             if (event instanceof FlushEvent) {
                 handleFlushEvent(((FlushEvent) event));
                 return;
             }
 
-            // CreateTableEvent marks the table as processed directly
             if (event instanceof CreateTableEvent) {
                 processedTableIds.add(((CreateTableEvent) event).tableId());
                 super.processElement(element);
                 return;
             }
 
-            // Check if the table is processed before emitting all other events, because we have to
-            // make
-            // sure that sink have a view of the full schema before processing any change events,
-            // including schema changes.
             ChangeEvent changeEvent = (ChangeEvent) event;
             if (!processedTableIds.contains(changeEvent.tableId())) {
                 emitLatestSchema(changeEvent.tableId());
@@ -117,7 +103,6 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
         }
     }
 
-    // ----------------------------- Helper functions -------------------------------
     private void handleFlushEvent(FlushEvent event) throws Exception {
         userFunction.finish();
         if (event.getSchemaChangeEventType() != SchemaChangeEventType.CREATE_TABLE) {
@@ -141,8 +126,6 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
     private void emitLatestSchema(TableId tableId) throws Exception {
         Optional<Schema> schema = schemaEvolutionClient.getLatestEvolvedSchema(tableId);
         if (schema.isPresent()) {
-            // request and process CreateTableEvent because SinkFunction need to retrieve
-            // Schema to deserialize RecordData after resuming job.
             super.processElement(new StreamRecord<>(new CreateTableEvent(tableId, schema.get())));
             processedTableIds.add(tableId);
         } else {

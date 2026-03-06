@@ -20,6 +20,7 @@ package org.apache.flink.cdc.pipeline.tests;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Deadline;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
 import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
@@ -27,7 +28,6 @@ import org.apache.flink.cdc.pipeline.tests.utils.TarballFetcher;
 import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.core.execution.SavepointFormatType;
 import org.apache.flink.runtime.client.JobStatusMessage;
-import org.apache.flink.table.api.ValidationException;
 
 import org.apache.hudi.common.model.HoodieTableType;
 import org.assertj.core.api.Assertions;

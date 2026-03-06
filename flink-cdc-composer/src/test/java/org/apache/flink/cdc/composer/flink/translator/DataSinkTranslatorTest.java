@@ -17,11 +17,11 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
+import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.runtime.jobgraph.OperatorID;
-import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -67,7 +67,7 @@ class DataSinkTranslatorTest {
 
     private static class EmptyEvent implements Event {}
 
-    private static class MockPreWriteWithoutCommitSink implements WithPreWriteTopology<Event> {
+    private static class MockPreWriteWithoutCommitSink implements Sink<Event> {
 
         private final String uid;
 
@@ -75,7 +75,7 @@ class DataSinkTranslatorTest {
             this.uid = uid;
         }
 
-        @Override
+        /** Discovered via reflection by DataSinkTranslator. */
         public DataStream<Event> addPreWriteTopology(DataStream<Event> inputDataStream) {
             // return a new DataSteam with specified uid
             DataStream<Event> rebalance = inputDataStream.rebalance();
@@ -84,7 +84,7 @@ class DataSinkTranslatorTest {
         }
 
         @Override
-        public SinkWriter<Event> createWriter(InitContext context) throws IOException {
+        public SinkWriter<Event> createWriter(Sink.InitContext context) throws IOException {
             return null;
         }
     }

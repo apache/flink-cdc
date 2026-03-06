@@ -24,6 +24,7 @@ import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.CoordinatedOperatorFactory;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.SimpleOperatorFactory;
@@ -50,6 +51,7 @@ public class SchemaOperatorFactory extends SimpleOperatorFactory<Event>
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
         super(new SchemaOperator(routingRules, rpcTimeout, schemaChangeBehavior, timezone));
+        setChainingStrategy(ChainingStrategy.ALWAYS);
         this.metadataApplier = metadataApplier;
         this.routingRules = routingRules;
         this.schemaChangeBehavior = schemaChangeBehavior;

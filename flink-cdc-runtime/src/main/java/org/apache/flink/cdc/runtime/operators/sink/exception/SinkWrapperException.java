@@ -20,9 +20,9 @@ package org.apache.flink.cdc.runtime.operators.sink.exception;
 import org.apache.flink.cdc.common.event.Event;
 
 /**
- * A generic {@link RuntimeException} thrown when an error occurs in {@link
- * org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperator} and {@link
- * org.apache.flink.cdc.runtime.operators.sink.DataSinkFunctionOperator}.
+ * A generic {@link RuntimeException} thrown when an error occurs in sink operators (e.g. {@link
+ * org.apache.flink.cdc.runtime.operators.sink.DataSinkWriterOperator} or the SinkFunction-based
+ * operator in the Flink 1.x compat module).
  */
 public class SinkWrapperException extends RuntimeException {
     public SinkWrapperException(Event event, Throwable cause) {

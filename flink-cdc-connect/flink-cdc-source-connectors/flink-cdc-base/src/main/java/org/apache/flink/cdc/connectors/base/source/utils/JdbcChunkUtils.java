@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.connectors.base.source.utils;
 
-import org.apache.flink.table.api.ValidationException;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 
 import io.debezium.jdbc.JdbcConnection;
 import io.debezium.relational.Column;

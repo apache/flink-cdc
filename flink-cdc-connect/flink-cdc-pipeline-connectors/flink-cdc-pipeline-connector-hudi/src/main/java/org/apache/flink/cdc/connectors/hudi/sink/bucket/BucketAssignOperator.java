@@ -32,7 +32,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -93,7 +92,6 @@ public class BucketAssignOperator extends AbstractStreamOperator<BucketWrapper>
     public BucketAssignOperator(Configuration conf, String schemaOperatorUid) {
         this.numBuckets = conf.getInteger(FlinkOptions.BUCKET_INDEX_NUM_BUCKETS);
         this.schemaOperatorUid = schemaOperatorUid;
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override

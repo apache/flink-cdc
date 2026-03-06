@@ -17,7 +17,6 @@
 
 package org.apache.flink.cdc.composer.flink.translator;
 
-import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
@@ -25,12 +24,11 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
-import org.apache.flink.cdc.common.source.FlinkSourceFunctionProvider;
-import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
+import org.apache.flink.cdc.composer.flink.compat.FlinkPipelineBridges;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
-import org.apache.flink.cdc.runtime.typeutils.EventTypeInfo;
+import org.apache.flink.cdc.flink.compat.FlinkPipelineBridge;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -45,43 +43,13 @@ public class DataSourceTranslator {
             StreamExecutionEnvironment env,
             int sourceParallelism,
             OperatorUidGenerator operatorUidGenerator) {
-        // Get source provider
         EventSourceProvider eventSourceProvider = dataSource.getEventSourceProvider();
-
-        return createDataStreamSource(env, eventSourceProvider, sourceDef)
-                .setParallelism(sourceParallelism)
+        String sourceName = sourceDef.getName().orElse(generateDefaultSourceName(sourceDef));
+        FlinkPipelineBridge bridge = FlinkPipelineBridges.getDefault();
+        DataStreamSource<Event> stream =
+                bridge.createDataStreamSource(env, eventSourceProvider, sourceName);
+        return stream.setParallelism(sourceParallelism)
                 .uid(operatorUidGenerator.generateUid("source"));
-    }
-
-    private DataStreamSource<Event> createDataStreamSource(
-            StreamExecutionEnvironment env,
-            EventSourceProvider eventSourceProvider,
-            SourceDef sourceDef) {
-        // Source
-        if (eventSourceProvider instanceof FlinkSourceProvider) {
-            FlinkSourceProvider sourceProvider = (FlinkSourceProvider) eventSourceProvider;
-            return env.fromSource(
-                    sourceProvider.getSource(),
-                    WatermarkStrategy.noWatermarks(),
-                    sourceDef.getName().orElse(generateDefaultSourceName(sourceDef)),
-                    new EventTypeInfo());
-        }
-
-        // SourceFunction
-        if (eventSourceProvider instanceof FlinkSourceFunctionProvider) {
-            FlinkSourceFunctionProvider sourceFunctionProvider =
-                    (FlinkSourceFunctionProvider) eventSourceProvider;
-            DataStreamSource<Event> stream =
-                    env.addSource(sourceFunctionProvider.getSourceFunction(), new EventTypeInfo());
-            sourceDef.getName().ifPresent(stream::name);
-            return stream;
-        }
-
-        // Unknown provider type
-        throw new IllegalStateException(
-                String.format(
-                        "Unsupported EventSourceProvider type \"%s\"",
-                        eventSourceProvider.getClass().getCanonicalName()));
     }
 
     public DataSource createDataSource(

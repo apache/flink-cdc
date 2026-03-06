@@ -21,7 +21,6 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 
@@ -45,8 +44,7 @@ public class FlushEventAlignmentOperator extends AbstractStreamOperator<Event>
     private transient int currentSubTaskId;
 
     public FlushEventAlignmentOperator() {
-        // It's necessary to avoid unpredictable outcomes of Event shuffling.
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        // Chaining is set via operator factory for Flink 2.x compatibility.
     }
 
     @Override
