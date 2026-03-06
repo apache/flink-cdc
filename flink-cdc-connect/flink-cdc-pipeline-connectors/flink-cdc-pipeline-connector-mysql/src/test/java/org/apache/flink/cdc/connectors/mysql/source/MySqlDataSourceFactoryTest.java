@@ -43,6 +43,7 @@ import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOption
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_CHUNK_KEY_COLUMN;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_INCREMENTAL_SNAPSHOT_UNBOUNDED_CHUNK_FIRST_ENABLED;
+import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TABLES_EXCLUDE;
 import static org.apache.flink.cdc.connectors.mysql.source.MySqlDataSourceOptions.TREAT_TINYINT1_AS_BOOLEAN_ENABLED;
@@ -269,12 +270,66 @@ class MySqlDataSourceFactoryTest extends MySqlSourceTestBase {
                 .contains(
                         TREAT_TINYINT1_AS_BOOLEAN_ENABLED,
                         PARSE_ONLINE_SCHEMA_CHANGES,
-                        SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED);
+                        SCAN_BINLOG_NEWLY_ADDED_TABLE_ENABLED,
+                        SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED);
 
         MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
         assertThat(dataSource.getSourceConfig().isTreatTinyInt1AsBoolean()).isFalse();
         assertThat(dataSource.getSourceConfig().isParseOnLineSchemaChanges()).isTrue();
         assertThat(dataSource.getSourceConfig().isAssignUnboundedChunkFirst()).isTrue();
+    }
+
+    @Test
+    void testScanReadChangelogAsAppendOnlyEnabledDefault() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+
+        assertThat(dataSource.getSourceConfig().isScanReadChangelogAsAppendOnly()).isFalse();
+    }
+
+    @Test
+    void testScanReadChangelogAsAppendOnlyEnabledTrue() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.key(), "true");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+
+        assertThat(dataSource.getSourceConfig().isScanReadChangelogAsAppendOnly()).isTrue();
+    }
+
+    @Test
+    void testScanReadChangelogAsAppendOnlyEnabledFalse() {
+        inventoryDatabase.createAndInitialize();
+        Map<String, String> options = new HashMap<>();
+        options.put(HOSTNAME.key(), MYSQL_CONTAINER.getHost());
+        options.put(PORT.key(), String.valueOf(MYSQL_CONTAINER.getDatabasePort()));
+        options.put(USERNAME.key(), TEST_USER);
+        options.put(PASSWORD.key(), TEST_PASSWORD);
+        options.put(TABLES.key(), inventoryDatabase.getDatabaseName() + ".prod\\.*");
+        options.put(SCAN_READ_CHANGELOG_AS_APPEND_ONLY_ENABLED.key(), "false");
+        Factory.Context context = new MockContext(Configuration.fromMap(options));
+
+        MySqlDataSourceFactory factory = new MySqlDataSourceFactory();
+        MySqlDataSource dataSource = (MySqlDataSource) factory.createDataSource(context);
+
+        assertThat(dataSource.getSourceConfig().isScanReadChangelogAsAppendOnly()).isFalse();
     }
 
     @Test
