@@ -15,21 +15,34 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink.v2;
+package org.apache.flink.cdc.connectors.fluss.sink.row;
 
-import org.apache.fluss.client.Connection;
+import org.apache.flink.cdc.common.data.MapData;
 
-import java.io.IOException;
-import java.io.Serializable;
+import org.apache.fluss.row.InternalArray;
+import org.apache.fluss.row.InternalMap;
 
-/**
- * Serializer to serialize the input record to a {@link FlussEvent} for {@link FlussSinkWriter}.
- *
- * @param <InputT> The type of the input record which comes from the upstream and will be
- *     transformed into a FlussEvent here.
- */
-public interface FlussEventSerializer<InputT> extends Serializable {
-    void open(Connection connection) throws IOException;
+/** Wraps a Cdc {@link MapData} as a Fluss {@link InternalMap}. */
+public class CdcAsFlussMap implements InternalMap {
 
-    FlussEvent serialize(InputT in) throws IOException;
+    private final MapData cdcMap;
+
+    public CdcAsFlussMap(MapData cdcMap) {
+        this.cdcMap = cdcMap;
+    }
+
+    @Override
+    public int size() {
+        return cdcMap.size();
+    }
+
+    @Override
+    public InternalArray keyArray() {
+        return new CdcAsFlussArray(cdcMap.keyArray());
+    }
+
+    @Override
+    public InternalArray valueArray() {
+        return new CdcAsFlussArray(cdcMap.valueArray());
+    }
 }
