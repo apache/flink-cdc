@@ -32,8 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussConfigUtils.parseBucketKeys;
-import static org.apache.flink.cdc.connectors.fluss.sink.FlussConfigUtils.parseBucketNumber;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConfigUtils.parseBucketKeys;
+import static org.apache.flink.cdc.connectors.fluss.utils.FlussConfigUtils.parseBucketNumber;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BOOTSTRAP_SERVERS;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_KEY;
 import static org.apache.flink.cdc.connectors.fluss.sink.FlussDataSinkOptions.BUCKET_NUMBER;
