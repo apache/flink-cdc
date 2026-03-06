@@ -38,6 +38,14 @@ limitations under the License.
             <version>${project.version}</version>
         </dependency>
 
+        <!-- MySQL JDBC: provided for compile; put mysql-connector-j in flink/lib -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.0.33</version>
+            <scope>provided</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-connector-mysql-cdc</artifactId>
