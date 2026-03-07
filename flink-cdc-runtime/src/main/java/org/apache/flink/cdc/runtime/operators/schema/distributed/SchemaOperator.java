@@ -97,7 +97,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
     @Override
     public void open() throws Exception {
         super.open();
-        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         upstreamSchemaTable = HashBasedTable.create();
         evolvedSchemaMap = new HashMap<>();
         tableIdRouter = new TableIdRouter(routingRules);

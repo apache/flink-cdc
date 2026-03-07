@@ -27,6 +27,7 @@ import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -58,7 +59,7 @@ public class BatchRegularPrePartitionOperator extends AbstractStreamOperator<Par
 
     public BatchRegularPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
     }

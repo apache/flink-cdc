@@ -178,7 +178,8 @@ public final class DecimalDataSerializer extends TypeSerializer<DecimalData> {
             return new DecimalDataSerializer(previousPrecision, previousScale);
         }
 
-        @Override
+        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
+        // compatibility
         public TypeSerializerSchemaCompatibility<DecimalData> resolveSchemaCompatibility(
                 TypeSerializer<DecimalData> newSerializer) {
             if (!(newSerializer instanceof DecimalDataSerializer)) {
@@ -192,6 +193,22 @@ public final class DecimalDataSerializer extends TypeSerializer<DecimalData> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
+        }
+
+        // Flink 2.x changed the abstract method to
+        // resolveSchemaCompatibility(TypeSerializerSnapshot).
+        // No @Override so this also compiles against Flink 1.x where the method does not exist.
+        public TypeSerializerSchemaCompatibility<DecimalData> resolveSchemaCompatibility(
+                TypeSerializerSnapshot<DecimalData> oldSerializerSnapshot) {
+            if (!(oldSerializerSnapshot instanceof DecimalSerializerSnapshot)) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            DecimalSerializerSnapshot snapshot = (DecimalSerializerSnapshot) oldSerializerSnapshot;
+            if (previousPrecision != snapshot.previousPrecision
+                    || previousScale != snapshot.previousScale) {
+                return TypeSerializerSchemaCompatibility.incompatible();
+            }
+            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

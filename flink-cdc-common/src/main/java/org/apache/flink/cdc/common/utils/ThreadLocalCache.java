@@ -17,7 +17,7 @@
 
 package org.apache.flink.cdc.common.utils;
 
-import org.apache.flink.annotation.Internal;
+import org.apache.flink.cdc.common.annotation.Internal;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

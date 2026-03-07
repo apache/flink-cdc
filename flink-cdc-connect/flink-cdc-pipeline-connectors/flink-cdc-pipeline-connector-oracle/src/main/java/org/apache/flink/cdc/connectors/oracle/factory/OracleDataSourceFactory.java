@@ -21,6 +21,7 @@ import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
@@ -35,7 +36,6 @@ import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfig;
 import org.apache.flink.cdc.connectors.oracle.source.config.OracleSourceConfigFactory;
 import org.apache.flink.cdc.connectors.oracle.table.OracleReadableMetaData;
 import org.apache.flink.cdc.connectors.oracle.utils.OracleSchemaUtils;
-import org.apache.flink.table.api.ValidationException;
 
 import java.time.Duration;
 import java.util.ArrayList;

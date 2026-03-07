@@ -22,6 +22,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotSerializationUtil;
 import org.apache.flink.cdc.common.utils.InstantiationUtil;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.apache.flink.util.TestLogger;
@@ -85,7 +86,7 @@ class EnumSerializerTest extends TestLogger {
         EnumSerializer.EnumSerializerSnapshot serializerSnapshot =
                 new EnumSerializer.EnumSerializerSnapshot(PublicEnum.class, mockPreviousOrder);
         TypeSerializerSchemaCompatibility compatibility =
-                serializerSnapshot.resolveSchemaCompatibility(serializer);
+                FlinkCompatibilityUtils.resolveSchemaCompatibility(serializerSnapshot, serializer);
         Assertions.assertThat(compatibility.isCompatibleWithReconfiguredSerializer()).isTrue();
 
         // after reconfiguration, the order should be first the original BAR, PAULA, NATHANIEL,
@@ -131,7 +132,7 @@ class EnumSerializerTest extends TestLogger {
         }
 
         TypeSerializerSchemaCompatibility<PublicEnum> compatResult =
-                restoredConfig.resolveSchemaCompatibility(serializer);
+                FlinkCompatibilityUtils.resolveSchemaCompatibility(restoredConfig, serializer);
         Assertions.assertThat(compatResult.isCompatibleAsIs()).isTrue();
 
         Assertions.assertThat(serializer.getValueToOrdinal().get(PublicEnum.FOO).intValue())
@@ -217,7 +218,7 @@ class EnumSerializerTest extends TestLogger {
         EnumSerializer.EnumSerializerSnapshot serializerSnapshot =
                 new EnumSerializer.EnumSerializerSnapshot(PublicEnum.class, mockPreviousOrder);
         TypeSerializerSchemaCompatibility compatibility =
-                serializerSnapshot.resolveSchemaCompatibility(serializer);
+                FlinkCompatibilityUtils.resolveSchemaCompatibility(serializerSnapshot, serializer);
         Assertions.assertThat(compatibility.isCompatibleWithReconfiguredSerializer()).isTrue();
 
         // verify that after the serializer was read, the reconfigured constant ordering is

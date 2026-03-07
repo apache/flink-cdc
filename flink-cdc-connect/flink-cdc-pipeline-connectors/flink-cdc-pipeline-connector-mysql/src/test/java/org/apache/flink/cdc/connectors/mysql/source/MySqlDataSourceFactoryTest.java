@@ -19,10 +19,10 @@ package org.apache.flink.cdc.connectors.mysql.source;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.connectors.mysql.factory.MySqlDataSourceFactory;
 import org.apache.flink.cdc.connectors.mysql.testutils.UniqueDatabase;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.ObjectPath;
 
 import org.junit.jupiter.api.Test;

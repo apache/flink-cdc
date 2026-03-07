@@ -54,6 +54,19 @@ limitations under the License.
         </dependency>
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>flink2</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-shaded-guava</artifactId>
+                    <version>${flink.2.x.shaded.guava.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>
