@@ -39,20 +39,16 @@ import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeR
 import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.testutils.DummyEnvironment;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
-import org.apache.flink.streaming.api.watermark.Watermark;
-import org.apache.flink.streaming.runtime.streamrecord.LatencyMarker;
-import org.apache.flink.streaming.runtime.streamrecord.RecordAttributes;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
-import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 import org.apache.flink.streaming.util.MockStreamConfig;
-import org.apache.flink.util.OutputTag;
 import org.apache.flink.util.SerializedValue;
 
 import org.slf4j.Logger;
@@ -285,68 +281,73 @@ public class RegularEventOperatorTestHarness<OP extends AbstractStreamOperator<E
 
     // -------------------------------------- Helper functions -------------------------------
 
+    @SuppressWarnings("unchecked")
     private void initializeOperator() throws Exception {
-        operator.setup(
+        Output<StreamRecord<E>> output =
+                (Output<StreamRecord<E>>)
+                        java.lang.reflect.Proxy.newProxyInstance(
+                                Output.class.getClassLoader(),
+                                new Class<?>[] {Output.class},
+                                new EventCollectingOutputHandler<>(
+                                        outputRecords, schemaRegistryGateway));
+        FlinkCompatibilityUtils.setupOperator(
+                operator,
                 new MockStreamTask(schemaRegistryGateway),
                 new MockStreamConfig(new Configuration(), numOutputs),
-                new EventCollectingOutput<>(outputRecords, schemaRegistryGateway));
+                output);
         schemaRegistryGateway.sendOperatorEventToCoordinator(
                 SINK_OPERATOR_ID, new SerializedValue<>(new SinkWriterRegisterEvent(0)));
     }
 
     // ---------------------------------------- Helper classes ---------------------------------
 
-    private static class EventCollectingOutput<E extends Event> implements Output<StreamRecord<E>> {
+    private static class EventCollectingOutputHandler<E extends Event>
+            implements java.lang.reflect.InvocationHandler {
         private final LinkedList<StreamRecord<E>> outputRecords;
-
         private final TestingSchemaRegistryGateway schemaRegistryGateway;
 
-        public EventCollectingOutput(
+        EventCollectingOutputHandler(
                 LinkedList<StreamRecord<E>> outputRecords,
                 TestingSchemaRegistryGateway schemaRegistryGateway) {
             this.outputRecords = outputRecords;
             this.schemaRegistryGateway = schemaRegistryGateway;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public void collect(StreamRecord<E> record) {
-            outputRecords.add(record);
-            Event event = record.getValue();
-            if (event instanceof FlushEvent) {
-                try {
-                    schemaRegistryGateway.sendOperatorEventToCoordinator(
-                            SINK_OPERATOR_ID, new SerializedValue<>(new FlushSuccessEvent(0, 0)));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+        public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args)
+                throws Throwable {
+            switch (method.getName()) {
+                case "collect":
+                    if (args != null && args.length == 1 && args[0] instanceof StreamRecord) {
+                        StreamRecord<E> record = (StreamRecord<E>) args[0];
+                        outputRecords.add(record);
+                        Event event = record.getValue();
+                        if (event instanceof FlushEvent) {
+                            try {
+                                schemaRegistryGateway.sendOperatorEventToCoordinator(
+                                        SINK_OPERATOR_ID,
+                                        new SerializedValue<>(new FlushSuccessEvent(0, 0)));
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        return null;
+                    }
+                    throw new UnsupportedOperationException();
+                case "emitRecordAttributes":
+                case "close":
+                    return null;
+                case "toString":
+                    return "EventCollectingOutput";
+                case "hashCode":
+                    return System.identityHashCode(proxy);
+                case "equals":
+                    return proxy == args[0];
+                default:
+                    throw new UnsupportedOperationException(method.getName());
             }
         }
-
-        @Override
-        public void emitWatermark(Watermark mark) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void emitWatermarkStatus(WatermarkStatus watermarkStatus) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public <X> void collect(OutputTag<X> outputTag, StreamRecord<X> record) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void emitLatencyMarker(LatencyMarker latencyMarker) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void emitRecordAttributes(RecordAttributes recordAttributes) {}
-
-        @Override
-        public void close() {}
     }
 
     private static class MockStreamTask extends StreamTask<Event, AbstractStreamOperator<Event>> {

@@ -82,4 +82,25 @@ limitations under the License.
 
     </dependencies>
 
+    <profiles>
+        <profile>
+            <id>flink2</id>
+            <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>

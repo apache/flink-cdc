@@ -20,6 +20,7 @@ package org.apache.flink.cdc.pipeline.tests.utils;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Deadline;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.test.utils.TestUtils;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlContainer;
 import org.apache.flink.cdc.connectors.mysql.testutils.MySqlVersion;
@@ -28,7 +29,6 @@ import org.apache.flink.client.program.rest.RestClusterClient;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.RestOptions;
 import org.apache.flink.runtime.client.JobStatusMessage;
-import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.util.TestLogger;
 
 import com.github.dockerjava.api.DockerClient;

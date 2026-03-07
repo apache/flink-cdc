@@ -59,7 +59,15 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
     public DataSinkOperatorAdapter() {
         this.schemaOperatorID = new OperatorID();
         this.processedTableIds = new HashSet<>();
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        // Try to set chainingStrategy via reflection for backward compatibility with Flink 1.x
+        try {
+            java.lang.reflect.Field field =
+                    AbstractStreamOperator.class.getDeclaredField("chainingStrategy");
+            field.setAccessible(true);
+            field.set(this, ChainingStrategy.ALWAYS);
+        } catch (Exception e) {
+            // Ignore if chainingStrategy doesn't exist in Flink 2.x
+        }
     }
 
     @Override
@@ -79,7 +87,8 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        schemaEvolutionClient.registerSubtask(getRuntimeContext().getIndexOfThisSubtask());
+        schemaEvolutionClient.registerSubtask(
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
     }
 
     @Override
@@ -149,7 +158,8 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
                             });
         }
         schemaEvolutionClient.notifyFlushSuccess(
-                getRuntimeContext().getIndexOfThisSubtask(), event.getSourceSubTaskId());
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
+                event.getSourceSubTaskId());
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {

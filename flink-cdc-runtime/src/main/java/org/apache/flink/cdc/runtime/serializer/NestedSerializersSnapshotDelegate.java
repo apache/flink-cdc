@@ -184,7 +184,14 @@ public class NestedSerializersSnapshotDelegate {
     //  Utilities
     // ------------------------------------------------------------------------
 
-    /** Utility method to conjure up a new scope for the generic parameters. */
+    /**
+     * Utility method to conjure up a new scope for the generic parameters.
+     *
+     * <p>In Flink 1.x, TypeSerializerSnapshot.resolveSchemaCompatibility(TypeSerializer) is the
+     * abstract method. In Flink 2.x, it was replaced by
+     * resolveSchemaCompatibility(TypeSerializerSnapshot). This method uses reflection to call the
+     * right variant at runtime.
+     */
     @SuppressWarnings("unchecked")
     private static <E> TypeSerializerSchemaCompatibility<E> resolveCompatibility(
             TypeSerializer<?> serializer, TypeSerializerSnapshot<?> snapshot) {
@@ -192,7 +199,32 @@ public class NestedSerializersSnapshotDelegate {
         TypeSerializer<E> typedSerializer = (TypeSerializer<E>) serializer;
         TypeSerializerSnapshot<E> typedSnapshot = (TypeSerializerSnapshot<E>) snapshot;
 
-        return typedSnapshot.resolveSchemaCompatibility(typedSerializer);
+        // Try Flink 1.x approach: oldSnapshot.resolveSchemaCompatibility(newSerializer)
+        try {
+            java.lang.reflect.Method m =
+                    typedSnapshot
+                            .getClass()
+                            .getMethod("resolveSchemaCompatibility", TypeSerializer.class);
+            return (TypeSerializerSchemaCompatibility<E>) m.invoke(typedSnapshot, typedSerializer);
+        } catch (NoSuchMethodException ignored) {
+            // fall through to Flink 2.x approach
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to resolve schema compatibility (Flink 1.x path)", e);
+        }
+
+        // Flink 2.x approach: newSnapshot.resolveSchemaCompatibility(oldSnapshot)
+        try {
+            TypeSerializerSnapshot<E> newSnapshot = typedSerializer.snapshotConfiguration();
+            java.lang.reflect.Method m =
+                    newSnapshot
+                            .getClass()
+                            .getMethod("resolveSchemaCompatibility", TypeSerializerSnapshot.class);
+            return (TypeSerializerSchemaCompatibility<E>) m.invoke(newSnapshot, typedSnapshot);
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Failed to resolve schema compatibility (Flink 2.x path)", e);
+        }
     }
 
     private static TypeSerializer<?>[] snapshotsToRestoreSerializers(

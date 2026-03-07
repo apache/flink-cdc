@@ -20,13 +20,13 @@ package org.apache.flink.cdc.connectors.elasticsearch.sink;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.TableId;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.pipeline.PipelineOptions;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.connectors.elasticsearch.config.ElasticsearchSinkOptions;
 import org.apache.flink.cdc.connectors.elasticsearch.v2.NetworkConfig;
-import org.apache.flink.table.api.ValidationException;
 
 import org.apache.http.HttpHost;
 

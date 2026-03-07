@@ -44,4 +44,37 @@ limitations under the License.
         </plugins>
     </build>
 
+    <profiles>
+        <profile>
+            <id>flink2</id>
+            <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <excludes>
+                                <!-- SinkFunction is moved to legacy package in Flink 2.x -->
+                                <exclude>org/apache/flink/cdc/common/sink/FlinkSinkFunctionProvider.java</exclude>
+                                <!-- SourceFunction is moved to legacy package in Flink 2.x -->
+                                <exclude>org/apache/flink/cdc/common/source/FlinkSourceFunctionProvider.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>

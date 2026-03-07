@@ -63,6 +63,14 @@ jobs:
     with:
       java-versions: "[11]"
       modules: "['core']"
+  common_2_x:
+    name: Common Unit Tests 2.x
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      flink-versions: "['2.2.0']"
+      custom-maven-parameter: "-Pflink2"
+      modules: "['core_2.x']"
   pipeline-ut:
     name: Pipeline Unit Tests
     uses: ./.github/workflows/flink_cdc_base.yml
@@ -87,6 +95,20 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['1.19.3', '1.20.3']"
       modules: "['pipeline_e2e']"
+      parallelism: ${{ matrix.parallelism }}
+  pipeline_e2e_2_x:
+    strategy:
+      max-parallel: 2
+      fail-fast: false
+      matrix:
+        parallelism: [ 1, 4 ]
+    name: Pipeline E2E Tests 2.x (${{ matrix.parallelism }}-Parallelism)
+    uses: ./.github/workflows/flink_cdc_base.yml
+    with:
+      java-versions: "[11]"
+      flink-versions: "['2.2.0']"
+      custom-maven-parameter: "-Pflink2"
+      modules: "['pipeline_e2e_2.x']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
     name: Source E2E Tests
