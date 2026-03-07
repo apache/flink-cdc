@@ -26,6 +26,7 @@ import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -62,7 +63,7 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
         super(userFunction);
         this.schemaOperatorID = schemaOperatorID;
         processedTableIds = new HashSet<>();
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
     }
 
     @Override
@@ -79,7 +80,8 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        schemaEvolutionClient.registerSubtask(getRuntimeContext().getIndexOfThisSubtask());
+        schemaEvolutionClient.registerSubtask(
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
         super.initializeState(context);
     }
 
@@ -135,7 +137,8 @@ public class DataSinkFunctionOperator extends StreamSink<Event> {
                             });
         }
         schemaEvolutionClient.notifyFlushSuccess(
-                getRuntimeContext().getIndexOfThisSubtask(), event.getSourceSubTaskId());
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
+                event.getSourceSubTaskId());
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {

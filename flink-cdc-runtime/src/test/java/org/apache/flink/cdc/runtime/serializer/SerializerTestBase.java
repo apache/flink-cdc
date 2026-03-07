@@ -23,6 +23,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotSerializationUtil;
 import org.apache.flink.api.java.typeutils.runtime.NullableSerializer;
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.core.memory.DataInputDeserializer;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataInputViewStreamWrapper;
@@ -152,7 +153,7 @@ public abstract class SerializerTestBase<T> {
         }
 
         TypeSerializerSchemaCompatibility<T> strategy =
-                restoredConfig.resolveSchemaCompatibility(getSerializer());
+                FlinkCompatibilityUtils.resolveSchemaCompatibility(restoredConfig, getSerializer());
         final TypeSerializer<T> restoreSerializer;
         if (strategy.isCompatibleAsIs()) {
             restoreSerializer = restoredConfig.restoreSerializer();

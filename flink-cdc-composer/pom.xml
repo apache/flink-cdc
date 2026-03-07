@@ -27,6 +27,10 @@ limitations under the License.
 
     <artifactId>flink-cdc-composer</artifactId>
 
+    <properties>
+        <values.connector.artifactId>flink-cdc-pipeline-connector-values</values.connector.artifactId>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -40,7 +44,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-pipeline-connector-values</artifactId>
+            <artifactId>${values.connector.artifactId}</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -94,5 +98,42 @@ limitations under the License.
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <profile>
+            <id>flink2</id>
+            <properties>
+                <flink.version>${flink.2.x.version}</flink.version>
+                <values.connector.artifactId>flink-cdc-pipeline-connector-values-2.x</values.connector.artifactId>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <testExcludes>
+                                <!-- Sink V2 topology interfaces (WithPreWriteTopology etc.) are removed in Flink 2.x -->
+                                <testExclude>org/apache/flink/cdc/composer/flink/translator/DataSinkTranslatorTest.java</testExclude>
+                            </testExcludes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <additionalClasspathElements>
+                                <additionalClasspathElement>${project.build.directory}/flink2-extra-libs/flink-shaded-guava-${flink.2.x.shaded.guava.version}.jar</additionalClasspathElement>
+                            </additionalClasspathElements>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

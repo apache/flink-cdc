@@ -20,10 +20,10 @@ package org.apache.flink.cdc.connectors.postgres.factory;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.factories.Factory;
 import org.apache.flink.cdc.connectors.postgres.PostgresTestBase;
 import org.apache.flink.cdc.connectors.postgres.source.PostgresDataSource;
-import org.apache.flink.table.api.ValidationException;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -33,6 +33,7 @@ limitations under the License.
         <module>flink-cdc-e2e-utils</module>
         <module>flink-cdc-source-e2e-tests</module>
         <module>flink-cdc-pipeline-e2e-tests</module>
+        <module>flink-cdc-pipeline-e2e-tests-2.x</module>
     </modules>
 
     <build>

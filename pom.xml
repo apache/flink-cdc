@@ -67,8 +67,13 @@ limitations under the License.
         <flink.reuseForks>true</flink.reuseForks>
 
         <!-- dependencies versions -->
-        <flink.version>1.20.3</flink.version>
+        <flink.1.x.version>1.20.3</flink.1.x.version>
+        <flink.2.x.version>2.2.0</flink.2.x.version>
+        <flink.version>${flink.1.x.version}</flink.version>
         <flink.major.version>1.20</flink.major.version>
+        <flink.1.x.shaded.guava.version>31.1-jre-17.0</flink.1.x.shaded.guava.version>
+        <flink.2.x.shaded.guava.version>33.4.0-jre-20.0</flink.2.x.shaded.guava.version>
+        <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
         <flink.shaded.version>17.0</flink.shaded.version>
         <debezium.version>1.9.8.Final</debezium.version>
         <tikv.version>3.2.0</tikv.version>
@@ -289,7 +294,7 @@ limitations under the License.
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-shaded-guava</artifactId>
-            <version>31.1-jre-${flink.shaded.version}</version>
+            <version>${shaded.guava.version}</version>
         </dependency>
 
         <dependency>
@@ -840,6 +845,38 @@ limitations under the License.
                         </configuration>
                     </plugin>
                 </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>flink2</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-dependency-plugin</artifactId>
+                            <executions>
+                                <execution>
+                                    <id>copy-flink2-guava</id>
+                                    <phase>process-test-resources</phase>
+                                    <goals>
+                                        <goal>copy</goal>
+                                    </goals>
+                                    <configuration>
+                                        <artifactItems>
+                                            <artifactItem>
+                                                <groupId>org.apache.flink</groupId>
+                                                <artifactId>flink-shaded-guava</artifactId>
+                                                <version>${flink.2.x.shaded.guava.version}</version>
+                                                <outputDirectory>${project.build.directory}/flink2-extra-libs</outputDirectory>
+                                            </artifactItem>
+                                        </artifactItems>
+                                    </configuration>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
             </build>
         </profile>
         <profile>

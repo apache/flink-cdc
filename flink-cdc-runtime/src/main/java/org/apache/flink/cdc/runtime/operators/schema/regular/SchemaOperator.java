@@ -34,6 +34,7 @@ import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
@@ -109,7 +110,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
         this.rpcTimeout = rpcTimeOut;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.timezone = timezone;
@@ -131,7 +132,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
         this.schemaOperatorMetrics =
                 new SchemaOperatorMetrics(
                         getRuntimeContext().getMetricGroup(), schemaChangeBehavior);
-        this.subTaskId = getRuntimeContext().getIndexOfThisSubtask();
+        this.subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
         this.originalSchemaMap = new HashMap<>();
         this.evolvedSchemaMap = new HashMap<>();
         this.router = new TableIdRouter(routingRules);

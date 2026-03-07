@@ -19,13 +19,13 @@ package org.apache.flink.cdc.connectors.paimon.sink;
 
 import org.apache.flink.cdc.common.configuration.ConfigOption;
 import org.apache.flink.cdc.common.configuration.Configuration;
+import org.apache.flink.cdc.common.exceptions.ValidationException;
 import org.apache.flink.cdc.common.factories.DataSinkFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.composer.utils.FactoryDiscoveryUtils;
 import org.apache.flink.cdc.connectors.paimon.sink.v2.PaimonEventSink;
-import org.apache.flink.table.api.ValidationException;
 
 import org.apache.flink.shaded.guava31.com.google.common.collect.ImmutableMap;
 

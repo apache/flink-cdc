@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.operators.sink;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
+import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.StreamSink;
@@ -37,7 +38,7 @@ public class BatchDataSinkFunctionOperator extends StreamSink<Event> {
 
     public BatchDataSinkFunctionOperator(SinkFunction<Event> userFunction) {
         super(userFunction);
-        this.chainingStrategy = ChainingStrategy.ALWAYS;
+        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
     }
 
     @Override

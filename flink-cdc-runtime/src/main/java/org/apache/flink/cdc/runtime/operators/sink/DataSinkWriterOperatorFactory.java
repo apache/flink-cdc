@@ -23,17 +23,16 @@ import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.streaming.api.operators.StreamOperator;
 import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
-import org.apache.flink.streaming.api.operators.YieldingOperatorFactory;
 
 /** Operator factory for {@link DataSinkWriterOperator}. */
 @Internal
 public class DataSinkWriterOperatorFactory<CommT>
         extends AbstractStreamOperatorFactory<CommittableMessage<CommT>>
-        implements OneInputStreamOperatorFactory<Event, CommittableMessage<CommT>>,
-                YieldingOperatorFactory<CommittableMessage<CommT>> {
+        implements OneInputStreamOperatorFactory<Event, CommittableMessage<CommT>> {
 
     private final Sink<Event> sink;
     private final boolean isBounded;
@@ -41,6 +40,7 @@ public class DataSinkWriterOperatorFactory<CommT>
 
     public DataSinkWriterOperatorFactory(
             Sink<Event> sink, boolean isBounded, OperatorID schemaOperatorID) {
+        setChainingStrategy(ChainingStrategy.ALWAYS);
         this.sink = sink;
         this.isBounded = isBounded;
         this.schemaOperatorID = schemaOperatorID;
@@ -50,11 +50,10 @@ public class DataSinkWriterOperatorFactory<CommT>
     @Override
     public <T extends StreamOperator<CommittableMessage<CommT>>> T createStreamOperator(
             StreamOperatorParameters<CommittableMessage<CommT>> parameters) {
-
         if (isBounded) {
             BatchDataSinkWriterOperator<CommT> writerOperator =
                     new BatchDataSinkWriterOperator<>(
-                            sink, processingTimeService, getMailboxExecutor());
+                            sink, processingTimeService, parameters.getMailboxExecutor());
             writerOperator.setup(
                     parameters.getContainingTask(),
                     parameters.getStreamConfig(),
@@ -63,7 +62,10 @@ public class DataSinkWriterOperatorFactory<CommT>
         }
         DataSinkWriterOperator<CommT> writerOperator =
                 new DataSinkWriterOperator<>(
-                        sink, processingTimeService, getMailboxExecutor(), schemaOperatorID);
+                        sink,
+                        processingTimeService,
+                        parameters.getMailboxExecutor(),
+                        schemaOperatorID);
         writerOperator.setup(
                 parameters.getContainingTask(),
                 parameters.getStreamConfig(),
