@@ -119,9 +119,7 @@ public class DataSinkTranslator {
         // Get sink provider
         EventSinkProvider eventSinkProvider = dataSink.getEventSinkProvider();
         if (eventSinkProvider == null) {
-            throw new IllegalStateException(
-                    "DataSink#getEventSinkProvider() must not return null. "
-                            + "Please ensure the sink is correctly configured.");
+            return;
         }
         String sinkName = generateSinkName(sinkDef);
         if (eventSinkProvider instanceof FlinkSinkProvider) {
