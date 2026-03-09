@@ -348,6 +348,21 @@ pipeline:
       <td>CDC defines the length by characters, and StarRocks defines it by bytes. According to UTF-8, one Chinese 
         character is equal to three bytes, so the length for StarRocks is n * 3.</td>
     </tr>
+    <tr>
+      <td>BINARY(n)</td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>The length is capped to 1048576.</td>
+    </tr>
+    <tr>
+      <td>VARBINARY(n)</td>
+      <td>VARBINARY(min(n,1048576))</td>
+      <td>The length is capped to 1048576.</td>
+    </tr>
+    <tr>
+      <td>BYTES</td>
+      <td>VARBINARY(1048576)</td>
+      <td>BYTES is mapped to VARBINARY with max length 1048576.</td>
+    </tr>
     </tbody>
 </table>
 </div>

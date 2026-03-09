@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.BigIntType;
+import org.apache.flink.cdc.common.types.BinaryType;
 import org.apache.flink.cdc.common.types.BooleanType;
 import org.apache.flink.cdc.common.types.CharType;
 import org.apache.flink.cdc.common.types.DataType;
@@ -36,6 +37,7 @@ import org.apache.flink.cdc.common.types.SmallIntType;
 import org.apache.flink.cdc.common.types.TimeType;
 import org.apache.flink.cdc.common.types.TimestampType;
 import org.apache.flink.cdc.common.types.TinyIntType;
+import org.apache.flink.cdc.common.types.VarBinaryType;
 import org.apache.flink.cdc.common.types.VarCharType;
 
 import com.starrocks.connector.flink.catalog.StarRocksColumn;
@@ -215,6 +217,10 @@ public class StarRocksUtils {
                 fieldGetter =
                         record -> record.getDate(fieldPos).toLocalDate().format(DATE_FORMATTER);
                 break;
+            case BINARY:
+            case VARBINARY:
+                fieldGetter = record -> record.getBinary(fieldPos);
+                break;
             case TIME_WITHOUT_TIME_ZONE:
                 fieldGetter =
                         record ->
@@ -273,6 +279,7 @@ public class StarRocksUtils {
     public static final String STRING = "STRING";
     public static final String DATE = "DATE";
     public static final String DATETIME = "DATETIME";
+    public static final String VARBINARY = "VARBINARY";
     public static final String JSON = "JSON";
 
     /** Max size of char type of StarRocks. */
@@ -280,6 +287,9 @@ public class StarRocksUtils {
 
     /** Max size of varchar type of StarRocks. */
     public static final int MAX_VARCHAR_SIZE = 1048576;
+
+    /** Max size of varbinary type of StarRocks. */
+    public static final int MAX_VARBINARY_SIZE = 1048576;
 
     /** Transforms CDC {@link DataType} to StarRocks data type. */
     public static class CdcDataTypeTransformer
@@ -403,6 +413,22 @@ public class StarRocksUtils {
             builder.setDataType(VARCHAR);
             builder.setNullable(varCharType.isNullable());
             builder.setColumnSize((int) Math.min(starRocksLength, MAX_VARCHAR_SIZE));
+            return builder;
+        }
+
+        @Override
+        public StarRocksColumn.Builder visit(BinaryType binaryType) {
+            builder.setDataType(VARBINARY);
+            builder.setNullable(binaryType.isNullable());
+            builder.setColumnSize(Math.min(binaryType.getLength(), MAX_VARBINARY_SIZE));
+            return builder;
+        }
+
+        @Override
+        public StarRocksColumn.Builder visit(VarBinaryType varBinaryType) {
+            builder.setDataType(VARBINARY);
+            builder.setNullable(varBinaryType.isNullable());
+            builder.setColumnSize(Math.min(varBinaryType.getLength(), MAX_VARBINARY_SIZE));
             return builder;
         }
 
