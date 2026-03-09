@@ -240,7 +240,7 @@ pipeline:
     自动设置分桶数量</a>。对于 StarRocks 2.5 之前的版本必须设置，否则无法自动创建表。
 
 * 对于表结构变更同步
-  * 只支持增删列
+  * 支持创建/删除/清空表，增加/删除/重命名列，修改列类型
   * 新增列只能添加到最后一列
   * 如果使用 StarRocks 3.2 及之后版本，并且通过连接器来自动建表, 可以通过配置 `table.create.properties.fast_schema_evolution` 为 `true`
     来加速 StarRocks 执行变更。
