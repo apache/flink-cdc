@@ -106,16 +106,6 @@ limitations under the License.
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <testExcludes>
-                                <!-- Sink V2 topology interfaces (WithPreWriteTopology etc.) are removed in Flink 2.x -->
-                                <testExclude>org/apache/flink/cdc/composer/flink/translator/DataSinkTranslatorTest.java</testExclude>
-                            </testExcludes>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-dependency-plugin</artifactId>
                     </plugin>
                     <plugin>

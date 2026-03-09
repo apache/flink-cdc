@@ -50,6 +50,18 @@ limitations under the License.
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
             </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-dependency-plugin</artifactId>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                    </plugin>
+                </plugins>
+            </build>
             <dependencies>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
