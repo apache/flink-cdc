@@ -38,6 +38,7 @@ import org.apache.flink.shaded.guava31.com.google.common.collect.Sets;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogUtil;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
@@ -197,6 +198,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
 
     private void applyDefaultValues(
             Table table, org.apache.flink.cdc.common.schema.Schema cdcSchema) {
+        if (getFormatVersion(table) < 3) {
+            return;
+        }
         UpdateSchema updateSchema = null;
         for (Column column : cdcSchema.getColumns()) {
             Literal<?> defaultValue =
@@ -240,8 +244,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
                 Literal<?> defaultValue =
                         IcebergTypeUtils.parseDefaultValue(
                                 addColumn.getDefaultValueExpression(), addColumn.getType());
-                if (defaultValue != null) {
+                if (defaultValue != null && getFormatVersion(table) >= 3) {
                     updateSchema.addColumn(columnName, icebergType, columnComment, defaultValue);
+                    updateSchema.updateColumnDefault(columnName, defaultValue);
                 } else {
                     updateSchema.addColumn(columnName, icebergType, columnComment);
                 }
@@ -394,6 +399,13 @@ public class IcebergMetadataApplier implements MetadataApplier {
                 SchemaChangeEventType.DROP_COLUMN,
                 SchemaChangeEventType.RENAME_COLUMN,
                 SchemaChangeEventType.ALTER_COLUMN_TYPE);
+    }
+
+    private int getFormatVersion(Table table) {
+        if (table instanceof HasTableOperations) {
+            return ((HasTableOperations) table).operations().current().formatVersion();
+        }
+        return 2;
     }
 
     @Override
