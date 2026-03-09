@@ -85,7 +85,6 @@ public class MySqlEventDeserializer extends DebeziumEventDeserializationSchema {
                 includeSchemaChanges,
                 tinyInt1isBit,
                 isTableIdCaseInsensitive);
-        this.isTableIdCaseInsensitive = isTableIdCaseInsensitive;
     }
 
     public MySqlEventDeserializer(
