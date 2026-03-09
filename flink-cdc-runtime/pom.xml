@@ -109,30 +109,14 @@ limitations under the License.
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
             </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-compiler-plugin</artifactId>
-                        <configuration>
-                            <excludes>
-                                <!-- SinkFunction is moved to legacy package in Flink 2.x -->
-                                <exclude>org/apache/flink/cdc/runtime/operators/sink/DataSinkFunctionOperator.java</exclude>
-                                <exclude>org/apache/flink/cdc/runtime/operators/sink/BatchDataSinkFunctionOperator.java</exclude>
-                            </excludes>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                    </plugin>
-                </plugins>
-            </build>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-cdc-flink2.2-compat</artifactId>
+                    <version>${project.version}</version>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
         </profile>
     </profiles>
-
 </project>

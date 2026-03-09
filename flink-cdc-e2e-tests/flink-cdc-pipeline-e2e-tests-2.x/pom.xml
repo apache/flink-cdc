@@ -77,7 +77,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-cdc-pipeline-connector-values-2.x</artifactId>
+            <artifactId>flink-cdc-pipeline-connector-values</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -409,7 +409,7 @@ limitations under the License.
 
                         <artifactItem>
                             <groupId>org.apache.flink</groupId>
-                            <artifactId>flink-cdc-pipeline-connector-values-2.x</artifactId>
+                            <artifactId>flink-cdc-pipeline-connector-values</artifactId>
                             <version>${project.version}</version>
                             <destFileName>values-cdc-pipeline-connector.jar</destFileName>
                             <type>jar</type>

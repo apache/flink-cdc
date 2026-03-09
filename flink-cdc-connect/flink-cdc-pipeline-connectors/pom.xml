@@ -42,7 +42,6 @@ limitations under the License.
         <module>flink-cdc-pipeline-connector-iceberg</module>
         <module>flink-cdc-pipeline-connector-fluss</module>
         <module>flink-cdc-pipeline-connector-hudi</module>
-        <module>flink-cdc-pipeline-connector-values-2.x</module>
     </modules>
 
     <dependencies>

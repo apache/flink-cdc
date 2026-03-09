@@ -18,7 +18,6 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.event.Event;
@@ -26,6 +25,7 @@ import org.apache.flink.cdc.common.factories.DataSourceFactory;
 import org.apache.flink.cdc.common.factories.FactoryHelper;
 import org.apache.flink.cdc.common.source.DataSource;
 import org.apache.flink.cdc.common.source.EventSourceProvider;
+import org.apache.flink.cdc.common.source.FlinkSourceFunctionProvider;
 import org.apache.flink.cdc.common.source.FlinkSourceProvider;
 import org.apache.flink.cdc.composer.definition.SourceDef;
 import org.apache.flink.cdc.composer.flink.FlinkEnvironmentUtils;
@@ -35,21 +35,9 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.lang.reflect.Method;
-
 /** Translator used to build {@link DataSource} which will generate a {@link DataStream}. */
 @Internal
 public class DataSourceTranslator {
-
-    private static final Logger LOG = LoggerFactory.getLogger(DataSourceTranslator.class);
-
-    private static final String FLINK_SOURCE_FUNCTION_PROVIDER_CLASS =
-            "org.apache.flink.cdc.common.source.FlinkSourceFunctionProvider";
-    private static final String SOURCE_FUNCTION_CLASS =
-            "org.apache.flink.streaming.api.functions.source.SourceFunction";
 
     public DataStream<Event> translate(
             SourceDef sourceDef,
@@ -69,7 +57,7 @@ public class DataSourceTranslator {
             StreamExecutionEnvironment env,
             EventSourceProvider eventSourceProvider,
             SourceDef sourceDef) {
-        // Source (New Source API, works with both Flink 1.x and 2.x)
+        // Source
         if (eventSourceProvider instanceof FlinkSourceProvider) {
             FlinkSourceProvider sourceProvider = (FlinkSourceProvider) eventSourceProvider;
             return env.fromSource(
@@ -79,13 +67,14 @@ public class DataSourceTranslator {
                     new EventTypeInfo());
         }
 
-        // SourceFunction (Legacy API, Flink 1.x only)
-        // Use reflection since FlinkSourceFunctionProvider and SourceFunction are not available
-        // in Flink 2.x builds.
-        DataStreamSource<Event> legacyResult =
-                tryCreateLegacyDataStreamSource(env, eventSourceProvider, sourceDef);
-        if (legacyResult != null) {
-            return legacyResult;
+        // SourceFunction
+        if (eventSourceProvider instanceof FlinkSourceFunctionProvider) {
+            FlinkSourceFunctionProvider sourceFunctionProvider =
+                    (FlinkSourceFunctionProvider) eventSourceProvider;
+            DataStreamSource<Event> stream =
+                    env.addSource(sourceFunctionProvider.getSourceFunction(), new EventTypeInfo());
+            sourceDef.getName().ifPresent(stream::name);
+            return stream;
         }
 
         // Unknown provider type
@@ -93,42 +82,6 @@ public class DataSourceTranslator {
                 String.format(
                         "Unsupported EventSourceProvider type \"%s\"",
                         eventSourceProvider.getClass().getCanonicalName()));
-    }
-
-    @SuppressWarnings("unchecked")
-    private DataStreamSource<Event> tryCreateLegacyDataStreamSource(
-            StreamExecutionEnvironment env,
-            EventSourceProvider eventSourceProvider,
-            SourceDef sourceDef) {
-        try {
-            Class<?> sourceFuncProviderClass = Class.forName(FLINK_SOURCE_FUNCTION_PROVIDER_CLASS);
-            if (!sourceFuncProviderClass.isInstance(eventSourceProvider)) {
-                return null;
-            }
-            // Get the SourceFunction via reflection
-            Object sourceFunction =
-                    sourceFuncProviderClass
-                            .getMethod("getSourceFunction")
-                            .invoke(eventSourceProvider);
-            // Call env.addSource(sourceFunction, typeInfo) via reflection
-            Class<?> sourceFunctionClass = Class.forName(SOURCE_FUNCTION_CLASS);
-            Method addSourceMethod =
-                    StreamExecutionEnvironment.class.getMethod(
-                            "addSource", sourceFunctionClass, TypeInformation.class);
-            DataStreamSource<Event> stream =
-                    (DataStreamSource<Event>)
-                            addSourceMethod.invoke(env, sourceFunction, new EventTypeInfo());
-            sourceDef.getName().ifPresent(stream::name);
-            return stream;
-        } catch (ClassNotFoundException e) {
-            LOG.debug(
-                    "FlinkSourceFunctionProvider or SourceFunction not available (likely Flink 2.x), "
-                            + "skipping legacy source function path.");
-            return null;
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failed to create legacy data stream source via reflection", e);
-        }
     }
 
     public DataSource createDataSource(

@@ -15,26 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.common.exceptions;
+package org.apache.flink.streaming.api.connector.sink2;
 
-import org.apache.flink.cdc.common.annotation.PublicEvolving;
-
-import javax.annotation.Nullable;
-
-/**
- * Exception for validation errors (e.g. invalid options, unsupported options). Defined in
- * flink-cdc-common to avoid runtime dependency on Flink table API (e.g. {@code
- * org.apache.flink.table.api.ValidationException}), which may not be on the classpath when running
- * with different Flink versions.
- */
-@PublicEvolving
-public class ValidationException extends RuntimeException {
-
-    public ValidationException(String message) {
-        super(message);
-    }
-
-    public ValidationException(String message, @Nullable Throwable cause) {
-        super(message, cause);
-    }
-}
+/** Compatibility adapter to add class that was present in Flink 1.20 but removed in Flink 2.2. */
+public interface WithPostCommitTopology<InputT, CommT> extends SupportsPostCommitTopology<CommT> {}

@@ -31,6 +31,7 @@ import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.DataSink;
 import org.apache.flink.cdc.common.sink.EventSinkProvider;
+import org.apache.flink.cdc.common.sink.FlinkSinkFunctionProvider;
 import org.apache.flink.cdc.common.sink.FlinkSinkProvider;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
@@ -68,7 +69,12 @@ public class ValuesDataSink implements DataSink, Serializable {
 
     @Override
     public EventSinkProvider getEventSinkProvider() {
-        return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
+        if (SinkApi.SINK_V2.equals(sinkApi)) {
+            return FlinkSinkProvider.of(new ValuesSink(materializedInMemory, print));
+        } else {
+            return FlinkSinkFunctionProvider.of(
+                    new ValuesDataSinkFunction(materializedInMemory, print));
+        }
     }
 
     @Override
@@ -92,6 +98,7 @@ public class ValuesDataSink implements DataSink, Serializable {
             this.print = print;
         }
 
+        @Override
         public SinkWriter<Event> createWriter(InitContext context) {
             return new ValuesSinkWriter(
                     materializedInMemory,
@@ -100,6 +107,7 @@ public class ValuesDataSink implements DataSink, Serializable {
                     context.getTaskInfo().getNumberOfParallelSubtasks());
         }
 
+        @Override
         public SinkWriter<Event> createWriter(WriterInitContext context) throws IOException {
             return new ValuesSinkWriter(
                     materializedInMemory,

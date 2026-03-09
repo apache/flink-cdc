@@ -27,10 +27,6 @@ limitations under the License.
 
     <artifactId>flink-cdc-composer</artifactId>
 
-    <properties>
-        <values.connector.artifactId>flink-cdc-pipeline-connector-values</values.connector.artifactId>
-    </properties>
-
     <dependencies>
         <dependency>
             <groupId>org.apache.flink</groupId>
@@ -44,7 +40,7 @@ limitations under the License.
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>${values.connector.artifactId}</artifactId>
+            <artifactId>flink-cdc-pipeline-connector-values</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
@@ -105,7 +101,6 @@ limitations under the License.
             <id>flink2</id>
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
-                <values.connector.artifactId>flink-cdc-pipeline-connector-values-2.x</values.connector.artifactId>
             </properties>
             <build>
                 <plugins>
@@ -129,6 +124,14 @@ limitations under the License.
                     </plugin>
                 </plugins>
             </build>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-cdc-flink2.2-compat</artifactId>
+                    <version>${project.version}</version>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
         </profile>
     </profiles>
 

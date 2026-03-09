@@ -88,6 +88,14 @@ limitations under the License.
             <properties>
                 <flink.version>${flink.2.x.version}</flink.version>
             </properties>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-cdc-flink2.2-compat</artifactId>
+                    <version>${project.version}</version>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
             <build>
                 <plugins>
                     <plugin>

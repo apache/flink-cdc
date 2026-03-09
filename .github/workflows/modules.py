@@ -22,8 +22,7 @@ MODULES_CORE_2_X = [
     "flink-cdc-common",
     "flink-cdc-composer",
     "flink-cdc-runtime",
-    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values",
-    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values-2.x"
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 ]
 
 MODULES_PIPELINE_CONNECTORS = [
