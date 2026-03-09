@@ -237,12 +237,13 @@ public class IcebergMetadataApplier implements MetadataApplier {
                         FlinkSchemaUtil.convert(
                                 DataTypeUtils.toFlinkDataType(addColumn.getType())
                                         .getLogicalType());
-                updateSchema.addColumn(columnName, icebergType, columnComment);
                 Literal<?> defaultValue =
                         IcebergTypeUtils.parseDefaultValue(
                                 addColumn.getDefaultValueExpression(), addColumn.getType());
                 if (defaultValue != null) {
-                    updateSchema.updateColumnDefault(columnName, defaultValue);
+                    updateSchema.addColumn(columnName, icebergType, columnComment, defaultValue);
+                } else {
+                    updateSchema.addColumn(columnName, icebergType, columnComment);
                 }
                 switch (columnWithPosition.getPosition()) {
                     case FIRST:
