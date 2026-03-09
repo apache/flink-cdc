@@ -72,7 +72,6 @@ public class IcebergTypeUtils {
         if (defaultValueExpression == null) {
             return null;
         }
-        defaultValueExpression = defaultValueExpression.trim();
         try {
             switch (cdcType.getTypeRoot()) {
                 case CHAR:
