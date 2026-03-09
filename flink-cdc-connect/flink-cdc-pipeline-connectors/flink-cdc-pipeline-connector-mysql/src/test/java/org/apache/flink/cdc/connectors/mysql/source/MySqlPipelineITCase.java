@@ -292,7 +292,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     + "       (default,\"hammer\",\"14oz carpenter's hammer\",0.875),\n"
                                     + "       (default,\"hammer\",\"16oz carpenter's hammer\",1.0),\n"
                                     + "       (default,\"rocks\",\"box of assorted rocks\",5.3),\n"
-                                    + "       (default,\"jacket\",\"water resistent black wind breaker\",0.1),\n"
+                                    + "       (default,\"jacket\",\"water resistant black wind breaker\",0.1),\n"
                                     + "       (default,\"spare tire\",\"24 inch spare tire\",22.2);",
                             StatementUtils.quote(inventoryDatabase.getDatabaseName()),
                             StatementUtils.quote(sqlInjectionTable)));
@@ -1835,7 +1835,7 @@ class MySqlPipelineITCase extends MySqlSourceTestBase {
                                     108,
                                     BinaryStringData.fromString("jacket"),
                                     BinaryStringData.fromString(
-                                            "water resistent black wind breaker"),
+                                            "water resistant black wind breaker"),
                                     0.1f
                                 })));
         snapshotExpected.add(
