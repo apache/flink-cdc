@@ -72,6 +72,7 @@ public class IcebergTypeUtils {
         if (defaultValueExpression == null) {
             return null;
         }
+        defaultValueExpression = defaultValueExpression.trim();
         try {
             switch (cdcType.getTypeRoot()) {
                 case CHAR:
@@ -104,7 +105,7 @@ public class IcebergTypeUtils {
                             new java.math.BigDecimal(defaultValueExpression)
                                     .setScale(scale, java.math.RoundingMode.HALF_UP));
                 default:
-                    LOG.warn(
+                    LOG.debug(
                             "Unsupported default value type {} for expression '{}', skipping default value.",
                             cdcType.getTypeRoot(),
                             defaultValueExpression);
