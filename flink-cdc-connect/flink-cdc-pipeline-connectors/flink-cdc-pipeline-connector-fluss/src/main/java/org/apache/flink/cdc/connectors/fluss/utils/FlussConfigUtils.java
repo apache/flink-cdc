@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.flink.cdc.connectors.fluss.sink;
+package org.apache.flink.cdc.connectors.fluss.utils;
 
 import javax.annotation.Nullable;
 
@@ -78,4 +78,6 @@ public class FlussConfigUtils {
         }
         return result;
     }
+
+    private FlussConfigUtils() {}
 }
