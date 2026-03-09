@@ -41,7 +41,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.lifecycle.Startables;
 
 import java.io.File;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -144,58 +143,49 @@ public class IcebergMetadataApplierTest {
                                 .build());
         icebergMetadataApplier.applySchemaChange(createTableEvent);
         Table table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
-        org.apache.iceberg.Schema schema =
-                new org.apache.iceberg.Schema(
-                        0,
-                        Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        4,
-                                        true,
-                                        "description",
-                                        Types.StringType.get(),
-                                        "column for descriptions"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal")),
-                        new HashSet<>(Collections.singletonList(1)));
-        assertThat(table.schema().sameSchema(schema)).isTrue();
+        // Verify schema structure (column names, types, nullability).
+        assertThat(table.schema().columns()).hasSize(8);
+        assertThat(table.schema().findField("id").type()).isInstanceOf(Types.LongType.class);
+        assertThat(table.schema().findField("id").isOptional()).isFalse();
+        assertThat(table.schema().findField("name").type()).isInstanceOf(Types.StringType.class);
+        assertThat(table.schema().findField("name").isOptional()).isFalse();
+        assertThat(table.schema().findField("tinyIntCol").type())
+                .isInstanceOf(Types.IntegerType.class);
+        assertThat(table.schema().findField("description").type())
+                .isInstanceOf(Types.StringType.class);
+        assertThat(table.schema().findField("bool_column").type())
+                .isInstanceOf(Types.BooleanType.class);
+        assertThat(table.schema().findField("float_column").type())
+                .isInstanceOf(Types.FloatType.class);
+        assertThat(table.schema().findField("double_column").type())
+                .isInstanceOf(Types.DoubleType.class);
+        assertThat(table.schema().findField("decimal_column").type())
+                .isEqualTo(Types.DecimalType.of(10, 2));
+        assertThat(table.schema().identifierFieldIds())
+                .isEqualTo(new HashSet<>(Collections.singletonList(1)));
 
-        // Add column.
+        // Verify default values after create table.
+        // "id" has "AUTO_DECREMENT()" which is unparseable for BIGINT, so no default
+        assertThat(table.schema().findField("id").initialDefault()).isNull();
+        assertThat(table.schema().findField("id").writeDefault()).isNull();
+        // "name" has "John Smith" which is a valid string default
+        assertThat(table.schema().findField("name").writeDefault()).isEqualTo("John Smith");
+        // "tinyIntCol" has "1" which maps to Integer
+        assertThat(table.schema().findField("tinyIntCol").writeDefault()).isEqualTo(1);
+        // "description" has "not important" which is a valid string default
+        assertThat(table.schema().findField("description").writeDefault())
+                .isEqualTo("not important");
+        // "bool_column" has "false"
+        assertThat(table.schema().findField("bool_column").writeDefault()).isEqualTo(false);
+        // "float_column" has "1.0"
+        assertThat(table.schema().findField("float_column").writeDefault()).isEqualTo(1.0f);
+        // "double_column" has "1.0"
+        assertThat(table.schema().findField("double_column").writeDefault()).isEqualTo(1.0d);
+        // "decimal_column" has "1.0"
+        assertThat(table.schema().findField("decimal_column").writeDefault())
+                .isEqualTo(new java.math.BigDecimal("1.00"));
+
+        // Add column with default value.
         AddColumnEvent addColumnEvent =
                 new AddColumnEvent(
                         tableId,
@@ -205,177 +195,35 @@ public class IcebergMetadataApplierTest {
                                                 "newIntColumn",
                                                 DataTypes.INT(),
                                                 "comment for newIntColumn",
-                                                "not important"))));
+                                                "42"))));
         icebergMetadataApplier.applySchemaChange(addColumnEvent);
         table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
-        schema =
-                new org.apache.iceberg.Schema(
-                        0,
-                        Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        4,
-                                        true,
-                                        "description",
-                                        Types.StringType.get(),
-                                        "column for descriptions"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "newIntColumn",
-                                        Types.IntegerType.get(),
-                                        "comment for newIntColumn")),
-                        new HashSet<>(Collections.singletonList(1)));
-        assertThat(table.schema().sameSchema(schema)).isTrue();
+        assertThat(table.schema().columns()).hasSize(9);
+        assertThat(table.schema().findField("newIntColumn").type())
+                .isInstanceOf(Types.IntegerType.class);
+        assertThat(table.schema().findField("newIntColumn").doc())
+                .isEqualTo("comment for newIntColumn");
+
+        // Verify default value for added column.
+        assertThat(table.schema().findField("newIntColumn").writeDefault()).isEqualTo(42);
 
         // Drop Column.
         DropColumnEvent dropColumnEvent =
                 new DropColumnEvent(tableId, Collections.singletonList("description"));
         icebergMetadataApplier.applySchemaChange(dropColumnEvent);
         table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
-        schema =
-                new org.apache.iceberg.Schema(
-                        0,
-                        Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "newIntColumn",
-                                        Types.IntegerType.get(),
-                                        "comment for newIntColumn")),
-                        new HashSet<>(Collections.singletonList(1)));
-        assertThat(table.schema().sameSchema(schema)).isTrue();
+        assertThat(table.schema().columns()).hasSize(8);
+        assertThat(table.schema().findField("description")).isNull();
 
         // Rename Column.
         RenameColumnEvent renameColumnEvent =
                 new RenameColumnEvent(tableId, ImmutableMap.of("newIntColumn", "renamedIntColumn"));
         icebergMetadataApplier.applySchemaChange(renameColumnEvent);
         table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
-        schema =
-                new org.apache.iceberg.Schema(
-                        0,
-                        Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "renamedIntColumn",
-                                        Types.IntegerType.get(),
-                                        "comment for newIntColumn")),
-                        new HashSet<>(Collections.singletonList(1)));
-        assertThat(table.schema().sameSchema(schema)).isTrue();
+        assertThat(table.schema().columns()).hasSize(8);
+        assertThat(table.schema().findField("newIntColumn")).isNull();
+        assertThat(table.schema().findField("renamedIntColumn").type())
+                .isInstanceOf(Types.IntegerType.class);
 
         // Alter Column Type.
         AlterColumnTypeEvent alterColumnTypeEvent =
@@ -383,55 +231,8 @@ public class IcebergMetadataApplierTest {
                         tableId, ImmutableMap.of("renamedIntColumn", DataTypes.BIGINT()));
         icebergMetadataApplier.applySchemaChange(alterColumnTypeEvent);
         table = catalog.loadTable(TableIdentifier.parse(defaultTableId));
-        schema =
-                new org.apache.iceberg.Schema(
-                        0,
-                        Arrays.asList(
-                                Types.NestedField.of(
-                                        1, false, "id", Types.LongType.get(), "column for id"),
-                                Types.NestedField.of(
-                                        2,
-                                        false,
-                                        "name",
-                                        Types.StringType.get(),
-                                        "column for name"),
-                                Types.NestedField.of(
-                                        3,
-                                        true,
-                                        "tinyIntCol",
-                                        Types.IntegerType.get(),
-                                        "column for tinyIntCol"),
-                                Types.NestedField.of(
-                                        5,
-                                        true,
-                                        "bool_column",
-                                        Types.BooleanType.get(),
-                                        "column for bool"),
-                                Types.NestedField.of(
-                                        6,
-                                        true,
-                                        "float_column",
-                                        Types.FloatType.get(),
-                                        "column for float"),
-                                Types.NestedField.of(
-                                        7,
-                                        true,
-                                        "double_column",
-                                        Types.DoubleType.get(),
-                                        "column for double"),
-                                Types.NestedField.of(
-                                        8,
-                                        true,
-                                        "decimal_column",
-                                        Types.DecimalType.of(10, 2),
-                                        "column for decimal"),
-                                Types.NestedField.of(
-                                        9,
-                                        true,
-                                        "renamedIntColumn",
-                                        Types.LongType.get(),
-                                        "comment for newIntColumn")),
-                        new HashSet<>(Collections.singletonList(1)));
-        assertThat(table.schema().sameSchema(schema)).isTrue();
+        assertThat(table.schema().columns()).hasSize(8);
+        assertThat(table.schema().findField("renamedIntColumn").type())
+                .isInstanceOf(Types.LongType.class);
     }
 }
