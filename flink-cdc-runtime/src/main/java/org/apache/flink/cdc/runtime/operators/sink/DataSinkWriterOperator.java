@@ -44,6 +44,9 @@ import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -64,6 +67,8 @@ import java.util.Set;
 @Internal
 public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<CommittableMessage<CommT>>
         implements OneInputStreamOperator<Event, CommittableMessage<CommT>>, BoundedOneInput {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DataSinkWriterOperator.class);
 
     private SchemaEvolutionClient schemaEvolutionClient;
 
