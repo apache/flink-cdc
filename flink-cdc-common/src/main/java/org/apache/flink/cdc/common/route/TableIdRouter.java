@@ -192,13 +192,34 @@ public class TableIdRouter {
         if (routes.isEmpty()) {
             return new ArrayList<>();
         }
-        return routes.stream()
-                .map(
-                        route ->
-                                tableIdSet.stream()
-                                        .filter(tableId -> matches(route.f0, tableId))
-                                        .collect(Collectors.toSet()))
-                .collect(Collectors.toList());
+
+        if (routeMode == RouteMode.ALL_MATCH) {
+            return routes.stream()
+                    .map(
+                            route ->
+                                    tableIdSet.stream()
+                                            .filter(tableId -> matches(route.f0, tableId))
+                                            .collect(Collectors.toSet()))
+                    .collect(Collectors.toList());
+        } else if (routeMode == RouteMode.FIRST_MATCH) {
+            List<Set<TableId>> matchedRules = new ArrayList<>();
+            for (TableId tableId : tableIdSet) {
+                boolean matched = false;
+                for (Tuple3<Pattern, String, String> route : routes) {
+                    if (matches(route.f0, tableId)) {
+                        matchedRules.add(Set.of(tableId));
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    matchedRules.add(Set.of());
+                }
+            }
+            return matchedRules;
+        } else {
+            throw new IllegalArgumentException("Unexpected route mode: " + routeMode);
+        }
     }
 
     private static boolean matches(Pattern pattern, TableId tableId) {
