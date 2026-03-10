@@ -150,8 +150,11 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
                     "EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0, @capture_instance = 'dbo_products_v2';");
             statement.execute("UPDATE inventory.dbo.products SET volume='1.2' WHERE id=110;");
         }
-
-        waitForSinkSize("sink", 20);
+        int expectedSize = 20;
+        if (parallelismSnapshot) {
+            expectedSize = 22;
+        }
+        waitForSinkSize("sink", expectedSize);
 
         /*
          * <pre>
