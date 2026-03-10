@@ -250,20 +250,11 @@ class FlinkPipelineTransformITCase {
     void testMultipleDispatchTransform(ValuesDataSink.SinkApi sinkApi) throws Exception {
         runGenericTransformTest(
                 sinkApi,
-                Arrays.asList(
+                List.of(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
-                                "*, 'YOUNG' AS category",
-                                "age < 20",
+                                "*, CASE WHEN age < 20 THEN 'YOUNG' WHEN age >= 20 THEN 'OLD' END AS category",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.\\.*",
-                                "*, 'OLD' AS category",
-                                "age >= 20",
                                 null,
                                 null,
                                 null,
@@ -285,20 +276,11 @@ class FlinkPipelineTransformITCase {
     void testMultipleTransformWithDiffRefColumn(ValuesDataSink.SinkApi sinkApi) throws Exception {
         runGenericTransformTest(
                 sinkApi,
-                Arrays.asList(
+                List.of(
                         new TransformDef(
                                 "default_namespace.default_schema.\\.*",
-                                "id,age,'Juvenile' AS roleName",
-                                "age < 18",
+                                "id,age, CASE WHEN age < 18 THEN 'Juvenile' WHEN age >= 18 THEN name END AS roleName",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.\\.*",
-                                "id,age,name AS roleName",
-                                "age >= 18",
                                 null,
                                 null,
                                 null,
@@ -320,20 +302,11 @@ class FlinkPipelineTransformITCase {
     void testMultiTransformWithAsterisk(ValuesDataSink.SinkApi sinkApi) throws Exception {
         runGenericTransformTest(
                 sinkApi,
-                Arrays.asList(
+                List.of(
                         new TransformDef(
                                 "default_namespace.default_schema.mytable2",
-                                "*,'Juvenile' AS roleName",
-                                "age < 18",
+                                "*, CASE WHEN age < 18 THEN 'Juvenile' WHEN age >= 18 THEN name END AS roleName",
                                 null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "id,name,age,description,name AS roleName",
-                                "age >= 18",
                                 null,
                                 null,
                                 null,
@@ -352,23 +325,14 @@ class FlinkPipelineTransformITCase {
 
     @ParameterizedTest
     @EnumSource
-    void testMultiTransformMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
+    void testMissingProjection(ValuesDataSink.SinkApi sinkApi) throws Exception {
         runGenericTransformTest(
                 sinkApi,
-                Arrays.asList(
+                List.of(
                         new TransformDef(
                                 "default_namespace.default_schema.mytable2",
                                 null,
                                 "age < 18",
-                                null,
-                                null,
-                                null,
-                                null,
-                                null),
-                        new TransformDef(
-                                "default_namespace.default_schema.mytable2",
-                                "id,UPPER(name) AS name,age,description",
-                                "age >= 18",
                                 null,
                                 null,
                                 null,
@@ -1271,6 +1235,16 @@ class FlinkPipelineTransformITCase {
     @ParameterizedTest
     @EnumSource
     void testTransformWithFallbackRules(ValuesDataSink.SinkApi apiVersion) throws Exception {
+        List<String> expected =
+                List.of(
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable2, schema=columns={`id` BIGINT NOT NULL,`name` VARCHAR(255),`age` TINYINT,`description` STRING,`rule_fallback` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob, 20, rule_1_matched], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[2, Bob, 20, rule_1_matched], after=[2, Bob, 30, rule_1_matched], op=UPDATE, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, rule_fallback], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, rule_fallback], after=[], op=DELETE, meta=()}");
         runGenericTransformTest(
                 apiVersion,
                 Arrays.asList(
@@ -1292,6 +1266,8 @@ class FlinkPipelineTransformITCase {
                                 null,
                                 null,
                                 null)),
+                expected);
+        expected.addAll(
                 Arrays.asList(
                         "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING,`age` INT,`rule_1_matched` STRING}, primaryKeys=id, partitionKeys=id, options=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice, 18, rule_1_matched], op=INSERT, meta=()}",
@@ -1301,6 +1277,28 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[3, Carol, 15, student, rule_fallback], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[], after=[4, Derrida, 25, student, rule_fallback], op=INSERT, meta=()}",
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, rule_fallback], after=[], op=DELETE, meta=()}"));
+        runGenericTransformTest(
+                apiVersion,
+                Arrays.asList(
+                        new TransformDef(
+                                "\\.*.\\.*.mytable1",
+                                "*, 'rule_1_matched' AS rule_1_matched",
+                                "id > 0",
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null),
+                        new TransformDef(
+                                "\\.*.\\.*.\\.*",
+                                "*, 'rule_fallback' AS rule_fallback",
+                                null,
+                                null,
+                                "id",
+                                null,
+                                null,
+                                null)),
+                expected);
     }
 
     void runGenericTransformTest(

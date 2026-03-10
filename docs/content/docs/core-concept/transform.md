@@ -349,13 +349,13 @@ For example, we may define a transform rule as follows:
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
-    filter: UPPER(province) = 'SHANGHAI'
     description: classification mapping example
-  - source-table: mydb.web_order
+  - source-table: mydb.\.*
     projection: order_id as id, id as order_id
-    filter: UPPER(province) = 'BEIJING'
     description: classification mapping example
 ```
+
+Here `mydb.web_order` will be handled in the first rule, while other tables in `mydb` will fall into the second one.
 
 ## User-defined Functions
 
