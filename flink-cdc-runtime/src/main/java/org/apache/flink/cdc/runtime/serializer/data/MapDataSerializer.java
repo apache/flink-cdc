@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.api.java.typeutils.runtime.DataInputViewStream;
 import org.apache.flink.api.java.typeutils.runtime.DataOutputViewStream;
 import org.apache.flink.cdc.common.annotation.Internal;
@@ -248,7 +249,8 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
     }
 
     /** {@link TypeSerializerSnapshot} for {@link MapDataSerializer}. */
-    public static final class MapDataSerializerSnapshot implements TypeSerializerSnapshot<MapData> {
+    public static final class MapDataSerializerSnapshot
+            implements TypeSerializerSnapshotAdapter<MapData> {
         private static final int CURRENT_VERSION = 0;
 
         private DataType keyType;
@@ -306,8 +308,7 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
             return new MapDataSerializer(keyType, valueType, keySerializer, valueSerializer);
         }
 
-        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
-        // compatibility
+        @Override
         public TypeSerializerSchemaCompatibility<MapData> resolveSchemaCompatibility(
                 TypeSerializer<MapData> newSerializer) {
             if (!(newSerializer instanceof MapDataSerializer)) {
@@ -323,22 +324,6 @@ public class MapDataSerializer extends TypeSerializer<MapData> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
-        }
-
-        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
-        public TypeSerializerSchemaCompatibility<MapData> resolveSchemaCompatibility(
-                TypeSerializerSnapshot<MapData> oldSerializerSnapshot) {
-            if (!(oldSerializerSnapshot instanceof MapDataSerializerSnapshot)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            MapDataSerializerSnapshot snapshot = (MapDataSerializerSnapshot) oldSerializerSnapshot;
-            if (!keyType.equals(snapshot.keyType)
-                    || !valueType.equals(snapshot.valueType)
-                    || !keySerializer.equals(snapshot.keySerializer)
-                    || !valueSerializer.equals(snapshot.valueSerializer)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

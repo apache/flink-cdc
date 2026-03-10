@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.types.utils.runtime.DataInputViewStream;
 import org.apache.flink.cdc.common.types.utils.runtime.DataOutputViewStream;
 import org.apache.flink.cdc.common.utils.InstantiationUtil;
@@ -130,7 +131,7 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
     /** Serializer configuration snapshot for compatibility and format evolution. */
     @SuppressWarnings("WeakerAccess")
     public static final class NullableSerializerWrapperSnapshot<T>
-            implements TypeSerializerSnapshot<T> {
+            implements TypeSerializerSnapshotAdapter<T> {
 
         private static final int CURRENT_VERSION = 1;
 
@@ -172,8 +173,7 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
             return new NullableSerializerWrapper<>(innerSerializer);
         }
 
-        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
-        // compatibility
+        @Override
         public TypeSerializerSchemaCompatibility<T> resolveSchemaCompatibility(
                 TypeSerializer<T> newSerializer) {
             if (!(newSerializer instanceof NullableSerializerWrapper)) {
@@ -187,21 +187,6 @@ public class NullableSerializerWrapper<T> extends TypeSerializer<T> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
-        }
-
-        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
-        @SuppressWarnings("unchecked")
-        public TypeSerializerSchemaCompatibility<T> resolveSchemaCompatibility(
-                TypeSerializerSnapshot<T> oldSerializerSnapshot) {
-            if (!(oldSerializerSnapshot instanceof NullableSerializerWrapperSnapshot)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            NullableSerializerWrapperSnapshot<T> snapshot =
-                    (NullableSerializerWrapperSnapshot<T>) oldSerializerSnapshot;
-            if (!innerSerializer.equals(snapshot.innerSerializer)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

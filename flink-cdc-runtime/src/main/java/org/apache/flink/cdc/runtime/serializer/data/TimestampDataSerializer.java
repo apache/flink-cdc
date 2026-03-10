@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -136,7 +137,7 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
 
     /** {@link TypeSerializerSnapshot} for {@link TimestampDataSerializer}. */
     public static final class TimestampDataSerializerSnapshot
-            implements TypeSerializerSnapshot<TimestampData> {
+            implements TypeSerializerSnapshotAdapter<TimestampData> {
 
         private static final int CURRENT_VERSION = 1;
 
@@ -171,8 +172,7 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
             return new TimestampDataSerializer(previousPrecision);
         }
 
-        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
-        // compatibility
+        @Override
         public TypeSerializerSchemaCompatibility<TimestampData> resolveSchemaCompatibility(
                 TypeSerializer<TimestampData> newSerializer) {
             if (!(newSerializer instanceof TimestampDataSerializer)) {
@@ -186,22 +186,6 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
-        }
-
-        // Flink 2.x changed the abstract method to
-        // resolveSchemaCompatibility(TypeSerializerSnapshot).
-        // No @Override so this also compiles against Flink 1.x where the method does not exist.
-        public TypeSerializerSchemaCompatibility<TimestampData> resolveSchemaCompatibility(
-                TypeSerializerSnapshot<TimestampData> oldSerializerSnapshot) {
-            if (!(oldSerializerSnapshot instanceof TimestampDataSerializerSnapshot)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            TimestampDataSerializerSnapshot snapshot =
-                    (TimestampDataSerializerSnapshot) oldSerializerSnapshot;
-            if (previousPrecision != snapshot.previousPrecision) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

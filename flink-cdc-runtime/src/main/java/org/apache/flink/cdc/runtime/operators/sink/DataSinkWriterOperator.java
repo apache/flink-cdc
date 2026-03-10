@@ -28,6 +28,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
@@ -36,16 +37,15 @@ import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.streaming.runtime.watermarkstatus.WatermarkStatus;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -65,10 +65,9 @@ import java.util.Set;
  * @param <CommT> the type of the committable (to send to downstream operators)
  */
 @Internal
-public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<CommittableMessage<CommT>>
+public class DataSinkWriterOperator<CommT>
+        extends AbstractStreamOperatorAdapter<CommittableMessage<CommT>>
         implements OneInputStreamOperator<Event, CommittableMessage<CommT>>, BoundedOneInput {
-
-    private static final Logger LOG = LoggerFactory.getLogger(DataSinkWriterOperator.class);
 
     private SchemaEvolutionClient schemaEvolutionClient;
 
@@ -102,6 +101,7 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
         this.mailboxExecutor = mailboxExecutor;
         this.schemaOperatorID = schemaOperatorID;
         this.processedTableIds = new HashSet<>();
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override
@@ -111,14 +111,7 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
             Output<StreamRecord<CommittableMessage<CommT>>> output) {
         super.setup(containingTask, config, output);
         flinkWriterOperator = createFlinkWriterOperator();
-        // Call protected AbstractStreamOperator.setup(...) on the wrapped operator via reflection
-        // to avoid JVM verifier issues with protected access across packages.
-        invokeFlinkWriterOperatorMethod(
-                "setup",
-                new Class<?>[] {StreamTask.class, StreamConfig.class, Output.class},
-                containingTask,
-                config,
-                output);
+        invokeSetup(flinkWriterOperator, containingTask, config, output);
         schemaEvolutionClient =
                 new SchemaEvolutionClient(
                         containingTask.getEnvironment().getOperatorCoordinatorEventGateway(),
@@ -127,109 +120,36 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
 
     @Override
     public void open() throws Exception {
-        invokeFlinkWriterOperatorMethod("open", new Class<?>[0]);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator().open();
         copySinkWriter = getFieldValue("sinkWriter");
-        ensureEmitDownstream();
-    }
-
-    /**
-     * Flink 2.2 {@code SinkWriterOperator} sets {@code emitDownstream = sink instanceof
-     * SupportsCommitter}. Sinks like Paimon implement the older {@code TwoPhaseCommittingSink}
-     * rather than Flink 2.x {@code SupportsCommitter}, so committables are silently discarded. This
-     * method forces the flag to {@code true} and fills in the committable serializer so that the
-     * wrapped operator properly emits committables to the downstream committer.
-     *
-     * <p>This is only applied when the sink actually supports committing (implements either {@code
-     * TwoPhaseCommittingSink} or {@code SupportsCommitter}). For sinks that do not support
-     * committing, forcing {@code emitDownstream = true} would cause a {@link ClassCastException}
-     * when the wrapped operator tries to cast the writer to {@code CommittingSinkWriter}.
-     */
-    private void ensureEmitDownstream() {
-        if (!sinkSupportsCommitting()) {
-            return;
-        }
-        try {
-            Field emitField = findField(flinkWriterOperator.getClass(), "emitDownstream");
-            if (emitField == null) {
-                return;
-            }
-            emitField.setAccessible(true);
-            if (!emitField.getBoolean(flinkWriterOperator)) {
-                emitField.setBoolean(flinkWriterOperator, true);
-
-                Field serField = findField(flinkWriterOperator.getClass(), "committableSerializer");
-                if (serField != null) {
-                    serField.setAccessible(true);
-                    if (serField.get(flinkWriterOperator) == null) {
-                        try {
-                            Method getSerializer =
-                                    sink.getClass().getMethod("getCommittableSerializer");
-                            getSerializer.setAccessible(true);
-                            serField.set(flinkWriterOperator, getSerializer.invoke(sink));
-                        } catch (NoSuchMethodException ignored) {
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.warn("Could not force emitDownstream on wrapped SinkWriterOperator", e);
-        }
-    }
-
-    private boolean sinkSupportsCommitting() {
-        try {
-            Class<?> tpc =
-                    Class.forName("org.apache.flink.api.connector.sink2.TwoPhaseCommittingSink");
-            if (tpc.isInstance(sink)) {
-                return true;
-            }
-        } catch (ClassNotFoundException ignored) {
-        }
-        try {
-            Class<?> sc = Class.forName("org.apache.flink.api.connector.sink2.SupportsCommitter");
-            if (sc.isInstance(sink)) {
-                return true;
-            }
-        } catch (ClassNotFoundException ignored) {
-        }
-        return false;
-    }
-
-    private static Field findField(Class<?> clazz, String name) {
-        while (clazz != null) {
-            try {
-                return clazz.getDeclaredField(name);
-            } catch (NoSuchFieldException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        return null;
     }
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        schemaEvolutionClient.registerSubtask(getSubtaskIndexCompat());
-        invokeFlinkWriterOperatorMethod(
-                "initializeState", new Class<?>[] {StateInitializationContext.class}, context);
+        schemaEvolutionClient.registerSubtask(
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask());
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .initializeState(context);
     }
 
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
-        invokeFlinkWriterOperatorMethod(
-                "snapshotState", new Class<?>[] {StateSnapshotContext.class}, context);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .snapshotState(context);
     }
 
     @Override
     public void processWatermark(Watermark mark) throws Exception {
         super.processWatermark(mark);
-        invokeFlinkWriterOperatorMethod("processWatermark", new Class<?>[] {Watermark.class}, mark);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .processWatermark(mark);
     }
 
     @Override
     public void processWatermarkStatus(WatermarkStatus watermarkStatus) throws Exception {
         super.processWatermarkStatus(watermarkStatus);
-        invokeFlinkWriterOperatorMethod(
-                "processWatermarkStatus", new Class<?>[] {WatermarkStatus.class}, watermarkStatus);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .processWatermarkStatus(watermarkStatus);
     }
 
     @Override
@@ -272,18 +192,19 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
 
     @Override
     public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
-        invokeFlinkWriterOperatorMethod(
-                "prepareSnapshotPreBarrier", new Class<?>[] {long.class}, checkpointId);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .prepareSnapshotPreBarrier(checkpointId);
     }
 
     @Override
     public void close() throws Exception {
-        invokeFlinkWriterOperatorMethod("close", new Class<?>[0]);
+        this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .close();
     }
 
     @Override
     public void endInput() throws Exception {
-        invokeFlinkWriterOperatorMethod("endInput", new Class<?>[0]);
+        this.<BoundedOneInput>getFlinkWriterOperator().endInput();
     }
 
     // ----------------------------- Helper functions -------------------------------
@@ -306,7 +227,8 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
                             });
         }
         schemaEvolutionClient.notifyFlushSuccess(
-                getSubtaskIndexCompat(), event.getSourceSubTaskId());
+                getRuntimeContext().getTaskInfo().getIndexOfThisSubtask(),
+                event.getSourceSubTaskId());
     }
 
     private void emitLatestSchema(TableId tableId) throws Exception {
@@ -326,6 +248,22 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
 
     // -------------------------- Reflection helper functions --------------------------
 
+    private void invokeSetup(
+            Object operator,
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<?> output) {
+        try {
+            Method setupMethod =
+                    AbstractStreamOperator.class.getDeclaredMethod(
+                            "setup", StreamTask.class, StreamConfig.class, Output.class);
+            setupMethod.setAccessible(true);
+            setupMethod.invoke(operator, containingTask, config, output);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to invoke setup on flinkWriterOperator", e);
+        }
+    }
+
     private Object createFlinkWriterOperator() {
         try {
             Class<?> flinkWriterClass =
@@ -333,103 +271,29 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
                             .getUserCodeClassLoader()
                             .loadClass(
                                     "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
-
-            // Try to find a constructor whose first three parameters are compatible with
-            // (Sink, ProcessingTimeService, MailboxExecutor). This makes the code resilient
-            // against Flink 2.x adding extra parameters to the constructor.
-            Constructor<?> target = null;
-            for (Constructor<?> c : flinkWriterClass.getDeclaredConstructors()) {
-                Class<?>[] p = c.getParameterTypes();
-                if (p.length >= 3
-                        && Sink.class.isAssignableFrom(p[0])
-                        && ProcessingTimeService.class.isAssignableFrom(p[1])
-                        && MailboxExecutor.class.isAssignableFrom(p[2])) {
-                    target = c;
-                    break;
-                }
-            }
-
-            if (target == null) {
-                // Fallback: use the first declared constructor and best-effort argument mapping
-                // below. This covers Flink 2.2 where the constructor signature may have changed.
-                Constructor<?>[] all = flinkWriterClass.getDeclaredConstructors();
-                if (all.length == 0) {
-                    throw new RuntimeException(
-                            "No constructors found on SinkWriterOperator in Flink runtime");
-                }
-                target = all[0];
-            }
-
-            target.setAccessible(true);
-            Class<?>[] paramTypes = target.getParameterTypes();
-            Object[] args = new Object[paramTypes.length];
-            for (int i = 0; i < paramTypes.length; i++) {
-                Class<?> t = paramTypes[i];
-                if (Sink.class.isAssignableFrom(t)) {
-                    args[i] = sink;
-                } else if (ProcessingTimeService.class.isAssignableFrom(t)) {
-                    args[i] = processingTimeService;
-                } else if (MailboxExecutor.class.isAssignableFrom(t)) {
-                    args[i] = mailboxExecutor;
-                } else if (t.isPrimitive()) {
-                    if (t == boolean.class) {
-                        args[i] = false;
-                    } else if (t == char.class) {
-                        args[i] = '\0';
-                    } else if (t == byte.class) {
-                        args[i] = (byte) 0;
-                    } else if (t == short.class) {
-                        args[i] = (short) 0;
-                    } else if (t == int.class) {
-                        args[i] = 0;
-                    } else if (t == long.class) {
-                        args[i] = 0L;
-                    } else if (t == float.class) {
-                        args[i] = 0.0f;
-                    } else if (t == double.class) {
-                        args[i] = 0.0d;
-                    }
-                } else {
-                    // Best effort: pass null for any extra, unknown parameters.
-                    args[i] = null;
-                }
-            }
-            return target.newInstance(args);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
-        }
-    }
-
-    /**
-     * Obtains the subtask index in a way that is compatible with both Flink 1.x and 2.x.
-     *
-     * <p>Flink 2.x removed {@code StreamingRuntimeContext.getIndexOfThisSubtask()}. The correct
-     * replacement is {@code getRuntimeContext().getTaskInfo().getIndexOfThisSubtask()}.
-     *
-     * <p><b>IMPORTANT:</b> Returning a wrong (fixed) index here causes ALL sink subtasks to report
-     * the same ID to SchemaCoordinator. The coordinator then waits forever for the missing subtask
-     * IDs, causing a 3-minute timeout in SchemaOperator.
-     */
-    private int getSubtaskIndexCompat() {
-        try {
-            Object ctx = getRuntimeContext();
-            // Flink 2.x: getTaskInfo().getIndexOfThisSubtask()
+            Constructor<?> constructor =
+                    flinkWriterClass.getDeclaredConstructor(
+                            Sink.class, ProcessingTimeService.class, MailboxExecutor.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(sink, processingTimeService, mailboxExecutor);
+        } catch (Exception ignore) {
             try {
-                Method getTaskInfo = ctx.getClass().getMethod("getTaskInfo");
-                getTaskInfo.setAccessible(true);
-                Object taskInfo = getTaskInfo.invoke(ctx);
-                Method getIndex = taskInfo.getClass().getMethod("getIndexOfThisSubtask");
-                getIndex.setAccessible(true);
-                return (Integer) getIndex.invoke(taskInfo);
-            } catch (NoSuchMethodException ignored) {
-                // fall through to Flink 1.x path
+                Class<?> flinkWriterClass =
+                        getRuntimeContext()
+                                .getUserCodeClassLoader()
+                                .loadClass(
+                                        "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
+                Constructor<?> constructor =
+                        flinkWriterClass.getDeclaredConstructor(
+                                StreamOperatorParameters.class,
+                                Sink.class,
+                                ProcessingTimeService.class,
+                                MailboxExecutor.class);
+                constructor.setAccessible(true);
+                return constructor.newInstance(null, sink, processingTimeService, mailboxExecutor);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
             }
-            // Flink 1.x: direct getIndexOfThisSubtask()
-            Method m = ctx.getClass().getMethod("getIndexOfThisSubtask");
-            m.setAccessible(true);
-            return (Integer) m.invoke(ctx);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to obtain subtask index from RuntimeContext", e);
         }
     }
 
@@ -458,37 +322,5 @@ public class DataSinkWriterOperator<CommT> extends AbstractStreamOperator<Commit
     @SuppressWarnings("unchecked")
     private <T> T getFlinkWriterOperator() {
         return (T) flinkWriterOperator;
-    }
-
-    private void invokeFlinkWriterOperatorMethod(
-            String methodName, Class<?>[] parameterTypes, Object... args) {
-        try {
-            Method m = findMethod(flinkWriterOperator.getClass(), methodName, parameterTypes);
-            if (m == null) {
-                // Method does not exist in this Flink version (for example, open() signature
-                // changed); ignore for compatibility.
-                return;
-            }
-            m.setAccessible(true);
-            m.invoke(flinkWriterOperator, args);
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failed to invoke method "
-                            + methodName
-                            + " on wrapped flink writer operator "
-                            + flinkWriterOperator.getClass().getName(),
-                    e);
-        }
-    }
-
-    private static Method findMethod(Class<?> clazz, String methodName, Class<?>[] parameterTypes) {
-        while (clazz != null) {
-            try {
-                return clazz.getDeclaredMethod(methodName, parameterTypes);
-            } catch (NoSuchMethodException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        return null;
     }
 }

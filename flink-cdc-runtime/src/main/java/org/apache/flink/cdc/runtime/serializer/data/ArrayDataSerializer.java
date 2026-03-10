@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.api.java.typeutils.runtime.DataInputViewStream;
 import org.apache.flink.api.java.typeutils.runtime.DataOutputViewStream;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
@@ -52,12 +53,12 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
     private transient BinaryArrayWriter reuseWriter;
 
     public ArrayDataSerializer(DataType eleType) {
-        this(eleType, InternalSerializers.create(eleType));
+        this(eleType, new NullableSerializerWrapper<>(InternalSerializers.create(eleType)));
     }
 
     private ArrayDataSerializer(DataType eleType, TypeSerializer<Object> eleSer) {
         this.eleType = eleType;
-        this.eleSer = new NullableSerializerWrapper<>(eleSer);
+        this.eleSer = eleSer;
         this.elementGetter = ArrayData.createElementGetter(eleType);
     }
 
@@ -218,7 +219,7 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
 
     /** {@link TypeSerializerSnapshot} for {@link ArrayDataSerializer}. */
     public static final class ArrayDataSerializerSnapshot
-            implements TypeSerializerSnapshot<ArrayData> {
+            implements TypeSerializerSnapshotAdapter<ArrayData> {
         private static final int CURRENT_VERSION = 3;
 
         private DataType previousType;
@@ -265,8 +266,7 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
             return new ArrayDataSerializer(previousType, previousEleSer);
         }
 
-        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
-        // compatibility
+        @Override
         public TypeSerializerSchemaCompatibility<ArrayData> resolveSchemaCompatibility(
                 TypeSerializer<ArrayData> newSerializer) {
             if (!(newSerializer instanceof ArrayDataSerializer)) {
@@ -280,21 +280,6 @@ public class ArrayDataSerializer extends TypeSerializer<ArrayData> {
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
-        }
-
-        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
-        public TypeSerializerSchemaCompatibility<ArrayData> resolveSchemaCompatibility(
-                TypeSerializerSnapshot<ArrayData> oldSerializerSnapshot) {
-            if (!(oldSerializerSnapshot instanceof ArrayDataSerializerSnapshot)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            ArrayDataSerializerSnapshot snapshot =
-                    (ArrayDataSerializerSnapshot) oldSerializerSnapshot;
-            if (!previousType.equals(snapshot.previousType)
-                    || !previousEleSer.equals(snapshot.previousEleSer)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

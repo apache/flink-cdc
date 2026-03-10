@@ -33,13 +33,12 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
-import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -61,7 +60,7 @@ import java.util.stream.Collectors;
 /**
  * A data process function that filters out columns which aren't (directly & indirectly) referenced.
  */
-public class PreTransformOperator extends AbstractStreamOperator<Event>
+public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -86,7 +85,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         this.preTransformChangeInfoMap = new HashMap<>();
         this.preTransformProcessorMap = new HashMap<>();
         this.schemaMetadataTransformers = new ArrayList<>();
-        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
 
         this.transformRules = transformRules;
         this.udfFunctions = udfFunctions;

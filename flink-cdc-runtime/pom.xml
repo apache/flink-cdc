@@ -130,5 +130,41 @@ limitations under the License.
                 </dependency>
             </dependencies>
         </profile>
+        <profile>
+            <id>flink1</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-cdc-flink1.20-compat</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>flink2-exclude-flink1</id>
+            <activation>
+                <property>
+                    <name>flink.version</name>
+                    <value>${flink.2.x.version}</value>
+                </property>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-cdc-flink1.20-compat</artifactId>
+                    <version>${project.version}</version>
+                    <scope>provided</scope>
+                    <exclusions>
+                        <exclusion>
+                            <groupId>*</groupId>
+                            <artifactId>*</artifactId>
+                        </exclusion>
+                    </exclusions>
+                </dependency>
+            </dependencies>
+        </profile>
     </profiles>
 </project>

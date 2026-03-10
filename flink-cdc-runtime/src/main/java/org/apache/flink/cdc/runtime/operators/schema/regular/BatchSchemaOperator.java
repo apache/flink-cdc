@@ -28,11 +28,10 @@ import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.sink.MetadataApplier;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaManager;
-import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -50,7 +49,7 @@ import java.util.stream.Collectors;
 
 /** The operator will apply create table event and router mapper in batch mode. */
 @Internal
-public class BatchSchemaOperator extends AbstractStreamOperator<Event>
+public class BatchSchemaOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -71,7 +70,7 @@ public class BatchSchemaOperator extends AbstractStreamOperator<Event>
 
     public BatchSchemaOperator(
             List<RouteRule> routingRules, MetadataApplier metadataApplier, String timezone) {
-        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.timezone = timezone;
         this.routingRules = routingRules;
         this.metadataApplier = metadataApplier;

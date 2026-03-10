@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.annotation.VisibleForTesting;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -176,7 +177,7 @@ public final class EnumSerializer<T extends Enum<T>> extends TypeSerializer<T> {
 
     /** {@link TypeSerializerSnapshot} for {@link EnumSerializer}. */
     public static final class EnumSerializerSnapshot<T extends Enum<T>>
-            implements TypeSerializerSnapshot<T> {
+            implements TypeSerializerSnapshotAdapter<T> {
         private static final int CURRENT_VERSION = 3;
 
         private T[] previousEnums;
@@ -238,8 +239,7 @@ public final class EnumSerializer<T extends Enum<T>> extends TypeSerializer<T> {
             return new EnumSerializer<>(enumClass, previousEnums);
         }
 
-        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
-        // compatibility
+        @Override
         public TypeSerializerSchemaCompatibility<T> resolveSchemaCompatibility(
                 TypeSerializer<T> newSerializer) {
             if (!(newSerializer instanceof EnumSerializer)) {
@@ -269,32 +269,6 @@ public final class EnumSerializer<T extends Enum<T>> extends TypeSerializer<T> {
                     new EnumSerializer<>(enumClass, reconfiguredEnums);
             return TypeSerializerSchemaCompatibility.compatibleWithReconfiguredSerializer(
                     reconfiguredSerializer);
-        }
-
-        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
-        public TypeSerializerSchemaCompatibility<T> resolveSchemaCompatibility(
-                TypeSerializerSnapshot<T> oldSerializerSnapshot) {
-            if (!(oldSerializerSnapshot instanceof EnumSerializerSnapshot)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            @SuppressWarnings("unchecked")
-            EnumSerializerSnapshot<T> oldSnapshot =
-                    (EnumSerializerSnapshot<T>) oldSerializerSnapshot;
-            if (!enumClass.equals(oldSnapshot.enumClass)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            if (Arrays.equals(oldSnapshot.previousEnums, previousEnums)) {
-                return TypeSerializerSchemaCompatibility.compatibleAsIs();
-            }
-            Set<T> reconfiguredEnumSet =
-                    new LinkedHashSet<>(Arrays.asList(oldSnapshot.previousEnums));
-            reconfiguredEnumSet.addAll(Arrays.asList(previousEnums));
-            @SuppressWarnings("unchecked")
-            T[] reconfiguredEnums =
-                    reconfiguredEnumSet.toArray(
-                            (T[]) Array.newInstance(enumClass, reconfiguredEnumSet.size()));
-            return TypeSerializerSchemaCompatibility.compatibleWithReconfiguredSerializer(
-                    new EnumSerializer<>(enumClass, reconfiguredEnums));
         }
     }
 

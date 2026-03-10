@@ -23,6 +23,7 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.cdc.common.event.FlushEvent;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.sink.exception.SinkWrapperException;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
@@ -30,8 +31,10 @@ import org.apache.flink.streaming.api.connector.sink2.CommittableMessage;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
+import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.ProcessingTimeService;
@@ -53,7 +56,7 @@ import java.lang.reflect.Method;
  */
 @Internal
 public class BatchDataSinkWriterOperator<CommT>
-        extends AbstractStreamOperator<CommittableMessage<CommT>>
+        extends AbstractStreamOperatorAdapter<CommittableMessage<CommT>>
         implements OneInputStreamOperator<Event, CommittableMessage<CommT>>, BoundedOneInput {
 
     private final Sink<Event> sink;
@@ -78,6 +81,7 @@ public class BatchDataSinkWriterOperator<CommT>
         this.sink = sink;
         this.processingTimeService = processingTimeService;
         this.mailboxExecutor = mailboxExecutor;
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override
@@ -87,43 +91,39 @@ public class BatchDataSinkWriterOperator<CommT>
             Output<StreamRecord<CommittableMessage<CommT>>> output) {
         super.setup(containingTask, config, output);
         flinkWriterOperator = createFlinkWriterOperator();
-        invokeFlinkWriterOperatorMethod(
-                "setup",
-                new Class<?>[] {StreamTask.class, StreamConfig.class, Output.class},
-                containingTask,
-                config,
-                output);
+        invokeSetup(flinkWriterOperator, containingTask, config, output);
     }
 
     @Override
     public void open() throws Exception {
-        invokeFlinkWriterOperatorMethod("open", new Class<?>[0]);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator().open();
         copySinkWriter = getFieldValue("sinkWriter");
     }
 
     @Override
     public void initializeState(StateInitializationContext context) throws Exception {
-        invokeFlinkWriterOperatorMethod(
-                "initializeState", new Class<?>[] {StateInitializationContext.class}, context);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .initializeState(context);
     }
 
     @Override
     public void snapshotState(StateSnapshotContext context) throws Exception {
-        invokeFlinkWriterOperatorMethod(
-                "snapshotState", new Class<?>[] {StateSnapshotContext.class}, context);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .snapshotState(context);
     }
 
     @Override
     public void processWatermark(Watermark mark) throws Exception {
         super.processWatermark(mark);
-        invokeFlinkWriterOperatorMethod("processWatermark", new Class<?>[] {Watermark.class}, mark);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .processWatermark(mark);
     }
 
     @Override
     public void processWatermarkStatus(WatermarkStatus watermarkStatus) throws Exception {
         super.processWatermarkStatus(watermarkStatus);
-        invokeFlinkWriterOperatorMethod(
-                "processWatermarkStatus", new Class<?>[] {WatermarkStatus.class}, watermarkStatus);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .processWatermarkStatus(watermarkStatus);
     }
 
     @Override
@@ -140,18 +140,19 @@ public class BatchDataSinkWriterOperator<CommT>
 
     @Override
     public void prepareSnapshotPreBarrier(long checkpointId) throws Exception {
-        invokeFlinkWriterOperatorMethod(
-                "prepareSnapshotPreBarrier", new Class<?>[] {long.class}, checkpointId);
+        this.<AbstractStreamOperator<CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .prepareSnapshotPreBarrier(checkpointId);
     }
 
     @Override
     public void close() throws Exception {
-        invokeFlinkWriterOperatorMethod("close", new Class<?>[0]);
+        this.<OneInputStreamOperator<Event, CommittableMessage<CommT>>>getFlinkWriterOperator()
+                .close();
     }
 
     @Override
     public void endInput() throws Exception {
-        invokeFlinkWriterOperatorMethod("endInput", new Class<?>[0]);
+        this.<BoundedOneInput>getFlinkWriterOperator().endInput();
     }
 
     // ----------------------------- Helper functions -------------------------------
@@ -162,6 +163,22 @@ public class BatchDataSinkWriterOperator<CommT>
 
     // -------------------------- Reflection helper functions --------------------------
 
+    private void invokeSetup(
+            Object operator,
+            StreamTask<?, ?> containingTask,
+            StreamConfig config,
+            Output<?> output) {
+        try {
+            Method setupMethod =
+                    AbstractStreamOperator.class.getDeclaredMethod(
+                            "setup", StreamTask.class, StreamConfig.class, Output.class);
+            setupMethod.setAccessible(true);
+            setupMethod.invoke(operator, containingTask, config, output);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to invoke setup on flinkWriterOperator", e);
+        }
+    }
+
     private Object createFlinkWriterOperator() {
         try {
             Class<?> flinkWriterClass =
@@ -169,70 +186,29 @@ public class BatchDataSinkWriterOperator<CommT>
                             .getUserCodeClassLoader()
                             .loadClass(
                                     "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
-
-            // Try to find a constructor whose first three parameters are compatible with
-            // (Sink, ProcessingTimeService, MailboxExecutor). This makes the code resilient
-            // against Flink 2.x adding extra parameters to the constructor.
-            Constructor<?> target = null;
-            for (Constructor<?> c : flinkWriterClass.getDeclaredConstructors()) {
-                Class<?>[] p = c.getParameterTypes();
-                if (p.length >= 3
-                        && Sink.class.isAssignableFrom(p[0])
-                        && ProcessingTimeService.class.isAssignableFrom(p[1])
-                        && MailboxExecutor.class.isAssignableFrom(p[2])) {
-                    target = c;
-                    break;
-                }
+            Constructor<?> constructor =
+                    flinkWriterClass.getDeclaredConstructor(
+                            Sink.class, ProcessingTimeService.class, MailboxExecutor.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(sink, processingTimeService, mailboxExecutor);
+        } catch (Exception ignore) {
+            try {
+                Class<?> flinkWriterClass =
+                        getRuntimeContext()
+                                .getUserCodeClassLoader()
+                                .loadClass(
+                                        "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
+                Constructor<?> constructor =
+                        flinkWriterClass.getDeclaredConstructor(
+                                StreamOperatorParameters.class,
+                                Sink.class,
+                                ProcessingTimeService.class,
+                                MailboxExecutor.class);
+                constructor.setAccessible(true);
+                return constructor.newInstance(null, sink, processingTimeService, mailboxExecutor);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
             }
-
-            if (target == null) {
-                // Fallback: use the first declared constructor and best-effort argument mapping
-                // below. This covers Flink 2.2 where the constructor signature may have changed.
-                Constructor<?>[] all = flinkWriterClass.getDeclaredConstructors();
-                if (all.length == 0) {
-                    throw new RuntimeException(
-                            "No constructors found on SinkWriterOperator in Flink runtime");
-                }
-                target = all[0];
-            }
-
-            target.setAccessible(true);
-            Class<?>[] paramTypes = target.getParameterTypes();
-            Object[] args = new Object[paramTypes.length];
-            for (int i = 0; i < paramTypes.length; i++) {
-                Class<?> t = paramTypes[i];
-                if (Sink.class.isAssignableFrom(t)) {
-                    args[i] = sink;
-                } else if (ProcessingTimeService.class.isAssignableFrom(t)) {
-                    args[i] = processingTimeService;
-                } else if (MailboxExecutor.class.isAssignableFrom(t)) {
-                    args[i] = mailboxExecutor;
-                } else if (t.isPrimitive()) {
-                    if (t == boolean.class) {
-                        args[i] = false;
-                    } else if (t == char.class) {
-                        args[i] = '\0';
-                    } else if (t == byte.class) {
-                        args[i] = (byte) 0;
-                    } else if (t == short.class) {
-                        args[i] = (short) 0;
-                    } else if (t == int.class) {
-                        args[i] = 0;
-                    } else if (t == long.class) {
-                        args[i] = 0L;
-                    } else if (t == float.class) {
-                        args[i] = 0.0f;
-                    } else if (t == double.class) {
-                        args[i] = 0.0d;
-                    }
-                } else {
-                    // Best effort: pass null for any extra, unknown parameters.
-                    args[i] = null;
-                }
-            }
-            return target.newInstance(args);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
         }
     }
 
@@ -261,37 +237,5 @@ public class BatchDataSinkWriterOperator<CommT>
     @SuppressWarnings("unchecked")
     private <T> T getFlinkWriterOperator() {
         return (T) flinkWriterOperator;
-    }
-
-    private void invokeFlinkWriterOperatorMethod(
-            String methodName, Class<?>[] parameterTypes, Object... args) {
-        try {
-            Method m = findMethod(flinkWriterOperator.getClass(), methodName, parameterTypes);
-            if (m == null) {
-                // Method does not exist in this Flink version (for example, open() signature
-                // changed); ignore for compatibility.
-                return;
-            }
-            m.setAccessible(true);
-            m.invoke(flinkWriterOperator, args);
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failed to invoke method "
-                            + methodName
-                            + " on wrapped flink writer operator "
-                            + flinkWriterOperator.getClass().getName(),
-                    e);
-        }
-    }
-
-    private static Method findMethod(Class<?> clazz, String methodName, Class<?>[] parameterTypes) {
-        while (clazz != null) {
-            try {
-                return clazz.getDeclaredMethod(methodName, parameterTypes);
-            } catch (NoSuchMethodException e) {
-                clazz = clazz.getSuperclass();
-            }
-        }
-        return null;
     }
 }

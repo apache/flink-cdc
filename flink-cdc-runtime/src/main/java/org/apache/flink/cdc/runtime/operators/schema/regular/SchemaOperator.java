@@ -29,17 +29,16 @@ import org.apache.flink.cdc.common.route.RouteRule;
 import org.apache.flink.cdc.common.route.TableIdRouter;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.CoordinationResponseUtils;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaDerivator;
 import org.apache.flink.cdc.runtime.operators.schema.common.metrics.SchemaOperatorMetrics;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeRequest;
 import org.apache.flink.cdc.runtime.operators.schema.regular.event.SchemaChangeResponse;
-import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.coordination.CoordinationRequest;
 import org.apache.flink.runtime.operators.coordination.CoordinationResponse;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -66,7 +65,7 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.DEFAULT_SCHEM
  * SchemaChangeEvent}s and block the stream for tables before their schema changes finish.
  */
 @Internal
-public class SchemaOperator extends AbstractStreamOperator<Event>
+public class SchemaOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -110,7 +109,7 @@ public class SchemaOperator extends AbstractStreamOperator<Event>
             Duration rpcTimeOut,
             SchemaChangeBehavior schemaChangeBehavior,
             String timezone) {
-        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.rpcTimeout = rpcTimeOut;
         this.schemaChangeBehavior = schemaChangeBehavior;
         this.timezone = timezone;

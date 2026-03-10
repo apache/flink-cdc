@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.cdc.common.data.ZonedTimestampData;
 import org.apache.flink.cdc.runtime.serializer.StringSerializer;
@@ -146,7 +147,7 @@ public class ZonedTimestampDataSerializer extends TypeSerializer<ZonedTimestampD
 
     /** {@link TypeSerializerSnapshot} for {@link ZonedTimestampDataSerializer}. */
     public static final class ZonedTimestampDataSerializerSnapshot
-            implements TypeSerializerSnapshot<ZonedTimestampData> {
+            implements TypeSerializerSnapshotAdapter<ZonedTimestampData> {
 
         private static final int CURRENT_VERSION = 1;
 
@@ -181,8 +182,7 @@ public class ZonedTimestampDataSerializer extends TypeSerializer<ZonedTimestampD
             return new ZonedTimestampDataSerializer(previousPrecision);
         }
 
-        // Flink 1.x abstract method - removed in Flink 2.x, @Override omitted for cross-version
-        // compatibility
+        @Override
         public TypeSerializerSchemaCompatibility<ZonedTimestampData> resolveSchemaCompatibility(
                 TypeSerializer<ZonedTimestampData> newSerializer) {
             if (!(newSerializer instanceof ZonedTimestampDataSerializer)) {
@@ -196,20 +196,6 @@ public class ZonedTimestampDataSerializer extends TypeSerializer<ZonedTimestampD
             } else {
                 return TypeSerializerSchemaCompatibility.compatibleAsIs();
             }
-        }
-
-        // Flink 2.x new abstract method - no @Override so this also compiles against Flink 1.x
-        public TypeSerializerSchemaCompatibility<ZonedTimestampData> resolveSchemaCompatibility(
-                TypeSerializerSnapshot<ZonedTimestampData> oldSerializerSnapshot) {
-            if (!(oldSerializerSnapshot instanceof ZonedTimestampDataSerializerSnapshot)) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            ZonedTimestampDataSerializerSnapshot snapshot =
-                    (ZonedTimestampDataSerializerSnapshot) oldSerializerSnapshot;
-            if (previousPrecision != snapshot.previousPrecision) {
-                return TypeSerializerSchemaCompatibility.incompatible();
-            }
-            return TypeSerializerSchemaCompatibility.compatibleAsIs();
         }
     }
 }

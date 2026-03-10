@@ -24,11 +24,11 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.SchemaChangeEventType;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.BoundedOneInput;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
@@ -46,7 +46,7 @@ import java.util.Set;
  * The DataSinkOperatorAdapter class acts as an adapter for testing the core schema evolution
  * process in both {@link DataSinkWriterOperator} and {@link DataSinkFunctionOperator}.
  */
-public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
+public class DataSinkOperatorAdapter extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, BoundedOneInput {
 
     private SchemaEvolutionClient schemaEvolutionClient;
@@ -59,15 +59,7 @@ public class DataSinkOperatorAdapter extends AbstractStreamOperator<Event>
     public DataSinkOperatorAdapter() {
         this.schemaOperatorID = new OperatorID();
         this.processedTableIds = new HashSet<>();
-        // Try to set chainingStrategy via reflection for backward compatibility with Flink 1.x
-        try {
-            java.lang.reflect.Field field =
-                    AbstractStreamOperator.class.getDeclaredField("chainingStrategy");
-            field.setAccessible(true);
-            field.set(this, ChainingStrategy.ALWAYS);
-        } catch (Exception e) {
-            // Ignore if chainingStrategy doesn't exist in Flink 2.x
-        }
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
     }
 
     @Override

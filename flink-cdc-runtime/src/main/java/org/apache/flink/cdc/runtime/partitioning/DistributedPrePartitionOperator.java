@@ -26,11 +26,10 @@ import org.apache.flink.cdc.common.function.HashFunction;
 import org.apache.flink.cdc.common.function.HashFunctionProvider;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.regular.SchemaOperator;
 import org.apache.flink.cdc.runtime.serializer.event.EventSerializer;
-import org.apache.flink.cdc.runtime.utils.FlinkCompatibilityUtils;
 import org.apache.flink.runtime.state.StateSnapshotContext;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
@@ -41,7 +40,8 @@ import java.util.Map;
 
 /** Operator for processing events from upstream before flowing to {@link SchemaOperator}. */
 @Internal
-public class DistributedPrePartitionOperator extends AbstractStreamOperator<PartitioningEvent>
+public class DistributedPrePartitionOperator
+        extends AbstractStreamOperatorAdapter<PartitioningEvent>
         implements OneInputStreamOperator<Event, PartitioningEvent>, Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -56,7 +56,7 @@ public class DistributedPrePartitionOperator extends AbstractStreamOperator<Part
 
     public DistributedPrePartitionOperator(
             int downstreamParallelism, HashFunctionProvider<DataChangeEvent> hashFunctionProvider) {
-        FlinkCompatibilityUtils.setChainingStrategyIfAvailable(this, ChainingStrategy.ALWAYS);
+        this.chainingStrategy = ChainingStrategy.ALWAYS;
         this.downstreamParallelism = downstreamParallelism;
         this.hashFunctionProvider = hashFunctionProvider;
     }
