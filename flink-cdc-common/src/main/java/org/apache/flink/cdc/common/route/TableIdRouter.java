@@ -35,7 +35,10 @@ import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -202,21 +205,23 @@ public class TableIdRouter {
                                             .collect(Collectors.toSet()))
                     .collect(Collectors.toList());
         } else if (routeMode == RouteMode.FIRST_MATCH) {
-            List<Set<TableId>> matchedRules = new ArrayList<>();
+            Map<TableId, Integer> matchingTableIds = new HashMap<>();
             for (TableId tableId : tableIdSet) {
-                boolean matched = false;
-                for (Tuple3<Pattern, String, String> route : routes) {
-                    if (matches(route.f0, tableId)) {
-                        matchedRules.add(Set.of(tableId));
-                        matched = true;
+                for (int i = 0; i < routes.size(); i++) {
+                    if (routes.get(i).f0.matcher(tableId.toString()).matches()) {
+                        matchingTableIds.put(tableId, i);
                         break;
                     }
                 }
-                if (!matched) {
-                    matchedRules.add(Set.of());
-                }
             }
-            return matchedRules;
+            List<Set<TableId>> routeGroups = new ArrayList<>(routes.size());
+            for (int i = 0; i < routes.size(); i++) {
+                routeGroups.add(new HashSet<>());
+            }
+            for (Map.Entry<TableId, Integer> entry : matchingTableIds.entrySet()) {
+                routeGroups.get(entry.getValue()).add(entry.getKey());
+            }
+            return routeGroups;
         } else {
             throw new IllegalArgumentException("Unexpected route mode: " + routeMode);
         }
