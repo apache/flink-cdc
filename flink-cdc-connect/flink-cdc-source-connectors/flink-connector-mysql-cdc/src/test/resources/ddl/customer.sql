@@ -326,3 +326,34 @@ CREATE TABLE default_value_test (
 INSERT INTO default_value_test
 VALUES (1,'user1','Shanghai',123567),
        (2,'user2','Shanghai',123567);
+
+-- table that is not subscribed
+CREATE TABLE trivial (
+  id INTEGER NOT NULL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL DEFAULT 'flink',
+  address VARCHAR(1024),
+  phone_number VARCHAR(512)
+);
+
+INSERT INTO trivial
+VALUES (101,"user_1","Beijing","123567891234"),
+       (102,"user_2","Beijing","123567891234"),
+       (103,"user_3","Beijing","123567891234"),
+       (109,"user_4","Beijing","123567891234"),
+       (110,"user_5","Beijing","123567891234"),
+       (111,"user_6","Beijing","123567891234"),
+       (118,"user_7","Beijing","123567891234"),
+       (121,"user_8","Beijing","123567891234"),
+       (123,"user_9","Beijing","123567891234"),
+       (1009,"user_10","Beijing","123567891234"),
+       (1010,"user_11","Beijing","123567891234"),
+       (1011,"user_12","Beijing","123567891234"),
+       (1012,"user_13","Beijing","123567891234"),
+       (1013,"user_14","Beijing","123567891234"),
+       (1014,"user_15","Beijing","123567891234"),
+       (1015,"user_16","Beijing","123567891234"),
+       (1016,"user_17","Beijing","123567891234"),
+       (1017,"user_18","Beijing","123567891234"),
+       (1018,"user_19","Beijing","123567891234"),
+       (1019,"user_20","Beijing","123567891234"),
+       (2000,"user_21","Beijing","123567891234");
