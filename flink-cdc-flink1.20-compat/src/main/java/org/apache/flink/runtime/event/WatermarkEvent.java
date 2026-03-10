@@ -17,5 +17,11 @@
 
 package org.apache.flink.runtime.event;
 
-/** Compatibility adapter to add class that was present in Flink 1.20 but removed in Flink 2.2. */
+import org.apache.flink.annotation.Internal;
+
+/**
+ * Compatibility adapter for Flink 1.20. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ */
+@Internal
 public class WatermarkEvent {}

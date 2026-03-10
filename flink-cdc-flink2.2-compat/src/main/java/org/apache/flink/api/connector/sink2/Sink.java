@@ -18,8 +18,7 @@
 package org.apache.flink.api.connector.sink2;
 
 import org.apache.flink.annotation.Experimental;
-import org.apache.flink.annotation.Public;
-import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.operators.MailboxExecutor;
 import org.apache.flink.api.common.operators.ProcessingTimeService;
 import org.apache.flink.api.common.serialization.SerializationSchema;
@@ -32,8 +31,11 @@ import java.io.Serializable;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-/** Compatibility adapter to add class that was present in Flink 1.20 but removed in Flink 2.2. */
-@Public
+/**
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ */
+@Internal
 public interface Sink<InputT> extends Serializable {
 
     SinkWriter<InputT> createWriter(WriterInitContext var1) throws IOException;
@@ -48,7 +50,7 @@ public interface Sink<InputT> extends Serializable {
      * @deprecated
      */
     @Deprecated
-    @PublicEvolving
+    @Internal
     public interface InitContext extends org.apache.flink.api.connector.sink2.InitContext {
         UserCodeClassLoader getUserCodeClassLoader();
 

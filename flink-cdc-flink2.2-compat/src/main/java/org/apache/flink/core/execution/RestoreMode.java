@@ -18,16 +18,18 @@
 package org.apache.flink.core.execution;
 
 import org.apache.flink.annotation.Internal;
-import org.apache.flink.annotation.PublicEvolving;
 import org.apache.flink.configuration.DescribedEnum;
 import org.apache.flink.configuration.description.InlineElement;
 import org.apache.flink.configuration.description.TextElement;
 
 /**
- * Copy from <a
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ *
+ * <p>Copy from <a
  * href="https://github.com/apache/flink/blob/release-1.20.3/flink-core/src/main/java/org/apache/flink/core/execution/RestoreMode.java">...</a>.
  */
-@PublicEvolving
+@Internal
 public enum RestoreMode implements DescribedEnum {
     CLAIM(
             "Flink will take ownership of the given snapshot. It will clean the snapshot once it is subsumed by newer ones."),

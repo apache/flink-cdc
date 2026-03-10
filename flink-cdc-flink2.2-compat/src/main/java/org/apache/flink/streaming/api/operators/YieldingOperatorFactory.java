@@ -17,6 +17,12 @@
 
 package org.apache.flink.streaming.api.operators;
 
-/** Compatibility adapter to add class that was present in Flink 1.20 but removed in Flink 2.2. */
+import org.apache.flink.annotation.Internal;
+
+/**
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ */
+@Internal
 public interface YieldingOperatorFactory<OUT>
         extends org.apache.flink.streaming.api.operators.legacy.YieldingOperatorFactory<OUT> {}

@@ -17,15 +17,18 @@
 
 package org.apache.flink.streaming.api.functions.source;
 
-import org.apache.flink.annotation.Public;
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.api.common.functions.AbstractRichFunction;
 import org.apache.flink.api.common.functions.OpenContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.source.legacy.ParallelSourceFunction;
 
-/** Compatibility adapter to add class that was present in Flink 1.20 but removed in Flink 2.2. */
+/**
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ */
 @Deprecated
-@Public
+@Internal
 public abstract class RichParallelSourceFunction<OUT> extends AbstractRichFunction
         implements ParallelSourceFunction<OUT>, SourceFunction<OUT> {
     private static final long serialVersionUID = 1L;

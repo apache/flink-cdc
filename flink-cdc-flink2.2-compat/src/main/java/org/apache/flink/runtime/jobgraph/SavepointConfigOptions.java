@@ -17,19 +17,22 @@
 
 package org.apache.flink.runtime.jobgraph;
 
-import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.annotation.docs.Documentation;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.core.execution.RestoreMode;
 
 /**
- * Copy from <a
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ *
+ * <p>Copy from <a
  * href="https://github.com/apache/flink/blob/release-1.20.3/flink-runtime/src/main/java/org/apache/flink/runtime/jobgraph/SavepointConfigOptions.java">...</a>.
  */
 @Deprecated
 @Documentation.ExcludeFromDocumentation("Hidden for deprecated.")
-@PublicEvolving
+@Internal
 public class SavepointConfigOptions {
     public static final ConfigOption<String> SAVEPOINT_PATH =
             ConfigOptions.key("execution.savepoint.path")

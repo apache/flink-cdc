@@ -17,6 +17,7 @@
 
 package org.apache.flink.cdc.runtime.operators;
 
+import org.apache.flink.annotation.Internal;
 import org.apache.flink.streaming.api.graph.StreamConfig;
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
@@ -24,7 +25,11 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
-/** Compatibility adapter to add class that was present in Flink 1.20 but removed in Flink 2.2. */
+/**
+ * Compatibility adapter for Flink 2.2. This class is part of the multi-version compatibility layer
+ * that allows Flink CDC to work across different Flink versions.
+ */
+@Internal
 public class AbstractStreamOperatorAdapter<OUT> extends AbstractStreamOperator<OUT> {
     protected ChainingStrategy chainingStrategy;
 
