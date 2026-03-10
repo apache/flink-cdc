@@ -63,17 +63,7 @@ public class MySqlBinlogSplit extends MySqlSplit {
             boolean isSuspended) {
         super(splitId);
 
-        Set<String> seenSplitIds = new HashSet<>();
-        for (FinishedSnapshotSplitInfo splitInfo : finishedSnapshotSplitInfos) {
-            if (seenSplitIds.contains(splitInfo.getSplitId())) {
-                throw new IllegalArgumentException(
-                        String.format(
-                                "Found duplicate split ID %s in finished snapshot split infos",
-                                splitInfo.getSplitId()));
-            }
-
-            seenSplitIds.add(splitInfo.getSplitId());
-        }
+        ensureNoDuplicates(finishedSnapshotSplitInfos);
 
         this.startingOffset = startingOffset;
         this.endingOffset = endingOffset;
@@ -99,6 +89,21 @@ public class MySqlBinlogSplit extends MySqlSplit {
                 tableSchemas,
                 totalFinishedSplitSize,
                 false);
+    }
+
+    private static void ensureNoDuplicates(
+            List<FinishedSnapshotSplitInfo> finishedSnapshotSplitInfos) {
+        Set<String> seenSplitIds = new HashSet<>();
+        for (FinishedSnapshotSplitInfo splitInfo : finishedSnapshotSplitInfos) {
+            if (seenSplitIds.contains(splitInfo.getSplitId())) {
+                throw new IllegalArgumentException(
+                        String.format(
+                                "Found duplicate split ID %s in finished snapshot split infos",
+                                splitInfo.getSplitId()));
+            }
+
+            seenSplitIds.add(splitInfo.getSplitId());
+        }
     }
 
     public BinlogOffset getStartingOffset() {
