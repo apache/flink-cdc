@@ -250,7 +250,6 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
                         .filter(postSchema.getColumnNames()::contains)
                         .collect(Collectors.toList()));
 
-        // Apply all effective post-converters
         Optional<SchemaChangeEvent> createTableEvent =
                 Optional.of(new CreateTableEvent(tableId, postSchema));
         return createTableEvent.map(Event.class::cast);
@@ -270,7 +269,7 @@ public class PostTransformOperator extends AbstractStreamOperator<Event>
         TableId tableId = event.tableId();
         if (!postTransformInfoMap.containsKey(tableId)) {
             LOG.warn(
-                    "Met dangling schema change event {}, Table {} might have been dropped.",
+                    "Encountered a dangling schema change event {}, table {} might have been dropped.",
                     event,
                     tableId);
             return Optional.empty();

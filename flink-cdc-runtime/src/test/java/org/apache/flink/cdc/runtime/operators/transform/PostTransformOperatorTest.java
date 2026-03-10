@@ -92,17 +92,6 @@ class PostTransformOperatorTest {
                     .physicalColumn("__table_name__", DataTypes.STRING().notNull())
                     .primaryKey("col1")
                     .build();
-    private static final Schema METADATA_SCHEMA_UPPER_CASE =
-            Schema.newBuilder()
-                    .physicalColumn("col1".toUpperCase(), DataTypes.STRING().notNull())
-                    .primaryKey("col1".toUpperCase())
-                    .build();
-    private static final Schema METADATA_SCHEMA_DUPLICATE_COLUMN_SCHEMA =
-            Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.STRING().notNull())
-                    .physicalColumn("col1".toUpperCase(), DataTypes.STRING().notNull())
-                    .primaryKey("col1".toUpperCase())
-                    .build();
 
     private static final TableId METADATA_AS_TABLEID =
             TableId.tableId("my_company", "my_branch", "metadata_as_table");
@@ -332,16 +321,6 @@ class PostTransformOperatorTest {
                     .primaryKey("id")
                     .partitionKey("id")
                     .options(ImmutableMap.of("key1", "value1", "key2", "value2"))
-                    .build();
-
-    private static final TableId COLUMN_SQUARE_TABLE =
-            TableId.tableId("my_company", "my_branch", "column_square");
-    private static final Schema COLUMN_SQUARE_SCHEMA =
-            Schema.newBuilder()
-                    .physicalColumn("col1", DataTypes.INT().notNull())
-                    .physicalColumn("col2", DataTypes.INT())
-                    .physicalColumn("square_col2", DataTypes.INT())
-                    .primaryKey("col1")
                     .build();
 
     private static final TableId COMPARE_TABLEID =

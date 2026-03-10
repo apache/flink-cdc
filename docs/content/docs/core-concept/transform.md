@@ -349,10 +349,10 @@ For example, we may define a transform rule as follows:
 transform:
   - source-table: mydb.web_order
     projection: id, order_id
-    description: classification mapping example
+    description: Specifically matched rule
   - source-table: mydb.\.*
     projection: order_id as id, id as order_id
-    description: classification mapping example
+    description: Fallback rule
 ```
 
 Here `mydb.web_order` will be handled in the first rule, while other tables in `mydb` will fall into the second one.
