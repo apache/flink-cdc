@@ -107,6 +107,10 @@ public class TableIdRouter {
         return standardRegExpTableCaptureList;
     }
 
+    public TableIdRouter(List<RouteRule> routingRules) {
+        this(routingRules, RouteMode.ALL_MATCH);
+    }
+
     public TableIdRouter(List<RouteRule> routingRules, RouteMode routeMode) {
         this.routeMode = routeMode;
         this.routes = new ArrayList<>();
