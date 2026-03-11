@@ -143,10 +143,11 @@ public class SchemaUtils {
                                     if (!existingColumn
                                             .getType()
                                             .equals(incomingColumn.getType())) {
+                                        // No coercion is performed; the existing column
+                                        // definition is preserved as-is.
                                         LOG.warn(
-                                                "Skipping duplicate AddColumn for column '{}' in table {}, "
-                                                        + "but definitions differ: existing type = {}, incoming type = {}. "
-                                                        + "The existing column definition will be kept.",
+                                                "Skipping duplicate column '{}' for table {} but types differ: "
+                                                        + "existing={}, incoming={}",
                                                 incomingColumn.getName(),
                                                 event.tableId(),
                                                 existingColumn.getType(),
@@ -258,6 +259,31 @@ public class SchemaUtils {
             return Optional.of(event);
         }
         return Optional.of(new AddColumnEvent(event.tableId(), nonRedundant));
+    }
+
+    /**
+     * Filters duplicate {@link AddColumnEvent} columns that already exist in the given schema. For
+     * non-AddColumnEvent schema changes, the event is returned as-is.
+     *
+     * @param currentSchema the current schema to check against
+     * @param event the schema change event to filter
+     * @return the filtered event, or {@link Optional#empty()} if the event is fully redundant
+     */
+    public static Optional<SchemaChangeEvent> filterDuplicateAddColumns(
+            Schema currentSchema, SchemaChangeEvent event) {
+        if (!(event instanceof AddColumnEvent)) {
+            return Optional.of(event);
+        }
+        Optional<AddColumnEvent> filtered =
+                filterRedundantAddColumns(currentSchema, (AddColumnEvent) event);
+        if (!filtered.isPresent()) {
+            LOG.debug(
+                    "Skipping fully redundant AddColumnEvent for table {} "
+                            + "- all columns already exist",
+                    event.tableId());
+            return Optional.empty();
+        }
+        return Optional.of(filtered.get());
     }
 
     private static Schema applyDropColumnEvent(DropColumnEvent event, Schema oldSchema) {

@@ -45,9 +45,6 @@ import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.runtime.tasks.StreamTask;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 
 import java.io.Serializable;
@@ -67,7 +64,6 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
-    private static final Logger LOG = LoggerFactory.getLogger(PreTransformOperator.class);
 
     private final List<TransformRule> transformRules;
     private final Map<TableId, PreTransformChangeInfo> preTransformChangeInfoMap;
@@ -222,8 +218,7 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         // Filter out redundant AddColumnEvent columns that already exist in the schema
         // to handle duplicate events from tools like gh-ost online schema migrations
         Optional<SchemaChangeEvent> filteredEvent =
-                TransformSchemaChangeUtils.filterDuplicateAddColumns(
-                        tableChangeInfo.getSourceSchema(), event, LOG);
+                SchemaUtils.filterDuplicateAddColumns(tableChangeInfo.getSourceSchema(), event);
         if (!filteredEvent.isPresent()) {
             return Optional.empty();
         }
