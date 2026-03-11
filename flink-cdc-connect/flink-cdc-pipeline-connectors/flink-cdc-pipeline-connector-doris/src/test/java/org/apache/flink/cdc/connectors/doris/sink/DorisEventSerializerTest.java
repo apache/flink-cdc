@@ -73,7 +73,7 @@ public class DorisEventSerializerTest {
             new BinaryRecordDataGenerator(((RowType) SCHEMA.toRowDataType()));
 
     @Test
-    public void testDataChangeEventWithFullDataType() throws IOException {
+    public void testDataChangeEventWithTimeDataType() throws IOException {
         Schema schema =
                 Schema.newBuilder()
                         .physicalColumn("id_", DataTypes.BIGINT().notNull())
