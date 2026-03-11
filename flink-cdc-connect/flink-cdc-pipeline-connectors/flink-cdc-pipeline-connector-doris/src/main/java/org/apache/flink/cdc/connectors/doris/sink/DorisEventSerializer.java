@@ -20,6 +20,7 @@ package org.apache.flink.cdc.connectors.doris.sink;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.cdc.common.configuration.Configuration;
 import org.apache.flink.cdc.common.data.RecordData;
+import org.apache.flink.cdc.common.data.TimeData;
 import org.apache.flink.cdc.common.event.CreateTableEvent;
 import org.apache.flink.cdc.common.event.DataChangeEvent;
 import org.apache.flink.cdc.common.event.Event;
@@ -66,6 +67,10 @@ public class DorisEventSerializer implements DorisRecordSerializer<Event> {
     /** Format timestamp-related type data. */
     public static final DateTimeFormatter DATE_TIME_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS");
+
+    /** Format TIME type data. Only support millisecond precision in {@link TimeData}. */
+    public static final DateTimeFormatter TIME_FORMATTER =
+            DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
 
     /** ZoneId from pipeline config to support timestamp with local time zone. */
     public final ZoneId pipelineZoneId;
