@@ -72,6 +72,10 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
         setup(parallelismSnapshot);
         initializeSqlServerTable("inventory");
         initializeSqlServerTable("product");
+        int expectedSize = 20;
+        if (parallelismSnapshot) {
+            expectedSize = 22;
+        }
         String sourceDDL =
                 String.format(
                         "CREATE TABLE debezium_source ("
@@ -98,15 +102,17 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
                         "inventory",
                         "dbo.products");
         String sinkDDL =
-                "CREATE TABLE sink ("
-                        + " name STRING,"
-                        + " weightSum DECIMAL(10,3),"
-                        + " PRIMARY KEY (name) NOT ENFORCED"
-                        + ") WITH ("
-                        + " 'connector' = 'values',"
-                        + " 'sink-insert-only' = 'false',"
-                        + " 'sink-expected-messages-num' = '20'"
-                        + ")";
+                String.format(
+                        "CREATE TABLE sink ("
+                                + " name STRING,"
+                                + " weightSum DECIMAL(10,3),"
+                                + " PRIMARY KEY (name) NOT ENFORCED"
+                                + ") WITH ("
+                                + " 'connector' = 'values',"
+                                + " 'sink-insert-only' = 'false',"
+                                + " 'sink-expected-messages-num' = '%s'"
+                                + ")",
+                        expectedSize);
         tEnv.executeSql(sourceDDL);
         tEnv.executeSql(sinkDDL);
 
@@ -150,10 +156,7 @@ class SqlServerConnectorITCase extends SqlServerTestBase {
                     "EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'products', @role_name = NULL, @supports_net_changes = 0, @capture_instance = 'dbo_products_v2';");
             statement.execute("UPDATE inventory.dbo.products SET volume='1.2' WHERE id=110;");
         }
-        int expectedSize = 20;
-        if (parallelismSnapshot) {
-            expectedSize = 22;
-        }
+
         waitForSinkSize("sink", expectedSize);
 
         /*
