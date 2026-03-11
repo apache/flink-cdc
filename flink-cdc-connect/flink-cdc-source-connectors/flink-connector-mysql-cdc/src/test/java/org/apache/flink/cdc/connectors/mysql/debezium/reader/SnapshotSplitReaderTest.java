@@ -602,20 +602,25 @@ class SnapshotSplitReaderTest extends MySqlSourceTestBase {
 
         String[] expected =
                 new String[] {
-                        "+I[101, user_1, Shanghai, 123567891234]",
-                        "+I[102, user_2, Shanghai, 123567891234]",
-                        "+I[103, user_3, Beijing, 123567891234]",
-                        "+I[104, user_4, Shanghai, 123567891234]",
-                        "+I[105, user_5, Shanghai, 123567891234]",
-                        "+I[106, user_6, Beijing, 123567891234]",
-                        "+I[107, user_7, Shanghai, 123567891234]",
-                        "+I[108, user_8, Shanghai, 123567891234]",
-                        "+I[109, user_9, Beijing, 123567891234]",
-                        "+I[110, user_10, Shanghai, 123567891234]"
+                    "+I[101, user_1, Shanghai, 123567891234]",
+                    "+I[102, user_2, Shanghai, 123567891234]",
+                    "+I[103, user_3, Beijing, 123567891234]",
+                    "+I[104, user_4, Shanghai, 123567891234]",
+                    "+I[105, user_5, Shanghai, 123567891234]",
+                    "+I[106, user_6, Beijing, 123567891234]",
+                    "+I[107, user_7, Shanghai, 123567891234]",
+                    "+I[108, user_8, Shanghai, 123567891234]",
+                    "+I[109, user_9, Beijing, 123567891234]",
+                    "+I[110, user_10, Shanghai, 123567891234]"
                 };
 
-        List<String> actual = readTableSnapshotSplits(
-                mySqlSplits, statefulTaskContext, mySqlSplits.size(), dataType, snapshotHooks);
+        List<String> actual =
+                readTableSnapshotSplits(
+                        mySqlSplits,
+                        statefulTaskContext,
+                        mySqlSplits.size(),
+                        dataType,
+                        snapshotHooks);
         assertEqualsInAnyOrder(Arrays.asList(expected), actual);
     }
 
