@@ -144,10 +144,6 @@ MODULES_PIPELINE_E2E = [
     "flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests"
 ]
 
-MODULES_PIPELINE_E2E_2_X = [
-    "flink-cdc-e2e-tests/flink-cdc-pipeline-e2e-tests-2.x"
-]
-
 MODULES_SOURCE_E2E = [
     "flink-cdc-e2e-tests/flink-cdc-source-e2e-tests"
 ]
@@ -182,18 +178,13 @@ ALL_MODULES = set(
     MODULES_SOURCE_E2E
 )
 
-# Modules that require the flink2 Maven profile to be activated
-ALL_MODULES_FLINK2 = ALL_MODULES | set(MODULES_PIPELINE_E2E_2_X)
-
 test_modules = set()
 compile_modules = set()
 
 for module in INPUT_MODULES.split(', '):
     module_list = set(globals()['MODULES_' + module.upper().replace('-', '_').replace('.', '_')])
     test_modules |= module_list
-    if module == 'pipeline_e2e_2.x':
-        compile_modules |= ALL_MODULES_FLINK2
-    elif module == 'source_e2e' or module == 'pipeline_e2e':
+    if module == 'source_e2e' or module == 'pipeline_e2e':
         compile_modules |= ALL_MODULES
     else:
         compile_modules |= module_list

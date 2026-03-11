@@ -108,7 +108,7 @@ jobs:
       java-versions: "[11]"
       flink-versions: "['2.2.0']"
       custom-maven-parameter: "-Pflink2"
-      modules: "['pipeline_e2e_2.x']"
+      modules: "['pipeline_e2e']"
       parallelism: ${{ matrix.parallelism }}
   source_e2e:
     name: Source E2E Tests

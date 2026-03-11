@@ -265,24 +265,26 @@ public class DataSinkWriterOperator<CommT>
     }
 
     private Object createFlinkWriterOperator() {
+        Class<?> flinkWriterClass;
         try {
-            Class<?> flinkWriterClass =
+            flinkWriterClass =
                     getRuntimeContext()
                             .getUserCodeClassLoader()
                             .loadClass(
                                     "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Failed to load SinkWriterOperator class", e);
+        }
+
+        try {
             Constructor<?> constructor =
                     flinkWriterClass.getDeclaredConstructor(
                             Sink.class, ProcessingTimeService.class, MailboxExecutor.class);
             constructor.setAccessible(true);
             return constructor.newInstance(sink, processingTimeService, mailboxExecutor);
-        } catch (Exception ignore) {
+        } catch (NoSuchMethodException e) {
+            // Constructor with 3 parameters not found, try the 4-parameter version
             try {
-                Class<?> flinkWriterClass =
-                        getRuntimeContext()
-                                .getUserCodeClassLoader()
-                                .loadClass(
-                                        "org.apache.flink.streaming.runtime.operators.sink.SinkWriterOperator");
                 Constructor<?> constructor =
                         flinkWriterClass.getDeclaredConstructor(
                                 StreamOperatorParameters.class,
@@ -291,9 +293,12 @@ public class DataSinkWriterOperator<CommT>
                                 MailboxExecutor.class);
                 constructor.setAccessible(true);
                 return constructor.newInstance(null, sink, processingTimeService, mailboxExecutor);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
+            } catch (Exception ex) {
+                throw new RuntimeException("Failed to create SinkWriterOperator in Flink", ex);
             }
+        } catch (Exception e) {
+            // Other exceptions (e.g., InvocationTargetException) indicate real failures
+            throw new RuntimeException("Failed to create SinkWriterOperator in Flink", e);
         }
     }
 

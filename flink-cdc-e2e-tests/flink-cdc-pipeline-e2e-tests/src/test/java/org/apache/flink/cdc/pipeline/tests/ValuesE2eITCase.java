@@ -47,7 +47,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -79,7 +79,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -115,7 +115,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -151,7 +151,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -186,7 +186,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -214,7 +214,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",
@@ -246,7 +246,7 @@ class ValuesE2eITCase extends PipelineTestEnvironment {
 
         submitPipelineJob(pipelineJob);
         waitUntilJobFinished(Duration.ofSeconds(30));
-        LOG.info("Pipeline job is running");
+        LOG.info("Pipeline job has finished");
 
         validateResult(
                 "CreateTableEvent{tableId=default_namespace.default_schema.table1, schema=columns={`col1` STRING,`col2` STRING}, primaryKeys=col1, options=()}",

@@ -805,4 +805,43 @@ limitations under the License.
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>flink2</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>default-test</id>
+                                <phase>none</phase>
+                            </execution>
+                            <execution>
+                                <id>integration-tests</id>
+                                <phase>none</phase>
+                            </execution>
+                            <execution>
+                                <id>end-to-end-tests</id>
+                                <configuration>
+                                    <includes>
+                                        <include>**/ValuesE2eITCase.java</include>
+                                    </includes>
+                                    <excludes>
+                                        <exclude>**/MysqlE2eWithYarnApplicationITCase.java</exclude>
+                                    </excludes>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>run-last-test</id>
+                                <phase>none</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
