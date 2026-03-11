@@ -33,8 +33,8 @@ limitations under the License.
     <packaging>pom</packaging>
 
     <modules>
-        <module>flink-cdc-flink1.20-compat</module>
-        <module>flink-cdc-flink2.2-compat</module>
+        <module>flink-cdc-flink1-compat</module>
+        <module>flink-cdc-flink2-compat</module>
         <module>flink-cdc-cli</module>
         <module>flink-cdc-common</module>
         <module>flink-cdc-composer</module>

@@ -122,7 +122,7 @@ limitations under the License.
                 </dependency>
                 <dependency>
                     <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-cdc-flink2.2-compat</artifactId>
+                    <artifactId>flink-cdc-flink2-compat</artifactId>
                     <version>${project.version}</version>
                     <scope>provided</scope>
                 </dependency>

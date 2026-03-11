@@ -25,11 +25,11 @@ limitations under the License.
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>flink-cdc-flink1.20-compat</artifactId>
+    <artifactId>flink-cdc-flink2-compat</artifactId>
 
     <properties>
-        <flink.version>${flink.1.x.version}</flink.version>
-        <shaded.guava.version>${flink.1.x.shaded.guava.version}</shaded.guava.version>
+        <flink.version>${flink.2.x.version}</flink.version>
+        <shaded.guava.version>${flink.2.x.shaded.guava.version}</shaded.guava.version>
     </properties>
 
 </project>
