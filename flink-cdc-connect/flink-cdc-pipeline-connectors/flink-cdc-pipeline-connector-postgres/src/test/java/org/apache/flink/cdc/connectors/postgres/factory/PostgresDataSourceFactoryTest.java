@@ -335,7 +335,6 @@ public class PostgresDataSourceFactoryTest extends PostgresTestBase {
         assertThat(metadataColumns[2].getName()).isEqualTo("database_name");
         assertThat(metadataColumns[3]).isInstanceOf(SchemaNameMetadataColumn.class);
         assertThat(metadataColumns[3].getName()).isEqualTo("schema_name");
-
     }
 
     class MockContext implements Factory.Context {
