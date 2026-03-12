@@ -35,6 +35,7 @@ limitations under the License.
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-flink-runtime-1.20</artifactId>
             <version>${iceberg.version}</version>
+            <scope>provided</scope>
         </dependency>
         <!-- AWS Glue Catalog support (provided: use the iceberg-aws classes from the runtime environment, e.g. EMR's iceberg-flink-runtime) -->
         <dependency>
@@ -298,15 +299,10 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <include>org.apache.iceberg:iceberg-flink-runtime-1.20</include>
+                                    <!-- iceberg runtime is provided by the Flink environment (e.g. EMR).
+                                         Do NOT shade it here to avoid ClassLoader conflicts. -->
                                 </includes>
                             </artifactSet>
-                            <relocations>
-                                <relocation>
-                                    <pattern>org.apache.kafka</pattern>
-                                    <shadedPattern>shaded.iceberg.org.apache.kafka</shadedPattern>
-                                </relocation>
-                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
