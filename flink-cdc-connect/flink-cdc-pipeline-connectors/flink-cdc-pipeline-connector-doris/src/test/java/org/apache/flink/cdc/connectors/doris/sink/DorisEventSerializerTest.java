@@ -97,7 +97,7 @@ public class DorisEventSerializerTest {
         JsonNode jsonNode = objectMapper.readTree(dorisRecord.getRow());
 
         Assertions.assertThat(jsonNode.get("id_").asLong()).isEqualTo(1L);
-        Assertions.assertThat(jsonNode.get("time_0_").asText()).isEqualTo("19:43:17.000");
+        Assertions.assertThat(jsonNode.get("time_0_").asText()).isEqualTo("19:43:17");
         Assertions.assertThat(jsonNode.get("time_3_").asText()).isEqualTo("21:45:03.123");
     }
 

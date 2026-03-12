@@ -117,10 +117,18 @@ public class DorisRowConverter implements Serializable {
                 final int zonedP = ((ZonedTimestampType) type).getPrecision();
                 return (index, val) -> val.getTimestamp(index, zonedP).toTimestamp();
             case TIME_WITHOUT_TIME_ZONE:
-                return (index, val) ->
-                        val.getTime(index)
+                return (index, val) -> {
+                    int precision = DataTypeChecks.getPrecision(type);
+                    if (precision == 0) {
+                        return val.getTime(index)
                                 .toLocalTime()
                                 .format(DorisEventSerializer.TIME_FORMATTER);
+                    } else {
+                        return val.getTime(index)
+                                .toLocalTime()
+                                .format(DorisEventSerializer.TIME_WITH_MILLISECOND_FORMATTER);
+                    }
+                };
             case ARRAY:
                 return (index, val) -> convertArrayData(val.getArray(index), type);
             case MAP:
