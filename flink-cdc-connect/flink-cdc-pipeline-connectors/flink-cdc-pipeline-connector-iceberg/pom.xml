@@ -37,7 +37,6 @@ limitations under the License.
             <version>${iceberg.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- AWS Glue Catalog support (provided: use the iceberg-aws classes from the runtime environment, e.g. EMR's iceberg-flink-runtime) -->
         <dependency>
             <groupId>org.apache.iceberg</groupId>
             <artifactId>iceberg-aws</artifactId>
@@ -299,8 +298,6 @@ limitations under the License.
                             <shadeTestJar>false</shadeTestJar>
                             <artifactSet>
                                 <includes>
-                                    <!-- iceberg runtime is provided by the Flink environment (e.g. EMR).
-                                         Do NOT shade it here to avoid ClassLoader conflicts. -->
                                 </includes>
                             </artifactSet>
                         </configuration>
