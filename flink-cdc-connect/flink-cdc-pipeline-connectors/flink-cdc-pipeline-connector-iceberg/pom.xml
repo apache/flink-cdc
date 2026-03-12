@@ -36,6 +36,18 @@ limitations under the License.
             <artifactId>iceberg-flink-runtime-1.20</artifactId>
             <version>${iceberg.version}</version>
         </dependency>
+        <!-- AWS Glue Catalog support -->
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-aws</artifactId>
+            <version>${iceberg.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.iceberg</groupId>
+            <artifactId>iceberg-aws-bundle</artifactId>
+            <version>${iceberg.version}</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-cdc-composer</artifactId>
@@ -292,6 +304,7 @@ limitations under the License.
                             <artifactSet>
                                 <includes>
                                     <include>org.apache.iceberg:*</include>
+                                    <include>software.amazon.awssdk:*</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
