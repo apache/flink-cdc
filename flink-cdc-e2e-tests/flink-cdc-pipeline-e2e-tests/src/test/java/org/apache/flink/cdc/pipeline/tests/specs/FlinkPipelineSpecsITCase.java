@@ -23,6 +23,7 @@ import org.apache.flink.cdc.pipeline.tests.utils.PipelineTestEnvironment;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -50,6 +51,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** YAML-spec based pipeline test cases. */
+@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 public class FlinkPipelineSpecsITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlinkPipelineSpecsITCase.class);

@@ -29,6 +29,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.Logger;
@@ -43,6 +44,7 @@ import java.time.Duration;
 import java.util.function.Function;
 
 /** E2e cases for stopping & restarting jobs from previous state. */
+@EnabledIfSystemProperty(named = "specifiedFlinkVersion", matches = "^1.*")
 class YamlJobMigrationITCase extends PipelineTestEnvironment {
 
     private static final Logger LOG = LoggerFactory.getLogger(YamlJobMigrationITCase.class);
