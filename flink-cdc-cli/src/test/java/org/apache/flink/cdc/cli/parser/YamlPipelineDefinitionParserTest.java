@@ -44,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.Set;
 
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ADD_COLUMN;
+import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_POSITION;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.ALTER_COLUMN_TYPE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.CREATE_TABLE;
 import static org.apache.flink.cdc.common.event.SchemaChangeEventType.DROP_COLUMN;
@@ -54,7 +55,7 @@ import static org.apache.flink.cdc.common.pipeline.PipelineOptions.PIPELINE_LOCA
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
-/** Unit test for {@link org.apache.flink.cdc.cli.parser.YamlPipelineDefinitionParser}. */
+/** Unit test for {@link YamlPipelineDefinitionParser}. */
 class YamlPipelineDefinitionParserTest {
 
     @Test
@@ -215,6 +216,7 @@ class YamlPipelineDefinitionParserTest {
                 ImmutableSet.of(
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
+                        ALTER_COLUMN_POSITION,
                         CREATE_TABLE,
                         DROP_COLUMN,
                         DROP_TABLE,
@@ -227,6 +229,7 @@ class YamlPipelineDefinitionParserTest {
                 ImmutableSet.of(
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
+                        ALTER_COLUMN_POSITION,
                         CREATE_TABLE,
                         DROP_COLUMN,
                         DROP_TABLE,
@@ -239,6 +242,7 @@ class YamlPipelineDefinitionParserTest {
                 ImmutableSet.of(
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
+                        ALTER_COLUMN_POSITION,
                         CREATE_TABLE,
                         RENAME_COLUMN,
                         TRUNCATE_TABLE));
@@ -247,7 +251,12 @@ class YamlPipelineDefinitionParserTest {
                 null,
                 null,
                 ImmutableSet.of(
-                        ADD_COLUMN, ALTER_COLUMN_TYPE, CREATE_TABLE, DROP_COLUMN, RENAME_COLUMN));
+                        ADD_COLUMN,
+                        ALTER_COLUMN_TYPE,
+                        ALTER_COLUMN_POSITION,
+                        CREATE_TABLE,
+                        DROP_COLUMN,
+                        RENAME_COLUMN));
         testSchemaEvolutionTypesParsing(
                 "lenient",
                 null,
@@ -255,6 +264,7 @@ class YamlPipelineDefinitionParserTest {
                 ImmutableSet.of(
                         ADD_COLUMN,
                         ALTER_COLUMN_TYPE,
+                        ALTER_COLUMN_POSITION,
                         CREATE_TABLE,
                         DROP_COLUMN,
                         DROP_TABLE,
@@ -541,6 +551,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableSet.of(
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
+                                    ALTER_COLUMN_POSITION,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
                                     RENAME_COLUMN)),
@@ -567,6 +578,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableSet.of(
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
+                                    ALTER_COLUMN_POSITION,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
                                     RENAME_COLUMN)),
@@ -653,6 +665,7 @@ class YamlPipelineDefinitionParserTest {
                             ImmutableSet.of(
                                     DROP_COLUMN,
                                     ALTER_COLUMN_TYPE,
+                                    ALTER_COLUMN_POSITION,
                                     ADD_COLUMN,
                                     CREATE_TABLE,
                                     RENAME_COLUMN)),

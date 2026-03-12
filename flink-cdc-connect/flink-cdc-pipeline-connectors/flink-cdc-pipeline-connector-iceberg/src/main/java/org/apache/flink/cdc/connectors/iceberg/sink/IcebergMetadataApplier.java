@@ -126,6 +126,9 @@ public class IcebergMetadataApplier implements MetadataApplier {
                     applyAlterColumnType(alterColumnTypeEvent);
                     return null;
                 },
+                alterColumnPositionEvent -> {
+                    return null;
+                },
                 createTableEvent -> {
                     applyCreateTable(createTableEvent);
                     return null;
