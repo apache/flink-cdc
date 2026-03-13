@@ -18,6 +18,7 @@
 package org.apache.flink.cdc.composer.flink.translator;
 
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.api.dag.Transformation;
 import org.apache.flink.cdc.common.event.Event;
 import org.apache.flink.runtime.jobgraph.OperatorID;
@@ -85,6 +86,11 @@ class DataSinkTranslatorTest {
 
         @Override
         public SinkWriter<Event> createWriter(InitContext context) throws IOException {
+            return null;
+        }
+
+        @Override
+        public SinkWriter<Event> createWriter(WriterInitContext context) throws IOException {
             return null;
         }
     }

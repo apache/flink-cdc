@@ -20,6 +20,7 @@ package org.apache.flink.cdc.runtime.serializer.data;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.TypeSerializerSchemaCompatibility;
 import org.apache.flink.api.common.typeutils.TypeSerializerSnapshot;
+import org.apache.flink.api.common.typeutils.TypeSerializerSnapshotAdapter;
 import org.apache.flink.cdc.common.data.TimestampData;
 import org.apache.flink.core.memory.DataInputView;
 import org.apache.flink.core.memory.DataOutputView;
@@ -136,7 +137,7 @@ public class TimestampDataSerializer extends TypeSerializer<TimestampData> {
 
     /** {@link TypeSerializerSnapshot} for {@link TimestampDataSerializer}. */
     public static final class TimestampDataSerializerSnapshot
-            implements TypeSerializerSnapshot<TimestampData> {
+            implements TypeSerializerSnapshotAdapter<TimestampData> {
 
         private static final int CURRENT_VERSION = 1;
 

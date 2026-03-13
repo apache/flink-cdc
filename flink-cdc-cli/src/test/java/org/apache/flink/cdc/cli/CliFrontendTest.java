@@ -107,7 +107,8 @@ class CliFrontendTest {
                         "-n");
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_PATH))
                 .isEqualTo(flinkHome() + "/savepoints/savepoint-1");
-        assertThat(executor.getFlinkConfig().get(RESTORE_MODE)).isEqualTo(RestoreMode.NO_CLAIM);
+        assertThat(executor.getFlinkConfig().get(RESTORE_MODE).toString())
+                .isEqualTo(RestoreMode.NO_CLAIM.toString());
         assertThat(executor.getFlinkConfig().get(SAVEPOINT_IGNORE_UNCLAIMED_STATE)).isTrue();
     }
 

@@ -19,6 +19,7 @@ package org.apache.flink.cdc.connectors.values.sink;
 
 import org.apache.flink.api.connector.sink2.Sink;
 import org.apache.flink.api.connector.sink2.SinkWriter;
+import org.apache.flink.api.connector.sink2.WriterInitContext;
 import org.apache.flink.cdc.common.annotation.Internal;
 import org.apache.flink.cdc.common.data.RecordData;
 import org.apache.flink.cdc.common.event.ChangeEvent;
@@ -36,6 +37,7 @@ import org.apache.flink.cdc.common.sink.MetadataApplier;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
 import org.apache.flink.cdc.connectors.values.ValuesDatabase;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
@@ -101,8 +103,17 @@ public class ValuesDataSink implements DataSink, Serializable {
             return new ValuesSinkWriter(
                     materializedInMemory,
                     print,
-                    context.getSubtaskId(),
-                    context.getNumberOfParallelSubtasks());
+                    context.getTaskInfo().getIndexOfThisSubtask(),
+                    context.getTaskInfo().getNumberOfParallelSubtasks());
+        }
+
+        @Override
+        public SinkWriter<Event> createWriter(WriterInitContext context) throws IOException {
+            return new ValuesSinkWriter(
+                    materializedInMemory,
+                    print,
+                    context.getTaskInfo().getIndexOfThisSubtask(),
+                    context.getTaskInfo().getNumberOfParallelSubtasks());
         }
     }
 

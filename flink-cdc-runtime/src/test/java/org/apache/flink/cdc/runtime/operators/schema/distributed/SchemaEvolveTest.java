@@ -32,9 +32,9 @@ import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Column;
 import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.types.DataTypes;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.SchemaTestBase;
 import org.apache.flink.cdc.runtime.testutils.operators.DistributedEventOperatorTestHarness;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.util.function.BiConsumerWithException;
 
@@ -378,7 +378,10 @@ public class SchemaEvolveTest extends SchemaTestBase {
                         "Unexpected schema change events occurred in EXCEPTION mode. Job will fail now.");
     }
 
-    protected static <OP extends AbstractStreamOperator<E>, E extends Event, T extends Throwable>
+    protected static <
+                    OP extends AbstractStreamOperatorAdapter<E>,
+                    E extends Event,
+                    T extends Throwable>
             LinkedList<StreamRecord<E>> runInHarness(
                     Supplier<OP> opCreator,
                     Function<OP, DistributedEventOperatorTestHarness<OP, E>> harnessCreator,

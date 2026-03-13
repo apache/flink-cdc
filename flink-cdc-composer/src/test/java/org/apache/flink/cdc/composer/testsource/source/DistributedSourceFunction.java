@@ -79,8 +79,8 @@ public class DistributedSourceFunction extends RichParallelSourceFunction<Event>
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
         iotaCounter = 0;
-        subTaskId = getRuntimeContext().getIndexOfThisSubtask();
-        parallelism = getRuntimeContext().getNumberOfParallelSubtasks();
+        subTaskId = getRuntimeContext().getTaskInfo().getIndexOfThisSubtask();
+        parallelism = getRuntimeContext().getTaskInfo().getNumberOfParallelSubtasks();
         if (distributedTables) {
             tables =
                     IntStream.range(0, numOfTables)

@@ -33,12 +33,12 @@ import org.apache.flink.cdc.common.schema.Schema;
 import org.apache.flink.cdc.common.schema.Selectors;
 import org.apache.flink.cdc.common.utils.Preconditions;
 import org.apache.flink.cdc.common.utils.SchemaUtils;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.transform.exceptions.TransformException;
 import org.apache.flink.cdc.runtime.parser.TransformParser;
 import org.apache.flink.runtime.state.StateInitializationContext;
 import org.apache.flink.runtime.state.StateSnapshotContext;
 import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
 import org.apache.flink.streaming.api.operators.ChainingStrategy;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator;
 import org.apache.flink.streaming.api.operators.Output;
@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
 /**
  * A data process function that filters out columns which aren't (directly & indirectly) referenced.
  */
-public class PreTransformOperator extends AbstractStreamOperator<Event>
+public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
         implements OneInputStreamOperator<Event, Event>, Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -161,6 +161,12 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
         try {
             processEvent(event);
         } catch (Exception e) {
+            // If this exception originates from a chained downstream operator, rethrow as-is
+            // to avoid misleadingly wrapping it as a "pre-transform" error.
+            if (isChainedOperatorException(e)) {
+                throw e;
+            }
+
             TableId tableId = null;
             Schema schemaBefore = null;
             Schema schemaAfter = null;
@@ -397,5 +403,22 @@ public class PreTransformOperator extends AbstractStreamOperator<Event>
     private void clearOperator() {
         this.transforms = null;
         this.preTransformProcessorMap = null;
+    }
+
+    /**
+     * Checks if the given exception originates from a chained downstream operator. In Flink 2.x,
+     * all operators default to {@code ChainingStrategy.ALWAYS}, which means downstream operators
+     * like PostTransformOperator may be chained with PreTransformOperator. When a chained operator
+     * fails, the exception propagates back through the chain and should not be re-wrapped as a
+     * "pre-transform" error.
+     */
+    private static boolean isChainedOperatorException(Exception e) {
+        try {
+            return Class.forName(
+                            "org.apache.flink.streaming.runtime.tasks.ExceptionInChainedOperatorException")
+                    .isInstance(e);
+        } catch (ClassNotFoundException ignored) {
+            return false;
+        }
     }
 }

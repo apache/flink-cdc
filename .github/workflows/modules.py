@@ -17,6 +17,14 @@ MODULES_CORE = [
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
 ]
 
+MODULES_CORE_2_X = [
+    "flink-cdc-cli",
+    "flink-cdc-common",
+    "flink-cdc-composer",
+    "flink-cdc-runtime",
+    "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-values"
+]
+
 MODULES_PIPELINE_CONNECTORS = [
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-doris",
     "flink-cdc-connect/flink-cdc-pipeline-connectors/flink-cdc-pipeline-connector-elasticsearch",
@@ -142,6 +150,7 @@ MODULES_SOURCE_E2E = [
 
 ALL_MODULES = set(
     MODULES_CORE +
+    MODULES_CORE_2_X +
     MODULES_PIPELINE_CONNECTORS +
     MODULES_MYSQL_SOURCE +
     MODULES_MYSQL_PIPELINE +
@@ -173,7 +182,7 @@ test_modules = set()
 compile_modules = set()
 
 for module in INPUT_MODULES.split(', '):
-    module_list = set(globals()['MODULES_' + module.upper().replace('-', '_')])
+    module_list = set(globals()['MODULES_' + module.upper().replace('-', '_').replace('.', '_')])
     test_modules |= module_list
     if module == 'source_e2e' or module == 'pipeline_e2e':
         compile_modules |= ALL_MODULES

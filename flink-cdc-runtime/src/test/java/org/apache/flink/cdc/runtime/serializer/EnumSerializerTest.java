@@ -131,7 +131,7 @@ class EnumSerializerTest extends TestLogger {
         }
 
         TypeSerializerSchemaCompatibility<PublicEnum> compatResult =
-                restoredConfig.resolveSchemaCompatibility(serializer);
+                restoredConfig.resolveSchemaCompatibility(serializer.snapshotConfiguration());
         Assertions.assertThat(compatResult.isCompatibleAsIs()).isTrue();
 
         Assertions.assertThat(serializer.getValueToOrdinal().get(PublicEnum.FOO).intValue())

@@ -22,6 +22,7 @@ import org.apache.flink.cdc.common.event.FlushEvent;
 import org.apache.flink.cdc.common.event.TableId;
 import org.apache.flink.cdc.common.pipeline.SchemaChangeBehavior;
 import org.apache.flink.cdc.common.schema.Schema;
+import org.apache.flink.cdc.runtime.operators.AbstractStreamOperatorAdapter;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.FlushSuccessEvent;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaRequest;
 import org.apache.flink.cdc.runtime.operators.schema.common.event.GetEvolvedSchemaResponse;
@@ -31,6 +32,7 @@ import org.apache.flink.cdc.runtime.operators.sink.SchemaEvolutionClient;
 import org.apache.flink.cdc.runtime.testutils.schema.CollectingMetadataApplier;
 import org.apache.flink.cdc.runtime.testutils.schema.TestingSchemaRegistryGateway;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.runtime.event.WatermarkEvent;
 import org.apache.flink.runtime.jobgraph.OperatorID;
 import org.apache.flink.runtime.jobgraph.tasks.TaskOperatorEventGateway;
 import org.apache.flink.runtime.operators.testutils.DummyEnvironment;
@@ -66,7 +68,7 @@ import static org.apache.flink.cdc.runtime.operators.schema.common.CoordinationR
  * @param <E> Type of the event emitted by the operator
  */
 public class DistributedEventOperatorTestHarness<
-                OP extends AbstractStreamOperator<E>, E extends Event>
+                OP extends AbstractStreamOperatorAdapter<E>, E extends Event>
         implements AutoCloseable {
     public static final OperatorID SCHEMA_OPERATOR_ID = new OperatorID(15213L, 15513L);
 
@@ -193,6 +195,10 @@ public class DistributedEventOperatorTestHarness<
 
         @Override
         public void emitWatermark(Watermark mark) {
+            throw new UnsupportedOperationException();
+        }
+
+        public void emitWatermark(WatermarkEvent mark) {
             throw new UnsupportedOperationException();
         }
 
