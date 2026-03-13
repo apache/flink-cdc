@@ -240,6 +240,15 @@ public class PostTransformOperator extends AbstractStreamOperatorAdapter<Event>
         TableId tableId = event.tableId();
         PostTransformChangeInfo info = checkNotNull(postTransformInfoMap.get(tableId));
 
+        // Filter out redundant AddColumnEvent columns that already exist in the schema
+        // to handle duplicate events from tools like gh-ost online schema migrations
+        Optional<SchemaChangeEvent> filteredEvent =
+                SchemaUtils.filterDuplicateAddColumns(info.getPreTransformedSchema(), event);
+        if (!filteredEvent.isPresent()) {
+            return Optional.empty();
+        }
+        event = filteredEvent.get();
+
         // Apply schema change event to the pre-transformed schema
         Schema prevPreSchema = info.getPreTransformedSchema();
         Schema nextPreSchema = SchemaUtils.applySchemaChangeEvent(prevPreSchema, event);

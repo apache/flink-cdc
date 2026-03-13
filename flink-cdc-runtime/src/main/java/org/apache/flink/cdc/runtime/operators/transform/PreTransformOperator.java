@@ -200,7 +200,6 @@ public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
             output.collect(new StreamRecord<>(event));
         } else if (event instanceof SchemaChangeEvent) {
             SchemaChangeEvent schemaChangeEvent = (SchemaChangeEvent) event;
-            preTransformProcessorMap.remove(schemaChangeEvent.tableId());
             cacheChangeSchema(schemaChangeEvent)
                     .ifPresent(e -> output.collect(new StreamRecord<>(e)));
         } else if (event instanceof DataChangeEvent) {
@@ -221,6 +220,19 @@ public class PreTransformOperator extends AbstractStreamOperatorAdapter<Event>
     private Optional<SchemaChangeEvent> cacheChangeSchema(SchemaChangeEvent event) {
         TableId tableId = event.tableId();
         PreTransformChangeInfo tableChangeInfo = preTransformChangeInfoMap.get(tableId);
+
+        // Filter out redundant AddColumnEvent columns that already exist in the schema
+        // to handle duplicate events from tools like gh-ost online schema migrations
+        Optional<SchemaChangeEvent> filteredEvent =
+                SchemaUtils.filterDuplicateAddColumns(tableChangeInfo.getSourceSchema(), event);
+        if (!filteredEvent.isPresent()) {
+            return Optional.empty();
+        }
+        event = filteredEvent.get();
+
+        // Schema actually changed, invalidate the processor cache so it gets rebuilt
+        preTransformProcessorMap.remove(tableId);
+
         Schema originalSchema =
                 SchemaUtils.applySchemaChangeEvent(tableChangeInfo.getSourceSchema(), event);
         Schema preTransformedSchema = tableChangeInfo.getPreTransformedSchema();

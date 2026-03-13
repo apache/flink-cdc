@@ -1303,6 +1303,129 @@ class FlinkPipelineTransformITCase {
                         "DataChangeEvent{tableId=default_namespace.default_schema.mytable2, before=[4, Derrida, 25, student, rule_fallback], after=[], op=DELETE, meta=()}"));
     }
 
+    /**
+     * Tests that duplicate {@link AddColumnEvent}s (e.g., from gh-ost online schema migrations) are
+     * properly filtered and do not crash the pipeline when a transform is applied.
+     */
+    @Test
+    void testDuplicateAddColumnEventWithTransform() throws Exception {
+        FlinkPipelineComposer composer = FlinkPipelineComposer.ofMiniCluster();
+
+        // Setup value source
+        Configuration sourceConfig = new Configuration();
+        sourceConfig.set(
+                ValuesDataSourceOptions.EVENT_SET_ID,
+                ValuesDataSourceHelper.EventSetId.CUSTOM_SOURCE_EVENTS);
+
+        TableId tableId = TableId.tableId("default_namespace", "default_schema", "mytable1");
+        List<Event> events = generateDuplicateAddColumnEvents(tableId);
+
+        ValuesDataSourceHelper.setSourceEvents(Collections.singletonList(events));
+
+        SourceDef sourceDef =
+                new SourceDef(ValuesDataFactory.IDENTIFIER, "Value Source", sourceConfig);
+
+        // Setup value sink
+        Configuration sinkConfig = new Configuration();
+        SinkDef sinkDef = new SinkDef(ValuesDataFactory.IDENTIFIER, "Value Sink", sinkConfig);
+
+        // Setup pipeline
+        Configuration pipelineConfig = new Configuration();
+        pipelineConfig.set(PipelineOptions.PIPELINE_PARALLELISM, 1);
+        pipelineConfig.set(
+                PipelineOptions.PIPELINE_SCHEMA_CHANGE_BEHAVIOR, SchemaChangeBehavior.EVOLVE);
+        PipelineDef pipelineDef =
+                new PipelineDef(
+                        sourceDef,
+                        sinkDef,
+                        Collections.emptyList(),
+                        Collections.singletonList(
+                                new TransformDef(
+                                        tableId.toString(),
+                                        "id, name",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null)),
+                        Collections.emptyList(),
+                        pipelineConfig);
+
+        // Execute the pipeline
+        PipelineExecution execution = composer.compose(pipelineDef);
+        execution.execute();
+
+        // Check the order and content of all received events
+        String[] outputEvents = outCaptor.toString().trim().split("\n");
+
+        assertThat(outputEvents)
+                .containsExactly(
+                        // Initial stage
+                        "CreateTableEvent{tableId=default_namespace.default_schema.mytable1, schema=columns={`id` INT NOT NULL,`name` STRING}, primaryKeys=id, options=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[1, Alice], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[2, Bob], op=INSERT, meta=()}",
+                        // No AddColumnEvent in output because "extras" is not in the projection
+                        // (transform selects only "id, name"). Both the original and the duplicate
+                        // AddColumnEvent are handled without error; the duplicate is filtered out.
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[], after=[3, Carol], op=INSERT, meta=()}",
+                        "DataChangeEvent{tableId=default_namespace.default_schema.mytable1, before=[3, Carol], after=[3, Colin], op=UPDATE, meta=()}");
+    }
+
+    private List<Event> generateDuplicateAddColumnEvents(TableId tableId) {
+        List<Event> events = new ArrayList<>();
+
+        // Initial schema: id, name, age
+        Schema schemaV1 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .primaryKey("id")
+                        .build();
+
+        events.add(new CreateTableEvent(tableId, schemaV1));
+        events.add(DataChangeEvent.insertEvent(tableId, generate(schemaV1, 1, "Alice", 18)));
+        events.add(DataChangeEvent.insertEvent(tableId, generate(schemaV1, 2, "Bob", 20)));
+
+        // First AddColumnEvent: add "extras" column
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("extras", DataTypes.STRING())))));
+
+        // Duplicate AddColumnEvent: add "extras" column again (e.g., from gh-ost migration)
+        events.add(
+                new AddColumnEvent(
+                        tableId,
+                        Collections.singletonList(
+                                new AddColumnEvent.ColumnWithPosition(
+                                        Column.physicalColumn("extras", DataTypes.STRING())))));
+
+        // Schema after adding extras: id, name, age, extras
+        Schema schemaV2 =
+                Schema.newBuilder()
+                        .physicalColumn("id", DataTypes.INT())
+                        .physicalColumn("name", DataTypes.STRING())
+                        .physicalColumn("age", DataTypes.INT())
+                        .physicalColumn("extras", DataTypes.STRING())
+                        .primaryKey("id")
+                        .build();
+
+        events.add(
+                DataChangeEvent.insertEvent(
+                        tableId, generate(schemaV2, 3, "Carol", 23, "extra_data")));
+        events.add(
+                DataChangeEvent.updateEvent(
+                        tableId,
+                        generate(schemaV2, 3, "Carol", 23, "extra_data"),
+                        generate(schemaV2, 3, "Colin", 24, "updated_extra")));
+
+        return events;
+    }
+
     void runGenericTransformTest(
             ValuesDataSink.SinkApi sinkApi,
             List<TransformDef> transformDefs,
