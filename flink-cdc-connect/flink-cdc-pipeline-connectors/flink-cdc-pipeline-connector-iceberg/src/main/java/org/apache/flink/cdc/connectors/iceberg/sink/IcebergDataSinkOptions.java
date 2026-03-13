@@ -86,9 +86,9 @@ public class IcebergDataSinkOptions {
                     .stringType()
                     .noDefaultValue()
                     .withDescription(
-                            "The warehouse root path of catalog. "
-                                    + "For `hadoop` catalog, this is the local or HDFS path. "
-                                    + "For `glue` catalog, this is typically an S3 path like `s3://my-bucket/warehouse`.");
+                            "The warehouse root path of the Iceberg catalog, used by all catalog types. "
+                                    + "For `hadoop` and `hive` catalogs, this is typically a local or distributed filesystem path (for example, `hdfs://namenode:8020/warehouse`). "
+                                    + "For `glue` catalog, this is typically an object storage path like `s3://my-bucket/warehouse`.");
 
     public static final ConfigOption<String> PARTITION_KEY =
             key("partition.key")
